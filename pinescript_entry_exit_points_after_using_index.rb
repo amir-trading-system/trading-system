@@ -124,35 +124,22 @@ current_bar_bigger_than_last_red_candle_body(last_bars, close_src, open_src, ind
 
     current_bar_bigger
 
-macd_histogram_is_higher_than_before_from_positive_start(close_src, index) =>
-    [_, _, histogram] = ta.macd(close_src, 12, 26, 9)
-
-    current_histogram_is_highest = true
-    for i = 1 to 50
-        if histogram[index+i] <= 0
-            break
-        if histogram[index+i] > histogram[index]
-            current_histogram_is_highest := false
-            break
-
-    current_histogram_is_highest
-
 current_bar_macd_is_positive(close_src, index) =>
     [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
 
-    macd_current_is_positive = histogram[index] > 0
+    macd_current_is_positive = macdLine[index] > 0 and macdLine[index] > signalLine[index] and histogram[index] > 0
     if not macd_current_is_positive
         false
 
     macd_crossed_recently = false
 
+    lowest_macdLine = ta.lowest(macdLine, 10)
+
     for i = 1 to 5
-        if (macdLine[index] > 0 and macdLine[index] > signalLine[index]) and (histogram[index+i] <= 0.01)
+        if macd_current_is_positive and histogram[index+i] <= 0.01 and lowest_macdLine > 0
             macd_crossed_recently := true
 
-    macd_histogram_is_higher_than_before_from_positive_start = macd_histogram_is_higher_than_before_from_positive_start(close_src, index)
-
-    macd_current_is_positive and (macd_crossed_recently or macd_histogram_is_higher_than_before_from_positive_start)
+    macd_current_is_positive and macd_crossed_recently
 
 current_bar_gets_50_percent_above_9_ema(close_src, low_src, ema_9) =>
     close_src - ema_9 > ema_9 - low_src
