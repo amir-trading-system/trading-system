@@ -132,11 +132,10 @@ current_bar_macd_is_positive(close_src, index) =>
         false
 
     macd_crossed_recently = false
-
-    lowest_macdLine = ta.lowest(macdLine, 10)
+    highest_macdLine = ta.highest(macdLine,50)
 
     for i = 1 to 5
-        if macd_current_is_positive and histogram[index+i] <= 0.01 and lowest_macdLine > 0
+        if macd_current_is_positive and histogram[index+i] <= 0.01 and (macdLine[index] / highest_macdLine > 0.3)
             macd_crossed_recently := true
 
     macd_current_is_positive and macd_crossed_recently
