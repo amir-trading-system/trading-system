@@ -3,7 +3,7 @@
 
 //@version=6
 indicator(title="Enter / Exit Position", overlay = true)
-import TradingView/ta/9
+import TradingView/ta/10
 
 last_bars = 4
 positive_sign = "✅"
@@ -132,10 +132,11 @@ current_bar_macd_is_positive(close_src, index) =>
         false
 
     macd_crossed_recently = false
-    highest_macdLine = ta.highest(macdLine,50)
+    highest_macdLine = ta.highest(macdLine, 360)
+    macd_is_still_strong_after_going_down = macdLine[index] > 0 and macdLine[index] / highest_macdLine >= 0.4
 
     for i = 1 to 5
-        if macd_current_is_positive and histogram[index+i] <= 0.01 and (macdLine[index] / highest_macdLine > 0.3)
+        if macd_current_is_positive and histogram[index+i] <= 0.01 and macd_is_still_strong_after_going_down
             macd_crossed_recently := true
 
     macd_current_is_positive and macd_crossed_recently
