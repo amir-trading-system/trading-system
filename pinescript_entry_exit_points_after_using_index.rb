@@ -6,6 +6,7 @@ indicator(title="Enter / Exit Position", overlay = true)
 import TradingView/ta/10
 
 last_bars = 4
+min_momentun_vol_avg = 5000
 positive_sign = "✅"
 negative_sign = "👮‍♂️"
 
@@ -110,17 +111,16 @@ last_bars_emas_higher(last_bars, ema_9_src, ema_20_src, ema_200_src, vwap_src, o
     last_bars_emas_higher and rounded_9_ema >= rounded_vwap and rounded_open > rounded_vwap
 
 buyers_coming_in(last_bars, close_src, open_src, volume_src, index) =>
-    red_bars_volume = 0.0
-    green_bars_volume = 0.0
+    vol_avg = ta.sma(volume_src[last_bars], 20)[index]
+    sellers_are_still_in_the_game = false
 
     for i = 0 to last_bars
         bar_is_negative = close_src[index + i] < open_src[index + i]
-        if bar_is_negative
-            red_bars_volume += volume_src[index + i]
-        else
-            green_bars_volume += volume_src[index + i]
+        if bar_is_negative and volume_src[i] > vol_avg
+            sellers_are_still_in_the_game := true
+            break
 
-    green_bars_volume / red_bars_volume > 0.75
+    not sellers_are_still_in_the_game
 
 current_bar_has_new_high(high_src, index) =>
     high_src > ta.highest(high_src[1], 5)[index]
@@ -132,7 +132,9 @@ inside_momentum(last_bars, close_src, open_src, volume_src, index) =>
     current_bar_volume_is_higher_than_last_ones = current_bar_volume_is_higher_than_last_ones(last_bars, close_src, open_src, volume_src, index)
 
     for i = 0 to last_bars
-        if close_src < open_src
+        if vol_avg[i] < min_momentun_vol_avg
+            under_avg_vol_bars_counter += 1
+        else if close_src < open_src
             under_avg_vol_bars_counter += 1
         else if current_bar_volume_is_higher_than_last_ones
             above_avg_vol_bars_counter += 1
@@ -210,7 +212,7 @@ current_bar_macd_is_positive(close_src, index) =>
         pattern_detected := true
         had_cross_under := false
 
-    macd_is_still_strong_after_going_down = macdLine[index] > 0 and histogram[index] > 0.01 and pattern_detected
+    macd_is_still_strong_after_going_down = macdLine[index] > 0 and histogram[index] > 0.005 and pattern_detected
 
     for i = 1 to 5
         if macd_current_is_positive and histogram[index+i] <= 0.01 and macd_is_still_strong_after_going_down
@@ -242,6 +244,17 @@ no_bearish_bar_detected_in_the_last_bars(last_bars) =>
 
     not at_leaast_one_bar_is_weak
 
+last_biggest_volume_bar_was_green(volume_src, close_src, open_src, high_src, low_src, last_bars) =>
+    highest_bar_volume = ta.highest(volume_src[1], last_bars)
+    highest_volume_bar_is_green = false
+
+    for i = 1 to last_bars
+        if volume_src[i] == highest_bar_volume and close_src[i] > open_src[i] and ((high_src[i] - close_src[i]) / (high_src[i] - low_src[i]) < 0.6) and ((high_src[0] - low_src[0]) > (high_src[i] - low_src[i]))
+            highest_volume_bar_is_green := true
+            break
+
+    highest_volume_bar_is_green
+
 ///////// run indicators /////////
 
 run_positive_indicator(i) =>
@@ -272,6 +285,7 @@ run_positive_indicator(i) =>
     current_bar_is_bullish = current_bar_is_bullish(high_index, close_index, low_index)
     last_bars_volume_is_higher = last_bars_volume_is_higher(i, last_bars)
     no_bearish_bar_detected_in_the_last_bars = no_bearish_bar_detected_in_the_last_bars(last_bars)
+    last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5)
 
     if show_logs
         if not current_bar_is_above_vwap
@@ -323,6 +337,8 @@ run_positive_indicator(i) =>
       and current_bar_is_bullish
       and last_bars_volume_is_higher
       and no_bearish_bar_detected_in_the_last_bars
+      and last_biggest_volume_bar_was_green
+      // maybe add check for minimum avg of the last high - low, if it above 20 or something similar.
 
 positive_indication = run_positive_indicator(0)
 negative_inidcation = run_negative_indicator(0)
