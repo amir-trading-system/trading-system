@@ -9,6 +9,67 @@ last_bars = 4
 positive_sign = "✅"
 negative_sign = "👮‍♂️"
 
+////           Negative indications           ////
+
+current_bar_is_negative(index) =>
+    close[index] < open[index]
+
+current_bar_volume_is_high_than_usual(index) =>
+    vol_avg = ta.sma(volume, 20)
+    volume_higher = volume[index] > vol_avg * 2
+
+    volume_higher and volume[index] > volume[index+1]
+
+current_bar_deletes_most_of_value_before(last_bars, index) =>
+    last_highest = ta.highest(high[index], last_bars)
+    last_lowest = ta.lowest(low[index], last_bars)
+    volume_higher = current_bar_volume_is_high_than_usual(index)
+    current_bar_is_negative = current_bar_is_negative(index)
+
+    length = last_highest - last_lowest
+    current_bar_length = high[index] - low[index]
+
+    current_bar_length / length > 0.5 and current_bar_is_negative and volume_higher
+
+current_bar_is_weak(index, close_src, open_src) =>
+    nine_ema = ta.ema(close_src, 9)
+    volume_higher = current_bar_volume_is_high_than_usual(index)
+    current_bar_is_negative = current_bar_is_negative(index)
+    (close_src[index] < nine_ema or open_src[index] < nine_ema) and current_bar_is_negative and volume_higher
+
+current_bar_makes_new_low(index) =>
+    volume_higher = current_bar_volume_is_high_than_usual(index)
+    current_bar_is_negative = current_bar_is_negative(index)
+    low[index] < ta.lowest(low[index+1], 5) and current_bar_is_negative and volume_higher
+
+current_bar_crosses_nine_ema(index, close_src, open_src) =>
+    nine_ema = ta.ema(close_src, 9)
+    twenty_ema = ta.ema(close_src, 20)
+
+    vol_avg = ta.sma(volume, 20)
+    volume_higher_than_avg = volume[index] > vol_avg
+
+    open_src[index] > nine_ema and close_src[index] < nine_ema and volume_higher_than_avg
+
+current_bar_dropped_its_majority_value(index) =>
+    is_green_bar = close[index] > open[index]
+    threshold = 0.2
+    bar_is_weak = false
+
+    if is_green_bar
+        bar_is_weak := (close[index] - low[index]) / (high[index] - low[index]) < threshold
+    else
+        bar_is_weak := (open[index] - low[index]) / (high[index] - low[index]) < threshold
+
+    bar_is_weak
+
+run_negative_indicator(index) =>
+    current_bar_is_weak(index, close[index], open[index])
+      or current_bar_makes_new_low(index)
+      or current_bar_deletes_most_of_value_before(last_bars, index)
+      or current_bar_crosses_nine_ema(index, close[index], open[index])
+      or current_bar_dropped_its_majority_value(index)
+
 ////           Positive indications           ////
 
 current_bar_is_bullish(high_src, close_src, low_src) =>
@@ -132,8 +193,21 @@ current_bar_macd_is_positive(close_src, index) =>
         false
 
     macd_crossed_recently = false
-    highest_macdLine = ta.highest(macdLine, 360)
-    macd_is_still_strong_after_going_down = macdLine[index] > 0 and macdLine[index] / highest_macdLine >= 0.4
+
+    macd_crossed_down = ta.crossunder(macdLine,signalLine)
+    macd_crossed_up = ta.crossover(macdLine,signalLine)
+    var bool had_cross_under = false
+    var bool pattern_detected = false
+
+    if macd_crossed_down
+        had_cross_under := true
+        pattern_detected := false
+
+    if macd_crossed_up and had_cross_under
+        pattern_detected := true
+        had_cross_under := false
+
+    macd_is_still_strong_after_going_down = macdLine[index] > 0 and histogram[index] > 0.01 and pattern_detected
 
     for i = 1 to 5
         if macd_current_is_positive and histogram[index+i] <= 0.01 and macd_is_still_strong_after_going_down
@@ -155,60 +229,15 @@ last_bars_volume_is_higher(index, last_bars) =>
 
     volume_is_higher
 
-////           Negative indications           ////
+no_bearish_bar_detected_in_the_last_bars(last_bars) =>
+    // need to run on the last bars and check for no bearish bar.
+    at_leaast_one_bar_is_weak = false
+    for i = 1 to last_bars
+        at_leaast_one_bar_is_weak := run_negative_indicator(i)
+        if at_leaast_one_bar_is_weak
+            break
 
-current_bar_is_negative() =>
-    close < open
-
-current_bar_volume_is_high_than_usual() =>
-    vol_avg = ta.sma(volume, 20)
-    volume_higher = volume > vol_avg * 2
-
-    volume_higher and volume > volume[1]
-
-current_bar_deletes_most_of_value_before(last_bars) =>
-    last_highest = ta.highest(high, last_bars)
-    last_lowest = ta.lowest(low, last_bars)
-    volume_higher = current_bar_volume_is_high_than_usual()
-    current_bar_is_negative = current_bar_is_negative()
-
-    length = last_highest - last_lowest
-    current_bar_length = high - low
-
-    current_bar_length / length > 0.5 and current_bar_is_negative and volume_higher
-
-current_bar_is_weak() =>
-    nine_ema = ta.ema(close, 9)
-    volume_higher = current_bar_volume_is_high_than_usual()
-    current_bar_is_negative = current_bar_is_negative()
-    (close < nine_ema or open < nine_ema) and current_bar_is_negative and volume_higher
-
-current_bar_makes_new_low() =>
-    volume_higher = current_bar_volume_is_high_than_usual()
-    current_bar_is_negative = current_bar_is_negative()
-    low < ta.lowest(low[1], 5) and current_bar_is_negative and volume_higher
-
-current_bar_crosses_nine_ema() =>
-    nine_ema = ta.ema(close, 9)
-    twenty_ema = ta.ema(close, 20)
-    open > nine_ema and close < nine_ema
-
-current_bar_dropped_its_majority_value() =>
-    is_green_bar = close > open
-    threshold = 0.2
-    bar_is_weak = false
-
-    if is_green_bar
-        bar_is_weak := (close - low) / (high - low) < threshold
-    else
-        bar_is_weak := (open - low) / (high - low) < threshold
-
-    bar_is_weak
-
-current_bar_makes_new_low = current_bar_makes_new_low()
-current_bar_deletes_most_of_value_before = current_bar_deletes_most_of_value_before(last_bars)
-current_bar_crosses_nine_ema = current_bar_crosses_nine_ema()
-current_bar_dropped_its_majority_value = current_bar_dropped_its_majority_value()
+    not at_leaast_one_bar_is_weak
 
 ///////// run indicators /////////
 
@@ -239,6 +268,7 @@ run_positive_indicator(i) =>
     current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(close_index, low_index, high_index)
     current_bar_is_bullish = current_bar_is_bullish(high_index, close_index, low_index)
     last_bars_volume_is_higher = last_bars_volume_is_higher(i, last_bars)
+    no_bearish_bar_detected_in_the_last_bars = no_bearish_bar_detected_in_the_last_bars(last_bars)
 
     current_bar_is_above_vwap
       and last_bars_emas_higher
@@ -255,16 +285,10 @@ run_positive_indicator(i) =>
       and current_bar_closes_where_buyers_still_in
       and current_bar_is_bullish
       and last_bars_volume_is_higher
-
-run_negative_indicator() =>
-    current_bar_is_weak()
-      or current_bar_makes_new_low
-      or current_bar_deletes_most_of_value_before
-      or current_bar_crosses_nine_ema
-      or current_bar_dropped_its_majority_value
+      and no_bearish_bar_detected_in_the_last_bars
 
 positive_indication = run_positive_indicator(0)
-negative_inidcation = run_negative_indicator()
+negative_inidcation = run_negative_indicator(0)
 
 plotshape(positive_indication, title="Positive indication", color=color.green, display = display.all, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign)
 plotshape(negative_inidcation, title="Negative indication", color=color.red, display = display.all, style = shape.arrowdown, size = size.small, location = location.abovebar, text = negative_sign)
