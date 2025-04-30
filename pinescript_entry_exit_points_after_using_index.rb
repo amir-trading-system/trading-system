@@ -9,6 +9,9 @@ last_bars = 4
 positive_sign = "✅"
 negative_sign = "👮‍♂️"
 
+show_logs = input.bool(false, "Show Debug Logs")
+
+
 ////           Negative indications           ////
 
 current_bar_is_negative(index) =>
@@ -269,6 +272,40 @@ run_positive_indicator(i) =>
     current_bar_is_bullish = current_bar_is_bullish(high_index, close_index, low_index)
     last_bars_volume_is_higher = last_bars_volume_is_higher(i, last_bars)
     no_bearish_bar_detected_in_the_last_bars = no_bearish_bar_detected_in_the_last_bars(last_bars)
+
+    if show_logs
+        if not current_bar_is_above_vwap
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_is_above_vwap")
+        if not last_bars_emas_higher
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "last_bars_emas_higher")
+        if not current_bar_has_new_high
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_has_new_high")
+        if not buyers_coming_in
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "buyers_coming_in")
+        if not inside_momentum
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "inside_momentum")
+        if not current_bar_has_at_least_one_weak_bar_before
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_has_at_least_one_weak_bar_before")
+        if not current_bar_must_be_positive_and_volatile
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_must_be_positive_and_volatile")
+        if not current_bar_is_above_support_line
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_is_above_support_line")
+        if not current_bar_close_to_nine_ema_by_avg
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_close_to_nine_ema_by_avg")
+        if not current_bar_bigger_than_last_red_candle_body
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_bigger_than_last_red_candle_body")
+        if not current_bar_macd_is_positive
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_macd_is_positive")
+        if not current_bar_gets_50_percent_above_9_ema
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_gets_50_percent_above_9_ema")
+        if not current_bar_closes_where_buyers_still_in
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_closes_where_buyers_still_in")
+        if not current_bar_is_bullish
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_is_bullish")
+        if not last_bars_volume_is_higher
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "last_bars_volume_is_higher")
+        if not no_bearish_bar_detected_in_the_last_bars
+            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "no_bearish_bar_detected_in_the_last_bars")
 
     current_bar_is_above_vwap
       and last_bars_emas_higher
