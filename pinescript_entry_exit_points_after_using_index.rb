@@ -200,10 +200,7 @@ current_bar_bigger_than_last_red_candle_body(last_bars, close_src, open_src, ind
 
 current_bar_macd_is_positive(close_src, index) =>
     [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
-
     macd_current_is_positive = macdLine[index] > 0 and macdLine[index] > signalLine[index] and histogram[index] > 0
-    if not macd_current_is_positive
-        false
 
     macd_crossed_recently = false
 
@@ -221,22 +218,22 @@ current_bar_macd_is_positive(close_src, index) =>
         had_cross_under := false
 
     macd_is_still_strong_after_going_down = macdLine[index] > 0 and histogram[index] > 0.005 and pattern_detected
-    if not macd_is_still_strong_after_going_down
-        false
 
-    macd_crossed_last_bars = 0
-    if timeframe.period == "1"
-        macd_crossed_last_bars := 20
-    if timeframe.period == "2"
-        macd_crossed_last_bars := 10
-    else
-        macd_crossed_last_bars := 5
-
+    macd_crossed_last_bars = 10
     for i = 1 to macd_crossed_last_bars
-        if histogram[index+i] <= 0.04
+        if histogram[index+i] <= 0.02 and macdLine[index+i] >= 0 and macdLine[index] > 0 and histogram[index] > 0.01
             macd_crossed_recently := true
+            break
 
-    macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down
+    pre_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 4, 1)
+    relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 0)
+    highest_macdLine = ta.highestSince(relevant_market_start_time > time, macdLine)
+    lowest_macdLine = ta.lowestSince(macdLine == highest_macdLine, macdLine)
+    pre_market_highest_macdLine = ta.highestSince(pre_market_start_time > time, macdLine)
+
+    macdLine_keep_up_growing = lowest_macdLine/highest_macdLine >= 0.3 and pre_market_highest_macdLine <= highest_macdLine
+
+    macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macdLine_keep_up_growing
 
 current_bar_gets_50_percent_above_9_ema(close_src, low_src, ema_9) =>
     close_src - ema_9 > ema_9 - low_src
@@ -264,7 +261,6 @@ last_bars_volume_is_higher(index, last_bars, volume_src) =>
     volume_is_higher and (volume_average / 5) > minimum_average_volume_per_bar
 
 no_bearish_bar_detected_in_the_last_bars(last_bars) =>
-    // need to run on the last bars and check for no bearish bar.
     at_least_one_bar_is_weak = false
     for i = 1 to last_bars
         at_least_one_bar_is_weak := run_negative_indicator(i)
@@ -278,7 +274,7 @@ last_biggest_volume_bar_was_green(volume_src, close_src, open_src, high_src, low
     highest_volume_bar_is_green = false
 
     for i = 1 to last_bars
-        if volume_src[i] == highest_bar_volume and close_src[i] > open_src[i] and ((high_src[i] - close_src[i]) / (high_src[i] - low_src[i]) < 0.6) and ((high_src[0] - low_src[0]) > (high_src[i] - low_src[i]))
+        if volume_src[i] == highest_bar_volume and close_src[i] > open_src[i] and ((high_src[i] - close_src[i]) / (high_src[i] - low_src[i]) < 0.6)
             highest_volume_bar_is_green := true
             break
 
@@ -333,7 +329,6 @@ run_positive_indicator(i) =>
       and last_bars_volume_is_higher
       and no_bearish_bar_detected_in_the_last_bars
       and last_biggest_volume_bar_was_green
-      // maybe add check for minimum avg of the last high - low, if it above 20 or something similar.
 
 positive_indication = run_positive_indicator(0)
 negative_inidcation = run_negative_indicator(0)
