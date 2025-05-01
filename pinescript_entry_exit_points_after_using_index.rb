@@ -113,14 +113,22 @@ last_bars_emas_higher(last_bars, ema_9_src, ema_20_src, ema_200_src, vwap_src, o
 buyers_coming_in(last_bars, close_src, open_src, volume_src, index) =>
     vol_avg = ta.sma(volume_src[last_bars], 20)[index]
     sellers_are_still_in_the_game = false
+    green_bars_volume = 0.0
+    red_bars_volume = 0.0
 
     for i = 0 to last_bars
         bar_is_negative = close_src[index + i] < open_src[index + i]
+        if bar_is_negative
+            red_bars_volume += volume_src[i]
+        else
+            green_bars_volume += volume_src[i]
         if bar_is_negative and volume_src[i] > vol_avg
             sellers_are_still_in_the_game := true
             break
 
-    not sellers_are_still_in_the_game
+    negative_condition = sellers_are_still_in_the_game and (green_bars_volume / (green_bars_volume + red_bars_volume)) < 0.6
+
+    not negative_condition
 
 current_bar_has_new_high(high_src, index) =>
     high_src > ta.highest(high_src[1], 5)[index]
@@ -213,17 +221,32 @@ current_bar_macd_is_positive(close_src, index) =>
         had_cross_under := false
 
     macd_is_still_strong_after_going_down = macdLine[index] > 0 and histogram[index] > 0.005 and pattern_detected
+    if not macd_is_still_strong_after_going_down
+        false
 
-    for i = 1 to 5
-        if macd_current_is_positive and histogram[index+i] <= 0.01 and macd_is_still_strong_after_going_down
+    macd_crossed_last_bars = 0
+    if timeframe.period == "1"
+        macd_crossed_last_bars := 20
+    if timeframe.period == "2"
+        macd_crossed_last_bars := 10
+    else
+        macd_crossed_last_bars := 5
+
+    for i = 1 to macd_crossed_last_bars
+        if histogram[index+i] <= 0.04
             macd_crossed_recently := true
 
-    macd_current_is_positive and macd_crossed_recently
+    macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down
 
 current_bar_gets_50_percent_above_9_ema(close_src, low_src, ema_9) =>
     close_src - ema_9 > ema_9 - low_src
 
-last_bars_volume_is_higher(index, last_bars) =>
+last_bars_volume_is_higher(index, last_bars, volume_src) =>
+    vol_avg = ta.sma(volume_src, 20)[index]
+    volume_average = 0.0
+    for i = 0 to 5
+        volume_average += vol_avg[i]
+
     minimum_volume_per_bar_in_momentum = 1000
     volume_is_higher = true
 
@@ -232,17 +255,23 @@ last_bars_volume_is_higher(index, last_bars) =>
             volume_is_higher := false
             break
 
-    volume_is_higher
+    minimum_average_volume_per_bar = 0
+    if timeframe.period == "1"
+        minimum_average_volume_per_bar := 5000
+    else
+        minimum_average_volume_per_bar := 10000
+
+    volume_is_higher and (volume_average / 5) > minimum_average_volume_per_bar
 
 no_bearish_bar_detected_in_the_last_bars(last_bars) =>
     // need to run on the last bars and check for no bearish bar.
-    at_leaast_one_bar_is_weak = false
+    at_least_one_bar_is_weak = false
     for i = 1 to last_bars
-        at_leaast_one_bar_is_weak := run_negative_indicator(i)
-        if at_leaast_one_bar_is_weak
+        at_least_one_bar_is_weak := run_negative_indicator(i)
+        if at_least_one_bar_is_weak
             break
 
-    not at_leaast_one_bar_is_weak
+    not at_least_one_bar_is_weak
 
 last_biggest_volume_bar_was_green(volume_src, close_src, open_src, high_src, low_src, last_bars) =>
     highest_bar_volume = ta.highest(volume_src[1], last_bars)
@@ -283,43 +312,9 @@ run_positive_indicator(i) =>
     current_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(close_index, low_index, ema_9_index)
     current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(close_index, low_index, high_index)
     current_bar_is_bullish = current_bar_is_bullish(high_index, close_index, low_index)
-    last_bars_volume_is_higher = last_bars_volume_is_higher(i, last_bars)
+    last_bars_volume_is_higher = last_bars_volume_is_higher(i, last_bars, volume_index)
     no_bearish_bar_detected_in_the_last_bars = no_bearish_bar_detected_in_the_last_bars(last_bars)
     last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5)
-
-    if show_logs
-        if not current_bar_is_above_vwap
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_is_above_vwap")
-        if not last_bars_emas_higher
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "last_bars_emas_higher")
-        if not current_bar_has_new_high
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_has_new_high")
-        if not buyers_coming_in
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "buyers_coming_in")
-        if not inside_momentum
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "inside_momentum")
-        if not current_bar_has_at_least_one_weak_bar_before
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_has_at_least_one_weak_bar_before")
-        if not current_bar_must_be_positive_and_volatile
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_must_be_positive_and_volatile")
-        if not current_bar_is_above_support_line
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_is_above_support_line")
-        if not current_bar_close_to_nine_ema_by_avg
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_close_to_nine_ema_by_avg")
-        if not current_bar_bigger_than_last_red_candle_body
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_bigger_than_last_red_candle_body")
-        if not current_bar_macd_is_positive
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_macd_is_positive")
-        if not current_bar_gets_50_percent_above_9_ema
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_gets_50_percent_above_9_ema")
-        if not current_bar_closes_where_buyers_still_in
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_closes_where_buyers_still_in")
-        if not current_bar_is_bullish
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "current_bar_is_bullish")
-        if not last_bars_volume_is_higher
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "last_bars_volume_is_higher")
-        if not no_bearish_bar_detected_in_the_last_bars
-            log.info("reason for negative: {0}. timeframe: {1} is false", timeframe.period, "no_bearish_bar_detected_in_the_last_bars")
 
     current_bar_is_above_vwap
       and last_bars_emas_higher
