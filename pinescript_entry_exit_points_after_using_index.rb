@@ -226,11 +226,10 @@ current_bar_macd_is_positive(close_src, index) =>
             break
 
     pre_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 4, 1)
-    relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 0)
+    relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 1)
     highest_macdLine = ta.highestSince(relevant_market_start_time > time, macdLine)
     lowest_macdLine = ta.lowestSince(macdLine == highest_macdLine, macdLine)
     pre_market_highest_macdLine = ta.highestSince(pre_market_start_time > time, macdLine)
-
     macdLine_keep_up_growing = lowest_macdLine/highest_macdLine >= 0.3 and pre_market_highest_macdLine <= highest_macdLine
 
     macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macdLine_keep_up_growing
