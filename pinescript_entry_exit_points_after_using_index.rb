@@ -221,7 +221,9 @@ current_bar_macd_is_positive(close_src, index) =>
 
     macd_crossed_last_bars = 10
     for i = 1 to macd_crossed_last_bars
-        if histogram[index+i] <= 0.02 and macdLine[index+i] >= 0 and macdLine[index] > 0 and histogram[index] > 0.01
+        bar_before_is_weak_but_above_zero_line = histogram[index+i] <= 0.02 and macdLine[index+i] >= 0 and macdLine[index+i] - signalLine[index+i] < 0.02
+        current_bar_is_strong = macdLine[index] > 0 and histogram[index] > 0.01
+        if bar_before_is_weak_but_above_zero_line and current_bar_is_strong
             macd_crossed_recently := true
             break
 
