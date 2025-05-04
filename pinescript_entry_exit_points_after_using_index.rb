@@ -200,7 +200,7 @@ current_bar_bigger_than_last_red_candle_body(last_bars, close_src, open_src, ind
 
 current_bar_macd_is_positive(close_src, index) =>
     [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
-    macd_current_is_positive = macdLine[index] > 0 and macdLine[index] > signalLine[index] and histogram[index] > 0
+    macd_current_is_positive = macdLine[index] > 0 and macdLine[index] > signalLine[index] and histogram[index] > 0.005
 
     macd_crossed_recently = false
 
@@ -217,7 +217,7 @@ current_bar_macd_is_positive(close_src, index) =>
         pattern_detected := true
         had_cross_under := false
 
-    macd_is_still_strong_after_going_down = macdLine[index] > 0 and histogram[index] > 0.005 and pattern_detected
+    macd_is_still_strong_after_going_down = macd_current_is_positive and pattern_detected
 
     macd_crossed_last_bars = 10
     for i = 1 to macd_crossed_last_bars
