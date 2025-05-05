@@ -2,7 +2,7 @@
 // © amiryaffe
 
 //@version=6
-indicator(title="Enter / Exit Position", overlay = true)
+indicator(title="DayTrader: Momentum Confirmed", overlay = true)
 import TradingView/ta/10
 
 last_bars = 4
@@ -204,8 +204,8 @@ current_bar_macd_is_positive(close_src, index) =>
 
     macd_crossed_recently = false
 
-    macd_crossed_down = ta.crossunder(macdLine,signalLine)
-    macd_crossed_up = ta.crossover(macdLine,signalLine)
+    macd_crossed_down = ta.crossunder(macdLine[index],signalLine[index])
+    macd_crossed_up = ta.crossover(macdLine[index],signalLine[index])
     var bool had_cross_under = false
     var bool pattern_detected = false
 
@@ -229,12 +229,22 @@ current_bar_macd_is_positive(close_src, index) =>
 
     pre_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 4, 1)
     relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 1)
-    highest_macdLine = ta.highestSince(relevant_market_start_time > time, macdLine)
-    lowest_macdLine = ta.lowestSince(macdLine == highest_macdLine, macdLine)
-    pre_market_highest_macdLine = ta.highestSince(pre_market_start_time > time, macdLine)
-    macdLine_keep_up_growing = lowest_macdLine/highest_macdLine >= 0.3 and pre_market_highest_macdLine <= highest_macdLine
+    highest_macdLine = ta.highestSince(relevant_market_start_time > time, macdLine[index])
+    lowest_macdLine = ta.lowestSince(macdLine == highest_macdLine, macdLine[index])
+    pre_market_highest_macdLine = ta.highestSince(pre_market_start_time > time, macdLine[index])
+    macd_fixed_less_than_50_percent = lowest_macdLine/highest_macdLine >= 0.5
+    macdLine_keep_up_growing = macd_fixed_less_than_50_percent and pre_market_highest_macdLine <= highest_macdLine
 
     macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macdLine_keep_up_growing
+
+most_of_the_value_did_not_came_in_one_bar(index, high_src, low_src) =>
+    relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 1)
+    highest_price = ta.highestSince(relevant_market_start_time > time, high_src)
+    lowest_price = ta.lowestSince(relevant_market_start_time > time, low_src)
+    highest_range = ta.highestSince(relevant_market_start_time > time, high_src - low_src)
+    most_of_the_value_did_not_came_in_one_bar = highest_range / (highest_price - lowest_price) <= 0.6
+
+    most_of_the_value_did_not_came_in_one_bar
 
 current_bar_gets_50_percent_above_9_ema(close_src, low_src, ema_9) =>
     close_src - ema_9 > ema_9 - low_src
@@ -312,6 +322,7 @@ run_positive_indicator(i) =>
     last_bars_volume_is_higher = last_bars_volume_is_higher(i, last_bars, volume_index)
     no_bearish_bar_detected_in_the_last_bars = no_bearish_bar_detected_in_the_last_bars(last_bars)
     last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5)
+    most_of_the_value_did_not_came_in_one_bar = most_of_the_value_did_not_came_in_one_bar(i, high_index, low_index)
 
     current_bar_is_above_vwap
       and last_bars_emas_higher
@@ -330,6 +341,7 @@ run_positive_indicator(i) =>
       and last_bars_volume_is_higher
       and no_bearish_bar_detected_in_the_last_bars
       and last_biggest_volume_bar_was_green
+      and most_of_the_value_did_not_came_in_one_bar
 
 positive_indication = run_positive_indicator(0)
 negative_inidcation = run_negative_indicator(0)
