@@ -411,7 +411,7 @@ run_buying_the_dip_indication(i) =>
     current_bar_has_at_least_one_weak_bar_before = current_bar_has_at_least_one_weak_bar_before(last_bars, close_index, open_index, high_index, low_index, i)
     current_bar_must_be_positive_and_volatile = current_bar_must_be_positive_and_volatile(last_bars, low_index, high_index, volume_index, close_index, open_index, i)
     current_bar_volume_is_high_than_usual = current_bar_volume_is_high_than_usual(i, volume_index)
-    //last_bars_volume_is_higher = last_bars_volume_is_higher(i, 10, volume_index)
+    last_bars_volume_is_higher = last_bars_volume_is_higher(i, 10, volume_index)
 
     last_bars_crossed_9_ema_but_didnt_closed_under_it
       and current_bar_close_is_not_highest
@@ -421,7 +421,7 @@ run_buying_the_dip_indication(i) =>
       and current_bar_has_at_least_one_weak_bar_before
       and current_bar_must_be_positive_and_volatile
       and current_bar_volume_is_high_than_usual
-      //and last_bars_volume_is_higher
+      and last_bars_volume_is_higher
 
 positive_indication = run_positive_indicator(0)
 negative_inidcation = run_negative_indicator(0)
