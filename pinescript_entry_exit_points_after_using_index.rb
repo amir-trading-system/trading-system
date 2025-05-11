@@ -235,8 +235,6 @@ current_bar_macd_is_positive(close_src, index, ema_9_src, vwap_src) =>
     highest_macdLine_before = 0.0
     highest_macdLine_index = 0
     bars_back = 20
-    if timeframe.period == "10S"
-        bars_back := 40
     for i = bars_back to 1
         if macdLine[index+i] > macdLine[index+i+1] and macdLine[index+i] > macdLine[index+i-1] and signalLine[index+i+1] > 0 and signalLine[index+i-1] > 0 and histogram[index+i] > 0
             if highest_macdLine_before < macdLine[index+i]
@@ -247,9 +245,9 @@ current_bar_macd_is_positive(close_src, index, ema_9_src, vwap_src) =>
         false
     else
         lowest_macdLine = ta.lowest(macdLine[index], highest_macdLine_index)
-        //log.info("h: {0}. h_i: {1}. l: {2}, p: {3}", highest_macdLine_before,highest_macdLine_index, lowest_macdLine, lowest_macdLine/highest_macdLine_before)
-
-        macd_fixed_less_than_50_percent = lowest_macdLine/highest_macdLine_before >= 0.4 and not (lowest_macdLine/highest_macdLine_before == 1)
+        // log.info("h: {0}. h_i: {1}. l: {2}, p: {3}.", highest_macdLine_before,highest_macdLine_index, lowest_macdLine, lowest_macdLine/highest_macdLine_before)
+        macd_fixed_less_than_50_percent = lowest_macdLine/highest_macdLine_before >= 0.4 and lowest_macdLine/highest_macdLine_before < 0.999 and not (highest_macdLine_before * 4 < macdLine[index])
+        // log.info("macd_current_is_positive: {0}. macd_crossed_recently: {1}. macd_is_still_strong_after_going_down: {2}. macd_fixed_less_than_50_percent: {3}", macd_current_is_positive, macd_crossed_recently, macd_is_still_strong_after_going_down, macd_fixed_less_than_50_percent)
         macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macd_fixed_less_than_50_percent
 
 most_of_the_value_did_not_came_in_one_bar(index, high_src, low_src) =>
@@ -312,27 +310,19 @@ last_biggest_volume_bar_was_green(volume_src, close_src, open_src, high_src, low
     highest_volume_bar_is_green
 
 current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9, low_src, close_src, vwap_src) =>
-    // need to check that if I run on 10 seconds timeframe, the current 9 ema at 1 minute and 2 minute charts is close as well to the price.
-    ema_9_at_1_minute_timeframe = request.security(syminfo.tickerid, "1", ema_9, lookahead=barmerge.lookahead_on)
     ema_9_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", ema_9, lookahead=barmerge.lookahead_on)
     vwap_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", vwap_src, lookahead=barmerge.lookahead_on)
 
-    low_1_min = request.security(syminfo.tickerid, "1", low_src, lookahead=barmerge.lookahead_on)
     low_2_min = request.security(syminfo.tickerid, "2", low_src, lookahead=barmerge.lookahead_on)
 
     not_far_from_9_ema_on_bigger_timeframes = true
-    one_minute_close_distance = 0.10
     two_minutes_close_distance = 0.20
 
-    m_1_distance = math.abs(low_1_min - ema_9_at_1_minute_timeframe)
     m_2_distance = math.abs(low_2_min - ema_9_at_2_minute_timeframe)
     m_2_vwap_distance = math.abs(low_2_min - vwap_at_2_minute_timeframe)
-    one_minute_chart_is_close_to_9_ema = m_1_distance <= one_minute_close_distance
     two_minute_chart_is_close_to_9_ema = m_2_distance <= two_minutes_close_distance
     two_minute_chart_is_close_to_vwap = m_2_vwap_distance <= two_minutes_close_distance
 
-    if timeframe.period == "10S"
-        not_far_from_9_ema_on_bigger_timeframes := one_minute_chart_is_close_to_9_ema or two_minute_chart_is_close_to_9_ema
     if timeframe.period == "1"
         not_far_from_9_ema_on_bigger_timeframes := two_minute_chart_is_close_to_9_ema or two_minute_chart_is_close_to_vwap
 
@@ -446,12 +436,9 @@ run_buying_the_dip_indication(i) =>
       and current_bar_volume_is_high_than_usual
       and last_bars_volume_is_higher
 
-positive_indication = run_positive_indicator(0)
-negative_inidcation = run_negative_indicator(0)
-
 is_long_term_minute_chart = timeframe.period == "15" or timeframe.period == "5"
-buying_the_dip_indication = run_buying_the_dip_indication(0) and is_long_term_minute_chart
+is_valid_timeframes = timeframe.period == "1" or timeframe.period == "2" or timeframe.period == "5" or timeframe.period == "15"
 
-plotshape(positive_indication, title="Positive indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign)
-plotshape(negative_inidcation, title="Negative indication", color=color.red, display = display.pane, style = shape.arrowdown, size = size.small, location = location.abovebar, text = negative_sign)
-plotshape(buying_the_dip_indication, title="Buying The Dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = buying_the_dip_sign)
+plotshape(is_valid_timeframes ? run_positive_indicator(0) : false, title="Positive indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign)
+plotshape(is_valid_timeframes ? run_negative_indicator(0) : false, title="Negative indication", color=color.red, display = display.pane, style = shape.arrowdown, size = size.small, location = location.abovebar, text = negative_sign)
+plotshape(is_long_term_minute_chart ? run_buying_the_dip_indication(0) : false, title="Buying The Dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = buying_the_dip_sign)
