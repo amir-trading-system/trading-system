@@ -244,11 +244,35 @@ current_bar_macd_is_positive(close_src, index, ema_9_src, vwap_src) =>
     if highest_macdLine_index == 0
         false
     else
+        // histogram check
+        most_process_already_finished = false
+        highest_histogram = ta.highest(histogram[index], highest_macdLine_index+10)
+        highest_histogram_index = 0
+        start_histogram_index = 0
+        end_histogram_index = 0
+        var float start_momentum_histogram = na
+        var float end_momentum_histogram = na
+        for i = bars_back to 1
+            if histogram[index+i] < 0
+                continue
+            if histogram[index+i] > 0 and histogram[index+i+1] < 0
+                start_momentum_histogram := histogram[index+i]
+                start_histogram_index := index+i
+            if histogram[index+i] == highest_histogram
+                highest_histogram_index := index+i
+            if histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i - 1] and start_histogram_index > index+i
+                end_histogram_index := index+i
+                end_momentum_histogram := histogram[index+i]
+
+        if end_histogram_index < start_histogram_index
+            most_process_already_finished := math.abs(highest_histogram_index - start_histogram_index) * 1.5 < math.abs(end_histogram_index - highest_histogram_index)
+
+        // log.info("highest_histogram_index: {0}. highest_histogram: {1}. start_histogram_index: {2}. end_histogram_index: {3}", highest_histogram_index, highest_histogram, start_histogram_index, end_histogram_index)
         lowest_macdLine = ta.lowest(macdLine[index], highest_macdLine_index)
-        // log.info("h: {0}. h_i: {1}. l: {2}, p: {3}.", highest_macdLine_before,highest_macdLine_index, lowest_macdLine, lowest_macdLine/highest_macdLine_before)
+        // log.info("h: {0}. h_i: {1}. l: {2}, p: {3}", highest_macdLine_before,highest_macdLine_index, lowest_macdLine, lowest_macdLine/highest_macdLine_before)
         macd_fixed_less_than_50_percent = lowest_macdLine/highest_macdLine_before >= 0.4 and lowest_macdLine/highest_macdLine_before < 0.999 and not (highest_macdLine_before * 4 < macdLine[index])
         // log.info("macd_current_is_positive: {0}. macd_crossed_recently: {1}. macd_is_still_strong_after_going_down: {2}. macd_fixed_less_than_50_percent: {3}", macd_current_is_positive, macd_crossed_recently, macd_is_still_strong_after_going_down, macd_fixed_less_than_50_percent)
-        macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macd_fixed_less_than_50_percent
+        macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macd_fixed_less_than_50_percent and not most_process_already_finished
 
 most_of_the_value_did_not_came_in_one_bar(index, high_src, low_src) =>
     relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 1)
