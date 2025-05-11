@@ -317,6 +317,27 @@ last_biggest_volume_bar_was_green(volume_src, close_src, open_src, high_src, low
 
     highest_volume_bar_is_green
 
+current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9, low_src, close_src) =>
+    // need to check that if I run on 10 seconds timeframe, the current 9 ema at 1 minute and 2 minute charts is close as well to the price.
+    ema_9_at_1_minute_timeframe = request.security(syminfo.tickerid, "1", ta.ema(close_src, 9), lookahead=barmerge.lookahead_on)
+    ema_9_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", ta.ema(close_src, 9), lookahead=barmerge.lookahead_on)
+
+    low_1_min = request.security(syminfo.tickerid, "1", low_src, lookahead=barmerge.lookahead_on)
+    low_2_min = request.security(syminfo.tickerid, "2", low_src, lookahead=barmerge.lookahead_on)
+
+    not_far_from_9_ema_on_bigger_timeframes = true
+    m_1_distance = math.abs(low_1_min - ema_9_at_1_minute_timeframe)
+    m_2_distance = math.abs(low_2_min - ema_9_at_2_minute_timeframe)
+    one_minute_chart_is_close_to_9_ema = math.abs(m_1_distance) <= 0.10
+    two_minute_chart_is_close_to_9_ema = math.abs(m_2_distance) <= 0.10
+
+    if timeframe.period == "10S"
+        not_far_from_9_ema_on_bigger_timeframes := one_minute_chart_is_close_to_9_ema or two_minute_chart_is_close_to_9_ema
+    if timeframe.period == "1"
+        not_far_from_9_ema_on_bigger_timeframes := two_minute_chart_is_close_to_9_ema
+
+    not_far_from_9_ema_on_bigger_timeframes
+
 ///////// buying the dip indicators /////////
 last_bars_crossed_9_ema_but_didnt_closed_under_it(index, close_src, low_src, high_src, last_bars, ema_9, ema_20) =>
     some_last_bars_closed_under_9_ema = false
@@ -371,6 +392,7 @@ run_positive_indicator(i) =>
     //no_bearish_bar_detected_in_the_last_bars = no_bearish_bar_detected_in_the_last_bars(last_bars)
     last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5)
     //most_of_the_value_did_not_came_in_one_bar = most_of_the_value_did_not_came_in_one_bar(i, high_index, low_index)
+    current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(i, ema_9_index, low_index, close_index)
 
     current_bar_is_above_vwap
       and last_bars_emas_higher
@@ -390,6 +412,7 @@ run_positive_indicator(i) =>
     //   and current_bar_bigger_than_last_red_candle_body
     //   and no_bearish_bar_detected_in_the_last_bars
       and last_biggest_volume_bar_was_green
+      and current_bar_close_to_9_ema_on_other_timeframes_as_well
     //   and most_of_the_value_did_not_came_in_one_bar
 
 run_buying_the_dip_indication(i) =>
