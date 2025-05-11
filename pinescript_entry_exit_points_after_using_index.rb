@@ -232,31 +232,25 @@ current_bar_macd_is_positive(close_src, index, ema_9_src, vwap_src) =>
         if macd_crossed_recently
             break
 
-    var float highest_macd = na
-    var int highest_macd_offset = na
+    highest_macdLine_before = 0.0
+    highest_macdLine_index = 0
+    bars_back = 20
+    if timeframe.period == "10S"
+        bars_back := 40
+    for i = bars_back to 1
+        if macdLine[index+i] > macdLine[index+i+1] and macdLine[index+i] > macdLine[index+i-1] and signalLine[index+i+1] > 0 and signalLine[index+i-1] > 0 and histogram[index+i] > 0
+            if highest_macdLine_before < macdLine[index+i]
+                highest_macdLine_before := macdLine[index+i]
+                highest_macdLine_index := index+i
 
-    highest_macd := na
-    highest_macd_offset := na
-    for i = 1 to macd_crossed_last_bars
-        if histogram[i] > 0
-            if na(highest_macd) or macdLine[i] > highest_macd
-                highest_macd := macdLine[i]
-                highest_macd_offset := i
+    if highest_macdLine_index == 0
+        false
+    else
+        lowest_macdLine = ta.lowest(macdLine[index], highest_macdLine_index)
+        //log.info("h: {0}. h_i: {1}. l: {2}, p: {3}", highest_macdLine_before,highest_macdLine_index, lowest_macdLine, lowest_macdLine/highest_macdLine_before)
 
-    bars_back_from_highest = ta.highestbars(macdLine[index+1], macd_crossed_last_bars)
-    macd_fixed_less_than_50_percent = false
-    if bars_back_from_highest == 0
-        macd_fixed_less_than_50_percent := true
-    if bars_back_from_highest != 0
-        bars_back_from_highest := bars_back_from_highest * -1
-
-        bars_back_from_highest_has_a_valid_value = not na(bars_back_from_highest) and not (bars_back_from_highest == 0)
-        lowest_macdLine = ta.lowest(macdLine[index], bars_back_from_highest_has_a_valid_value ? bars_back_from_highest : macd_crossed_last_bars)
-
-        macd_fixed_less_than_50_percent := lowest_macdLine/highest_macd >= 0.5 and not (lowest_macdLine/highest_macd == 1)
-
-    // log.info("h: {0}. bars_back: {2}", highest_macd, bars_back_from_highest)
-    macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macd_fixed_less_than_50_percent
+        macd_fixed_less_than_50_percent = lowest_macdLine/highest_macdLine_before >= 0.4 and not (lowest_macdLine/highest_macdLine_before == 1)
+        macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macd_fixed_less_than_50_percent
 
 most_of_the_value_did_not_came_in_one_bar(index, high_src, low_src) =>
     relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 1)
@@ -317,24 +311,30 @@ last_biggest_volume_bar_was_green(volume_src, close_src, open_src, high_src, low
 
     highest_volume_bar_is_green
 
-current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9, low_src, close_src) =>
+current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9, low_src, close_src, vwap_src) =>
     // need to check that if I run on 10 seconds timeframe, the current 9 ema at 1 minute and 2 minute charts is close as well to the price.
-    ema_9_at_1_minute_timeframe = request.security(syminfo.tickerid, "1", ta.ema(close_src, 9), lookahead=barmerge.lookahead_on)
-    ema_9_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", ta.ema(close_src, 9), lookahead=barmerge.lookahead_on)
+    ema_9_at_1_minute_timeframe = request.security(syminfo.tickerid, "1", ema_9, lookahead=barmerge.lookahead_on)
+    ema_9_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", ema_9, lookahead=barmerge.lookahead_on)
+    vwap_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", vwap_src, lookahead=barmerge.lookahead_on)
 
     low_1_min = request.security(syminfo.tickerid, "1", low_src, lookahead=barmerge.lookahead_on)
     low_2_min = request.security(syminfo.tickerid, "2", low_src, lookahead=barmerge.lookahead_on)
 
     not_far_from_9_ema_on_bigger_timeframes = true
+    one_minute_close_distance = 0.10
+    two_minutes_close_distance = 0.20
+
     m_1_distance = math.abs(low_1_min - ema_9_at_1_minute_timeframe)
     m_2_distance = math.abs(low_2_min - ema_9_at_2_minute_timeframe)
-    one_minute_chart_is_close_to_9_ema = math.abs(m_1_distance) <= 0.10
-    two_minute_chart_is_close_to_9_ema = math.abs(m_2_distance) <= 0.10
+    m_2_vwap_distance = math.abs(low_2_min - vwap_at_2_minute_timeframe)
+    one_minute_chart_is_close_to_9_ema = m_1_distance <= one_minute_close_distance
+    two_minute_chart_is_close_to_9_ema = m_2_distance <= two_minutes_close_distance
+    two_minute_chart_is_close_to_vwap = m_2_vwap_distance <= two_minutes_close_distance
 
     if timeframe.period == "10S"
         not_far_from_9_ema_on_bigger_timeframes := one_minute_chart_is_close_to_9_ema or two_minute_chart_is_close_to_9_ema
     if timeframe.period == "1"
-        not_far_from_9_ema_on_bigger_timeframes := two_minute_chart_is_close_to_9_ema
+        not_far_from_9_ema_on_bigger_timeframes := two_minute_chart_is_close_to_9_ema or two_minute_chart_is_close_to_vwap
 
     not_far_from_9_ema_on_bigger_timeframes
 
@@ -392,7 +392,7 @@ run_positive_indicator(i) =>
     //no_bearish_bar_detected_in_the_last_bars = no_bearish_bar_detected_in_the_last_bars(last_bars)
     last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5)
     //most_of_the_value_did_not_came_in_one_bar = most_of_the_value_did_not_came_in_one_bar(i, high_index, low_index)
-    current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(i, ema_9_index, low_index, close_index)
+    current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(i, ema_9_index, low_index, close_index, vwap_index)
 
     current_bar_is_above_vwap
       and last_bars_emas_higher
