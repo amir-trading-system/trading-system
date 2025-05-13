@@ -282,7 +282,9 @@ current_macd_has_new_high_and_came_as_change_point(close_src, index) =>
     previous_bars_has_change_in_momentum = false
 
     for i = 1 to last_bars
-        last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < macdLine[index+i-1]
+        if histogram[index+i] < 0
+            continue
+        last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i] > 0
         macd_is_positive = macdLine[index+i] > 0
         histogram_is_positive = histogram[index+i] > 0
         current_macd_is_bigger = macdLine[index] > macdLine[index+i]
@@ -459,7 +461,7 @@ run_positive_indicator(i, with_certainty) =>
           and current_bar_must_be_positive_and_volatile
           and current_bar_is_above_support_line
           and current_bar_close_to_nine_ema_by_avg
-          and (current_bar_macd_is_positive or current_macd_has_new_high_and_came_as_change_point)
+          and current_macd_has_new_high_and_came_as_change_point
           and current_bar_gets_50_percent_above_9_ema
           and current_bar_closes_where_buyers_still_in
           and current_bar_is_bullish_without_ema_certainty
@@ -499,7 +501,12 @@ run_buying_the_dip_indication(i) =>
 
 is_long_term_minute_chart = timeframe.period == "15" or timeframe.period == "5"
 
-plotshape(run_positive_indicator(0, true), title="Positive indication with 9 ema certainty", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign)
-plotshape(run_positive_indicator(0, false), title="Positive indication without 9 ema certainty", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
+positive_indication = run_positive_indicator(0, true)
+positive_indication_without_certainty = run_positive_indicator(0, false)
+
+plotshape(positive_indication, title="Positive indication with certainty", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign)
+plotshape(positive_indication_without_certainty, title="Positive indication without certainty", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
 plotshape(run_negative_indicator(0), title="Negative indication", color=color.red, display = display.pane, style = shape.arrowdown, size = size.small, location = location.abovebar, text = negative_sign)
-plotshape(is_long_term_minute_chart ? run_buying_the_dip_indication(0) : false, title="Buying The Dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = buying_the_dip_sign)
+//plotshape(is_long_term_minute_chart ? run_buying_the_dip_indication(0) : false, title="Buying The Dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = buying_the_dip_sign)
+
+alertcondition(positive_indication or positive_indication_without_certainty, title="Positive indication with or without certainty", message="Positive indication with or without certainty")
