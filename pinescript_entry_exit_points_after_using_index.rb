@@ -281,28 +281,34 @@ current_macd_has_new_high_and_came_as_change_point(close_src, index) =>
     [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
     previous_bars_has_change_in_momentum = false
 
-    for i = 1 to last_bars
+    for i = 1 to 3
         if histogram[index+i] < 0
             continue
         last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i] > 0
+        all_are_in_the_same_session = dayofmonth[index] == dayofmonth[index+i] and dayofmonth[index+i] == dayofmonth[index+i+1] and dayofmonth[index+i+1] == dayofmonth[index+i-1]
         macd_is_positive = macdLine[index+i] > 0
         histogram_is_positive = histogram[index+i] > 0
         current_macd_is_bigger = macdLine[index] > macdLine[index+i]
         current_histogram_is_bigger = histogram[index] > histogram[index+i]
-        if last_histogram_is_between_two_highs and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger
+        if last_histogram_is_between_two_highs and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session
             previous_bars_has_change_in_momentum := true
             break
 
     previous_bars_has_change_in_momentum
 
-most_of_the_value_did_not_came_in_one_bar(index, high_src, low_src) =>
-    relevant_market_start_time = timestamp("America/New_York", year, month, dayofmonth, 6, 1)
-    highest_price = ta.highestSince(relevant_market_start_time > time, high_src)
-    lowest_price = ta.lowestSince(relevant_market_start_time > time, low_src)
-    highest_range = ta.highestSince(relevant_market_start_time > time, high_src - low_src)
-    most_of_the_value_did_not_came_in_one_bar = highest_range / (highest_price - lowest_price) <= 0.6
+current_bar_touching_9_ema(low_src, ema_9, index) =>
+    low_src[index] <= ema_9[index] or (math.abs(low_src[index] - ema_9[index]) <= 0.10)
 
-    most_of_the_value_did_not_came_in_one_bar
+current_bar_is_at_the_beginning_of_the_day(index) =>
+    still_in_the_beginning = false
+    current_timeframe = str.tonumber(timeframe.period)
+    for i = 10 to 1
+        if (time[i-1] - time[i])/1000/60/current_timeframe > current_timeframe
+            //log.info("minutes_between_bars: {0}", (time[i] - time[i-1])/1000/60)
+            still_in_the_beginning := true
+            break
+
+    still_in_the_beginning
 
 current_bar_gets_50_percent_above_9_ema(close_src, low_src, ema_9) =>
     close_src - ema_9 > ema_9 - low_src
@@ -419,20 +425,16 @@ run_positive_indicator(i, with_certainty) =>
     current_bar_has_new_high = current_bar_has_new_high(high_index, i)
     buyers_coming_in = buyers_coming_in(last_bars, close_index, open_index, volume_index, i)
     inside_momentum = inside_momentum(last_bars, close_index, open_index, volume_index, i, true)
-    inside_momentum_without_certainty = inside_momentum(last_bars, close_index, open_index, volume_index, i, false)
     current_bar_has_at_least_one_weak_bar_before = current_bar_has_at_least_one_weak_bar_before(last_bars, close_index, open_index, high_index, low_index, i)
     current_bar_must_be_positive_and_volatile = current_bar_must_be_positive_and_volatile(last_bars, low_index, high_index, volume_index, close_index, open_index, i)
     current_bar_is_above_support_line = current_bar_is_above_support_line(3, low_index, i)
     current_bar_close_to_nine_ema_by_avg = current_bar_close_to_nine_ema_by_avg(last_bars, close_index, low_index, high_index, ema_9_index, ema_20_index, i)
     current_bar_macd_is_positive = current_bar_macd_is_positive(close_index, i)
-    current_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(close_index, i)
     current_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(close_index, low_index, ema_9_index)
     current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(close_index, low_index, high_index)
     current_bar_is_bullish = current_bar_is_bullish(high_index, close_index, low_index, ema_9_index, ema_20_index, true)
-    current_bar_is_bullish_without_ema_certainty = current_bar_is_bullish(high_index, close_index, low_index, ema_9_index, ema_20_index, false)
     last_bars_volume_is_higher = last_bars_volume_is_higher(i, 10, volume_index)
     last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5, true)
-    last_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5, false)
     current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(i, ema_9_index, low_index, close_index, vwap_index)
 
     if with_certainty
@@ -452,7 +454,15 @@ run_positive_indicator(i, with_certainty) =>
           and last_bars_volume_is_higher
           and last_biggest_volume_bar_was_green
     else
+        current_bar_touching_9_ema = current_bar_touching_9_ema(low_index, ema_9_index, i)
+        current_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(close_index, i)
+        current_bar_is_bullish_without_ema_certainty = current_bar_is_bullish(high_index, close_index, low_index, ema_9_index, ema_20_index, false)
+        last_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5, false)
+        inside_momentum_without_certainty = inside_momentum(last_bars, close_index, open_index, volume_index, i, false)
+        current_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(i)
+
         current_bar_is_above_vwap
+          and current_bar_touching_9_ema
           and last_bars_emas_higher
           and current_bar_has_new_high
           and buyers_coming_in
@@ -467,6 +477,7 @@ run_positive_indicator(i, with_certainty) =>
           and current_bar_is_bullish_without_ema_certainty
           and last_bars_volume_is_higher
           and last_biggest_volume_bar_was_green_without_certainty
+          and current_bar_is_at_the_beginning_of_the_day
 
 run_buying_the_dip_indication(i) =>
     vwap_index = ta.vwap(hlc3)[i]
@@ -504,7 +515,7 @@ is_long_term_minute_chart = timeframe.period == "15" or timeframe.period == "5"
 positive_indication = run_positive_indicator(0, true)
 positive_indication_without_certainty = run_positive_indicator(0, false)
 
-plotshape(positive_indication, title="Positive indication with certainty", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign)
+plotshape(positive_indication, title="Positive indication with certainty", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = positive_sign)
 plotshape(positive_indication_without_certainty, title="Positive indication without certainty", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
 plotshape(run_negative_indicator(0), title="Negative indication", color=color.red, display = display.pane, style = shape.arrowdown, size = size.small, location = location.abovebar, text = negative_sign)
 //plotshape(is_long_term_minute_chart ? run_buying_the_dip_indication(0) : false, title="Buying The Dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = buying_the_dip_sign)
