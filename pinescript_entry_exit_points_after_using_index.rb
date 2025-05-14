@@ -288,7 +288,7 @@ current_macd_has_new_high_and_came_as_change_point(close_src, index) =>
 
         current_histogram_is_high = true
         for j = 1 to 3
-            current_histogram_is_high := histogram[index] >= histogram[index+j] * 1.5
+            current_histogram_is_high := histogram[index] >= histogram[index+j] * 1.5 and histogram[index+j] > 0
             if not current_histogram_is_high
                 break
         if not current_histogram_is_high
