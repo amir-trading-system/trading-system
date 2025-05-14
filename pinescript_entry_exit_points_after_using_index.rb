@@ -249,7 +249,8 @@ current_bar_macd_is_positive(close_src, index) =>
     else
         // histogram check
         most_process_already_finished = false
-        highest_histogram = ta.highest(histogram[index], highest_macdLine_index+10)
+        max_bars_back(histogram, 5000)
+        highest_histogram = ta.highest(histogram[index], 30)
         highest_histogram_index = 0
         start_histogram_index = 0
         end_histogram_index = 0
@@ -284,13 +285,22 @@ current_macd_has_new_high_and_came_as_change_point(close_src, index) =>
     for i = 1 to 3
         if histogram[index+i] < 0
             continue
+
+        current_histogram_is_high = true
+        for j = 1 to 3
+            current_histogram_is_high := histogram[index] >= histogram[index+j] * 1.5
+            if not current_histogram_is_high
+                break
+        if not current_histogram_is_high
+            false
+
         last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i] > 0
         all_are_in_the_same_session = dayofmonth[index] == dayofmonth[index+i] and dayofmonth[index+i] == dayofmonth[index+i+1] and dayofmonth[index+i+1] == dayofmonth[index+i-1]
         macd_is_positive = macdLine[index+i] > 0
         histogram_is_positive = histogram[index+i] > 0
         current_macd_is_bigger = macdLine[index] > macdLine[index+i]
         current_histogram_is_bigger = histogram[index] > histogram[index+i]
-        if last_histogram_is_between_two_highs and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session
+        if last_histogram_is_between_two_highs and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session and current_histogram_is_high
             previous_bars_has_change_in_momentum := true
             break
 
@@ -303,7 +313,7 @@ current_bar_is_at_the_beginning_of_the_day(index) =>
     still_in_the_beginning = false
     current_timeframe = str.tonumber(timeframe.period)
     for i = 10 to 1
-        if (time[i-1] - time[i])/1000/60/current_timeframe > current_timeframe
+        if (time[i-1] - time[i])/1000/60/current_timeframe > current_timeframe * 10
             //log.info("minutes_between_bars: {0}", (time[i] - time[i-1])/1000/60)
             still_in_the_beginning := true
             break
