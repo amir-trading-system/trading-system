@@ -17,8 +17,8 @@ show_logs = input.bool(false, "Show Debug Logs")
 
 ////           Negative indications           ////
 
-current_bar_is_negative(index) =>
-    close[index] < open[index]
+current_bar_is_negative(index, close_src, open_src) =>
+    close_src[index] < open_src[index]
 
 current_bar_volume_is_high_than_usual(index, volume_src) =>
     vol_avg = ta.sma(volume_src[index], 20)
@@ -26,11 +26,19 @@ current_bar_volume_is_high_than_usual(index, volume_src) =>
 
     volume_higher and volume_src[index] > volume_src[index+1]
 
-current_bar_deletes_most_of_value_before(last_bars, index, volume_src) =>
-    last_highest = ta.highest(high[index], last_bars)
-    last_lowest = ta.lowest(low[index], last_bars)
+current_bar_deletes_most_of_value_before(high_src, low_src, close_src, open_src, last_bars, index, volume_src) =>
+    last_highest = 0.0
+    for i = index to last_bars
+        if high_src[index] > last_highest
+            last_highest := high_src[index]
+
+    last_lowest = last_highest
+    for i = index to last_bars
+        if low_src[index] <= last_lowest
+            last_lowest := low_src[index]
+
     volume_higher = current_bar_volume_is_high_than_usual(index, volume_src)
-    current_bar_is_negative = current_bar_is_negative(index)
+    current_bar_is_negative = current_bar_is_negative(index, close_src, open_src)
 
     length = last_highest - last_lowest
     current_bar_length = high[index] - low[index]
@@ -40,13 +48,19 @@ current_bar_deletes_most_of_value_before(last_bars, index, volume_src) =>
 current_bar_is_weak(index, close_src, open_src, volume_src) =>
     nine_ema = ta.ema(close_src, 9)
     volume_higher = current_bar_volume_is_high_than_usual(index, volume_src)
-    current_bar_is_negative = current_bar_is_negative(index)
+    current_bar_is_negative = current_bar_is_negative(index, close_src, open_src)
     (close_src[index] < nine_ema or open_src[index] < nine_ema) and current_bar_is_negative and volume_higher
 
-current_bar_makes_new_low(index, volume_src) =>
+current_bar_makes_new_low(index, volume_src, low_src, close_src, open_src) =>
     volume_higher = current_bar_volume_is_high_than_usual(index, volume_src)
-    current_bar_is_negative = current_bar_is_negative(index)
-    low[index] < ta.lowest(low[index+1], 5) and current_bar_is_negative and volume_higher
+    current_bar_is_negative = current_bar_is_negative(index, close_src, open_src)
+
+    lowest_low = 100.0
+    for i = index to 5
+        if low_src[index+1] < lowest_low
+            lowest_low := low_src[index+1]
+
+    low_src[index] < lowest_low and current_bar_is_negative and volume_higher
 
 current_bar_crosses_nine_ema(index, close_src, open_src) =>
     nine_ema = ta.ema(close_src, 9)
@@ -71,8 +85,8 @@ current_bar_dropped_its_majority_value(index) =>
 
 run_negative_indicator(index) =>
     current_bar_is_weak = current_bar_is_weak(index, close[index], open[index], volume[index])
-    current_bar_makes_new_low = current_bar_makes_new_low(index, volume[index])
-    current_bar_deletes_most_of_value_before = current_bar_deletes_most_of_value_before(last_bars, index, volume[index])
+    current_bar_makes_new_low = current_bar_makes_new_low(index, low[index], volume[index], close[index], open[index])
+    current_bar_deletes_most_of_value_before = current_bar_deletes_most_of_value_before(high[index], low[index], close[index], open[index], last_bars, index, volume[index])
     current_bar_crosses_nine_ema = current_bar_crosses_nine_ema(index, close[index], open[index])
     current_bar_dropped_its_majority_value = current_bar_dropped_its_majority_value(index)
 
@@ -147,7 +161,12 @@ buyers_coming_in(last_bars, close_src, open_src, volume_src, index) =>
     not negative_condition
 
 current_bar_has_new_high(high_src, index) =>
-    high_src > ta.highest(high_src[1], 5)[index]
+    highest_high = 0.0
+    for i = 1 to 5
+        if high_src[index+i] > highest_high
+            highest_high := high_src[index+i]
+
+    high_src > highest_high
 
 inside_momentum(last_bars, close_src, open_src, volume_src, index, with_certainty) =>
     under_avg_vol_bars_counter = 0
@@ -221,12 +240,12 @@ current_bar_bigger_than_last_red_candle_body(last_bars, close_src, open_src, ind
     current_bar_bigger
 
 current_bar_macd_is_positive(close_src, index) =>
+    macd_is_positive = true
+
     [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
     macd_current_is_positive = macdLine[index] > 0 and macdLine[index] > signalLine[index] and histogram[index] > 0.005
 
     macd_crossed_recently = false
-
-    macd_is_still_strong_after_going_down = macd_current_is_positive
 
     macd_crossed_last_bars = 10
     for i = 1 to macd_crossed_last_bars
@@ -238,6 +257,7 @@ current_bar_macd_is_positive(close_src, index) =>
     highest_macdLine_before = 0.0
     highest_macdLine_index = 0
     bars_back = 20
+
     for i = bars_back to 1
         if macdLine[index+i] > macdLine[index+i+1] and macdLine[index+i] > macdLine[index+i-1] and signalLine[index+i+1] > 0 and signalLine[index+i-1] > 0 and histogram[index+i] > 0
             if highest_macdLine_before < macdLine[index+i]
@@ -245,38 +265,51 @@ current_bar_macd_is_positive(close_src, index) =>
                 highest_macdLine_index := index+i
 
     if highest_macdLine_index == 0
-        false
-    else
+        macd_is_positive := false
+    else if macd_is_positive
         // histogram check
-        most_process_already_finished = false
-        max_bars_back(histogram, 5000)
-        highest_histogram = ta.highest(histogram[index], 30)
-        highest_histogram_index = 0
-        start_histogram_index = 0
-        end_histogram_index = 0
-        var float start_momentum_histogram = na
-        var float end_momentum_histogram = na
-        for i = bars_back to 1
-            if histogram[index+i] < 0
-                continue
-            if histogram[index+i] > 0 and histogram[index+i+1] < 0
-                start_momentum_histogram := histogram[index+i]
-                start_histogram_index := index+i
-            if histogram[index+i] == highest_histogram
-                highest_histogram_index := index+i
-            if histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i - 1] and start_histogram_index > index+i
-                end_histogram_index := index+i
-                end_momentum_histogram := histogram[index+i]
+        highest_histogram = 0.0
+        for i = 1 to 15
+            if histogram[index+i] > highest_histogram
+                highest_histogram := histogram[index+i]
 
-        if end_histogram_index < start_histogram_index
-            most_process_already_finished := math.abs(highest_histogram_index - start_histogram_index) * 1.5 < math.abs(end_histogram_index - highest_histogram_index)
+        // log.info("highest_histogram: {0}. c_h: {1}. r: {2}", highest_histogram, histogram[index], histogram[index]/highest_histogram)
+        if histogram[index]/highest_histogram < 0.6
+            macd_is_positive := false
+        if macd_is_positive
+            highest_histogram_index = 0
+            start_histogram_index = 0
+            end_histogram_index = 0
+            var float start_momentum_histogram = na
+            var float end_momentum_histogram = na
+            for i = bars_back to 1
+                if histogram[index+i] < 0
+                    continue
+                if histogram[index+i] > 0 and histogram[index+i+1] < 0
+                    start_momentum_histogram := histogram[index+i]
+                    start_histogram_index := index+i
+                if histogram[index+i] == highest_histogram
+                    highest_histogram_index := index+i
+                if histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i - 1] and start_histogram_index > index+i
+                    end_histogram_index := index+i
+                    end_momentum_histogram := histogram[index+i]
 
-        // log.info("highest_histogram_index: {0}. highest_histogram: {1}. start_histogram_index: {2}. end_histogram_index: {3}", highest_histogram_index, highest_histogram, start_histogram_index, end_histogram_index)
-        lowest_macdLine = ta.lowest(macdLine[index], highest_macdLine_index)
-        // log.info("h: {0}. h_i: {1}. l: {2}, p: {3}", highest_macdLine_before,highest_macdLine_index, lowest_macdLine, lowest_macdLine/highest_macdLine_before)
-        macd_fixed_less_than_50_percent = lowest_macdLine/highest_macdLine_before >= 0.4 and lowest_macdLine/highest_macdLine_before < 0.999 and not (highest_macdLine_before * 4 < macdLine[index])
-        // log.info("macd_current_is_positive: {0}. macd_crossed_recently: {1}. macd_is_still_strong_after_going_down: {2}. macd_fixed_less_than_50_percent: {3}", macd_current_is_positive, macd_crossed_recently, macd_is_still_strong_after_going_down, macd_fixed_less_than_50_percent)
-        macd_current_is_positive and macd_crossed_recently and macd_is_still_strong_after_going_down and macd_fixed_less_than_50_percent and not most_process_already_finished
+            most_process_already_finished = false
+            if end_histogram_index < start_histogram_index
+                most_process_already_finished := math.abs(highest_histogram_index - start_histogram_index) * 1.5 < math.abs(end_histogram_index - highest_histogram_index)
+
+            // log.info("highest_histogram_index: {0}. highest_histogram: {1}. start_histogram_index: {2}. end_histogram_index: {3}", highest_histogram_index, highest_histogram, start_histogram_index, end_histogram_index)
+            lowest_macdLine = highest_macdLine_before
+            for i = index to highest_macdLine_index
+                if macdLine[index+i] < lowest_macdLine
+                    lowest_macdLine := macdLine[index+i]
+
+            // log.info("h: {0}. h_i: {1}. l: {2}, p: {3}", highest_macdLine_before,highest_macdLine_index, lowest_macdLine, lowest_macdLine/highest_macdLine_before)
+            macd_fixed_less_than_50_percent = lowest_macdLine/highest_macdLine_before >= 0.4 and lowest_macdLine/highest_macdLine_before < 0.999 and not (highest_macdLine_before * 4 < macdLine[index])
+            // log.info("macd_current_is_positive: {0}. macd_crossed_recently: {1}. macd_current_is_positive: {2}. macd_fixed_less_than_50_percent: {3}", macd_current_is_positive, macd_crossed_recently, macd_current_is_positive, macd_fixed_less_than_50_percent)
+            macd_is_positive := macd_current_is_positive and macd_crossed_recently and macd_current_is_positive and macd_fixed_less_than_50_percent and not most_process_already_finished
+
+        macd_is_positive
 
 current_macd_has_new_high_and_came_as_change_point(close_src, index) =>
     [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
@@ -341,8 +374,18 @@ last_bars_volume_is_higher(index, last_bars, volume_src) =>
         current_bar_volume_is_much_bigger_than_previous_bar := true
 
     current_vol_avg_is_biggest_by_multiply_from_lowest = false
-    highest_vol_avg = ta.highest(vol_avg, last_bars)
-    lowest_vol_avg = ta.lowest(vol_avg, last_bars)
+    highest_vol_avg = 0.0
+    // instead of ta.highest function which does not work properly always
+    for i = 0 to last_bars
+        if vol_avg[index+i] > highest_vol_avg
+            highest_vol_avg := vol_avg[index+i]
+
+    // instead of ta.lowest function which does not work properly always
+    lowest_vol_avg = highest_vol_avg
+    for i = 0 to last_bars
+        if vol_avg[index+i] < lowest_vol_avg
+            lowest_vol_avg := vol_avg[index+i]
+
     if highest_vol_avg / lowest_vol_avg >= 1.3 or lowest_vol_avg / highest_vol_avg <= 0.5
         current_vol_avg_is_biggest_by_multiply_from_lowest := true
 
@@ -360,12 +403,15 @@ no_bearish_bar_detected_in_the_last_bars(last_bars) =>
     not at_least_one_bar_is_weak
 
 last_biggest_volume_bar_was_green(volume_src, close_src, open_src, high_src, low_src, last_bars, with_certainty) =>
-    v = volume_src
     start_index = 0
     if with_certainty
-        v := volume_src[1]
         start_index := 1
-    highest_bar_volume = ta.highest(v, last_bars)
+
+    highest_bar_volume = 0.0
+    for i = start_index to last_bars
+        if volume_src[i] > highest_bar_volume
+            highest_bar_volume := volume_src[i]
+
     highest_volume_bar_is_green = false
 
     for i = start_index to last_bars
@@ -413,7 +459,11 @@ last_bars_crossed_9_ema_but_didnt_closed_under_it(index, close_src, low_src, hig
     low_is_stronger_than_9_ema_but_close and rounded_close[index] > rounded_9_ema[index] and not some_last_bars_closed_under_9_ema
 
 current_bar_close_is_not_highest(index, high_src, close_src) =>
-    last_highest_high = ta.highest(high_src[index+1], 10)
+    last_highest_high = 0.0
+    for i = index to 10
+        if high_src[index+1] > last_highest_high
+            last_highest_high := high_src[index+1]
+
     close_src[index] <= last_highest_high
 
 ///////// run indicators /////////
