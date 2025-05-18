@@ -393,7 +393,7 @@ last_bars_volume_is_higher(index, last_bars, volume_src) =>
 
 current_bar_volume_is_higher_for_fast_change(index, volume_src, high_src, low_src) =>
     minimum_volume_per_bar = 5000
-    volume_src[index] >= minimum_volume_per_bar and high_src[index] - low_src[index] >= 10
+    volume_src[index] >= minimum_volume_per_bar and high_src[index] - low_src[index] >= 0.1
 
 no_bearish_bar_detected_in_the_last_bars(last_bars) =>
     at_least_one_bar_is_weak = false
