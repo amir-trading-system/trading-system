@@ -2,7 +2,7 @@
 // © amiryaffe
 
 //@version=6
-indicator(title="DayTrader: Momentum Confirmed", overlay = true)
+indicator(title="Momentum Indicator for Day Trading", overlay = true)
 import TradingView/ta/10
 
 last_bars = 4
@@ -11,8 +11,6 @@ positive_sign = "✅"
 positive_sign_without_ema = "📈"
 negative_sign = "👮‍♂️"
 buying_the_dip_sign = "📉🛒"
-
-show_logs = input.bool(false, "Show Debug Logs")
 
 
 ////           Negative indications           ////
@@ -393,6 +391,10 @@ last_bars_volume_is_higher(index, last_bars, volume_src) =>
 
     volumer_is_getting_higher and current_vol_avg_is_biggest_by_multiply_from_lowest and current_bar_volume_is_much_bigger_than_previous_bar
 
+current_bar_volume_is_higher_for_fast_change(index, volume_src, high_src, low_src) =>
+    minimum_volume_per_bar = 5000
+    volume_src[index] >= minimum_volume_per_bar and high_src[index] - low_src[index] >= 10
+
 no_bearish_bar_detected_in_the_last_bars(last_bars) =>
     at_least_one_bar_is_weak = false
     for i = 1 to last_bars
@@ -428,12 +430,13 @@ current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9, low_src, cl
     low_2_min = request.security(syminfo.tickerid, "2", low_src, lookahead=barmerge.lookahead_on)
 
     not_far_from_9_ema_on_bigger_timeframes = true
-    two_minutes_close_distance = 0.20
+    close_distance = 0.20
 
     m_2_distance = math.abs(low_2_min - ema_9_at_2_minute_timeframe)
+    m_1_distance = math.abs(low_src[index] - ema_9[index])
     m_2_vwap_distance = math.abs(low_2_min - vwap_at_2_minute_timeframe)
-    two_minute_chart_is_close_to_9_ema = m_2_distance <= two_minutes_close_distance
-    two_minute_chart_is_close_to_vwap = m_2_vwap_distance <= two_minutes_close_distance
+    two_minute_chart_is_close_to_9_ema = m_2_distance <= close_distance or m_1_distance <= close_distance
+    two_minute_chart_is_close_to_vwap = m_2_vwap_distance <= close_distance
 
     if timeframe.period == "1"
         not_far_from_9_ema_on_bigger_timeframes := two_minute_chart_is_close_to_9_ema or two_minute_chart_is_close_to_vwap
@@ -513,6 +516,7 @@ run_positive_indicator(i, with_certainty) =>
           and current_bar_is_bullish
           and last_bars_volume_is_higher
           and last_biggest_volume_bar_was_green
+          and current_bar_close_to_9_ema_on_other_timeframes_as_well
     else
         current_bar_touching_9_ema = current_bar_touching_9_ema(low_index, ema_9_index, i)
         current_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(close_index, i)
@@ -520,6 +524,7 @@ run_positive_indicator(i, with_certainty) =>
         last_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(volume_index, close_index, open_index, high_index, low_index, 5, false)
         inside_momentum_without_certainty = inside_momentum(last_bars, close_index, open_index, volume_index, i, false)
         current_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(i)
+        current_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(i, volume_index, high_index, low_index)
 
         current_bar_is_above_vwap
           and current_bar_touching_9_ema
@@ -538,6 +543,7 @@ run_positive_indicator(i, with_certainty) =>
           and last_bars_volume_is_higher
           and last_biggest_volume_bar_was_green_without_certainty
           and current_bar_is_at_the_beginning_of_the_day
+          and current_bar_volume_is_higher_for_fast_change
 
 run_buying_the_dip_indication(i) =>
     vwap_index = ta.vwap(hlc3)[i]
