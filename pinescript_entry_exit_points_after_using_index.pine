@@ -345,7 +345,12 @@ current_bar_is_at_the_beginning_of_the_day(index) =>
     // checks if it still in the beginning and also if it right before market opening
     still_in_the_beginning = false
     current_timeframe = str.tonumber(timeframe.period)
-    for i = 15 to 1
+    bars_back = 15
+    if current_timeframe == 2
+        bars_back := 10
+    if current_timeframe > 2
+        bars_back := 5
+    for i = bars_back to 1
         if (time[i-1] - time[i])/1000/60/current_timeframe > current_timeframe * 10
             //log.info("minutes_between_bars: {0}", (time[i] - time[i-1])/1000/60)
             still_in_the_beginning := true
@@ -507,6 +512,7 @@ run_positive_indicator(i, with_certainty) =>
 
     if with_certainty
         current_bar_is_above_vwap
+          and current_ema_is_above_vwap
           and last_bars_emas_higher
           and current_bar_has_new_high
           and buyers_coming_in
@@ -581,14 +587,11 @@ run_buying_the_dip_indication(i) =>
       and current_bar_volume_is_high_than_usual
       and last_bars_volume_is_higher
 
-is_long_term_minute_chart = timeframe.period == "15" or timeframe.period == "5"
-
 positive_indication = run_positive_indicator(0, true)
 positive_indication_without_certainty = run_positive_indicator(0, false)
 
 plotshape(positive_indication, title="Positive indication with certainty", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = positive_sign)
 plotshape(positive_indication_without_certainty, title="Positive indication without certainty", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
 plotshape(run_negative_indicator(0), title="Negative indication", color=color.red, display = display.pane, style = shape.arrowdown, size = size.small, location = location.abovebar, text = negative_sign)
-//plotshape(is_long_term_minute_chart ? run_buying_the_dip_indication(0) : false, title="Buying The Dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = buying_the_dip_sign)
 
 alertcondition(positive_indication or positive_indication_without_certainty, title="Positive indication with or without certainty", message="Positive indication with or without certainty")
