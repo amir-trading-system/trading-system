@@ -248,22 +248,25 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
 current_bar_touching_9_ema(index, low_src, ema_9) =>
     low_src[index] <= ema_9[index] or (math.abs(low_src[index] - ema_9[index]) <= 0.10)
 
-current_bar_is_at_the_beginning_of_the_day(index) =>
+current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =>
+    market_start_time = timestamp("America/New_York", year, month, dayofmonth, 9, 30)
+    market_end_time = timestamp("America/New_York", year, month, dayofmonth, 10, 30)
+
     still_in_the_beginning = false
     current_timeframe = str.tonumber(timeframe.period)
-    bars_back = 15
-    if current_timeframe == 2
-        bars_back := 10
-    if current_timeframe > 2
-        bars_back := 5
+    bigger_than_period = current_timeframe * 10
+    if is_long_momentum
+        bigger_than_period := current_timeframe * 2
+
     for i = bars_back to 1
-        if (time[index+i-1] - time[index+i])/1000/60/current_timeframe > current_timeframe * 10
-            //log.info("minutes_between_bars: {0}", (time[i] - time[i-1])/1000/60)
+        if (time[index+i-1] - time[index+i])/1000/60/current_timeframe >= bigger_than_period and time <= market_end_time
+            // log.info("start: {0}:{1}. end: {2}:{3}", hour[index+i-1], minute[index+i-1], hour[index+i], minute[index+i])
             still_in_the_beginning := true
             break
-        if hour[index+i] == 9 and minute[index+i] >= 30 and minute[index+i] < 50
+
+    if not still_in_the_beginning
+        if time >= market_start_time and time <= market_end_time
             still_in_the_beginning := true
-            break
 
     still_in_the_beginning
 
@@ -394,6 +397,14 @@ run_positive_indicator(with_certainty) =>
         last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(index, volume_i, close_i, open_i, high_i, low_i, 5, true)
         current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9_i, low_i, close_i, vwap_i)
 
+        bars_back = 60
+        if str.tonumber(timeframe.period) == 2
+            bars_back := 30
+        if str.tonumber(timeframe.period) == 5
+            bars_back := 12
+
+        last_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(index, bars_back, true)
+
         current_bar_is_above_vwap
           and current_ema_is_above_vwap
           and last_bars_emas_higher
@@ -411,6 +422,7 @@ run_positive_indicator(with_certainty) =>
           and last_bars_volume_is_higher
           and last_biggest_volume_bar_was_green
           and current_bar_close_to_9_ema_on_other_timeframes_as_well
+          and last_bar_is_at_the_beginning_of_the_day
     else
         last_index = index+1
 
@@ -431,8 +443,15 @@ run_positive_indicator(with_certainty) =>
         last_bar_is_bullish_without_ema_certainty = current_bar_is_bullish(last_index, high_i, close_i, low_i, ema_9_i, ema_20_i, false)
         last_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(last_index, volume_i, close_i, open_i, high_i, low_i, 5, false)
         last_bar_inside_momentum_without_certainty = inside_momentum(last_index, last_bars, close_i, open_i, volume_i, false)
-        last_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(last_index)
         last_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(last_index, volume_i, high_i, low_i)
+
+        bars_back = 15
+        if str.tonumber(timeframe.period) == 2
+            bars_back := 10
+        if str.tonumber(timeframe.period) == 5
+            bars_back := 5
+
+        last_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(last_index, bars_back, false)
 
         last_bar_results = last_bar_is_above_vwap
           and last_bar_touching_9_ema
