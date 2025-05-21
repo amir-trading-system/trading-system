@@ -168,7 +168,20 @@ current_bar_macd_is_positive(index, close_src) =>
                 highest_macdLine_before := macdLine[index+i]
                 highest_macdLine_index := index+i
 
-    if highest_macdLine_index != 0 and highest_macdLine_before <= macdLine[index]
+    highest_histogram_in_the_last_bars = 0.0
+    for i = 10 to index
+        if histogram[index+i] > highest_histogram_in_the_last_bars
+            highest_histogram_in_the_last_bars := histogram[index+i]
+
+    lowest_histogram_in_the_last_bars = highest_histogram_in_the_last_bars
+    for i = 10 to index
+        if histogram[index+i] < lowest_histogram_in_the_last_bars
+            lowest_histogram_in_the_last_bars := histogram[index+i]
+
+    histogram_changed_significantly = lowest_histogram_in_the_last_bars / highest_histogram_in_the_last_bars < 0.5
+    //log.info("l: {0}. h: {1}", lowest_histogram_in_the_last_bars, highest_histogram_in_the_last_bars)
+
+    if highest_macdLine_index != 0 and highest_macdLine_before <= macdLine[index] and histogram_changed_significantly
         // histogram check
         highest_histogram = 0.0
         for i = 1 to 15
@@ -234,12 +247,13 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
             false
 
         last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i] > 0 and histogram[index+i+1] < histogram[index]
+        current_histogram_has_changed_significantly = last_histogram_is_between_two_highs and histogram[index+i] / histogram[0] < 0.5
         all_are_in_the_same_session = dayofmonth[index] == dayofmonth[index+i] and dayofmonth[index+i] == dayofmonth[index+i+1] and dayofmonth[index+i+1] == dayofmonth[index+i-1]
         macd_is_positive = macdLine[index+i] > 0
         histogram_is_positive = histogram[index+i] > 0
         current_macd_is_bigger = macdLine[index] > macdLine[index+i]
         current_histogram_is_bigger = histogram[index] > histogram[index+i] and highest_histogram < histogram[index]
-        if last_histogram_is_between_two_highs and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session and current_histogram_is_high
+        if last_histogram_is_between_two_highs and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session and current_histogram_is_high and current_histogram_has_changed_significantly
             previous_bars_has_change_in_momentum := true
             break
 
@@ -250,7 +264,7 @@ current_bar_touching_9_ema(index, low_src, ema_9) =>
 
 current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =>
     market_start_time = timestamp("America/New_York", year, month, dayofmonth, 9, 30)
-    market_end_time = timestamp("America/New_York", year, month, dayofmonth, 10, 30)
+    market_end_time = timestamp("America/New_York", year, month, dayofmonth, 12, 30)
 
     still_in_the_beginning = false
     current_timeframe = str.tonumber(timeframe.period)
@@ -259,7 +273,7 @@ current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =
         bigger_than_period := current_timeframe * 2
 
     for i = bars_back to 1
-        if (time[index+i-1] - time[index+i])/1000/60/current_timeframe >= bigger_than_period and time <= market_end_time
+        if (time[index+i-1] - time[index+i])/1000/60/current_timeframe >= bigger_than_period and time < market_start_time
             // log.info("start: {0}:{1}. end: {2}:{3}", hour[index+i-1], minute[index+i-1], hour[index+i], minute[index+i])
             still_in_the_beginning := true
             break
