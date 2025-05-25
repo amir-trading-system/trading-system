@@ -164,6 +164,8 @@ current_bar_macd_is_positive(index, close_src) =>
     bars_back = 20
 
     for i = bars_back to 1
+        if index+i-1 < 0
+            continue
         if macdLine[index+i] > macdLine[index+i+1] and macdLine[index+i] > macdLine[index+i-1] and signalLine[index+i+1] > 0 and signalLine[index+i-1] > 0 and histogram[index+i] > 0
             if highest_macdLine_before < macdLine[index+i]
                 highest_macdLine_before := macdLine[index+i]
@@ -183,7 +185,8 @@ current_bar_macd_is_positive(index, close_src) =>
             lowest_histogram_in_the_last_bars := histogram[index+i]
             lowest_histogram_in_the_last_bars_index := index+i
 
-    histogram_changed_significantly = lowest_histogram_in_the_last_bars / highest_histogram_in_the_last_bars < 0.5 and highest_histogram_in_the_last_bars_index < highest_macdLine_index_before
+    histogram_changed_significantly = lowest_histogram_in_the_last_bars / highest_histogram_in_the_last_bars < 0.5
+    // log.info("histogram_changed_significantly: {0}", histogram_changed_significantly)
 
     if highest_macdLine_index_before != 0 and highest_macdLine_before <= macdLine[index] and histogram_changed_significantly
         // histogram check
@@ -278,6 +281,8 @@ current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =
         bigger_than_period := current_timeframe * 2
 
     for i = bars_back to 1
+        if index+i-1 < 0
+            continue
         if (time[index+i-1] - time[index+i])/1000/60/current_timeframe >= bigger_than_period and time < market_start_time
             // log.info("start: {0}:{1}. end: {2}:{3}", hour[index+i-1], minute[index+i-1], hour[index+i], minute[index+i])
             still_in_the_beginning := true
@@ -388,6 +393,8 @@ macd_crossed_up_in_the_last_minutes(index, close_src) =>
     macd_crossed_recently = false
     for i = bars_back to index+1
         macd_crossed = (macdLine[index+i] > signalLine[index+i] and macdLine[index+i+1] < signalLine[index+i+1]) or histogram[index+i] < 0.001
+        if index+i-1 < 0
+            continue
         macd_direction_changed = macdLine[index+i] < macdLine[index+i-1] and macdLine[index+i] < macdLine[index+i+1]
         if macd_crossed or macd_direction_changed
             macd_crossed_recently := true
@@ -396,6 +403,8 @@ macd_crossed_up_in_the_last_minutes(index, close_src) =>
     histogram_crossed_recently = false
     if macd_crossed_recently
         for i = bars_back to index+1
+            if index+i-1 < 0
+                continue
             macd_is_above_zero = macdLine[index+i] > 0 and macdLine[index+i+1] > 0 and macdLine[index+i-1] > 0
             if macd_is_above_zero and histogram[index+i] < histogram[index+i-1] and histogram[index+i] < histogram[index+i+1]
                 histogram_crossed_recently := true
