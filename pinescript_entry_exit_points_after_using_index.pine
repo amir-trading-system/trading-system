@@ -423,6 +423,15 @@ histogram_check(index, close_src, bars_back) =>
 
     histogram_pattern_is_good
 
+at_least_one_bar_has_big_volume(index, volume_src) =>
+    at_least_one_bar_has_big_volume = false
+    for i = last_bars to index+1
+        if volume_src[i] >= 20000
+            at_least_one_bar_has_big_volume := true
+            break
+
+    at_least_one_bar_has_big_volume
+
 ///////// run indicators /////////
 
 run_positive_indicator(with_certainty) =>
@@ -465,6 +474,7 @@ run_positive_indicator(with_certainty) =>
         last_bars_volume_is_higher = last_bars_volume_is_higher(index, volume_i)
         last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(index, volume_i, close_i, open_i, high_i, low_i, 5, true)
         current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9_i, low_i, close_i, vwap_i)
+        at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(index, volume_i)
 
         bars_back = 60
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -505,6 +515,7 @@ run_positive_indicator(with_certainty) =>
           and current_bar_is_at_the_beginning_of_the_day
           and histogram_check
           and macd_check
+          and at_least_one_bar_has_big_volume
     else
         last_index = index+1
 
