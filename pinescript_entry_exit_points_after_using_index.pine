@@ -432,6 +432,27 @@ at_least_one_bar_has_big_volume(index, volume_src) =>
 
     at_least_one_bar_has_big_volume
 
+current_macd_is_higher_in_the_last_bars(index, close_src) =>
+    bars_back = 0
+    current_timeframe = str.tonumber(timeframe.period)
+    bars_in_hour = int(60 / current_timeframe)
+
+    market_start_time = timestamp(relevant_timezone, year, month, dayofmonth, 9, 30)
+    if time > market_start_time
+        bars_back := int((hour - 9) * bars_in_hour) + int((minute - 30) / current_timeframe)
+    else
+        bars_back := (hour - 4) * bars_in_hour
+
+    [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
+    highest_macdLine = 0.0
+
+    for i = index to bars_back
+        if i < 0
+            continue
+        if macdLine[i] > highest_macdLine
+            highest_macdLine := macdLine[i]
+    macdLine[0] >= highest_macdLine
+
 ///////// run indicators /////////
 
 run_positive_indicator(with_certainty) =>
@@ -530,6 +551,7 @@ run_positive_indicator(with_certainty) =>
         last_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(last_index, close_i, low_i, ema_9_i)
         last_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(last_index, close_i, low_i, high_i)
         last_bars_volume_is_higher = last_bars_volume_is_higher(last_index, volume_i)
+        at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(last_index, volume_i)
 
         last_bar_touching_9_ema = current_bar_touching_9_ema(last_index, low_i, ema_9_i)
         last_bar_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(last_index, close_i)
@@ -537,6 +559,7 @@ run_positive_indicator(with_certainty) =>
         last_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(last_index, volume_i, close_i, open_i, high_i, low_i, 5, false)
         last_bar_inside_momentum_without_certainty = inside_momentum(last_index, last_bars, close_i, open_i, volume_i, false)
         last_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(last_index, volume_i, high_i, low_i)
+        current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index, close_i)
 
         bars_back = 30
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -563,7 +586,9 @@ run_positive_indicator(with_certainty) =>
           and last_bars_volume_is_higher
           and last_biggest_volume_bar_was_green_without_certainty
           and last_bar_is_at_the_beginning_of_the_day
-         and last_bar_volume_is_higher_for_fast_change
+          and last_bar_volume_is_higher_for_fast_change
+          and current_macd_is_higher_in_the_last_bars
+          and at_least_one_bar_has_big_volume
           and close[index] > open[index]
 
 positive_indication = run_positive_indicator(true)
