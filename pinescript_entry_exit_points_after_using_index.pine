@@ -514,6 +514,7 @@ run_positive_indicator(with_certainty) =>
 
         histogram_check = histogram_check(index, close_i, macd_bars_back)
         macd_check = macd_check(index, close_i, macd_bars_back)
+        current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index, close_i)
 
 
         current_bar_is_above_vwap
@@ -536,6 +537,7 @@ run_positive_indicator(with_certainty) =>
           and histogram_check
           and macd_check
           and at_least_one_bar_has_big_volume
+          and current_macd_is_higher_in_the_last_bars
     else
         last_index = index+1
 
