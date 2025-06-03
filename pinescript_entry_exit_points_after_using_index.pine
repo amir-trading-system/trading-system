@@ -9,6 +9,7 @@ last_bars = 4
 min_momentun_vol_avg = 5000
 positive_sign = "✅"
 positive_sign_without_ema = "📈"
+long_time_gaps = "⏰"
 relevant_timezone = "America/New_York"
 
 ////           Positive indications           ////
@@ -213,6 +214,18 @@ current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =
     long_momentum_condition = time >= market_start_time and is_long_momentum
     short_momentum_condition = time >= pre_market_start_time and not is_long_momentum
     if not still_in_the_beginning and (long_momentum_condition or short_momentum_condition)
+        still_in_the_beginning := true
+
+    still_in_the_beginning
+
+current_bar_has_long_time_gaps(index) =>
+    still_in_the_beginning = false
+    pre_market_start_time = timestamp(relevant_timezone, year, month, dayofmonth, 04, 00)
+    market_end_time = timestamp(relevant_timezone, year, month, dayofmonth, 14, 00)
+    current_timeframe = str.tonumber(timeframe.period)
+    bigger_than_period = current_timeframe * 2
+
+    if (time[index] - time[index+1])/1000/60/current_timeframe >= bigger_than_period and time >= pre_market_start_time and time < market_end_time
         still_in_the_beginning := true
 
     still_in_the_beginning
@@ -597,5 +610,7 @@ positive_indication_for_short_momentum = run_positive_indicator(false)
 
 plotshape(positive_indication, title="Positive indication for long momentum", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = positive_sign)
 plotshape(positive_indication_for_short_momentum, title="Positive indication for short momentum", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
+plotshape(current_bar_has_long_time_gaps(0), title="Time Gaps", color=color.red, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = long_time_gaps)
+
 
 alertcondition(positive_indication or positive_indication_for_short_momentum, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
