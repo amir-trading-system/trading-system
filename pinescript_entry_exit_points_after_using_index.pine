@@ -195,7 +195,7 @@ current_bar_touching_9_ema(index, low_src, ema_9) =>
     low_src[index] <= ema_9[index] or (math.abs(low_src[index] - ema_9[index]) <= 0.10)
 
 current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =>
-    pre_market_start_time = timestamp(relevant_timezone, year, month, dayofmonth, 6, 00)
+    pre_market_start_time = timestamp(relevant_timezone, year, month, dayofmonth, 7, 00)
     market_start_time = timestamp(relevant_timezone, year, month, dayofmonth, 9, 30)
     market_end_time = timestamp(relevant_timezone, year, month, dayofmonth, 16, 00)
 
@@ -210,9 +210,9 @@ current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =
             still_in_the_beginning := true
             break
 
-    time_between_market_opening_to_3_hours_later = time >= market_start_time
-    time_between_pre_market_hours = time >= pre_market_start_time and time <= market_start_time
-    if not still_in_the_beginning and (time_between_market_opening_to_3_hours_later or (time_between_pre_market_hours and not is_long_momentum))
+    long_momentum_condition = time >= market_start_time and is_long_momentum
+    short_momentum_condition = time >= pre_market_start_time and not is_long_momentum
+    if not still_in_the_beginning and (long_momentum_condition or short_momentum_condition)
         still_in_the_beginning := true
 
     still_in_the_beginning
