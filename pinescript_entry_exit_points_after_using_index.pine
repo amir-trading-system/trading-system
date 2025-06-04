@@ -168,12 +168,12 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
             highest_histogram := histogram[index+i]
 
     for i = index to 3
-        if histogram[index+i] < 0
+        if histogram[index+i] < 0 or index+i-1 < 0
             continue
 
         current_histogram_is_high = true
-        for j = index to 3
-            current_histogram_is_high := histogram[index] > histogram[index+j] and histogram[index+j] > 0
+        for j = i to 3
+            current_histogram_is_high := histogram[index] > histogram[j] and histogram[index] > 0
             if not current_histogram_is_high
                 break
         if not current_histogram_is_high
@@ -489,25 +489,26 @@ run_positive_indicator(with_certainty) =>
     high_i = high_values[index]
     volume_i = volume_values[index]
 
+    current_bar_is_above_vwap = current_bar_is_above_vwap(index, vwap_i, close_i, high_i)
+    last_bars_emas_higher = last_bars_emas_higher(index, last_bars, ema_9_i, ema_20_i, vwap_i)
+    current_bar_has_new_high = current_bar_has_new_high(index, high_i)
+    buyers_coming_in = buyers_coming_in(index, last_bars, close_i, open_i, volume_i)
+    current_bar_has_at_least_one_weak_bar_before = current_bar_has_at_least_one_weak_bar_before(index, last_bars, close_i, open_i, high_i, low_i)
+    current_bar_must_be_positive_and_volatile = current_bar_must_be_positive_and_volatile(index, last_bars, low_i, high_i, volume_i, close_i, open_i)
+    current_bar_is_above_support_line = current_bar_is_above_support_line(index, 3, low_i)
+    current_bar_close_to_nine_ema_by_avg = current_bar_close_to_nine_ema_by_avg(index, last_bars, close_i, low_i, high_i, ema_9_i, ema_20_i)
+    current_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(index, close_i, low_i, ema_9_i)
+    current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(index, close_i, low_i, high_i)
+    last_bars_volume_is_higher = last_bars_volume_is_higher(index, volume_i)
+    at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(index, volume_i)
+    current_bar_is_bullish = current_bar_is_bullish(index, high_i, close_i, low_i, ema_9_i, ema_20_i, true)
+    current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index, close_i)
 
     if with_certainty
-        current_bar_is_above_vwap = current_bar_is_above_vwap(index, vwap_i, close_i, high_i)
-        last_bars_emas_higher = last_bars_emas_higher(index, last_bars, ema_9_i, ema_20_i, vwap_i)
         current_ema_is_above_vwap = current_ema_is_above_vwap(index, ema_9_i, vwap_i, open_i)
-        current_bar_has_new_high = current_bar_has_new_high(index, high_i)
-        buyers_coming_in = buyers_coming_in(index, last_bars, close_i, open_i, volume_i)
         inside_momentum = inside_momentum(index, last_bars, close_i, open_i, volume_i, true)
-        current_bar_has_at_least_one_weak_bar_before = current_bar_has_at_least_one_weak_bar_before(index, last_bars, close_i, open_i, high_i, low_i)
-        current_bar_must_be_positive_and_volatile = current_bar_must_be_positive_and_volatile(index, last_bars, low_i, high_i, volume_i, close_i, open_i)
-        current_bar_is_above_support_line = current_bar_is_above_support_line(index, 3, low_i)
-        current_bar_close_to_nine_ema_by_avg = current_bar_close_to_nine_ema_by_avg(index, last_bars, close_i, low_i, high_i, ema_9_i, ema_20_i)
-        current_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(index, close_i, low_i, ema_9_i)
-        current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(index, close_i, low_i, high_i)
-        current_bar_is_bullish = current_bar_is_bullish(index, high_i, close_i, low_i, ema_9_i, ema_20_i, true)
-        last_bars_volume_is_higher = last_bars_volume_is_higher(index, volume_i)
         last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(index, volume_i, close_i, open_i, high_i, low_i, 5, true)
         current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9_i, low_i, close_i, vwap_i)
-        at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(index, volume_i)
 
         bars_back = 60
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -527,7 +528,6 @@ run_positive_indicator(with_certainty) =>
 
         histogram_check = histogram_check(index, close_i, macd_bars_back)
         macd_check = macd_check(index, close_i, macd_bars_back)
-        current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index, close_i)
 
 
         current_bar_is_above_vwap
@@ -552,28 +552,12 @@ run_positive_indicator(with_certainty) =>
           and at_least_one_bar_has_big_volume
           and current_macd_is_higher_in_the_last_bars
     else
-        last_index = index+1
-
-        last_bar_is_above_vwap = current_bar_is_above_vwap(last_index, vwap_i, close_i, high_i)
-        last_bars_emas_higher = last_bars_emas_higher(last_index, last_bars, ema_9_i, ema_20_i, vwap_i)
-        last_bar_has_new_high = current_bar_has_new_high(last_index, high_i)
-        last_bar_buyers_coming_in = buyers_coming_in(last_index, last_bars, close_i, open_i, volume_i)
-        last_bar_has_at_least_one_weak_bar_before = current_bar_has_at_least_one_weak_bar_before(last_index, last_bars, close_i, open_i, high_i, low_i)
-        last_bar_must_be_positive_and_volatile = current_bar_must_be_positive_and_volatile(last_index, last_bars, low_i, high_i, volume_i, close_i, open_i)
-        last_bar_is_above_support_line = current_bar_is_above_support_line(last_index, last_bars, low_i)
-        last_bar_close_to_nine_ema_by_avg = current_bar_close_to_nine_ema_by_avg(last_index, last_bars, close_i, low_i, high_i, ema_9_i, ema_20_i)
-        last_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(last_index, close_i, low_i, ema_9_i)
-        last_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(last_index, close_i, low_i, high_i)
-        last_bars_volume_is_higher = last_bars_volume_is_higher(last_index, volume_i)
-        at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(last_index, volume_i)
-
-        last_bar_touching_9_ema = current_bar_touching_9_ema(last_index, low_i, ema_9_i)
-        last_bar_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(last_index, close_i)
-        last_bar_is_bullish_without_ema_certainty = current_bar_is_bullish(last_index, high_i, close_i, low_i, ema_9_i, ema_20_i, false)
-        last_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(last_index, volume_i, close_i, open_i, high_i, low_i, 5, false)
-        last_bar_inside_momentum_without_certainty = inside_momentum(last_index, last_bars, close_i, open_i, volume_i, false)
-        last_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(last_index, volume_i, high_i, low_i)
-        current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index, close_i)
+        current_bar_touching_9_ema = current_bar_touching_9_ema(index, low_i, ema_9_i)
+        current_bar_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(index, close_i)
+        current_bar_is_bullish_without_ema_certainty = current_bar_is_bullish(index, high_i, close_i, low_i, ema_9_i, ema_20_i, false)
+        current_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(index, volume_i, close_i, open_i, high_i, low_i, 5, false)
+        current_bar_inside_momentum_without_certainty = inside_momentum(index, last_bars, close_i, open_i, volume_i, false)
+        current_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(index, volume_i, high_i, low_i)
 
         bars_back = 30
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -581,29 +565,28 @@ run_positive_indicator(with_certainty) =>
         if str.tonumber(timeframe.period) >= 5
             bars_back := 6
 
-        last_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(last_index, bars_back, false)
+        current_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(index, bars_back, false)
 
-        last_bar_results = last_bar_is_above_vwap
-          and last_bar_touching_9_ema
+        current_bar_results = current_bar_is_above_vwap
           and last_bars_emas_higher
-          and last_bar_has_new_high
-          and last_bar_buyers_coming_in
-          and last_bar_inside_momentum_without_certainty
-          and last_bar_has_at_least_one_weak_bar_before
-          and last_bar_must_be_positive_and_volatile
-          and last_bar_is_above_support_line
-          and last_bar_close_to_nine_ema_by_avg
-          and last_bar_macd_has_new_high_and_came_as_change_point
-          and last_bar_gets_50_percent_above_9_ema
-          and last_bar_closes_where_buyers_still_in
-          and last_bar_is_bullish_without_ema_certainty
+          and current_bar_has_new_high
+          and buyers_coming_in
+          and current_bar_has_at_least_one_weak_bar_before
+          and current_bar_must_be_positive_and_volatile
+          and current_bar_is_above_support_line
+          and current_bar_close_to_nine_ema_by_avg
+          and current_bar_gets_50_percent_above_9_ema
+          and current_bar_closes_where_buyers_still_in
           and last_bars_volume_is_higher
-          and last_biggest_volume_bar_was_green_without_certainty
-          and last_bar_is_at_the_beginning_of_the_day
-          and last_bar_volume_is_higher_for_fast_change
-          and current_macd_is_higher_in_the_last_bars
+          and current_bar_is_at_the_beginning_of_the_day
           and at_least_one_bar_has_big_volume
-          and close[index] > open[index]
+          and current_bar_touching_9_ema
+          and current_bar_macd_has_new_high_and_came_as_change_point
+          and current_bar_is_bullish_without_ema_certainty
+          and current_biggest_volume_bar_was_green_without_certainty
+          and current_bar_inside_momentum_without_certainty
+          and current_bar_volume_is_higher_for_fast_change
+          and current_macd_is_higher_in_the_last_bars
 
 positive_indication = run_positive_indicator(true)
 positive_indication_for_short_momentum = run_positive_indicator(false)
