@@ -186,6 +186,18 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
         macd_has_high_point_before = false
         histogram_has_high_point_before = false
 
+        histogram_has_high_point_before_index = 0
+        histogram_has_high_point_before_value = 0.0
+
+        macd_relevant_high_point_before_index = 0
+        macd_relevant_high_point_before_value = 0.0
+
+        macd_has_high_point_before_index = 0
+        macd_has_high_point_before_value = 0.0
+
+        macd_has_strong_point_before_index = 0
+        macd_has_strong_point_before_value = 0.0
+
         last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i+1] > 0 and histogram[index+i+1] < histogram[index]
         if last_histogram_is_between_two_highs
             for j = i+20 to i
@@ -193,38 +205,58 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
                     it_is_start_of_the_move := false
                     break
 
-            for j = index+i to 10
-                histogram_has_high_point_before := histogram[j] > histogram[j+1] and histogram[j] > histogram[j-1]
-                if histogram_has_high_point_before
-                    break
+            if it_is_start_of_the_move
+                for j = index+i to 10
+                    if histogram[j] > histogram[j+1] and histogram[j] > histogram[j-1] and histogram[j] > 0
+                        histogram_has_high_point_before := true
+                        if histogram[j] > histogram_has_high_point_before_value
+                            histogram_has_high_point_before_index := j
+                            histogram_has_high_point_before_value := histogram[j]
 
-            signalLine_at_point_greater_than_zero = false
-            macd_had_top_point = false
-            macd_hasnt_top_point_but_still_very_strong = false
-            for j = index+i to 10
-                if j-2 < 0 or j-1 < 0
-                    continue
+                signalLine_at_point_greater_than_zero = false
+                macd_had_top_point = false
+                macd_hasnt_top_point_because_it_is_very_strong = false
+                for j = index+i to 10
+                    if j-2 < 0 or j-1 < 0
+                        continue
 
-                if signalLine[j] > 0
-                    signalLine_at_point_greater_than_zero := true
-                    if macdLine[j] > macdLine[j+1] and macdLine[j] > macdLine[j-1] and histogram[j] > 0
-                        macd_had_top_point := true
-                    if macdLine[j] - macdLine[j+1] > macdLine[j-1] - macdLine[j] and macdLine[j-2] - macdLine[j-1] > macdLine[j-1] - macdLine[j] and histogram[j] > 0
-                        macd_hasnt_top_point_but_still_very_strong := true
+                    current_histogram_is_positive = histogram[j] > 0
+                    signalLine_at_point_greater_than_zero := signalLine[j] > 0
 
-                if macd_had_top_point and signalLine_at_point_greater_than_zero
-                    macd_has_high_point_before := true
-                    break
-            if not macd_had_top_point and (macd_hasnt_top_point_but_still_very_strong and signalLine_at_point_greater_than_zero)
-                macd_has_high_point_before := true
+                    macd_had_top_point := macdLine[j] > macdLine[j+1] and macdLine[j] > macdLine[j-1]
+                    macd_hasnt_top_point_because_it_is_very_strong := macdLine[j] > macdLine[j+1] and macdLine[j] - macdLine[j+1] > macdLine[j-1] - macdLine[j] and macdLine[j-2] - macdLine[j-1] > macdLine[j-1] - macdLine[j]
 
+                    if signalLine_at_point_greater_than_zero and current_histogram_is_positive
+                        if macd_had_top_point and macdLine[j] > macd_has_high_point_before_value
+                            macd_has_high_point_before_index := j
+                            macd_has_high_point_before_value := macdLine[j]
+                            macd_has_high_point_before := true
+                        if macd_hasnt_top_point_because_it_is_very_strong and macdLine[j] > macd_has_strong_point_before_value
+                            macd_has_strong_point_before_index := j
+                            macd_has_strong_point_before_value := macdLine[j]
+                            macd_has_high_point_before := true
+
+                if macd_has_high_point_before_index != 0
+                    macd_relevant_high_point_before_index := macd_has_high_point_before_index
+                    macd_relevant_high_point_before_value := macd_has_high_point_before_value
+                else if macd_has_strong_point_before_index != 0
+                    macd_relevant_high_point_before_index := macd_has_strong_point_before_index
+                    macd_relevant_high_point_before_value := macd_has_strong_point_before_value
+
+        // if time == timestamp(relevant_timezone, year, 5, 30, 8, 50) and str.tonumber(timeframe.period) == 2
+        //     log.info("macd_i: {0}. macd_v: {1}. histogram_i: {2}. histogram_v: {3}", macd_relevant_high_point_before_index, macd_relevant_high_point_before_value, histogram_has_high_point_before_index, histogram_has_high_point_before_value)
+
+        histogram_and_macd_top_points_are_close = math.abs(macd_relevant_high_point_before_index-histogram_has_high_point_before_index) <= 3
         current_histogram_has_changed_significantly = last_histogram_is_between_two_highs and histogram[index+i] / histogram[0] < 0.6 and histogram[1]/histogram[0] < 0.7
         all_are_in_the_same_session = dayofmonth[index] == dayofmonth[index+i] and dayofmonth[index+i] == dayofmonth[index+i+1] and dayofmonth[index+i+1] == dayofmonth[index+i-1]
         macd_is_positive = macdLine[index+i] > 0
         histogram_is_positive = histogram[index+i] > 0
         current_macd_is_bigger = macdLine[index] > macdLine[index+i]
         current_histogram_is_bigger = histogram[index] > histogram[index+i] and histogram[index] / highest_histogram > 0.75
-        if last_histogram_is_between_two_highs and macd_has_high_point_before and histogram_has_high_point_before and it_is_start_of_the_move and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session and current_histogram_is_high and current_histogram_has_changed_significantly and histogram_was_negative_before
+        // if time == timestamp(relevant_timezone, year, 5, 1, 8, 44) and str.tonumber(timeframe.period) == 2
+        //     log.info("macd_has_high_point_before: {0}.", macd_has_high_point_before)
+
+        if last_histogram_is_between_two_highs and macd_has_high_point_before and histogram_has_high_point_before and it_is_start_of_the_move and histogram_and_macd_top_points_are_close and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session and current_histogram_is_high and current_histogram_has_changed_significantly and histogram_was_negative_before
             previous_bars_has_change_in_momentum := true
             break
 
