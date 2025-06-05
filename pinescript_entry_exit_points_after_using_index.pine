@@ -207,10 +207,10 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
 
                 if signalLine[j] > 0
                     signalLine_at_point_greater_than_zero := true
-                if macdLine[j] > macdLine[j+1] and macdLine[j] > macdLine[j-1] and histogram[j] > 0
-                    macd_had_top_point := true
-                if macdLine[j] - macdLine[j+1] > macdLine[j-1] - macdLine[j] and macdLine[j-2] - macdLine[j-1] > macdLine[j-1] - macdLine[j] and histogram[j] > 0
-                    macd_hasnt_top_point_but_still_very_strong := true
+                    if macdLine[j] > macdLine[j+1] and macdLine[j] > macdLine[j-1] and histogram[j] > 0
+                        macd_had_top_point := true
+                    if macdLine[j] - macdLine[j+1] > macdLine[j-1] - macdLine[j] and macdLine[j-2] - macdLine[j-1] > macdLine[j-1] - macdLine[j] and histogram[j] > 0
+                        macd_hasnt_top_point_but_still_very_strong := true
 
                 if macd_had_top_point and signalLine_at_point_greater_than_zero
                     macd_has_high_point_before := true
