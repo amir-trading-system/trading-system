@@ -155,6 +155,44 @@ current_bar_close_to_nine_ema_by_avg(index, last_bars, close_src, low_src, high_
     (low_distance_from_ema / bar_size <= 0.5) or
       (low_src[index] > ema_20[index] and low_src[index] < ema_9[index])
 
+current_bar_price_changed_significantly(check_on_index, index_between_two_highes, last_bars) =>
+    bar_sizes_sum = 0.0
+    highest_price_in_last_bars = 0.0
+    current_bar_size = high[check_on_index] - low[check_on_index]
+
+    counter = 0
+    there_is_a_big_bar_before = false
+    for i = index_between_two_highes+last_bars to index_between_two_highes+1
+        if time[i] <= timestamp(relevant_timezone, year, month, dayofmonth, 4, 00)
+            continue
+        if high[i]-close[i] > close[i]-low[i] and open[i] > close[i]
+            continue
+
+        if (high[i]-low[i])/current_bar_size >= 0.7 and volume[i] * 5 > volume[check_on_index]
+            there_is_a_big_bar_before := true
+
+        // if time == timestamp(relevant_timezone, year, 6, 3, 7, 20) and str.tonumber(timeframe.period) == 5
+        //     log.info("i: {0}. h: {1}. l: {2}", i, str.tostring(high[i], format.mintick), str.tostring(low[i], format.mintick))
+        bar_sizes_sum += high[i] - low[i]
+        counter += 1
+        if high[i] > highest_price_in_last_bars
+            highest_price_in_last_bars := high[i]
+
+    lowest_price_in_last_bars = highest_price_in_last_bars
+    for i = index_between_two_highes+last_bars to index_between_two_highes+1
+        if time[i] <= timestamp(relevant_timezone, year, month, dayofmonth, 4, 00)
+            continue
+        if high[i]-close[i] > close[i]-low[i] and open[i] > close[i]
+            continue
+        if low[i] < lowest_price_in_last_bars
+            lowest_price_in_last_bars := low[i]
+
+    bar_size_avg = bar_sizes_sum/counter
+    current_bar_price_has_changed = not there_is_a_big_bar_before and current_bar_size/bar_size_avg > 0.75 and high[check_on_index] > highest_price_in_last_bars and lowest_price_in_last_bars - 0.1 < low[check_on_index]
+    // if time == timestamp(relevant_timezone, year, 6, 3, 7, 20) and str.tonumber(timeframe.period) == 5
+    //     log.info("current_bar_size: {0}, avg_bar_size_mul_3: {1}. highest_price_in_last_bars: {2}. lowest_price_in_last_bars: {3}. bar_sizes_sum: {4}", high[check_on_index] - low[check_on_index], bar_size_avg * 3, highest_price_in_last_bars, lowest_price_in_last_bars, bar_sizes_sum)
+    current_bar_price_has_changed
+
 current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
     [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
     previous_bars_has_change_in_momentum = false
@@ -182,6 +220,7 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
         if not current_histogram_is_high
             false
 
+        price_change_ocurred_after_histogram_between_two_highs = false
         it_is_start_of_the_move = true
         macd_has_high_point_before = false
         histogram_has_high_point_before = false
@@ -200,6 +239,11 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
 
         last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i+1] > 0 and histogram[index+i+1] < histogram[index]
         if last_histogram_is_between_two_highs
+            for j = index+i-1 to index
+                price_change_ocurred_after_histogram_between_two_highs := current_bar_price_changed_significantly(j, index+i, 5)
+                if price_change_ocurred_after_histogram_between_two_highs
+                    break
+
             for j = i+20 to i
                 if histogram[j]/highest_histogram >= 0.8 and j-i >= 7
                     it_is_start_of_the_move := false
@@ -256,7 +300,7 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
         // if time == timestamp(relevant_timezone, year, 5, 1, 8, 44) and str.tonumber(timeframe.period) == 2
         //     log.info("macd_has_high_point_before: {0}.", macd_has_high_point_before)
 
-        if last_histogram_is_between_two_highs and macd_has_high_point_before and histogram_has_high_point_before and it_is_start_of_the_move and histogram_and_macd_top_points_are_close and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session and current_histogram_is_high and current_histogram_has_changed_significantly and histogram_was_negative_before
+        if last_histogram_is_between_two_highs and price_change_ocurred_after_histogram_between_two_highs and macd_has_high_point_before and histogram_has_high_point_before and it_is_start_of_the_move and histogram_and_macd_top_points_are_close and macd_is_positive and histogram_is_positive and current_macd_is_bigger and current_histogram_is_bigger and all_are_in_the_same_session and current_histogram_is_high and current_histogram_has_changed_significantly and histogram_was_negative_before
             previous_bars_has_change_in_momentum := true
             break
 
