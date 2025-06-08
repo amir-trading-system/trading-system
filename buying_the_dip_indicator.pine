@@ -1,0 +1,112 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © amiryaffe
+
+//@version=6
+indicator(title="Buying The Dip for Day Trading", overlay = true)
+import TradingView/ta/10
+
+
+buying_the_dip_sign = "💰"
+relevant_timezone = "America/New_York"
+
+////           Indications           ////
+
+current_bar_is_strong_green(index, bars_back) =>
+    current_bars_is_positive = close[index] > open[index]
+    current_bar_is_strong = (close[index] - open[index]) / (high[index] - close[index]) > 0.5
+    current_volume_is_bigger_than_last_ones = true
+    for i = 1 to bars_back
+        if close[index+i] < open[index+i] and (volume[index+i] > volume[0] or volume[index+i]/volume[0] >= 0.8)
+            current_volume_is_bigger_than_last_ones := false
+            break
+
+    current_bars_is_positive and current_bar_is_strong and current_volume_is_bigger_than_last_ones
+
+volume_has_changed_significantly_in_the_last_bars(index, bars_back) =>
+    vol_avg = ta.sma(volume, 20)
+    volume_has_changed_significantly_in_the_last_bars = false
+
+    for i = 1 to bars_back
+        if volume[index+i] > volume[index+i+1] * 10
+            volume_has_changed_significantly_in_the_last_bars := true
+            break
+
+    volume_has_changed_significantly_in_the_last_bars
+
+macd_is_still_in_its_first_phase(index) =>
+    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
+    macd_is_still_in_its_first_phase = true
+    for i = 0 to 5
+        if signalLine[index+i] >= macdLine[index+i]
+            macd_is_still_in_its_first_phase := false
+            break
+        if macdLine[index+i+1] > macdLine[index]
+            macd_is_still_in_its_first_phase := false
+            break
+
+    macd_is_still_in_its_first_phase
+
+current_bar_is_stronger_than_the_last_red_bars(index, bars_back) =>
+    current_bar_is_stronger_than_the_last_red_bars = true
+
+    for i = 1 to bars_back
+        if close[index+i] > open[index+i]
+            continue
+        if volume[index+i] >= volume[index]
+            current_bar_is_stronger_than_the_last_red_bars := false
+            break
+
+    current_bar_is_stronger_than_the_last_red_bars
+
+current_bar_crossed_vwap_towards_up(index) =>
+    vwap = ta.vwap(hlc3)
+    open[index] < vwap[index] and close[index] > vwap[index]
+
+current_bar_is_the_nearest_bar_to_9_ema(index) =>
+    ema_9 = ta.ema(close, 9)
+
+    last_bars_higher_than_9_ema = true
+    for i = 0 to 3
+        if low[index+i] < ema_9[index+i]
+            last_bars_higher_than_9_ema := false
+            break
+
+
+    current_bar_is_the_nearest_bar_to_9_ema = true
+    for i = 0 to 3
+        if ema_9[index+i+1] >= ema_9[index+i]
+            current_bar_is_the_nearest_bar_to_9_ema := false
+            break
+
+        if close[index+i+1] > open[index+i+1] and current_bar_crossed_vwap_towards_up(index+i+1)
+            continue
+
+        if (low[index+i+1] - ema_9[index+i+1]) < (low[index+i] - ema_9[index+i])
+            current_bar_is_the_nearest_bar_to_9_ema := false
+            break
+
+    last_bars_higher_than_9_ema and current_bar_is_the_nearest_bar_to_9_ema
+
+///////// run indicators /////////
+
+run_indicator() =>
+    index = 0
+    bars_back = 10
+
+    current_bar_is_strong_green = current_bar_is_strong_green(index, bars_back)
+    volume_has_changed_significantly_in_the_last_bars = volume_has_changed_significantly_in_the_last_bars(index, bars_back)
+    macd_is_still_in_its_first_phase = macd_is_still_in_its_first_phase(index)
+    current_bar_is_stronger_than_the_last_red_bars = current_bar_is_stronger_than_the_last_red_bars(index, bars_back)
+    current_bar_is_the_nearest_bar_to_9_ema = current_bar_is_the_nearest_bar_to_9_ema(index)
+    current_bar_crossed_vwap_towards_up = current_bar_crossed_vwap_towards_up(index)
+
+    current_bar_is_strong_green
+      and volume_has_changed_significantly_in_the_last_bars
+      and macd_is_still_in_its_first_phase
+      and current_bar_is_stronger_than_the_last_red_bars
+      and current_bar_is_the_nearest_bar_to_9_ema
+      and current_bar_crossed_vwap_towards_up
+
+buying_the_dip_indication = run_indicator()
+
+plotshape(buying_the_dip_indication, title="Buying the dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = buying_the_dip_sign)
