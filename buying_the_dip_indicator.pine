@@ -13,7 +13,7 @@ relevant_timezone = "America/New_York"
 
 current_bar_is_strong_green(index, bars_back) =>
     current_bars_is_positive = close[index] > open[index]
-    current_bar_is_strong = (close[index] - open[index]) / (high[index] - close[index]) > 0.5
+    current_bar_is_strong = (close[index] - open[index]) / (high[index] - open[index]) > 0.6
     current_volume_is_bigger_than_last_ones = true
     for i = 1 to bars_back
         if close[index+i] < open[index+i] and (volume[index+i] > volume[0] or volume[index+i]/volume[0] >= 0.8)
@@ -71,7 +71,6 @@ current_bar_is_the_nearest_bar_to_9_ema(index) =>
             last_bars_higher_than_9_ema := false
             break
 
-
     current_bar_is_the_nearest_bar_to_9_ema = true
     for i = 0 to 3
         if ema_9[index+i+1] >= ema_9[index+i]
@@ -87,6 +86,25 @@ current_bar_is_the_nearest_bar_to_9_ema(index) =>
 
     last_bars_higher_than_9_ema and current_bar_is_the_nearest_bar_to_9_ema
 
+last_bars_showing_weak_downtrend(index) =>
+    ema_9 = ta.ema(close, 9)
+    last_bars_showing_weak_downtrend = false
+
+    for i = 1 to 2
+        has_low_of_lows = low[index+i+1] > low[index+1]
+        has_low_highs = high[index+i+1] > high[index+1]
+        volume_getting_slower = volume[index+i+1] > volume[index+1]
+        getting_close_to_9_ema = ema_9[index+i+1] < ema_9[index+1] and (low[index+i+1] - ema_9[index+i+1] > low[index+1] - ema_9[index+1])
+        last_bars_showing_weak_downtrend := has_low_of_lows
+          and has_low_highs
+          and volume_getting_slower
+          and getting_close_to_9_ema
+
+        if last_bars_showing_weak_downtrend
+            break
+
+    last_bars_showing_weak_downtrend
+
 ///////// run indicators /////////
 
 run_indicator() =>
@@ -99,6 +117,7 @@ run_indicator() =>
     current_bar_is_stronger_than_the_last_red_bars = current_bar_is_stronger_than_the_last_red_bars(index, bars_back)
     current_bar_is_the_nearest_bar_to_9_ema = current_bar_is_the_nearest_bar_to_9_ema(index)
     current_bar_crossed_vwap_towards_up = current_bar_crossed_vwap_towards_up(index)
+    last_bars_showing_weak_downtrend = last_bars_showing_weak_downtrend(index)
 
     current_bar_is_strong_green
       and volume_has_changed_significantly_in_the_last_bars
@@ -106,6 +125,7 @@ run_indicator() =>
       and current_bar_is_stronger_than_the_last_red_bars
       and current_bar_is_the_nearest_bar_to_9_ema
       and current_bar_crossed_vwap_towards_up
+      and last_bars_showing_weak_downtrend
 
 buying_the_dip_indication = run_indicator()
 
