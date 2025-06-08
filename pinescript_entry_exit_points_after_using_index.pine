@@ -14,61 +14,70 @@ relevant_timezone = "America/New_York"
 
 ////           Positive indications           ////
 
-current_bar_is_bullish(index, high_src, close_src, low_src, ema_9, ema_20, with_certainty) =>
-    result = high_src[index] - close_src[index] < close_src[index] - low_src[index]
+current_bar_is_bullish(index, with_certainty) =>
+    ema_9 = ta.ema(close, 9)
+    ema_20 = ta.ema(close, 20)
+    result = high[index] - close[index] < close[index] - low[index]
     if with_certainty
-        result := result and low_src[index] > ema_9[index] and low_src[index] > ema_20[index]
+        result := result and low[index] > ema_9[index] and low[index] > ema_20[index]
     else
-        result := result and (low_src[index] > ema_9[index] or low_src[index] > ema_20[index])
+        result := result and (low[index] > ema_9[index] or low[index] > ema_20[index])
     result
 
-current_bar_volume_is_higher_than_last_ones(index, last_bars, close_src, open_src, volume_src) =>
+current_bar_volume_is_higher_than_last_ones(index, last_bars) =>
     sum_of_buyers = 0.0
     sum_of_sellers = 0.0
     volume_is_higher_than_last_ones = true
     for i = 1 to last_bars
-        if close_src[index+i] > open_src[index+i]
-            sum_of_buyers += volume_src[index+i]
+        if close[index+i] > open[index+i]
+            sum_of_buyers += volume[index+i]
             continue
         else
-            sum_of_sellers += volume_src[index+i]
-            if volume_src[index+i] > volume_src[index]
+            sum_of_sellers += volume[index+i]
+            if volume[index+i] > volume[index]
                 volume_is_higher_than_last_ones := false
 
     volume_is_higher_than_last_ones or (sum_of_buyers > sum_of_sellers)
 
-current_bar_is_above_vwap(index, vwap_src, close_src, high_src) =>
-    close_src[index] > vwap_src[index] and high_src[index] > vwap_src[index]
+current_bar_is_above_vwap(index) =>
+    vwap = ta.vwap(hlc3)
+    close[index] > vwap[index] and high[index] > vwap[index]
 
-current_ema_is_above_vwap(index, ema_9_src, vwap_src, open_src) =>
-    rounded_vwap = (math.round(vwap_src[index] * 100) / 100)
-    rounded_9_ema = (math.round(ema_9_src[index] * 100) / 100)
-    rounded_open = (math.round(open_src[index] * 100) / 100)
+current_ema_is_above_vwap(index) =>
+    vwap = ta.vwap(hlc3)
+    ema_9 = ta.ema(close, 9)
+
+    rounded_vwap = (math.round(vwap[index] * 100) / 100)
+    rounded_9_ema = (math.round(ema_9[index] * 100) / 100)
+    rounded_open = (math.round(open[index] * 100) / 100)
 
     rounded_9_ema >= rounded_vwap and rounded_open > rounded_vwap
 
-last_bars_emas_higher(index, last_bars, ema_9_src, ema_20_src, vwap_src) =>
+last_bars_emas_higher(index, last_bars) =>
+    ema_9 = ta.ema(close, 9)
+    ema_20 = ta.ema(close, 20)
     last_bars_emas_higher = true
+
     for i = index to last_bars
-        if not (math.max(ema_9_src[index+i], ema_20_src[index+i]) == ema_9_src[index+i])
+        if not (math.max(ema_9[index+i], ema_20[index+i]) == ema_9[index+i])
             last_bars_emas_higher := false
             break
 
     last_bars_emas_higher
 
-buyers_coming_in(index, last_bars, close_src, open_src, volume_src) =>
-    vol_avg = ta.sma(volume_src[last_bars], 20)[index]
+buyers_coming_in(index, last_bars) =>
+    vol_avg = ta.sma(volume[last_bars], 20)[index]
     sellers_are_still_in_the_game = false
     green_bars_volume = 0.0
     red_bars_volume = 0.0
 
     for i = 0 to last_bars
-        bar_is_negative = close_src[index+i] < open_src[index+i]
+        bar_is_negative = close[index+i] < open[index+i]
         if bar_is_negative
-            red_bars_volume += volume_src[i]
+            red_bars_volume += volume[index+i]
         else
-            green_bars_volume += volume_src[i]
-        if bar_is_negative and volume_src[i] > vol_avg
+            green_bars_volume += volume[index+i]
+        if bar_is_negative and volume[index+i] > vol_avg
             sellers_are_still_in_the_game := true
             break
 
@@ -76,7 +85,7 @@ buyers_coming_in(index, last_bars, close_src, open_src, volume_src) =>
 
     not negative_condition
 
-current_bar_has_new_high(index, high_src) =>
+current_bar_has_new_high(index) =>
     bars_back = 5
     current_timeframe = str.tonumber(timeframe.period)
     if current_timeframe > 1 and current_timeframe < 5
@@ -86,74 +95,76 @@ current_bar_has_new_high(index, high_src) =>
 
     highest_high = 0.0
     for i = 1 to bars_back
-        if high_src[index+i] > highest_high
-            highest_high := high_src[index+i]
+        if high[index+i] > highest_high
+            highest_high := high[index+i]
 
-    high_src[index] > highest_high
+    high[index] > highest_high
 
-inside_momentum(index, last_bars, close_src, open_src, volume_src, with_certainty) =>
+inside_momentum(index, last_bars, with_certainty) =>
     under_avg_vol_bars_counter = 0
     above_avg_vol_bars_counter = 0
-    vol_avg = ta.sma(volume_src[last_bars], 20)[index]
-    current_bar_volume_is_higher_than_last_ones = current_bar_volume_is_higher_than_last_ones(index, last_bars, close_src, open_src, volume_src)
+    vol_avg = ta.sma(volume[last_bars], 20)[index]
+    current_bar_volume_is_higher_than_last_ones = current_bar_volume_is_higher_than_last_ones(index, last_bars)
 
     for i = 0 to last_bars
         if vol_avg[i] < min_momentun_vol_avg and with_certainty
             under_avg_vol_bars_counter += 1
-        else if close_src < open_src
+        else if close < open
             under_avg_vol_bars_counter += 1
         else if current_bar_volume_is_higher_than_last_ones
             above_avg_vol_bars_counter += 1
 
-    above_avg_vol_bars_counter > under_avg_vol_bars_counter and volume_src[index] > vol_avg
+    above_avg_vol_bars_counter > under_avg_vol_bars_counter and volume[index] > vol_avg
 
-current_bar_must_be_positive_and_volatile(index, last_bars, low_src, high_src, volume_src, close_src, open_src) =>
-    current_bar_volume_is_higher_than_last_ones = current_bar_volume_is_higher_than_last_ones(index, last_bars, close_src, open_src, volume_src)
-    rounded_low = math.round(low_src[index] * 100) / 100
-    rounded_high = math.round(high_src[index] * 100) / 100
-    vol_avg = ta.sma(volume_src, 20)[index]
-    close_src[index] > open_src[index] and volume_src[index] > vol_avg and current_bar_volume_is_higher_than_last_ones
+current_bar_must_be_positive_and_volatile(index, last_bars) =>
+    current_bar_volume_is_higher_than_last_ones = current_bar_volume_is_higher_than_last_ones(index, last_bars)
+    rounded_low = math.round(low[index] * 100) / 100
+    rounded_high = math.round(high[index] * 100) / 100
+    vol_avg = ta.sma(volume, 20)[index]
+    close[index] > open[index] and volume[index] > vol_avg and current_bar_volume_is_higher_than_last_ones
 
-current_bar_closes_where_buyers_still_in(index, close_src, low_src, high_src) =>
-    close_src[index] - low_src[index] > high_src[index] - close_src[index]
+current_bar_closes_where_buyers_still_in(index) =>
+    close[index] - low[index] > high[index] - close[index]
 
-current_bar_has_at_least_one_weak_bar_before(index, last_bars, close_src, open_src, high_src, low_src) =>
+current_bar_has_at_least_one_weak_bar_before(index, last_bars) =>
     has_weak_bar_before = false
 
     for i = 1 to last_bars
-        if close_src[index+i] < open_src[index+i] or ((high_src[index+i] - close_src[index+i]) >= close_src[index+i] - low_src[index+i])
+        if close[index+i] < open[index+i] or ((high[index+i] - close[index+i]) >= close[index+i] - low[index+i])
             has_weak_bar_before := true
             break
     has_weak_bar_before
 
-current_bar_is_above_support_line(index, last_bars, low_src) =>
+current_bar_is_above_support_line(index, last_bars) =>
     current_bar_above_support_line = true
     for i = 1 to last_bars
-        if low_src[index] < low_src[index+i] - 2
+        if low[index] < low[index+i] - 2
             current_bar_above_support_line := false
             break
-    if current_bar_above_support_line and low_src[index] < low_src[index+1]
+    if current_bar_above_support_line and low[index] < low[index+1]
         current_bar_above_support_line := false
 
     current_bar_above_support_line
 
-current_bar_close_to_nine_ema_by_avg(index, last_bars, close_src, low_src, high_src, ema_9, ema_20) =>
+current_bar_close_to_nine_ema_by_avg(index, last_bars) =>
+    ema_9 = ta.ema(close, 9)
+    ema_20 = ta.ema(close, 20)
     current_bar_close_to_nine_ema_by_avg = false
     highest_distance = 0.0
 
 
     for i = last_bars to index
-        current_distance = low_src[index+i] - ema_9[index+i]
+        current_distance = low[index+i] - ema_9[index+i]
         if highest_distance < current_distance
             highest_distance := current_distance
 
-    bar_size = high_src[index] - low_src[index]
-    low_distance_from_ema = low_src[index] - ema_9[index]
+    bar_size = high[index] - low[index]
+    low_distance_from_ema = low[index] - ema_9[index]
 
     low_distance_from_ema_is_less_than_highest_distance = low_distance_from_ema <= highest_distance
 
     (low_distance_from_ema / bar_size <= 0.5) or
-      (low_src[index] > ema_20[index] and low_src[index] < ema_9[index])
+      (low[index] > ema_20[index] and low[index] < ema_9[index])
 
 current_bar_price_changed_significantly(check_on_index, index_between_two_highes, last_bars) =>
     bar_sizes_sum = 0.0
@@ -193,8 +204,8 @@ current_bar_price_changed_significantly(check_on_index, index_between_two_highes
     //     log.info("current_bar_size: {0}, avg_bar_size_mul_3: {1}. highest_price_in_last_bars: {2}. lowest_price_in_last_bars: {3}. bar_sizes_sum: {4}", high[check_on_index] - low[check_on_index], bar_size_avg * 3, highest_price_in_last_bars, lowest_price_in_last_bars, bar_sizes_sum)
     current_bar_price_has_changed
 
-current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
-    [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
+current_macd_has_new_high_and_came_as_change_point(index) =>
+    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
     previous_bars_has_change_in_momentum = false
 
     histogram_was_negative_before = false
@@ -306,8 +317,9 @@ current_macd_has_new_high_and_came_as_change_point(index, close_src) =>
 
     previous_bars_has_change_in_momentum
 
-current_bar_touching_9_ema(index, low_src, ema_9) =>
-    low_src[index] <= ema_9[index] or (math.abs(low_src[index] - ema_9[index]) <= 0.10)
+current_bar_touching_9_ema(index) =>
+    ema_9 = ta.ema(close, 9)
+    low[index] <= ema_9[index] or (math.abs(low[index] - ema_9[index]) <= 0.10)
 
 current_bar_is_at_the_beginning_of_the_day(index, bars_back, is_long_momentum) =>
     pre_market_start_time = timestamp(relevant_timezone, year, month, dayofmonth, 7, 00)
@@ -344,11 +356,12 @@ current_bar_has_long_time_gaps(index) =>
 
     still_in_the_beginning
 
-current_bar_gets_50_percent_above_9_ema(index, close_src, low_src, ema_9) =>
-    close_src[index] - ema_9[index] > ema_9[index] - low_src[index]
+current_bar_gets_50_percent_above_9_ema(index) =>
+    ema_9 = ta.ema(close, 9)
+    close[index] - ema_9[index] > ema_9[index] - low[index]
 
-last_bars_volume_is_higher(index, volume_src) =>
-    vol_avg = ta.sma(volume_src, 20)
+last_bars_volume_is_higher(index) =>
+    vol_avg = ta.sma(volume, 20)
 
     last_highest_vol_avg = 0.0
     last_bars_back = 10
@@ -362,63 +375,66 @@ last_bars_volume_is_higher(index, volume_src) =>
     middle_vol_avg = vol_avg[index+(last_bars_back / 2)]
     end_vol_avg = vol_avg[index]
 
-    volumer_is_getting_higher = (end_vol_avg > middle_vol_avg and middle_vol_avg > start_vol_avg) or end_vol_avg > start_vol_avg * 5 or (end_vol_avg > start_vol_avg and end_vol_avg > middle_vol_avg and volume_src[index] > vol_avg[index] * 2)
+    volumer_is_getting_higher = (end_vol_avg > middle_vol_avg and middle_vol_avg > start_vol_avg) or end_vol_avg > start_vol_avg * 5 or (end_vol_avg > start_vol_avg and end_vol_avg > middle_vol_avg and volume[index] > vol_avg[index] * 2)
     current_bar_volume_is_much_bigger_than_previous_bar = false
-    if volume_src[index+1] / volume_src[0] < 0.8
+    if volume[index+1] / volume[0] < 0.8
         current_bar_volume_is_much_bigger_than_previous_bar := true
 
     current_vol_avg_is_biggest_by_multiply_from_lowest = false
     highest_vol = 0.0
     // instead of ta.highest function which does not work properly always
     for i = 0 to last_bars_back
-        if volume_src[i] > highest_vol
-            highest_vol := volume_src[i]
+        if volume[i] > highest_vol
+            highest_vol := volume[i]
 
     // instead of ta.lowest function which does not work properly always
     lowest_vol = highest_vol
     for i = 0 to last_bars_back
-        if volume_src[i] < lowest_vol
-            lowest_vol := volume_src[i]
+        if volume[i] < lowest_vol
+            lowest_vol := volume[i]
 
     if highest_vol / lowest_vol >= 1.3 or lowest_vol / highest_vol <= 0.5
         current_vol_avg_is_biggest_by_multiply_from_lowest := true
 
     volumer_is_getting_higher and current_vol_avg_is_biggest_by_multiply_from_lowest and current_bar_volume_is_much_bigger_than_previous_bar
 
-current_bar_volume_is_higher_for_fast_change(index, volume_src, high_src, low_src) =>
+current_bar_volume_is_higher_for_fast_change(index) =>
     minimum_volume_per_bar = 5000
-    volume_src[index] >= minimum_volume_per_bar and high_src[index] - low_src[index] >= 0.1
+    volume[index] >= minimum_volume_per_bar and high[index] - low[index] >= 0.1
 
-last_biggest_volume_bar_was_green(index, volume_src, close_src, open_src, high_src, low_src, last_bars, with_certainty) =>
+last_biggest_volume_bar_was_green(index, last_bars, with_certainty) =>
     start_index = 0
     if with_certainty
         start_index := 1
 
     highest_bar_volume = 0.0
     for i = start_index to last_bars
-        if volume_src[index+i] > highest_bar_volume
-            highest_bar_volume := volume_src[index+i]
+        if volume[index+i] > highest_bar_volume
+            highest_bar_volume := volume[index+i]
 
     highest_volume_bar_is_green = false
 
     for i = start_index to last_bars
-        if volume_src[index+i] == highest_bar_volume and close_src[index+i] > open_src[index+i] and ((high_src[index+i] - close_src[index+i]) / (high_src[index+i] - low_src[index+i]) < 0.6)
+        if volume[index+i] == highest_bar_volume and close[index+i] > open[index+i] and ((high[index+i] - close[index+i]) / (high[index+i] - low[index+i]) < 0.6)
             highest_volume_bar_is_green := true
             break
 
     highest_volume_bar_is_green
 
-current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9, low_src, close_src, vwap_src) =>
-    ema_9_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", ema_9, lookahead=barmerge.lookahead_on)
-    vwap_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", vwap_src, lookahead=barmerge.lookahead_on)
+current_bar_close_to_9_ema_on_other_timeframes_as_well(index) =>
+    vwap = ta.vwap(hlc3)
+    ema_9 = ta.ema(close, 9)
 
-    low_2_min = request.security(syminfo.tickerid, "2", low_src, lookahead=barmerge.lookahead_on)
+    ema_9_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", ema_9, lookahead=barmerge.lookahead_on)
+    vwap_at_2_minute_timeframe = request.security(syminfo.tickerid, "2", vwap, lookahead=barmerge.lookahead_on)
+
+    low_2_min = request.security(syminfo.tickerid, "2", low, lookahead=barmerge.lookahead_on)
 
     not_far_from_9_ema_on_bigger_timeframes = true
     close_distance = 0.20
 
     m_2_distance = math.abs(low_2_min - ema_9_at_2_minute_timeframe)
-    m_1_distance = math.abs(low_src[index] - ema_9[index])
+    m_1_distance = math.abs(low[index] - ema_9[index])
     m_2_vwap_distance = math.abs(low_2_min - vwap_at_2_minute_timeframe)
     two_minute_chart_is_close_to_9_ema = m_2_distance <= close_distance or m_1_distance <= close_distance
     two_minute_chart_is_close_to_vwap = m_2_vwap_distance <= close_distance
@@ -428,8 +444,8 @@ current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9, low_src, cl
 
     not_far_from_9_ema_on_bigger_timeframes
 
-macd_check(index, close_src, bars_back) =>
-    [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
+macd_check(index, bars_back) =>
+    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
     macd_is_positive = false
 
     current_macd_is_positive = macdLine[index] > 0 and macdLine[index] > signalLine[index]
@@ -473,8 +489,8 @@ macd_check(index, close_src, bars_back) =>
 
     macd_is_positive
 
-histogram_check(index, close_src, bars_back) =>
-    [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
+histogram_check(index, bars_back) =>
+    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
     histogram_is_above_threshold = histogram[index] > 0.005
 
     // Check that histogram changed direction in the last bars towards up
@@ -549,16 +565,16 @@ histogram_check(index, close_src, bars_back) =>
 
     histogram_pattern_is_good
 
-at_least_one_bar_has_big_volume(index, volume_src) =>
+at_least_one_bar_has_big_volume(index) =>
     at_least_one_bar_has_big_volume = false
     for i = last_bars to index+1
-        if volume_src[i] >= 20000
+        if volume[i] >= 20000
             at_least_one_bar_has_big_volume := true
             break
 
     at_least_one_bar_has_big_volume
 
-current_macd_is_higher_in_the_last_bars(index, close_src) =>
+current_macd_is_higher_in_the_last_bars(index) =>
     bars_back = 0
     current_timeframe = str.tonumber(timeframe.period)
     bars_in_hour = int(60 / current_timeframe)
@@ -569,7 +585,7 @@ current_macd_is_higher_in_the_last_bars(index, close_src) =>
     else
         bars_back := (hour - 4) * bars_in_hour
 
-    [macdLine, signalLine, histogram] = ta.macd(close_src, 12, 26, 9)
+    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
     highest_macdLine = 0.0
 
     for i = index to bars_back
@@ -583,46 +599,27 @@ current_macd_is_higher_in_the_last_bars(index, close_src) =>
 
 run_positive_indicator(with_certainty) =>
     index = 0
-    vwap_values = ta.vwap(hlc3)
-    ema_9_values = ta.ema(close, 9)
-    ema_20_values = ta.ema(close, 20)
 
-    open_values = open
-    close_values = close
-    low_values = low
-    high_values = high
-    volume_values = volume
-
-    vwap_i = vwap_values[index]
-    ema_9_i = ema_9_values[index]
-    ema_20_i = ema_20_values[index]
-
-    open_i = open_values[index]
-    close_i = close_values[index]
-    low_i = low_values[index]
-    high_i = high_values[index]
-    volume_i = volume_values[index]
-
-    current_bar_is_above_vwap = current_bar_is_above_vwap(index, vwap_i, close_i, high_i)
-    last_bars_emas_higher = last_bars_emas_higher(index, last_bars, ema_9_i, ema_20_i, vwap_i)
-    current_bar_has_new_high = current_bar_has_new_high(index, high_i)
-    buyers_coming_in = buyers_coming_in(index, last_bars, close_i, open_i, volume_i)
-    current_bar_has_at_least_one_weak_bar_before = current_bar_has_at_least_one_weak_bar_before(index, last_bars, close_i, open_i, high_i, low_i)
-    current_bar_must_be_positive_and_volatile = current_bar_must_be_positive_and_volatile(index, last_bars, low_i, high_i, volume_i, close_i, open_i)
-    current_bar_is_above_support_line = current_bar_is_above_support_line(index, 3, low_i)
-    current_bar_close_to_nine_ema_by_avg = current_bar_close_to_nine_ema_by_avg(index, last_bars, close_i, low_i, high_i, ema_9_i, ema_20_i)
-    current_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(index, close_i, low_i, ema_9_i)
-    current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(index, close_i, low_i, high_i)
-    last_bars_volume_is_higher = last_bars_volume_is_higher(index, volume_i)
-    at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(index, volume_i)
-    current_bar_is_bullish = current_bar_is_bullish(index, high_i, close_i, low_i, ema_9_i, ema_20_i, true)
-    current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index, close_i)
+    current_bar_is_above_vwap = current_bar_is_above_vwap(index)
+    last_bars_emas_higher = last_bars_emas_higher(index, last_bars)
+    current_bar_has_new_high = current_bar_has_new_high(index)
+    buyers_coming_in = buyers_coming_in(index, last_bars)
+    current_bar_has_at_least_one_weak_bar_before = current_bar_has_at_least_one_weak_bar_before(index, last_bars)
+    current_bar_must_be_positive_and_volatile = current_bar_must_be_positive_and_volatile(index, last_bars)
+    current_bar_is_above_support_line = current_bar_is_above_support_line(index, 3)
+    current_bar_close_to_nine_ema_by_avg = current_bar_close_to_nine_ema_by_avg(index, last_bars)
+    current_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(index)
+    current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(index)
+    last_bars_volume_is_higher = last_bars_volume_is_higher(index)
+    at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(index)
+    current_bar_is_bullish = current_bar_is_bullish(index, true)
+    current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index)
 
     if with_certainty
-        current_ema_is_above_vwap = current_ema_is_above_vwap(index, ema_9_i, vwap_i, open_i)
-        inside_momentum = inside_momentum(index, last_bars, close_i, open_i, volume_i, true)
-        last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(index, volume_i, close_i, open_i, high_i, low_i, 5, true)
-        current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index, ema_9_i, low_i, close_i, vwap_i)
+        current_ema_is_above_vwap = current_ema_is_above_vwap(index)
+        inside_momentum = inside_momentum(index, last_bars, true)
+        last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(index, 5, true)
+        current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index)
 
         bars_back = 60
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -640,8 +637,8 @@ run_positive_indicator(with_certainty) =>
         if str.tonumber(timeframe.period) >= 5
             macd_bars_back := 4
 
-        histogram_check = histogram_check(index, close_i, macd_bars_back)
-        macd_check = macd_check(index, close_i, macd_bars_back)
+        histogram_check = histogram_check(index, macd_bars_back)
+        macd_check = macd_check(index, macd_bars_back)
 
 
         current_bar_is_above_vwap
@@ -666,12 +663,12 @@ run_positive_indicator(with_certainty) =>
           and at_least_one_bar_has_big_volume
           and current_macd_is_higher_in_the_last_bars
     else
-        current_bar_touching_9_ema = current_bar_touching_9_ema(index, low_i, ema_9_i)
-        current_bar_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(index, close_i)
-        current_bar_is_bullish_without_ema_certainty = current_bar_is_bullish(index, high_i, close_i, low_i, ema_9_i, ema_20_i, false)
-        current_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(index, volume_i, close_i, open_i, high_i, low_i, 5, false)
-        current_bar_inside_momentum_without_certainty = inside_momentum(index, last_bars, close_i, open_i, volume_i, false)
-        current_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(index, volume_i, high_i, low_i)
+        current_bar_touching_9_ema = current_bar_touching_9_ema(index)
+        current_bar_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(index)
+        current_bar_is_bullish_without_ema_certainty = current_bar_is_bullish(index, false)
+        current_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(index, 5, false)
+        current_bar_inside_momentum_without_certainty = inside_momentum(index, last_bars, false)
+        current_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(index)
 
         bars_back = 30
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
