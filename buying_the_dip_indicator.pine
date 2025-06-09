@@ -7,9 +7,35 @@ import TradingView/ta/10
 
 
 buying_the_dip_sign = "💰"
+change_direction_sign = "👆"
 relevant_timezone = "America/New_York"
 
-////           Indications           ////
+////           Changing direction Indications           ////
+current_bar_is_strong(index, low_src, high_src, close_src, open_src) =>
+    has_high_lows = low_src[index] > low_src[index+1]
+    has_high_highs = high_src[index] > high_src[index+1]
+    is_solid_green = close_src[index] > open_src[index] and (high_src[index] - close_src[index]) / (close_src[index] - low_src[index]) < 0.3
+
+    has_high_lows and has_high_highs and is_solid_green
+
+current_bar_volume_is_strong(index) =>
+    vol_avg = ta.sma(volume, 20)
+    if index == 11 and time == timestamp(relevant_timezone, year, month, 9, 9, 10) and timeframe.period == "5"
+        log.info("c_v: {0}. p_v: {1}. c_v_a: {2}. p_v_a: {3}", volume[index], volume[index+1], vol_avg[index], vol_avg[index+1])
+    volume[index] > (volume[index+1] * 2) and volume[index] > vol_avg[index] and volume[index+1] <= vol_avg[index+1]
+
+current_bar_is_near_to_9_ema(index, open_src, low_src, ema_9, ema_20, vwap) =>
+    ema_9_is_higher = ema_9[index] > ema_20[index] and ema_9[index] > vwap[index]
+    open_close_to_9_ema = math.abs(open_src[index] - ema_9[index]) < 0.05 and math.abs(low_src[index] - ema_9[index]) < 0.05
+
+current_bar_is_bigger_than_last_one(index, close_src, open_src) =>
+    (close_src[index] - open_src[index]) > math.abs(close_src[index+1] - open_src[index+1])
+
+macd_is_positive(index, macdLine, histogram) =>
+    current_macd_is_positive = macdLine[index] > 0
+    current_histogram_stronger_than_before = histogram[index] > histogram[index+1]
+
+////           Buying the Dip Indications           ////
 
 current_bar_is_strong_green(index, bars_back) =>
     current_bars_is_positive = close[index] > open[index]
@@ -114,7 +140,76 @@ no_weak_green_bar_before(index, bars_back) =>
     not weak_green_bar_before
 ///////// run indicators /////////
 
-run_indicator() =>
+change_direction_indicator() =>
+    index = 0
+    vol_avg = ta.sma(volume, 20)
+    ema_9 = ta.ema(close, 9)
+    ema_20 = ta.ema(close, 20)
+    vwap = ta.vwap(hlc3)
+    [macdLine, _, histogram] = ta.macd(close, 12, 26, 9)
+
+    current_bar_is_strong = current_bar_is_strong(index, low, high, close, open)
+    current_bar_volume_is_strong = current_bar_volume_is_strong(index)
+    current_bar_is_near_to_9_ema = current_bar_is_near_to_9_ema(index, open, low, ema_9, ema_20, vwap)
+    current_bar_is_bigger_than_last_one = current_bar_is_bigger_than_last_one(index, close, open)
+    macd_is_positive = macd_is_positive(index, macdLine, histogram)
+
+    current_bar_is_potential = current_bar_is_strong
+     and current_bar_volume_is_strong
+     and current_bar_is_near_to_9_ema
+     and current_bar_is_bigger_than_last_one
+     and macd_is_positive
+
+    already_happend_before = false
+    failed_under_9_ema_in_between = false
+    if current_bar_is_potential
+        for i = 1 to 20
+            if close[index+i] < ema_9[index+i] and open[index+i] < ema_9[index+i]
+                failed_under_9_ema_in_between := true
+                break
+
+            // start current_bar_is_strong
+            has_high_lows = low[index+i] > low[index+i+1]
+            has_high_highs = high[index+i] > high[index+i+1]
+            is_solid_green = close[index+i] > open[index+i] and (high[index+i] - close[index+i]) / (close[index+i] - low[index+i]) < 0.3
+            current_bar_is_strong := has_high_lows and has_high_highs and is_solid_green
+            // end current_bar_is_strong
+
+
+            // start current_bar_volume_is_strong
+            // if index == 11 and time == timestamp(relevant_timezone, year, month, 9, 9, 10) and timeframe.period == "5"
+            //     log.info("c_v: {0}. p_v: {1}. c_v_a: {2}. p_v_a: {3}", volume[index], volume[index+1], vol_avg[index], vol_avg[index+1])
+            current_bar_volume_is_strong := volume[index+i] > (volume[index+i+1] * 2) and volume[index+i] > vol_avg[index+i] and volume[index+i+1] <= vol_avg[index+i+1]
+            // end current_bar_volume_is_strong
+
+            // start current_bar_is_near_to_9_ema
+            ema_9_is_higher = ema_9[index+i] > ema_20[index+i] and ema_9[index+i] > vwap[index+i]
+            open_close_to_9_ema = math.abs(open[index+i] - ema_9[index+i]) < 0.05 and math.abs(low[index+i] - ema_9[index+i]) < 0.05
+            current_bar_is_near_to_9_ema := ema_9_is_higher and open_close_to_9_ema
+            // end current_bar_is_near_to_9_ema
+
+            // start current_bar_is_bigger_than_last_one
+            current_bar_is_bigger_than_last_one := (close[index+i] - open[index+i]) > math.abs(close[index+i+1] - open[index+i+1])
+            // end current_bar_is_bigger_than_last_one
+
+            // start macd_is_positive
+            current_macd_is_positive = macdLine[index+i] > 0
+            current_histogram_stronger_than_before = histogram[index+i] > histogram[index+i+1]
+            macd_is_positive := current_macd_is_positive and current_histogram_stronger_than_before
+
+            already_happend_before := current_bar_is_strong
+             and current_bar_volume_is_strong
+             and current_bar_is_near_to_9_ema
+             and current_bar_is_bigger_than_last_one
+             and macd_is_positive
+
+            if already_happend_before
+                // log.info("i: {0}", index+i)
+                break
+
+    already_happend_before and not failed_under_9_ema_in_between
+
+buying_the_dip_run_indicator() =>
     index = 0
     bars_back = 10
 
@@ -136,8 +231,10 @@ run_indicator() =>
       and last_bars_showing_weak_downtrend
       and no_weak_green_bar_before
 
-buying_the_dip_indication = run_indicator()
+buying_the_dip_indication = buying_the_dip_run_indicator()
+change_direction_indication = str.tonumber(timeframe.period) >= 5 ? change_direction_indicator() : false
 
 plotshape(buying_the_dip_indication, title="Buying the dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = buying_the_dip_sign)
+plotshape(change_direction_indication, title="Change direction indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = change_direction_sign)
 
-alertcondition(buying_the_dip_indication, title="Buying the dip indication", message="Buying the dip indication")
+alertcondition(buying_the_dip_indication or change_direction_indication, title="Buying the dip indication", message="Buying the dip indication")
