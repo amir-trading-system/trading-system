@@ -264,7 +264,7 @@ current_macd_has_new_high_and_came_as_change_point(index) =>
                 for j = index+i to 10
                     if histogram[j] > histogram[j+1] and histogram[j] > histogram[j-1] and histogram[j] > 0
                         histogram_has_high_point_before := true
-                        if histogram[j] > histogram_has_high_point_before_value
+                        if histogram[j] > histogram_has_high_point_before_value and close[j] != open[j]
                             histogram_has_high_point_before_index := j
                             histogram_has_high_point_before_value := histogram[j]
 
@@ -595,6 +595,24 @@ current_macd_is_higher_in_the_last_bars(index) =>
             highest_macdLine := macdLine[i]
     macdLine[0] >= highest_macdLine
 
+current_bar_has_good_weak_pattern_before(index, bars_back) =>
+    current_bar_has_good_weak_pattern_before = false
+    has_two_red_bars = false
+
+    for i = 1 to bars_back
+        if not has_two_red_bars
+            has_two_red_bars := close[index+i] < open[index+i] and close[index+i+1] < open[index+i+1]
+            if not has_two_red_bars
+                continue
+
+            if has_two_red_bars and volume[index+i+1] > volume[index+i]
+                current_bar_has_good_weak_pattern_before := true
+                break
+    if not has_two_red_bars
+        true
+    else
+        current_bar_has_good_weak_pattern_before
+
 ///////// run indicators /////////
 
 run_positive_indicator(with_certainty) =>
@@ -620,6 +638,7 @@ run_positive_indicator(with_certainty) =>
         inside_momentum = inside_momentum(index, last_bars, true)
         last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(index, 5, true)
         current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index)
+        current_bar_has_good_weak_pattern_before = current_bar_has_good_weak_pattern_before(index, 3)
 
         bars_back = 60
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -662,6 +681,7 @@ run_positive_indicator(with_certainty) =>
           and macd_check
           and at_least_one_bar_has_big_volume
           and current_macd_is_higher_in_the_last_bars
+          and current_bar_has_good_weak_pattern_before
     else
         current_bar_touching_9_ema = current_bar_touching_9_ema(index)
         current_bar_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(index)

@@ -105,6 +105,13 @@ last_bars_showing_weak_downtrend(index) =>
 
     last_bars_showing_weak_downtrend
 
+no_weak_green_bar_before(index, bars_back) =>
+    weak_green_bar_before = false
+    for i = 1 to bars_back
+        if close[i] > open[i] and ((close[i] - low[i]) / (high[i] - close[i]) < 0.4)
+            weak_green_bar_before := true
+
+    not weak_green_bar_before
 ///////// run indicators /////////
 
 run_indicator() =>
@@ -118,6 +125,7 @@ run_indicator() =>
     current_bar_is_the_nearest_bar_to_9_ema = current_bar_is_the_nearest_bar_to_9_ema(index)
     current_bar_crossed_vwap_towards_up = current_bar_crossed_vwap_towards_up(index)
     last_bars_showing_weak_downtrend = last_bars_showing_weak_downtrend(index)
+    no_weak_green_bar_before = no_weak_green_bar_before(index, bars_back)
 
     current_bar_is_strong_green
       and volume_has_changed_significantly_in_the_last_bars
@@ -126,7 +134,10 @@ run_indicator() =>
       and current_bar_is_the_nearest_bar_to_9_ema
       and current_bar_crossed_vwap_towards_up
       and last_bars_showing_weak_downtrend
+      and no_weak_green_bar_before
 
 buying_the_dip_indication = run_indicator()
 
 plotshape(buying_the_dip_indication, title="Buying the dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = buying_the_dip_sign)
+
+alertcondition(buying_the_dip_indication, title="Buying the dip indication", message="Buying the dip indication")
