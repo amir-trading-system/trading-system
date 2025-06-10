@@ -146,7 +146,10 @@ current_bar_is_above_support_line(index, last_bars) =>
     if current_bar_above_support_line and low[index] < low[index+1]
         current_bar_above_support_line := false
 
-    current_bar_above_support_line
+    vol_avg = ta.sma(volume, 20)
+    previous_bar_is_weak = low[index+2] > low[index+1] and open[index+1] > close[index+1] and volume[index+1] > vol_avg and (volume[index+1] / volume[index] > 0.5)
+
+    not previous_bar_is_weak and current_bar_above_support_line
 
 current_bar_close_to_nine_ema_by_avg(index, last_bars) =>
     ema_9 = ta.ema(close, 9)
@@ -508,7 +511,7 @@ histogram_check(index, bars_back) =>
 
         macd_is_above_zero = macdLine[index+i] > 0 and macdLine[index+i+1] > 0 and macdLine[index+i-1] > 0
         middle_histogram = histogram[index+i]
-        current_histogram_is_between_2_highes_and_changed_direction = middle_histogram < histogram[index+i-1] and middle_histogram < histogram[index+i+1]
+        current_histogram_is_between_2_highes_and_changed_direction = middle_histogram < histogram[index+i-1] and middle_histogram < histogram[index+i+1] and index+i - 3 <= index
 
         if macd_is_above_zero and current_histogram_is_between_2_highes_and_changed_direction
             histogram_direction_changed_index := index+i
@@ -665,7 +668,6 @@ run_positive_indicator(with_certainty) =>
         histogram_check = histogram_check(index, macd_bars_back)
         macd_check = macd_check(index, macd_bars_back)
 
-
         result = current_bar_is_above_vwap
           and current_ema_is_above_vwap
           and last_bars_emas_higher
@@ -688,6 +690,7 @@ run_positive_indicator(with_certainty) =>
           and at_least_one_bar_has_big_volume
           and current_macd_is_higher_in_the_last_bars
           and current_bar_has_good_weak_pattern_before
+
         if result
             log.info("long momentum!")
         result
@@ -707,7 +710,7 @@ run_positive_indicator(with_certainty) =>
 
         current_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(index, bars_back, false)
 
-        fast_result = current_bar_is_above_vwap
+        result = current_bar_is_above_vwap
           and last_bars_emas_higher
           and current_bar_has_new_high
           and buyers_coming_in
@@ -727,9 +730,10 @@ run_positive_indicator(with_certainty) =>
           and current_bar_inside_momentum_without_certainty
           and current_bar_volume_is_higher_for_fast_change
           and current_macd_is_higher_in_the_last_bars
-        if fast_result
-            log.info("fast momentum!")
-        fast_result
+
+        if result
+            log.info("short momentum!")
+        result
 
 positive_indication = run_positive_indicator(true)
 positive_indication_for_short_momentum = run_positive_indicator(false)
