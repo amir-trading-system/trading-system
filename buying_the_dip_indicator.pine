@@ -8,7 +8,9 @@ import TradingView/ta/10
 
 buying_the_dip_sign = "💰"
 change_direction_sign = "👆"
+dip_while_still_in_trend_sign = "📊"
 relevant_timezone = "America/New_York"
+
 
 ////           Changing direction Indications           ////
 current_bar_is_strong(index, low_src, high_src, close_src, open_src) =>
@@ -20,8 +22,6 @@ current_bar_is_strong(index, low_src, high_src, close_src, open_src) =>
 
 current_bar_volume_is_strong(index) =>
     vol_avg = ta.sma(volume, 20)
-    if index == 11 and time == timestamp(relevant_timezone, year, month, 9, 9, 10) and timeframe.period == "5"
-        log.info("c_v: {0}. p_v: {1}. c_v_a: {2}. p_v_a: {3}", volume[index], volume[index+1], vol_avg[index], vol_avg[index+1])
     volume[index] > (volume[index+1] * 2) and volume[index] > vol_avg[index] and volume[index+1] <= vol_avg[index+1]
 
 current_bar_is_near_to_9_ema(index, open_src, low_src, ema_9, ema_20, vwap) =>
@@ -48,16 +48,18 @@ current_bar_is_strong_green(index, bars_back) =>
 
     current_bars_is_positive and current_bar_is_strong and current_volume_is_bigger_than_last_ones
 
-volume_has_changed_significantly_in_the_last_bars(index, bars_back) =>
+volume_has_changed_significantly_in_the_last_bars(index, bars_back, multiply_by) =>
     vol_avg = ta.sma(volume, 20)
     volume_has_changed_significantly_in_the_last_bars = false
+    volume_changed_index = 0
 
     for i = 1 to bars_back
-        if volume[index+i] > volume[index+i+1] * 10
+        if volume[index+i] > volume[index+i+1] * multiply_by
             volume_has_changed_significantly_in_the_last_bars := true
+            volume_changed_index := index+i
             break
 
-    volume_has_changed_significantly_in_the_last_bars
+    [volume_has_changed_significantly_in_the_last_bars, volume_changed_index]
 
 macd_is_still_in_its_first_phase(index) =>
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
@@ -138,6 +140,79 @@ no_weak_green_bar_before(index, bars_back) =>
             weak_green_bar_before := true
 
     not weak_green_bar_before
+
+
+////           Changing direction Indications           ////
+direction_has_changed_just_before(index, index_to_start_from) =>
+    [macdLine, _, histogram] = ta.macd(close, 12, 26, 9)
+    has_lower_points_between_to_high_highs = false
+    macd_is_positive = false
+    histogram_is_positive = false
+
+    for i = 1 to index_to_start_from
+        if index+i-1 < 0
+            continue
+        has_lower_points_between_to_high_highs := high[index+i] < high[index+i-1] and high[index+i] < high[index+i+1]
+        histogram_is_positive := histogram[index+i+1] > 0 and histogram[index+i] > 0 and histogram[index+i-1] > 0
+        macd_is_positive := macdLine[index+i+1] > 0 and macdLine[index+i] > 0 and macdLine[index+i-1] > 0
+        if has_lower_points_between_to_high_highs and histogram_is_positive and macd_is_positive
+            break
+
+    has_lower_points_between_to_high_highs
+
+last_bars_are_above_all_indicators(index) =>
+    [_, _, histogram] = ta.macd(close, 12, 26, 9)
+    last_bars_are_above_all_indicators = false
+    ema_9 = ta.ema(close, 9)
+    ema_20 = ta.ema(close, 20)
+    vwap = ta.vwap(hlc3)
+    vol_avg = ta.sma(volume, 20)
+
+    for i = 0 to 2
+        histogram_keeps_up = histogram[index+i] > histogram[index+i+1]
+        low_above_vwap = low[index+i] > vwap[index+i]
+        low_above_emas = low[index+i] > ema_9[index+i] and ema_9[index+i] > ema_20[index+i]
+        volume_above_avg = volume[index+i] > vol_avg[index+i]
+        last_bars_are_above_all_indicators := low_above_emas and low_above_vwap and volume_above_avg and histogram_keeps_up
+        if not last_bars_are_above_all_indicators
+            break
+
+    current_volume_is_higher_than_last_ones = volume[index] > volume[index+1] and close[index] > close[index+1] and low[index] - 0.2 < ema_9[index]
+    last_bars_are_above_all_indicators and current_volume_is_higher_than_last_ones
+
+last_bars_volume_need_to_be_above_threshold(index, index_to_start_from) =>
+    last_bars_volume_above_threshold = true
+    min_volume_per_bar = 20000
+    for i = index_to_start_from to index
+        if volume[i] < min_volume_per_bar
+            last_bars_volume_above_threshold := false
+            break
+
+    last_bars_volume_above_threshold
+
+current_bar_is_dip_while_still_in_trend(index) =>
+    [macdLine, _, histogram] = ta.macd(close, 12, 26, 9)
+    current_bar_is_strong = current_bar_is_strong(index, low, high, close, open)
+    current_bar_is_bigger_than_last_one = current_bar_is_bigger_than_last_one(index, close, open)
+    macd_is_positive = macd_is_positive(index, macdLine, histogram)
+    [volume_has_changed_significantly_in_the_last_bars, volume_changed_index] = volume_has_changed_significantly_in_the_last_bars(index, 5, 5)
+    direction_has_changed_just_before = direction_has_changed_just_before(index, volume_changed_index)
+    last_bars_are_above_all_indicators = last_bars_are_above_all_indicators(index)
+    last_bars_volume_need_to_be_above_threshold = last_bars_volume_need_to_be_above_threshold(index, volume_changed_index)
+
+    current_bar_is_dip_while_still_in_trend = current_bar_is_strong
+     and current_bar_is_bigger_than_last_one
+     and macd_is_positive
+     and volume_has_changed_significantly_in_the_last_bars
+     and direction_has_changed_just_before
+     and last_bars_are_above_all_indicators
+     and last_bars_volume_need_to_be_above_threshold
+     and low[index] > 1
+
+    if current_bar_is_dip_while_still_in_trend and year >= 2024
+        log.info("volume_changed_index: {0}. timeframe: {1}", volume_changed_index, str.tonumber(timeframe.period))
+    current_bar_is_dip_while_still_in_trend
+
 ///////// run indicators /////////
 
 change_direction_indicator() =>
@@ -214,7 +289,7 @@ buying_the_dip_run_indicator() =>
     bars_back = 10
 
     current_bar_is_strong_green = current_bar_is_strong_green(index, bars_back)
-    volume_has_changed_significantly_in_the_last_bars = volume_has_changed_significantly_in_the_last_bars(index, bars_back)
+    [volume_has_changed_significantly_in_the_last_bars, volume_changed_index] = volume_has_changed_significantly_in_the_last_bars(index, bars_back, 10)
     macd_is_still_in_its_first_phase = macd_is_still_in_its_first_phase(index)
     current_bar_is_stronger_than_the_last_red_bars = current_bar_is_stronger_than_the_last_red_bars(index, bars_back)
     current_bar_is_the_nearest_bar_to_9_ema = current_bar_is_the_nearest_bar_to_9_ema(index)
@@ -233,8 +308,11 @@ buying_the_dip_run_indicator() =>
 
 buying_the_dip_indication = buying_the_dip_run_indicator()
 change_direction_indication = str.tonumber(timeframe.period) >= 5 ? change_direction_indicator() : false
+current_bar_is_dip_while_still_in_trend = current_bar_is_dip_while_still_in_trend(0)
 
 plotshape(buying_the_dip_indication, title="Buying the dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = buying_the_dip_sign)
 plotshape(change_direction_indication, title="Change direction indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = change_direction_sign)
+plotshape(current_bar_is_dip_while_still_in_trend, title="Dip while still in trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = dip_while_still_in_trend_sign)
 
-alertcondition(buying_the_dip_indication or change_direction_indication, title="Buying the dip indication", message="Buying the dip indication")
+
+alertcondition(buying_the_dip_indication or change_direction_indication or current_bar_is_dip_while_still_in_trend, title="Buying the dip indication", message="Buying the dip indication")
