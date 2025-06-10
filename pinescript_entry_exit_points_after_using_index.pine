@@ -511,7 +511,7 @@ histogram_check(index, bars_back) =>
 
         macd_is_above_zero = macdLine[index+i] > 0 and macdLine[index+i+1] > 0 and macdLine[index+i-1] > 0
         middle_histogram = histogram[index+i]
-        current_histogram_is_between_2_highes_and_changed_direction = middle_histogram < histogram[index+i-1] and middle_histogram < histogram[index+i+1] and index+i - 3 <= index
+        current_histogram_is_between_2_highes_and_changed_direction = middle_histogram < histogram[index+i-1] and middle_histogram < histogram[index+i+1] and index+i - 5 <= index
 
         if macd_is_above_zero and current_histogram_is_between_2_highes_and_changed_direction
             histogram_direction_changed_index := index+i
