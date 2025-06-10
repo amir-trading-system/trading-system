@@ -17,7 +17,7 @@ relevant_timezone = "America/New_York"
 current_bar_is_bullish(index, with_certainty) =>
     ema_9 = ta.ema(close, 9)
     ema_20 = ta.ema(close, 20)
-    result = high[index] - close[index] < close[index] - low[index]
+    result = (high[index] - close[index]) / (close[index] - low[index]) <= 0.5
     if with_certainty
         result := result and low[index] > ema_9[index] and low[index] > ema_20[index]
     else
@@ -106,8 +106,10 @@ inside_momentum(index, last_bars, with_certainty) =>
     vol_avg = ta.sma(volume[last_bars], 20)[index]
     current_bar_volume_is_higher_than_last_ones = current_bar_volume_is_higher_than_last_ones(index, last_bars)
 
-    for i = 0 to last_bars
-        if vol_avg[i] < min_momentun_vol_avg and with_certainty
+    for i = 1 to last_bars
+        if volume[i] < vol_avg[i] and with_certainty
+            under_avg_vol_bars_counter += 1
+        else if vol_avg[i] < min_momentun_vol_avg and with_certainty
             under_avg_vol_bars_counter += 1
         else if close < open
             under_avg_vol_bars_counter += 1
@@ -206,6 +208,7 @@ current_bar_price_changed_significantly(check_on_index, index_between_two_highes
 
 current_macd_has_new_high_and_came_as_change_point(index) =>
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
+    vol_avg = ta.sma(volume, 20)
     previous_bars_has_change_in_momentum = false
 
     histogram_was_negative_before = false
@@ -248,7 +251,10 @@ current_macd_has_new_high_and_came_as_change_point(index) =>
         macd_has_strong_point_before_index = 0
         macd_has_strong_point_before_value = 0.0
 
-        last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i+1] > 0 and histogram[index+i+1] < histogram[index]
+        both_middle_histogram_are_similar = histogram[index+i] / histogram[index+i+1] >= 0.8
+        border_histograms_are_higher = (histogram[index+i] / histogram[index+i-1]) <= 0.75
+        has_best_pattern_or_is_above_vol_avg = (both_middle_histogram_are_similar and border_histograms_are_higher and histogram[index+i+1] < histogram[index+i+2]) or (volume[index+i] > vol_avg[index+i] and volume[index+i+1] > vol_avg[index+i+1] and volume[index+i-1] > vol_avg[index+i-1])
+        last_histogram_is_between_two_highs = histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1] and histogram[index+i] > 0 and histogram[index+i+1] > 0 and histogram[index+i+1] < histogram[index] and has_best_pattern_or_is_above_vol_avg
         if last_histogram_is_between_two_highs
             for j = index+i-1 to index
                 price_change_ocurred_after_histogram_between_two_highs := current_bar_price_changed_significantly(j, index+i, 5)
@@ -568,7 +574,7 @@ histogram_check(index, bars_back) =>
 at_least_one_bar_has_big_volume(index) =>
     at_least_one_bar_has_big_volume = false
     for i = last_bars to index+1
-        if volume[i] >= 20000
+        if volume[i] >= 50000
             at_least_one_bar_has_big_volume := true
             break
 
@@ -660,7 +666,7 @@ run_positive_indicator(with_certainty) =>
         macd_check = macd_check(index, macd_bars_back)
 
 
-        current_bar_is_above_vwap
+        result = current_bar_is_above_vwap
           and current_ema_is_above_vwap
           and last_bars_emas_higher
           and current_bar_has_new_high
@@ -682,6 +688,9 @@ run_positive_indicator(with_certainty) =>
           and at_least_one_bar_has_big_volume
           and current_macd_is_higher_in_the_last_bars
           and current_bar_has_good_weak_pattern_before
+        if result
+            log.info("long momentum!")
+        result
     else
         current_bar_touching_9_ema = current_bar_touching_9_ema(index)
         current_bar_macd_has_new_high_and_came_as_change_point = current_macd_has_new_high_and_came_as_change_point(index)
@@ -698,7 +707,7 @@ run_positive_indicator(with_certainty) =>
 
         current_bar_is_at_the_beginning_of_the_day = current_bar_is_at_the_beginning_of_the_day(index, bars_back, false)
 
-        current_bar_results = current_bar_is_above_vwap
+        fast_result = current_bar_is_above_vwap
           and last_bars_emas_higher
           and current_bar_has_new_high
           and buyers_coming_in
@@ -718,6 +727,9 @@ run_positive_indicator(with_certainty) =>
           and current_bar_inside_momentum_without_certainty
           and current_bar_volume_is_higher_for_fast_change
           and current_macd_is_higher_in_the_last_bars
+        if fast_result
+            log.info("fast momentum!")
+        fast_result
 
 positive_indication = run_positive_indicator(true)
 positive_indication_for_short_momentum = run_positive_indicator(false)
