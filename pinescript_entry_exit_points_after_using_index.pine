@@ -146,8 +146,22 @@ current_bar_is_above_support_line(index, last_bars) =>
     if current_bar_above_support_line and low[index] < low[index+1]
         current_bar_above_support_line := false
 
+    has_highest_high_in_the_last_bars = false
+    highest_high_index = 0
+    for i = index to last_bars
+        if index+i-1 < 0
+            continue
+        if high[index+i] > high[index+i+1] and high[index+i] > high[index+i-1]
+            has_highest_high_in_the_last_bars := true
+            highest_high_index := index+i
+
     vol_avg = ta.sma(volume, 20)
-    previous_bar_is_weak = low[index+2] > low[index+1] and open[index+1] > close[index+1] and volume[index+1] > vol_avg and (volume[index+1] / volume[index] > 0.5)
+    previous_bar_is_weak = false
+    if has_highest_high_in_the_last_bars
+        for i = index to highest_high_index-1
+            previous_bar_is_weak := low[index+i+2] > low[index+i+1] and open[index+i+1] > close[index+i+1] and volume[index+i+1] > vol_avg and (volume[index+i+1] / volume[index] > 0.5)
+            if previous_bar_is_weak
+                break
 
     not previous_bar_is_weak and current_bar_above_support_line
 
@@ -516,7 +530,6 @@ histogram_check(index, bars_back) =>
         if macd_is_above_zero and current_histogram_is_between_2_highes_and_changed_direction
             histogram_direction_changed_index := index+i
             histogram_crossed_recently := true
-            break
 
     // Get highest and lowest histogram in the last bars for up trending changed check.
     highest_histogram_in_the_last_bars = 0.0
@@ -534,7 +547,7 @@ histogram_check(index, bars_back) =>
             lowest_histogram_in_the_last_bars_index := index+i
 
     // Lowest histogram happend before it got high and it changed more than 50%
-    low_histogram_is_before_high_histogram = lowest_histogram_in_the_last_bars_index > highest_histogram_in_the_last_bars_index and histogram_direction_changed_index > highest_histogram_in_the_last_bars_index
+    low_histogram_is_before_high_histogram = lowest_histogram_in_the_last_bars_index > highest_histogram_in_the_last_bars_index
     histogram_changed_significantly = low_histogram_is_before_high_histogram and lowest_histogram_in_the_last_bars / highest_histogram_in_the_last_bars < 0.5
     current_histogram_is_strong = histogram[index]/highest_histogram_in_the_last_bars >= 0.5 and histogram[index] >= histogram[index+1] * 1.2 and highest_histogram_in_the_last_bars > 0.002
 
@@ -622,6 +635,19 @@ current_bar_has_good_weak_pattern_before(index, bars_back) =>
     else
         current_bar_has_good_weak_pattern_before
 
+last_bars_majority_crossed_volume_average(index, last_bars) =>
+    vol_avg = ta.sma(volume, 20)
+    under_volume_average_count = 0
+    above_volume_average_count = 0
+
+    for i = index to last_bars
+        if volume[index+i] > vol_avg[index+i]
+            above_volume_average_count += 1
+        else if volume[index+i] < vol_avg[index+i] and volume[index+i] / vol_avg[index+i] < 0.6 and index+i - 2 < index
+            under_volume_average_count += 1
+
+    under_volume_average_count/above_volume_average_count <= 0.3
+
 ///////// run indicators /////////
 
 run_positive_indicator(with_certainty) =>
@@ -648,6 +674,7 @@ run_positive_indicator(with_certainty) =>
         last_biggest_volume_bar_was_green = last_biggest_volume_bar_was_green(index, 5, true)
         current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index)
         current_bar_has_good_weak_pattern_before = current_bar_has_good_weak_pattern_before(index, 3)
+        last_bars_majority_crossed_volume_average = last_bars_majority_crossed_volume_average(index, 5)
 
         bars_back = 60
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -690,6 +717,7 @@ run_positive_indicator(with_certainty) =>
           and at_least_one_bar_has_big_volume
           and current_macd_is_higher_in_the_last_bars
           and current_bar_has_good_weak_pattern_before
+          and last_bars_majority_crossed_volume_average
 
         if result
             log.info("long momentum!")
@@ -735,7 +763,7 @@ run_positive_indicator(with_certainty) =>
             log.info("short momentum!")
         result
 
-positive_indication = run_positive_indicator(true)
+positive_indication = time < timestamp(relevant_timezone, year, month, dayofmonth, 15, 0) ? run_positive_indicator(true) : false
 positive_indication_for_short_momentum = run_positive_indicator(false)
 
 plotshape(positive_indication, title="Positive indication for long momentum", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = positive_sign)
