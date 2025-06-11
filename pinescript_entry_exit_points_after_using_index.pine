@@ -467,6 +467,42 @@ current_bar_close_to_9_ema_on_other_timeframes_as_well(index) =>
 
     not_far_from_9_ema_on_bigger_timeframes
 
+current_macd_and_histogram_is_stronger_than_before(index) =>
+    bars_back = 20
+    if str.tonumber(timeframe.period) > 2
+        bars_back := 5
+    current_macd_and_histogram_is_stronger_than_before = false
+
+    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
+
+    highest_macd_until_now = 0.0
+    highest_histogram_until_now = 0.0
+    highest_high_until_now = 0.0
+    highest_high_until_now_index = 0
+
+    for i = index+bars_back to index+1
+        if macdLine[i] > highest_macd_until_now and macdLine[i] > signalLine[i] and signalLine[i] > 0
+            highest_macd_until_now := macdLine[i]
+
+        if histogram[i] > highest_histogram_until_now and histogram[i] > 0
+            highest_histogram_until_now := histogram[i]
+        if high[i] > highest_high_until_now
+            highest_high_until_now := high[i]
+            highest_high_until_now_index := i
+
+    vwap = ta.vwap(hlc3)
+    vwap_crossed_down = false
+    for i = highest_high_until_now_index+1 to index
+        if low[i] < vwap[i] and high[i] > vwap[i]
+            vwap_crossed_down := true
+
+    price_action_looks_good = high[index] >= highest_high_until_now and vwap_crossed_down and low[index] > vwap[index]
+
+    if highest_macd_until_now > 0.0 and highest_histogram_until_now > 0.0
+        current_macd_and_histogram_is_stronger_than_before := macdLine[index] > highest_macd_until_now and (histogram[index]/highest_histogram_until_now >= 0.8 or price_action_looks_good)
+
+    current_macd_and_histogram_is_stronger_than_before
+
 macd_check(index, bars_back) =>
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
     macd_is_positive = false
@@ -648,6 +684,17 @@ last_bars_majority_crossed_volume_average(index, last_bars) =>
 
     under_volume_average_count/above_volume_average_count <= 0.3
 
+last_bars_had_big_price_rejection(index) =>
+    last_bars_had_big_price_rejection = false
+    vol_avg = ta.sma(volume, 20)
+    for i = 5 to index
+        volume_is_strong = volume[i] > volume[index] and volume[i] > vol_avg[i]
+        price_had_rejection = (close[i] - low[i]) / (high[i] - close[i]) < 0.3
+        if volume_is_strong and price_had_rejection
+            last_bars_had_big_price_rejection := true
+
+    not last_bars_had_big_price_rejection
+
 ///////// run indicators /////////
 
 run_positive_indicator(with_certainty) =>
@@ -675,6 +722,7 @@ run_positive_indicator(with_certainty) =>
         current_bar_close_to_9_ema_on_other_timeframes_as_well = current_bar_close_to_9_ema_on_other_timeframes_as_well(index)
         current_bar_has_good_weak_pattern_before = current_bar_has_good_weak_pattern_before(index, 3)
         last_bars_majority_crossed_volume_average = last_bars_majority_crossed_volume_average(index, 5)
+        last_bars_had_big_price_rejection = last_bars_had_big_price_rejection(index)
 
         bars_back = 60
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -694,6 +742,7 @@ run_positive_indicator(with_certainty) =>
 
         histogram_check = histogram_check(index, macd_bars_back)
         macd_check = macd_check(index, macd_bars_back)
+        current_macd_and_histogram_is_stronger_than_before = current_macd_and_histogram_is_stronger_than_before(index)
 
         result = current_bar_is_above_vwap
           and current_ema_is_above_vwap
@@ -718,6 +767,8 @@ run_positive_indicator(with_certainty) =>
           and current_macd_is_higher_in_the_last_bars
           and current_bar_has_good_weak_pattern_before
           and last_bars_majority_crossed_volume_average
+          and current_macd_and_histogram_is_stronger_than_before
+          and last_bars_had_big_price_rejection
 
         if result
             log.info("long momentum!")
@@ -764,7 +815,7 @@ run_positive_indicator(with_certainty) =>
         result
 
 positive_indication = time < timestamp(relevant_timezone, year, month, dayofmonth, 15, 0) ? run_positive_indicator(true) : false
-positive_indication_for_short_momentum = run_positive_indicator(false)
+positive_indication_for_short_momentum = time < timestamp(relevant_timezone, year, month, dayofmonth, 15, 0) ? run_positive_indicator(false) : false
 
 plotshape(positive_indication, title="Positive indication for long momentum", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = positive_sign)
 plotshape(positive_indication_for_short_momentum, title="Positive indication for short momentum", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
