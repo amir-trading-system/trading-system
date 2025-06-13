@@ -7,7 +7,6 @@ import TradingView/ta/10
 
 
 buying_the_dip_sign = "💰"
-support_sign = "👆"
 dip_while_still_in_trend_sign = "📊"
 relevant_timezone = "America/New_York"
 
@@ -19,37 +18,6 @@ current_bar_is_strong(index, low_src, high_src, close_src, open_src) =>
     is_solid_green = close_src[index] > open_src[index] and (high_src[index] - close_src[index]) / (close_src[index] - low_src[index]) < 0.3
 
     has_high_lows and has_high_highs and is_solid_green
-
-current_bar_volume_is_strong(index) =>
-    volume_threashold_for_strong_bar = 100000
-    vol_avg = ta.sma(volume, 20)
-    last_bar_is_weaker = false
-    if close[index+1] < open[index+1]
-        last_bar_is_weaker := volume[index+1] <= vol_avg[index+1]
-    else if close[index+1] > open[index+1]
-        last_bar_is_weaker := true
-    volume_is_higher_than_threshold = volume[index] >= volume_threashold_for_strong_bar
-    current_volume_is_higher_than_last_ones = true
-    for i = index+10 to index+1
-        if volume[i] > volume[index]
-            current_volume_is_higher_than_last_ones := false
-
-    volume[index] > (volume[index+1] * 2) and volume[index] > vol_avg[index] and last_bar_is_weaker and volume_is_higher_than_threshold and current_volume_is_higher_than_last_ones
-
-current_bar_is_near_to_9_ema(index, open_src, low_src, ema_9, ema_20, vwap) =>
-    ema_9_is_higher = ema_9[index] > ema_20[index] and ema_9[index] > vwap[index]
-    open_close_to_9_ema = false
-    if ema_9[index] > low[index] and close[index] > ema_9[index]
-        open_close_to_9_ema := true
-    if ema_9[index] < low[index]
-        for i = index+1 to 3
-            if low[i] - ema_9[i] > low[index] - ema_9[index]
-                open_close_to_9_ema := true
-            else if low[i] - ema_9[i] < low[index] - ema_9[index] and close[i] > open[index]
-                open_close_to_9_ema := false
-                break
-
-    open_close_to_9_ema
 
 current_bar_is_bigger_than_last_one(index, close_src, open_src) =>
     (close_src[index] - open_src[index]) > math.abs(close_src[index+1] - open_src[index+1])
@@ -240,94 +208,6 @@ current_bar_is_dip_while_still_in_trend(index) =>
     current_bar_is_dip_while_still_in_trend
 
 ///////// run indicators /////////
-
-support_indicator() =>
-    index = 0
-    vol_avg = ta.sma(volume, 20)
-    ema_9 = ta.ema(close, 9)
-    ema_20 = ta.ema(close, 20)
-    vwap = ta.vwap(hlc3)
-    [macdLine, _, histogram] = ta.macd(close, 12, 26, 9)
-
-    current_bar_is_strong = current_bar_is_strong(index, low, high, close, open)
-    current_bar_volume_is_strong = current_bar_volume_is_strong(index)
-    current_bar_is_near_to_9_ema = current_bar_is_near_to_9_ema(index, open, low, ema_9, ema_20, vwap)
-    current_bar_is_bigger_than_last_one = current_bar_is_bigger_than_last_one(index, close, open)
-    macd_is_positive = macd_is_positive(index, macdLine, histogram)
-
-    current_bar_is_potential = current_bar_is_strong
-     and current_bar_volume_is_strong
-     and current_bar_is_near_to_9_ema
-     and current_bar_is_bigger_than_last_one
-     and macd_is_positive
-
-    already_happend_before = false
-    failed_under_9_ema_in_between = false
-    if current_bar_is_potential
-        for i = 1 to 15
-            if close[index+i] < ema_9[index+i] and open[index+i] < ema_9[index+i]
-                failed_under_9_ema_in_between := true
-                break
-
-            // start current_bar_is_strong
-            has_high_lows = low[index+i] > low[index+i+1]
-            has_high_highs = high[index+i] > high[index+i+1]
-            is_solid_green = close[index+i] > open[index+i] and (high[index+i] - close[index+i]) / (close[index+i] - low[index+i]) < 0.3
-            current_bar_is_strong := has_high_lows and has_high_highs and is_solid_green
-            // end current_bar_is_strong
-
-
-            // start current_bar_volume_is_strong
-            last_bar_is_weaker = false
-            if close[index+i+1] < open[index+i+1]
-                last_bar_is_weaker := volume[index+i+1] <= vol_avg[index+i+1]
-            else if close[index+i+1] > open[index+i+1]
-                last_bar_is_weaker := true
-            current_bar_volume_is_strong := volume[index+i] > (volume[index+i+1] * 2) and volume[index+i] > vol_avg[index+i] and last_bar_is_weaker
-            // end current_bar_volume_is_strong
-
-            // start current_bar_is_near_to_9_ema
-            ema_9_is_higher = ema_9[index+i] > ema_20[index+i] and ema_9[index+i] > vwap[index+i]
-            current_bar_is_near_to_9_ema := false
-            if ema_9[index+i] > low[index+i] and close[index+i] > ema_9[index+i]
-                current_bar_is_near_to_9_ema := true
-            if ema_9[index+i] < low[index+i]
-                for j = index+i+1 to 3
-                    if low[j] - ema_9[j] > low[index+i] - ema_9[index+i]
-                        current_bar_is_near_to_9_ema := true
-                    else if low[j] - ema_9[j] < low[index+i] - ema_9[index+i] and close[j] > open[index+i]
-                        current_bar_is_near_to_9_ema := false
-                        break
-            // end current_bar_is_near_to_9_ema
-
-            // start current_bar_is_bigger_than_last_one
-            current_bar_is_bigger_than_last_one := (close[index+i] - open[index+i]) > math.abs(close[index+i+1] - open[index+i+1])
-            // end current_bar_is_bigger_than_last_one
-
-            // start macd_is_positive
-            current_macd_is_positive = macdLine[index+i] > 0
-            current_histogram_stronger_than_before = histogram[index+i] > histogram[index+i+1] or volume[index+i] > volume[index+i+1]
-            macd_is_positive := current_macd_is_positive and current_histogram_stronger_than_before and histogram[index+i] > 0
-            // end macd_is_positive
-
-
-            already_happend_before := current_bar_is_strong
-             and current_bar_volume_is_strong
-             and current_bar_is_near_to_9_ema
-             and current_bar_is_bigger_than_last_one
-             and macd_is_positive
-
-            if already_happend_before
-                // log.info("i: {0}", index+i)
-                break
-
-    result = already_happend_before and not failed_under_9_ema_in_between
-    // if time == timestamp(relevant_timezone, year, 6, 13, 6, 56) and timeframe.period == "2"
-    //     log.info("already_happend_before: {0}. failed_under_9_ema_in_between: {1}", already_happend_before, failed_under_9_ema_in_between)
-    if result
-        log.info("support_indicator!")
-    result
-
 buying_the_dip_run_indicator() =>
     index = 0
     bars_back = 10
@@ -355,12 +235,10 @@ buying_the_dip_run_indicator() =>
     result
 
 buying_the_dip_indication = buying_the_dip_run_indicator()
-support_indication = support_indicator()
 current_bar_is_dip_while_still_in_trend = current_bar_is_dip_while_still_in_trend(0)
 
 plotshape(hour >= 4 and hour < 15 ? buying_the_dip_indication : false, title="Buying the dip indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = buying_the_dip_sign)
-plotshape(hour >= 4 and hour < 15 ? support_indication : false, title="Support indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = support_sign)
 plotshape(hour >= 4 and hour < 15 ? current_bar_is_dip_while_still_in_trend : false, title="Dip while still in trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = dip_while_still_in_trend_sign)
 
 
-alertcondition(buying_the_dip_indication or support_indication or current_bar_is_dip_while_still_in_trend, title="Good indication for entry point", message="Good indication for entry point")
+alertcondition(buying_the_dip_indication or current_bar_is_dip_while_still_in_trend, title="Good indication for entry point", message="Good indication for entry point")
