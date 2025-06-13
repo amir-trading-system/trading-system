@@ -19,7 +19,7 @@ current_bar_is_bullish(index, with_certainty) =>
     ema_20 = ta.ema(close, 20)
     result = (high[index] - close[index]) / (close[index] - low[index]) <= 0.5
     if with_certainty
-        result := result and low[index] > ema_9[index] and low[index] > ema_20[index]
+        result := result and low[index] > ema_9[index] and low[index] > ema_20[index] and close[index] - open[index] > 0.1
     else
         result := result and (low[index] > ema_9[index] or low[index] > ema_20[index])
     result
@@ -469,8 +469,12 @@ current_macd_and_histogram_is_stronger_than_before(index) =>
     highest_histogram_until_now = 0.0
     highest_high_until_now = 0.0
     highest_high_until_now_index = 0
+    low_between_2_highs_counter = 0
 
     for i = index+bars_back to index+1
+        border_histograms_are_positive_but_low_value = histogram[i+1] > 0 and histogram[i-1] > 0 and histogram[i+1] < 0.01 and histogram[i-1] < 0.01
+        if histogram[i] < histogram[i+1] and histogram[i] < histogram[i-1] and border_histograms_are_positive_but_low_value
+            low_between_2_highs_counter += 1
         if macdLine[i] > highest_macd_until_now and macdLine[i] > signalLine[i] and signalLine[i] > 0
             highest_macd_until_now := macdLine[i]
 
@@ -488,7 +492,7 @@ current_macd_and_histogram_is_stronger_than_before(index) =>
 
     price_action_looks_good = high[index] >= highest_high_until_now and vwap_crossed_down and low[index] > vwap[index]
 
-    if highest_macd_until_now > 0.0 and highest_histogram_until_now > 0.0
+    if highest_macd_until_now > 0.0 and highest_histogram_until_now > 0.0 and low_between_2_highs_counter <= 2
         current_macd_and_histogram_is_stronger_than_before := macdLine[index] > highest_macd_until_now and (histogram[index]/highest_histogram_until_now >= 0.8 or price_action_looks_good)
 
     current_macd_and_histogram_is_stronger_than_before
@@ -540,78 +544,114 @@ macd_check(index, bars_back) =>
 
 histogram_check(index, bars_back) =>
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
-    histogram_is_above_threshold = histogram[index] > 0.005
+    vol_avg = ta.sma(volume, 20)
+    histogram_pattern_looks_good = false
 
-    // Check that histogram changed direction in the last bars towards up
-    histogram_direction_changed_index = 0
-    histogram_crossed_recently = false
-    for i = bars_back to index+1
-        if index+i-1 < 0
-            continue
+    has_top_histogram_before = false
+    top_histogram_before_value = 0.0
+    top_histogram_before_index = 0
 
-        macd_is_above_zero = macdLine[index+i] > 0 and macdLine[index+i+1] > 0 and macdLine[index+i-1] > 0
-        middle_histogram = histogram[index+i]
-        current_histogram_is_between_2_highes_and_changed_direction = middle_histogram < histogram[index+i-1] and middle_histogram < histogram[index+i+1] and index+i - 5 <= index
+    has_low_histogram_before = false
+    low_histogram_before_value = 0.0
+    low_histogram_before_index = 0
 
-        if macd_is_above_zero and current_histogram_is_between_2_highes_and_changed_direction
-            histogram_direction_changed_index := index+i
-            histogram_crossed_recently := true
+    low_of_lows_histogram = 0.0
+    low_of_lows_histogram_index = 0
 
-    // Get highest and lowest histogram in the last bars for up trending changed check.
-    highest_histogram_in_the_last_bars = 0.0
-    highest_histogram_in_the_last_bars_index = 0
-    for i = bars_back to index
-        if histogram[index+i] > highest_histogram_in_the_last_bars
-            highest_histogram_in_the_last_bars := histogram[index+i]
-            highest_histogram_in_the_last_bars_index := index+i
+    has_low_signal_line_after_top_histogram = false
 
-    lowest_histogram_in_the_last_bars = highest_histogram_in_the_last_bars
-    lowest_histogram_in_the_last_bars_index = 0
-    for i = bars_back to index
-        if histogram[index+i] < lowest_histogram_in_the_last_bars
-            lowest_histogram_in_the_last_bars := histogram[index+i]
-            lowest_histogram_in_the_last_bars_index := index+i
+    highest_macd_in_the_last_bars_value = 0.0
+    highest_macd_in_the_last_bars_index = 0
 
-    // Lowest histogram happend before it got high and it changed more than 50%
-    low_histogram_is_before_high_histogram = lowest_histogram_in_the_last_bars_index > highest_histogram_in_the_last_bars_index
-    histogram_changed_significantly = low_histogram_is_before_high_histogram and lowest_histogram_in_the_last_bars / highest_histogram_in_the_last_bars < 0.5
-    current_histogram_is_strong = histogram[index]/highest_histogram_in_the_last_bars >= 0.5 and histogram[index] >= histogram[index+1] * 1.2 and highest_histogram_in_the_last_bars > 0.002
+    has_many_sellers = false
+    for j = index+10 to index
+        is_market_time = (hour[j] == 9 and minute[j] > 30) or (hour[j] > 9)
+        if not is_market_time
+            break
+        first_bar_is_green = close[j+2] > open[j+2]
+        after_bars_are_strong_red = close[j] < open[j] and close[j+1] < open[j+1] and volume[j] > volume[j+1] and volume[j+1] > vol_avg[j+1] and volume[j] > vol_avg[j]
+        if first_bar_is_green and after_bars_are_strong_red
+            for t = j-1 to j - 5
+                if t < 0
+                    continue
+                if close[t] > open[t]
+                    if volume[t] > volume[j]
+                        break
+                    else
+                        has_many_sellers := true
+                        // if time == timestamp(relevant_timezone, year, 3, 3, 9, 58) and timeframe.period == "2"
+                        //     log.info("f_r_i: {0}. s_r_i: {1}. g_i: {2}", j+1, j, t)
+                        break
 
-    // Check that most of the momentum didnt finish already
-    highgest_histogram_before = 0.0
-    highgest_histogram_before_index = 0
-    start_momentum_histogram_index = 0
-    end_momentum_histogram_index = 0
-    start_momentum_histogram = 0.0
-    end_momentum_histogram = 0.0
-    for i = bars_back to index+1
-        if histogram[index+i] > 0 and start_momentum_histogram == 0 and (histogram[index+i+1] < 0 or histogram[index+i] > histogram[index+i+1] * 2)
-            start_momentum_histogram := histogram[index+i]
-            start_momentum_histogram_index := index+i
-        if index+i-1 > 0 and histogram[index+i] > histogram[index+i+1] and histogram[index+i] > histogram[index+i-1] and index+i < start_momentum_histogram_index and histogram[index+i] > highgest_histogram_before
-            highgest_histogram_before := histogram[index+i]
-            highgest_histogram_before_index := index+i
-        if index+i-1 > 0 and  (histogram[index+i] < 0 or (histogram[index+i] < histogram[index+i+1] and histogram[index+i] < histogram[index+i-1])) and start_momentum_histogram_index > index+i
-            end_momentum_histogram_index := index+i
-            end_momentum_histogram := histogram[index+i]
+    if not has_many_sellers
+        for i = index+20 to index+3
+            borders_are_positive = macdLine[i+1] > 0 and macdLine[i-1] > 0
+            top_pattern_founded = histogram[i] > histogram[i+1] and histogram[i] > histogram[i-1] and borders_are_positive and histogram[i] > 0
+            at_least_one_bar_has_big_volume = false
+            for j = i+1 to 5
+                if volume[j] >= 50000
+                    at_least_one_bar_has_big_volume := true
+                    break
 
-    // Check that the current highest is bigger than the last highest negative histogram before the momentum.
-    highest_negative_histogram_is_bigger_than_positive_highest_histogram = false
-    for i = start_momentum_histogram_index to start_momentum_histogram_index+10
-        if math.abs(histogram[i]) > highest_histogram_in_the_last_bars and histogram[i] < 0
-            highest_negative_histogram_is_bigger_than_positive_highest_histogram := true
+            if top_pattern_founded and not has_top_histogram_before and volume[i] > vol_avg[i] and volume[i] > 10000 and at_least_one_bar_has_big_volume and not has_many_sellers
+                // if time == timestamp(relevant_timezone, year, 3, 3, 9, 58) and timeframe.period == "2"
+                //     log.info("top_i: {0}. accurate_time: {1}:{2}", i, hour[i], minute[i])
 
-    // Check that most of the histogram has not finished already after 2 or 3 bars - usually in those cases it has quick up trend and thats it for today - we want to prevent such cases.
-    most_process_already_finished = false
-    correct_histogram_structure = end_momentum_histogram_index < start_momentum_histogram_index and start_momentum_histogram_index > highest_histogram_in_the_last_bars_index
-    if correct_histogram_structure
-        most_process_already_finished := math.abs(start_momentum_histogram_index - highgest_histogram_before_index) * 1.5 < math.abs(end_momentum_histogram_index - highgest_histogram_before_index) and highest_histogram_in_the_last_bars <= highgest_histogram_before
+                has_top_histogram_before := true
+                top_histogram_before_value := histogram[i]
+                top_histogram_before_index := i
 
-    histogram_pattern_is_good = histogram_is_above_threshold and correct_histogram_structure and histogram_crossed_recently and histogram_changed_significantly and current_histogram_is_strong and not most_process_already_finished and not highest_negative_histogram_is_bigger_than_positive_highest_histogram
-    // if time == timestamp(relevant_timezone, year, 5, 22, 9, 16) and str.tonumber(timeframe.period) == 2
-    //     log.info("r: {0}", histogram_pattern_is_good)
+            low_pattern_founded = histogram[i] < histogram[i+1] and histogram[i] < histogram[i-1]
+            if low_pattern_founded and has_top_histogram_before and top_histogram_before_index > i + 1 and histogram[i] < top_histogram_before_value
+                // if time == timestamp(relevant_timezone, year, 5, 2, 7, 17) and timeframe.period == "1"
+                //     log.info("low_i: {0}. accurate_time: {1}:{2}", i, hour[i], minute[i])
+                if has_low_histogram_before and low_histogram_before_value > histogram[i] and histogram[low_histogram_before_index-1] > histogram[i-1]
+                    has_low_histogram_before := false
+                else
+                    has_low_histogram_before := true
+                    low_histogram_before_value := histogram[i]
+                    low_histogram_before_index := i
 
-    histogram_pattern_is_good
+            if signalLine[i] < signalLine[i+1] and has_top_histogram_before and top_histogram_before_index > i
+                has_low_signal_line_after_top_histogram := true
+
+            if highest_macd_in_the_last_bars_value < macdLine[i] and not has_low_histogram_before
+                highest_macd_in_the_last_bars_value := macdLine[i]
+                highest_macd_in_the_last_bars_index := i
+
+        low_of_lows_histogram := top_histogram_before_value
+        for i = index+20 to index+3
+            if histogram[i] < low_of_lows_histogram and has_top_histogram_before and top_histogram_before_index > i
+                low_of_lows_histogram := histogram[i]
+                low_of_lows_histogram_index := i
+
+    // if time == timestamp(relevant_timezone, year, 5, 2, 7, 17) and timeframe.period == "1"
+    //     log.info("low_of_lows_i: {0}.", low_of_lows_histogram_index)
+
+    current_histogram_is_stronger_since_low_histogram = true
+    if has_low_histogram_before
+        for i = low_histogram_before_index to index+1
+            if histogram[i] > histogram[index]
+                current_histogram_is_stronger_since_low_histogram := false
+                break
+    current_histogram_is_stronger_since_low_histogram := current_histogram_is_stronger_since_low_histogram and histogram[index] / top_histogram_before_value >= 0.3
+    no_low_signal_line_because_its_stron_trend = not has_low_signal_line_after_top_histogram and histogram[index] >= top_histogram_before_value
+
+    if has_top_histogram_before and has_low_histogram_before and (has_low_signal_line_after_top_histogram or no_low_signal_line_because_its_stron_trend)
+        // if time == timestamp(relevant_timezone, year, 5, 2, 7, 17) and timeframe.period == "1"
+        //     log.info("top_histogram_before_index: {0}. low_histogram_before_index: {1}. ", top_histogram_before_index, low_histogram_before_index)
+        current_index_lower_from_low_histogram = index < low_histogram_before_index
+        current_macd_is_stronger_than_top_macd = macdLine[index] > highest_macd_in_the_last_bars_value
+        top_and_low_histogram_ratio_is_good = math.abs(low_of_lows_histogram) / top_histogram_before_value <= 0.5 or (no_low_signal_line_because_its_stron_trend and math.abs(low_of_lows_histogram) / top_histogram_before_value <= 0.75)
+        // if time == timestamp(relevant_timezone, year, 5, 2, 7, 17) and timeframe.period == "1"
+        //     log.info("current_index_lower_from_low_histogram: {0}. current_histogram_is_stronger_since_low_histogram: {1}. current_macd_is_stronger_than_top_macd: {2}. top_and_low_histogram_ratio_is_good: {3}", current_index_lower_from_low_histogram, current_histogram_is_stronger_since_low_histogram, current_macd_is_stronger_than_top_macd, top_and_low_histogram_ratio_is_good)
+
+        histogram_pattern_looks_good := current_index_lower_from_low_histogram
+         and current_histogram_is_stronger_since_low_histogram
+         and current_macd_is_stronger_than_top_macd
+         and top_and_low_histogram_ratio_is_good
+
+    histogram_pattern_looks_good
 
 at_least_one_bar_has_big_volume(index) =>
     at_least_one_bar_has_big_volume = false
@@ -621,6 +661,21 @@ at_least_one_bar_has_big_volume(index) =>
             break
 
     at_least_one_bar_has_big_volume
+
+at_least_several_bars_has_big_volume(index, bars_back) =>
+    volume_threshold = 40000
+    current_timeframe = str.tonumber(timeframe.period)
+    if current_timeframe > 1 and current_timeframe < 5
+        volume_threshold := 50000
+    if current_timeframe >= 5
+        volume_threshold := 100000
+    big_volume_bars_count = 0
+
+    for i = bars_back to index
+        if volume[i] >= volume_threshold
+            big_volume_bars_count+=1
+
+    big_volume_bars_count >= 2
 
 current_macd_is_higher_in_the_last_bars(index) =>
     bars_back = 0
@@ -685,6 +740,21 @@ last_bars_had_big_price_rejection(index) =>
 
     not last_bars_had_big_price_rejection
 
+current_bar_is_close_to_9_ema(index) =>
+    ema_9 = ta.ema(close, 9)
+    current_distance_low_from_9_ema = math.abs(low[index] - ema_9[index])
+    previous_bar_distance = low[index+1] - ema_9[index+1]
+    if previous_bar_distance < 0 and close[index+1] > ema_9[index+1]
+        previous_bar_distance := math.abs(previous_bar_distance)
+
+    bar_wick_to_body_ratio = (open[index] - low[index]) / (close[index] - open[index])
+    current_bar_has_strong_support = open[index] > low[index] and (bar_wick_to_body_ratio > 0.2 and bar_wick_to_body_ratio <= 0.8)
+    its_pre_market_baby = hour[index] >= 4 and hour[index] < 10
+    if hour[index] == 9 and minute[index] > 30
+        its_pre_market_baby := false
+    close_to_9_ema = current_distance_low_from_9_ema < previous_bar_distance or (current_distance_low_from_9_ema / (high[index] - low[index]) < 0.5 and (its_pre_market_baby or current_bar_has_strong_support))
+    close_to_9_ema
+
 ///////// run indicators /////////
 
 run_positive_indicator(with_certainty) =>
@@ -701,7 +771,6 @@ run_positive_indicator(with_certainty) =>
     current_bar_gets_50_percent_above_9_ema = current_bar_gets_50_percent_above_9_ema(index)
     current_bar_closes_where_buyers_still_in = current_bar_closes_where_buyers_still_in(index)
     last_bars_volume_is_higher = last_bars_volume_is_higher(index)
-    at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(index)
     current_bar_is_bullish = current_bar_is_bullish(index, true)
     current_macd_is_higher_in_the_last_bars = current_macd_is_higher_in_the_last_bars(index)
 
@@ -713,6 +782,8 @@ run_positive_indicator(with_certainty) =>
         current_bar_has_good_weak_pattern_before = current_bar_has_good_weak_pattern_before(index, 3)
         last_bars_majority_crossed_volume_average = last_bars_majority_crossed_volume_average(index, 5)
         last_bars_had_big_price_rejection = last_bars_had_big_price_rejection(index)
+        current_bar_is_close_to_9_ema = current_bar_is_close_to_9_ema(index)
+        at_least_several_bars_has_big_volume = at_least_several_bars_has_big_volume(index, 15)
 
         bars_back = 60
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
@@ -753,12 +824,13 @@ run_positive_indicator(with_certainty) =>
           and current_bar_is_at_the_beginning_of_the_day
           and histogram_check
           and macd_check
-          and at_least_one_bar_has_big_volume
+          and at_least_several_bars_has_big_volume
           and current_macd_is_higher_in_the_last_bars
           and current_bar_has_good_weak_pattern_before
           and last_bars_majority_crossed_volume_average
           and current_macd_and_histogram_is_stronger_than_before
           and last_bars_had_big_price_rejection
+          and current_bar_is_close_to_9_ema
 
         if result and hour >= 4 and hour < 15
             log.info("long momentum!")
@@ -770,6 +842,7 @@ run_positive_indicator(with_certainty) =>
         current_biggest_volume_bar_was_green_without_certainty = last_biggest_volume_bar_was_green(index, 5, false)
         current_bar_inside_momentum_without_certainty = inside_momentum(index, last_bars, false)
         current_bar_volume_is_higher_for_fast_change = current_bar_volume_is_higher_for_fast_change(index)
+        at_least_one_bar_has_big_volume = at_least_one_bar_has_big_volume(index)
 
         bars_back = 30
         if str.tonumber(timeframe.period) > 1 and str.tonumber(timeframe.period) < 5
