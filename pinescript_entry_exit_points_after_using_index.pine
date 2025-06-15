@@ -79,9 +79,9 @@ run_9_ema_support_indicator() =>
         log.info("9 ema support indicator!")
     current_bar_is_potential
 
-support_indication = run_9_ema_support_indicator()
+//support_indication = run_9_ema_support_indicator()
 
-plotshape(support_indication, title="9 EMA Support indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = support_sign)
+//plotshape(support_indication, title="9 EMA Support indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = support_sign)
 
 ////           Positive indications           ////
 positive_sign = "✅"
@@ -908,8 +908,8 @@ run_positive_indicator(with_certainty) =>
           and last_bars_had_big_price_rejection
           and current_bar_is_close_to_9_ema
 
-        if result and hour >= 4 and hour < 15
-            log.info("long momentum!")
+        // if result and hour >= 4 and hour < 15
+        //     log.info("long momentum!")
         result
     else
         current_bar_touching_9_ema = current_bar_touching_9_ema(index)
@@ -949,16 +949,16 @@ run_positive_indicator(with_certainty) =>
           and current_bar_volume_is_higher_for_fast_change
           and current_macd_is_higher_in_the_last_bars
 
-        if result and hour >= 4 and hour < 15
-            log.info("short momentum!")
+        // if result and hour >= 4 and hour < 15
+        //     log.info("short momentum!")
         result
 
 positive_indication = run_positive_indicator(true)
-positive_indication_for_short_momentum = run_positive_indicator(false)
+//positive_indication_for_short_momentum = run_positive_indicator(false)
 
 plotshape(hour >= 4 and hour < 15 ? positive_indication : false, title="Positive indication for long momentum", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = positive_sign)
-plotshape(hour >= 4 and hour < 15 ? positive_indication_for_short_momentum : false, title="Positive indication for short momentum", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
+//plotshape(hour >= 4 and hour < 15 ? positive_indication_for_short_momentum : false, title="Positive indication for short momentum", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
 plotshape(current_bar_has_long_time_gaps(0), title="Time Gaps", color=color.red, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = long_time_gaps)
 
 
-alertcondition(positive_indication or positive_indication_for_short_momentum or support_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(positive_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
