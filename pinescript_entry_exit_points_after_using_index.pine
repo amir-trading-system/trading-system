@@ -1012,9 +1012,9 @@ run_positive_indicator(with_certainty) =>
 positive_indication = run_positive_indicator(true)
 //positive_indication_for_short_momentum = run_positive_indicator(false)
 
-plotshape(hour >= 4 and hour < 15 ? positive_indication : false, title="Positive indication for long momentum", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = positive_sign)
+plotshape(hour >= 4 and hour < 15 ? positive_indication : false, title="Positive indication for long momentum", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign)
 //plotshape(hour >= 4 and hour < 15 ? positive_indication_for_short_momentum : false, title="Positive indication for short momentum", color=color.blue, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = positive_sign_without_ema)
 plotshape(current_bar_has_long_time_gaps(0), title="Time Gaps", color=color.red, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = long_time_gaps)
 
 
-alertcondition(continues_trend_indication or positive_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(positive_indication or continues_trend_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
