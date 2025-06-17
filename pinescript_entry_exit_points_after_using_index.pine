@@ -9,112 +9,63 @@ import TradingView/ta/10
 
 relevant_timezone = "America/New_York"
 
-////           9 EMA Support indications           ////
-support_sign = "👆"
-
-current_bar_is_strong(index, low_src, high_src, close_src, open_src) =>
-    has_high_lows = low_src[index] > low_src[index+1]
-    has_high_highs = high_src[index] > high_src[index+1]
-    is_solid_green = close_src[index] > open_src[index] and (high_src[index] - close_src[index]) / (close_src[index] - low_src[index]) < 0.3
-
-    has_high_lows and has_high_highs and is_solid_green
-
-current_bar_volume_is_strong(index) =>
-    volume_threashold_for_strong_bar = 100000
-    vol_avg = ta.sma(volume, 20)
-    last_bar_is_weaker = false
-    if close[index+1] < open[index+1]
-        last_bar_is_weaker := volume[index+1] <= vol_avg[index+1]
-    else if close[index+1] > open[index+1]
-        last_bar_is_weaker := true
-    volume_is_higher_than_threshold = volume[index] >= volume_threashold_for_strong_bar
-    current_volume_is_higher_than_last_ones = true
-    for i = index+10 to index+1
-        if volume[i] > volume[index]
-            current_volume_is_higher_than_last_ones := false
-
-    volume[index] > (volume[index+1] * 2) and volume[index] > vol_avg[index] and last_bar_is_weaker and volume_is_higher_than_threshold and current_volume_is_higher_than_last_ones
-
-current_bar_is_near_to_9_ema(index, open_src, low_src, ema_9, ema_20, vwap) =>
-    ema_9_is_higher = ema_9[index] > ema_20[index] and ema_9[index] > vwap[index]
-    open_close_to_9_ema = false
-    if math.abs(ema_9[index]-open[index]) <= 0.05 and close[index] > ema_9[index]
-        open_close_to_9_ema := true
-    if ema_9[index] < open[index]
-        for i = index to 3
-            if open[i+1] - ema_9[i+1] < open[i] - ema_9[i]
-                open_close_to_9_ema := false
-                break
-
-    open_close_to_9_ema and ema_9_is_higher
-
-current_bar_is_bigger_than_last_one(index, close_src, open_src) =>
-    (close_src[index] - open_src[index]) > math.abs(close_src[index+1] - open_src[index+1])
-
-macd_is_positive(index, macdLine, histogram) =>
-    current_macd_is_positive = macdLine[index] > 0
-    current_bar_is_stronger_than_before = histogram[index] > histogram[index+1] or volume[index] > volume[index+1]
-
-run_9_ema_support_indicator() =>
-    index = 0
-    vol_avg = ta.sma(volume, 20)
-    ema_9 = ta.ema(close, 9)
-    ema_20 = ta.ema(close, 20)
-    vwap = ta.vwap(hlc3)
-    [macdLine, _, histogram] = ta.macd(close, 12, 26, 9)
-
-    current_bar_is_strong = current_bar_is_strong(index, low, high, close, open)
-    current_bar_volume_is_strong = current_bar_volume_is_strong(index)
-    current_bar_is_near_to_9_ema = current_bar_is_near_to_9_ema(index, open, low, ema_9, ema_20, vwap)
-    current_bar_is_bigger_than_last_one = current_bar_is_bigger_than_last_one(index, close, open)
-    macd_is_positive = macd_is_positive(index, macdLine, histogram)
-
-    current_bar_is_potential = current_bar_is_strong
-     and current_bar_volume_is_strong
-     and current_bar_is_near_to_9_ema
-     and current_bar_is_bigger_than_last_one
-     and macd_is_positive
-
-    if current_bar_is_potential
-        log.info("9 ema support indicator!")
-    current_bar_is_potential
-
-//support_indication = run_9_ema_support_indicator()
-
-//plotshape(support_indication, title="9 EMA Support indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = support_sign)
-
 ////           Continues trend Indications           ////
 continues_trend_sign = "🛫"
 
-strong_trend_with_one_red_bar(index) =>
+previous_positive_bar_is_strong(index, min_volume_threshold, vol_avg) =>
+    bar_is_positive = close[index] > open[index]
+    volume_is_strong = volume[index] > min_volume_threshold and volume[index] > vol_avg[index]
+    bar_closes_near_to_high = (close[index] - open[index]) / (high[index] - open[index]) >= 0.6
+
+    previous_bar_is_strong = bar_is_positive
+     and volume_is_strong
+     and bar_closes_near_to_high
+     and high[index] - low[index] >= 0.1
+
+    previous_bar_is_strong
+
+current_bar_is_strong_bar(index, bars_count_pattern) =>
     min_volume_threshold_for_first_strong_bar = 50000
     vol_avg = ta.sma(volume, 20)
     vwap = ta.vwap(hlc3)
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
 
     macd_is_positive = macdLine[index] > 0 and signalLine[index] > 0 and histogram[index] > 0
-    highs_above_vwap = high[index+2] > vwap[index+2] and high[index+1] > vwap[index+1] and high[index] > vwap[index]
-    lows_above_vwap = low[index+2] > vwap[index+2] and low[index+1] > vwap[index+1] and low[index] > vwap[index]
-    numbers_are_strong = (high[index+2] - low[index+2]) >= 0.1
 
-    previous_positive_bar_is_strong = close[index+2] > open[index+2] and volume[index+2] > min_volume_threshold_for_first_strong_bar and volume[index+2] > vol_avg[index+2] and (close[index+2] - open[index+2]) / (high[index+2] - open[index+2]) >= 0.6
-    previous_positive_bar_is_stronger_than_before = (close[index+2]-open[index+2]) > (close[index+3]-open[index+3]) and (close[index+2]-open[index+2]) > (close[index+4]-open[index+4])
-    previous_negative_bar_is_weak = open[index+1] > close[index+1] and volume[index+1] < volume[index+2] and open[index+1] - close[index+1] < close[index+1] - low[index+1] and (high[index+1] - open[index+1]) < (open[index+1] - low[index+1]) and volume[index+1]/volume[index] <= 0.6
-    current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and volume[index+1]/volume[index] <= 0.75 and volume[index] > min_volume_threshold_for_first_strong_bar and volume[index] > vol_avg[index] and (close[index] - open[index]) / (high[index] - open[index]) >= 0.6 and low[index] > low[index+1]
+    pattern_occurred = false
+    if bars_count_pattern == 3
+        lows_above_vwap = low[index+2] > vwap[index+2] and low[index+1] > vwap[index+1] and low[index] > vwap[index]
+        highs_above_vwap = high[index+2] > vwap[index+2] and high[index+1] > vwap[index+1] and high[index] > vwap[index]
+        previous_positive_bar_is_strong = previous_positive_bar_is_strong(index+2, min_volume_threshold_for_first_strong_bar, vol_avg)
+        previous_positive_bar_is_stronger_than_before = (high[index+2]-open[index+2]) > (high[index+3]-open[index+3]) and (high[index+2]-open[index+2]) > (high[index+4]-open[index+4])
+        previous_negative_bar_is_weak = open[index+1] > close[index+1] and volume[index+1] < volume[index+2] and open[index+1] - close[index+1] < close[index+1] - low[index+1] and (high[index+1] - open[index+1]) < (open[index+1] - low[index+1]) and volume[index+1]/volume[index] <= 0.6
+        current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and volume[index+1]/volume[index] <= 0.75 and volume[index] > min_volume_threshold_for_first_strong_bar and volume[index] > vol_avg[index] and (close[index] - open[index]) / (high[index] - open[index]) >= 0.6 and low[index] > low[index+1]
 
-    standard_3_bars_pattern_is_good = macd_is_positive and numbers_are_strong and lows_above_vwap and highs_above_vwap and previous_positive_bar_is_strong and previous_negative_bar_is_weak and current_bar_is_positive_and_strong and previous_positive_bar_is_stronger_than_before
+        pattern_occurred := macd_is_positive
+         and lows_above_vwap
+         and highs_above_vwap
+         and previous_positive_bar_is_strong
+         and previous_negative_bar_is_weak
+         and current_bar_is_positive_and_strong
+         and previous_positive_bar_is_stronger_than_before
+    else
+        previous_positive_bar_is_strong = previous_positive_bar_is_strong(index+3, min_volume_threshold_for_first_strong_bar, vol_avg)
+        four_pattern_lows_above_vwap = low[index+3] > vwap[index+3] and low[index+2] > vwap[index+2] and low[index+1] > vwap[index+1] and low[index] > vwap[index]
 
-    four_pattern_highs_above_vwap = high[index+3] > vwap[index+3] and high[index+2] > vwap[index+2] and high[index+1] > vwap[index+1] and high[index] > vwap[index]
-    four_pattern_lows_above_vwap = low[index+3] > vwap[index+3] and low[index+2] > vwap[index+2] and low[index+1] > vwap[index+1] and low[index] > vwap[index]
-    four_pattern_numbers_are_strong = (high[index+3] - low[index+3]) >= 0.1
+        four_pattern_previous_positive_bar_is_strong = close[index+3] > open[index+3] and volume[index+3] > min_volume_threshold_for_first_strong_bar and volume[index+3] > vol_avg[index+3] and (close[index+3] - open[index+3]) / (high[index+3] - low[index+3]) >= 0.6
+        four_pattern_previous_positive_bar_is_stronger_than_before = (high[index+3]-open[index+3]) > (high[index+4]-open[index+4]) and (high[index+3]-open[index+3]) > (high[index+5]-open[index+5])
+        four_pattern_previous_negative_bar_is_weak = open[index+2] > close[index+2] and volume[index+2] < volume[index+3] and low[index+2] > low[index+3]
+        four_pattern_third_bar_is_stronger = (close[index+1] > open[index+1] and close[index+1] - open[index+1] > 0.1 and volume[index+1]/volume[index] <= 0.6 and (close[index]-open[index]) > (close[index+1]-open[index+1])) or (open[index+1] > close[index+1] and volume[index+1] < volume[index+2])
+        four_pattern_current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and volume[index] > volume[index+1] and volume[index] > min_volume_threshold_for_first_strong_bar and volume[index] > vol_avg[index] and (close[index] - open[index]) / (high[index] - open[index]) >= 0.6 and low[index] > low[index+1] and volume[index+1]/volume[index] <= 0.75 and volume[index+2]/volume[index] <= 0.75
 
-    four_pattern_previous_positive_bar_is_strong = close[index+3] > open[index+3] and volume[index+3] > min_volume_threshold_for_first_strong_bar and volume[index+3] > vol_avg[index+3] and (close[index+3] - open[index+3]) / (high[index+3] - low[index+3]) >= 0.6
-    four_pattern_previous_positive_bar_is_stronger_than_before = (close[index+3]-open[index+3]) > (close[index+4]-open[index+4]) and (close[index+3]-open[index+3]) > (close[index+5]-open[index+5])
-    four_pattern_previous_negative_bar_is_weak = open[index+2] > close[index+2] and volume[index+2] < volume[index+3] and low[index+2] > low[index+3]
-    four_pattern_third_bar_is_stronger = (close[index+1] > open[index+1] and close[index+1] - open[index+1] > 0.1 and volume[index+1]/volume[index] <= 0.6 and (close[index]-open[index]) > (close[index+1]-open[index+1])) or (open[index+1] > close[index+1] and volume[index+1] < volume[index+2])
-    four_pattern_current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and volume[index] > volume[index+1] and volume[index] > min_volume_threshold_for_first_strong_bar and volume[index] > vol_avg[index] and (close[index] - open[index]) / (high[index] - open[index]) >= 0.6 and low[index] > low[index+1] and volume[index+1]/volume[index] <= 0.75 and volume[index+2]/volume[index] <= 0.75
-
-    standard_4_bars_pattern_is_good = macd_is_positive and four_pattern_highs_above_vwap and four_pattern_lows_above_vwap and four_pattern_numbers_are_strong and four_pattern_previous_positive_bar_is_strong and four_pattern_previous_negative_bar_is_weak and four_pattern_current_bar_is_positive_and_strong and four_pattern_third_bar_is_stronger and four_pattern_previous_positive_bar_is_stronger_than_before
+        pattern_occurred := macd_is_positive
+         and four_pattern_lows_above_vwap
+         and previous_positive_bar_is_strong
+         and four_pattern_previous_positive_bar_is_strong
+         and four_pattern_previous_negative_bar_is_weak
+         and four_pattern_current_bar_is_positive_and_strong
+         and four_pattern_third_bar_is_stronger
+         and four_pattern_previous_positive_bar_is_stronger_than_before
 
     current_high_is_higher = true
     highest_bar_index = 0
@@ -123,21 +74,23 @@ strong_trend_with_one_red_bar(index) =>
             current_high_is_higher := false
             break
 
-    current_high_is_higher and (standard_3_bars_pattern_is_good or standard_4_bars_pattern_is_good)
+    current_high_is_higher and pattern_occurred
 
 run_continues_trend_indication() =>
     index = 0
 
-    strong_trend_with_one_red_bar = strong_trend_with_one_red_bar(index)
+    current_bar_is_strong_in_3_bars_pattern = current_bar_is_strong_bar(index, 3)
+    current_bar_is_strong_in_4_bars_pattern = current_bar_is_strong_bar(index, 4)
 
-    result = strong_trend_with_one_red_bar
-    // if result and hour >= 6 and hour < 15
-    //     log.info("continues trend sign!")
-    result
+    current_bar_is_strong = current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern
+
+    if current_bar_is_strong and hour >= 6 and hour < 15 and str.tonumber(timeframe.period) > 1
+        log.info("continues trend sign!")
+    current_bar_is_strong
 
 continues_trend_indication = run_continues_trend_indication()
 
-plotshape(hour >= 4 and hour < 15 ? continues_trend_indication : false, title="Continues trend indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign)
+plotshape(hour >= 4 and hour < 15 and str.tonumber(timeframe.period) > 1 ? continues_trend_indication : false, title="Continues trend indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign)
 
 ////           Positive indications           ////
 positive_sign = "✅"
