@@ -15,7 +15,7 @@ continues_trend_sign = "🛫"
 previous_positive_bar_is_strong(index, min_volume_threshold, vol_avg) =>
     bar_is_positive = close[index] > open[index]
     volume_is_strong = (volume[index] > min_volume_threshold and volume[index] > vol_avg[index]) or (volume[index+1] > min_volume_threshold and volume[index+1] > vol_avg[index+1])
-    bar_closes_near_to_high = (close[index] - low[index]) >= (high[index] - close[index]) * 1.5
+    bar_closes_near_to_high = (close[index] - low[index]) >= (high[index] - close[index]) * 1.2
 
     previous_bar_is_strong = bar_is_positive
      and volume_is_strong
@@ -38,7 +38,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
 
     pattern_occurred = false
     if bars_count_pattern == 3
-        lows_above_vwap = low[index+2] > vwap[index+2] and low[index+1] > vwap[index+1] and low[index] > vwap[index]
+        lows_above_vwap = open[index+2] > vwap[index+2] and open[index+1] > vwap[index+1] and low[index] > vwap[index]
         highs_above_vwap = high[index+2] > vwap[index+2] and high[index+1] > vwap[index+1] and high[index] > vwap[index]
         previous_positive_bar_is_strong := previous_positive_bar_is_strong(index+2, min_volume_threshold_for_first_strong_bar, vol_avg)
         previous_positive_bar_is_stronger_than_before = (high[index+2]-open[index+2]) > (high[index+3]-open[index+3]) and (high[index+2]-open[index+2]) > (high[index+4]-open[index+4])
@@ -52,7 +52,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
          and previous_positive_bar_is_stronger_than_before
     else
         previous_positive_bar_is_strong := previous_positive_bar_is_strong(index+3, min_volume_threshold_for_first_strong_bar, vol_avg)
-        four_pattern_lows_above_vwap = low[index+3] > vwap[index+3] and low[index+2] > vwap[index+2] and low[index+1] > vwap[index+1] and low[index] > vwap[index]
+        four_pattern_lows_above_vwap = open[index+3] > vwap[index+3] and open[index+2] > vwap[index+2] and open[index+1] > vwap[index+1] and low[index] > vwap[index]
         four_pattern_previous_positive_bar_is_stronger_than_before = high[index+3] > high[index+4] and high[index+3] > high[index+5]
         four_pattern_previous_negative_bar_is_weak = open[index+2] > close[index+2] and volume[index+2] < volume[index+3] and low[index+2] > low[index+3]
         four_pattern_third_bar_is_stronger = (close[index+1] > open[index+1] and close[index+1] - open[index+1] > 0.1 and volume[index+1]/volume[index] <= 0.6 and (close[index]-open[index]) > (close[index+1]-open[index+1])) or (open[index+1] > close[index+1] and volume[index+1] < volume[index+2])
