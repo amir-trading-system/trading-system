@@ -42,7 +42,9 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
         highs_above_vwap = high[index+2] > vwap[index+2] and high[index+1] > vwap[index+1] and high[index] > vwap[index]
         previous_positive_bar_is_strong := previous_positive_bar_is_strong(index+2, min_volume_threshold_for_first_strong_bar, vol_avg)
         previous_positive_bar_is_stronger_than_before = (high[index+2]-open[index+2]) > (high[index+3]-open[index+3]) and (high[index+2]-open[index+2]) > (high[index+4]-open[index+4])
-        previous_negative_bar_is_weak = open[index+1] > close[index+1] and volume[index+1] < volume[index+2] and open[index+1] - close[index+1] < close[index+1] - low[index+1] and (high[index+1] - open[index+1]) < (open[index+1] - low[index+1]) and volume[index+1]/volume[index] <= 0.6
+        previous_negative_bar_is_weak = open[index+1] > close[index+1] and volume[index+1] < volume[index+2] and open[index+1] - close[index+1] < close[index+1] - low[index+1] and (high[index+1] - open[index+1]) < (open[index+1] - low[index+1]) and volume[index+1]/volume[index] <= 0.6 and low[index+1] > low[index+2]
+        if str.tonumber(timeframe.period) == 2
+            previous_negative_bar_is_weak := previous_negative_bar_is_weak and volume[index+1]/volume[index+2] <= 0.7
         current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and volume[index+1]/volume[index] <= 0.75 and volume[index] > min_volume_threshold_for_first_strong_bar and volume[index] > vol_avg[index] and (close[index] - open[index]) / (high[index] - open[index]) >= 0.6 and low[index] > low[index+1]
 
         pattern_occurred := lows_above_vwap
@@ -56,7 +58,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
         four_pattern_previous_positive_bar_is_stronger_than_before = high[index+3] > high[index+4] and high[index+3] > high[index+5]
         four_pattern_previous_negative_bar_is_weak = open[index+2] > close[index+2] and volume[index+2] < volume[index+3] and low[index+2] > low[index+3]
         four_pattern_third_bar_is_stronger = (close[index+1] > open[index+1] and close[index+1] - open[index+1] > 0.1 and volume[index+1]/volume[index] <= 0.6 and (close[index]-open[index]) > (close[index+1]-open[index+1])) or (open[index+1] > close[index+1] and volume[index+1] < volume[index+2])
-        four_pattern_current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and volume[index] > volume[index+1] and volume[index] > min_volume_threshold_for_first_strong_bar and volume[index] > vol_avg[index] and (close[index] - open[index]) / (high[index] - open[index]) >= 0.6 and low[index] > low[index+1] and volume[index+1]/volume[index] <= 0.75 and volume[index+2]/volume[index] <= 0.75
+        four_pattern_current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and volume[index] > volume[index+1] and volume[index] > min_volume_threshold_for_first_strong_bar and volume[index] > vol_avg[index] and (close[index] - open[index]) / (high[index] - open[index]) >= 0.6 and low[index] > low[index+1] and volume[index] > volume[index+1] and volume[index] > volume[index+2] and close[index] > high[index+1] and close[index] > high[index+2]
 
         pattern_occurred := four_pattern_lows_above_vwap
          and four_pattern_previous_negative_bar_is_weak
