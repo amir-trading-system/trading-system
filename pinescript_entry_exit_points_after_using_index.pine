@@ -28,6 +28,14 @@ ema_support_indication(index) =>
         if close[i] < ema_9[i]
             ema_was_crossed_down := true
 
+    bars_prices_are_similar_counter = 0
+    for i = index+6 to index+1
+        current_close_inside_previus_range = close[i] <= high[i+1] and close[i] >= low[i+1]
+        if current_close_inside_previus_range
+            bars_prices_are_similar_counter += 1
+
+    bars_price_range_is_different = bars_prices_are_similar_counter <= 4
+
     lowest_price_in_last_bars = ta.lowest(low, 20)
     highest_price_in_last_bars = ta.highest(close, 20)
     current_bar_continues_up_trend = (highest_price_in_last_bars-lowest_price_in_last_bars) / close[index] >= 0.15
@@ -37,7 +45,7 @@ ema_support_indication(index) =>
     above_vwap = close[index] > vwap[index] and close[index+1] > vwap[index+1]
     macd_is_positive = macdLine[index] > 0 and histogram[index] > 0 and histogram[index] > histogram[index+1]
     previous_bar_is_strong = close[index+1] > close[index+2] and close[index+1] > open[index+2] and close[index+1] > open[index+1]
-    buyers_coming_in = previous_bar_is_strong and volume[index] > (volume[index+1] * 2) and volume[index] > vol_avg[index] and vol_avg[index] > 100000 and (close[index] - open[index]) > (high[index] - close[index]) and (high[index] - low[index])/(close[index+1] - open[index+1]) >= 0.9
+    buyers_coming_in = previous_bar_is_strong and volume[index] > (volume[index+1] * 2) and volume[index] > vol_avg[index] and vol_avg[index] > 100000 and vol_avg[index+1] >= 50000 and (close[index] - open[index]) > (high[index] - close[index]) and (high[index] - low[index])/(close[index+1] - open[index+1]) >= 0.9
     bar_full_body_is_strong_than_candles = (open[index]-low[index])/(close[index]-open[index]) <= 0.33
     bar_is_positive = bar_full_body_is_strong_than_candles and close[index] > open[index] and high[index] > high[index+1] and open[index] > open[index+1]
     ema_is_supporting = math.abs(ema_9[index+1] - low[index+1])/(close[index]-low[index]) <= 0.2 and not ema_was_crossed_down
@@ -49,6 +57,7 @@ ema_support_indication(index) =>
      and ema_is_supporting
      and current_bar_is_highest
      and current_bar_continues_up_trend
+     and bars_price_range_is_different
 
     ema_support_indication
 
