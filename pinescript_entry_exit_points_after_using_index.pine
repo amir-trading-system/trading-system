@@ -6,12 +6,10 @@ indicator(title="Momentum Indicator for Day Trading", overlay = true)
 import TradingView/ta/10
 
 
-
 relevant_timezone = "America/New_York"
 
-////           Continues trend Indications           ////
-continues_trend_sign_3_pattern = "🛫3️⃣"
-continues_trend_sign_4_pattern = "🛫4️⃣"
+
+////           9 EMA Support Indication           ////
 ema_support_indication_sign = "🛫👆"
 
 ema_support_indication(index) =>
@@ -60,6 +58,19 @@ ema_support_indication(index) =>
      and bars_price_range_is_different
 
     ema_support_indication
+
+ema_support_indication = ema_support_indication(0)
+
+// if ema_support_indication and hour >= 6 and hour < 15
+//     log.info("Ema Support Indication!")
+
+plotshape(hour >= 4 and hour < 15 ? ema_support_indication : false, title="EMA Support Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = ema_support_indication_sign)
+
+
+
+////           Continues Trend Indication           ////
+continues_trend_sign_3_pattern = "🛫3️⃣"
+continues_trend_sign_4_pattern = "🛫4️⃣"
 
 previous_positive_bar_is_strong(index, current_index, min_volume_threshold, vol_avg, vwap, ema_9) =>
     bar_is_positive = close[index] > open[index] and high[index] > high[index+1] and close[index] > close[index+1]
@@ -272,13 +283,62 @@ run_continues_trend_indication() =>
 
 [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern] = run_continues_trend_indication()
 
-ema_support_indication = ema_support_indication(0)
-
-if ema_support_indication and hour >= 6 and hour < 15
-    log.info("Ema Support Indication!")
-
 plotshape(hour >= 4 and hour < 15 ? current_bar_is_strong_in_3_bars_pattern : false, title="Continues trend indication 3 pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign_3_pattern)
 plotshape(hour >= 4 and hour < 15 ? current_bar_is_strong_in_4_bars_pattern : false, title="Continues trend indication 4 pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign_4_pattern)
-plotshape(hour >= 4 and hour < 15 ? ema_support_indication : false, title="EMA Support Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = ema_support_indication_sign)
 
-alertcondition(current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern or ema_support_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+
+
+////           9 EMA Support Indication           ////
+change_direction_up_indication_sign = "📈👆"
+
+direction_has_changed_to_upward() =>
+    index = 0
+    ema_9 = ta.ema(close, 9)
+    ema_20 = ta.ema(close, 20)
+    vol_avg = ta.sma(volume, 20)
+    vwap = ta.vwap(hlc3)
+
+    current_bar_is_positive = close[index] > open[index] and low[index] > vwap[index] and volume[index] > 10000 and close[index] - open[index] > 0.1
+    current_bar_touched_9_ema = low[index] <= ema_9[index] and close[index] > ema_9[index]
+    current_bar_is_strong = (close[index] - open[index]) / (high[index] - close[index] + open[index] - low[index]) >= 0.6
+    current_bar_changed_direction = high[index+1] < high[index]
+
+    highest_high_index = 0
+    highest_high_value = 0.0
+    for i = index+10 to index+4
+        if high[i] > highest_high_value and high[i] > high[i+1] and high[i] > high[i-1] and volume[i] >= vol_avg[i]
+            highest_high_value := high[i]
+            highest_high_index := i
+
+    price_action_fixing_itself_towards_9_ema = true
+    for i = highest_high_index-1 to index+1
+        if i < 0 or i-1 < 0
+            continue
+        if i-1 != index and (high[i] < high[i-1] or low[i] < vwap[i] or low[i] < ema_20[i] or open[i] == close[i])
+            price_action_fixing_itself_towards_9_ema := false
+            break
+
+    price_is_above_9_ema_until_now = true
+    for i = highest_high_index-1 to index+1
+        if i < 0
+            continue
+        if close[i] < ema_9[i] or open[i] < ema_9[i]
+            price_is_above_9_ema_until_now := false
+            break
+
+    current_bar_close_is_lower_than_highest_high = close[index] < highest_high_value
+
+    current_bar_looks_good = current_bar_is_positive and current_bar_touched_9_ema and current_bar_is_strong and current_bar_changed_direction and current_bar_close_is_lower_than_highest_high
+
+    // if time == timestamp(relevant_timezone, year, 6, 26, 8, 16) and timeframe.period == "2"
+    //     log.info("highest_high_index: {0}", highest_high_index)
+
+    current_bar_looks_good and price_action_fixing_itself_towards_9_ema and price_is_above_9_ema_until_now
+
+direction_has_changed_to_upward = direction_has_changed_to_upward()
+if direction_has_changed_to_upward and hour >= 4 and hour < 15
+    log.info("Direction has changed!")
+
+plotshape(hour >= 4 and hour < 15 ? direction_has_changed_to_upward : false, title="Change Direction up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = change_direction_up_indication_sign)
+
+alertcondition(current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern or ema_support_indication or direction_has_changed_to_upward, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
