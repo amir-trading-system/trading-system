@@ -315,7 +315,7 @@ direction_has_changed_to_upward() =>
     current_bar_is_positive = close[index] > open[index] and low[index] > vwap[index] and volume[index] > 10000 and close[index] - open[index] > 0.1
     current_bar_touched_9_ema = low[index] <= ema_9[index] and close[index] > ema_9[index]
     current_bar_is_strong = (close[index] - open[index]) / (high[index] - close[index] + open[index] - low[index]) >= 0.6
-    current_bar_changed_direction = high[index+1] < high[index]
+    current_bar_changed_direction = high[index+1] < high[index] and not (low[index] < low[index+1] and math.abs(low[index+1]-ema_9[index+1]) < math.abs(low[index]-ema_9[index]))
 
     highest_high_index = 0
     highest_high_value = 0.0
