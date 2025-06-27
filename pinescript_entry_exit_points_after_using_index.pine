@@ -319,10 +319,14 @@ direction_has_changed_to_upward() =>
 
     highest_high_index = 0
     highest_high_value = 0.0
-    for i = index+10 to index+4
+    for i = index+10 to index+3
         if high[i] > highest_high_value and high[i] > high[i+1] and high[i] > high[i-1] and volume[i] >= vol_avg[i]
             highest_high_value := high[i]
             highest_high_index := i
+
+    highest_bar_has_huge_rejection = false
+    if highest_high_index-1 > 0
+        highest_bar_has_huge_rejection := close[highest_high_index] > open[highest_high_index] and (high[highest_high_index-1] - low[highest_high_index-1])/(high[highest_high_index] - low[highest_high_index]) >= 0.7
 
     price_action_fixing_itself_towards_9_ema = true
     for i = highest_high_index-1 to index+1
@@ -342,10 +346,7 @@ direction_has_changed_to_upward() =>
 
     current_bar_close_is_lower_than_highest_high = close[index] < highest_high_value
 
-    current_bar_looks_good = current_bar_is_positive and current_bar_touched_9_ema and current_bar_is_strong and current_bar_changed_direction and current_bar_close_is_lower_than_highest_high
-
-    // if time == timestamp(relevant_timezone, year, 6, 26, 8, 16) and timeframe.period == "2"
-    //     log.info("highest_high_index: {0}", highest_high_index)
+    current_bar_looks_good = current_bar_is_positive and current_bar_touched_9_ema and current_bar_is_strong and current_bar_changed_direction and current_bar_close_is_lower_than_highest_high and not highest_bar_has_huge_rejection
 
     current_bar_looks_good and price_action_fixing_itself_towards_9_ema and price_is_above_9_ema_until_now
 
