@@ -34,6 +34,19 @@ ema_support_indication(index) =>
 
     bars_price_range_is_different = bars_prices_are_similar_counter <= 4
 
+    last_highest_value = 0.0
+    last_highest_index = 0
+    for i = index+5 to index+2
+        if high[i] > last_highest_value
+            last_highest_value := high[i]
+            last_highest_index := i
+
+    at_least_one_bar_is_red = false
+    for i = last_highest_index+1 to index
+        if close[i] < open[i]
+            at_least_one_bar_is_red := true
+            break
+
     lowest_price_in_last_bars = ta.lowest(low, 20)
     highest_price_in_last_bars = ta.highest(close, 20)
     current_bar_continues_up_trend = (highest_price_in_last_bars-lowest_price_in_last_bars) / close[index] >= 0.15
@@ -56,6 +69,7 @@ ema_support_indication(index) =>
      and current_bar_is_highest
      and current_bar_continues_up_trend
      and bars_price_range_is_different
+     and at_least_one_bar_is_red
 
     ema_support_indication
 
