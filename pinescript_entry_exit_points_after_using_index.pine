@@ -37,9 +37,14 @@ ema_support_indication(index) =>
     last_highest_value = 0.0
     last_highest_index = 0
     for i = index+5 to index+2
-        if high[i] > last_highest_value
+        red_bar_right_after = close[i-1] < open[i-1]
+        if high[i] > last_highest_value and not (red_bar_right_after and volume[i] < volume[i-1])
             last_highest_value := high[i]
             last_highest_index := i
+
+    highest_is_on_weak_bar = false
+    if last_highest_index != 0 and close[last_highest_index] < open[last_highest_index]
+        highest_is_on_weak_bar := true
 
     at_least_one_bar_is_red = false
     for i = last_highest_index+1 to index
@@ -70,6 +75,7 @@ ema_support_indication(index) =>
      and current_bar_continues_up_trend
      and bars_price_range_is_different
      and at_least_one_bar_is_red
+     and not highest_is_on_weak_bar
 
     ema_support_indication
 
