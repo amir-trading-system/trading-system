@@ -36,9 +36,10 @@ ema_support_indication(index) =>
 
     last_highest_value = 0.0
     last_highest_index = 0
-    for i = index+5 to index+2
-        red_bar_right_after = close[i-1] < open[i-1]
-        if high[i] > last_highest_value and not (red_bar_right_after and volume[i] < volume[i-1])
+    for i = index+10 to index+2
+        is_between_two_lows = high[i] > high[i+1] and high[i] > high[i-1]
+        red_bar_right_after = close[i-1] < open[i-1] and volume[i]/volume[i-1] <= 0.6
+        if high[i] > last_highest_value and is_between_two_lows and not (red_bar_right_after and volume[i] < volume[i-1])
             last_highest_value := high[i]
             last_highest_index := i
 
@@ -47,10 +48,12 @@ ema_support_indication(index) =>
         highest_is_on_weak_bar := true
 
     at_least_one_bar_is_red = false
-    for i = last_highest_index+1 to index
-        if close[i] < open[i]
+    no_weak_bar_between = true
+    for i = last_highest_index to index
+        if (close[i] < open[i] or (close[i] - open[i])/(high[i] - low[i]) <= 0.2) or str.tonumber(timeframe.period) == 15
             at_least_one_bar_is_red := true
-            break
+        if close[i] > open[i] and volume[i] < 10000
+            no_weak_bar_between := false
 
     lowest_price_in_last_bars = ta.lowest(low, 20)
     highest_price_in_last_bars = ta.highest(close, 20)
@@ -76,13 +79,14 @@ ema_support_indication(index) =>
      and bars_price_range_is_different
      and at_least_one_bar_is_red
      and not highest_is_on_weak_bar
+     and no_weak_bar_between
 
     ema_support_indication
 
 ema_support_indication = ema_support_indication(0)
 
-// if ema_support_indication and hour >= 6 and hour < 15
-//     log.info("Ema Support Indication!")
+if ema_support_indication and hour >= 4 and hour < 15
+    log.info("Ema Support Indication!")
 
 plotshape(hour >= 4 and hour < 15 ? ema_support_indication : false, title="EMA Support Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = ema_support_indication_sign)
 
@@ -200,6 +204,16 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
     macd_is_positive = macdLine[index] > 0 and signalLine[index] > 0 and histogram[index] > 0
     current_bar_is_mostly_above_previous_one = (high[index+1] - low[index]) / (high[index] - low[index]) <= 0.5
 
+    bars_back = 20
+    if str.tonumber(timeframe.period) == 2
+        bars_back := 10
+    if str.tonumber(timeframe.period) >= 5
+        bars_back := 6
+
+    lowest_price_in_last_bars = ta.lowest(low, bars_back)
+    highest_price_in_last_bars = ta.highest(close, bars_back)
+    current_bar_continues_up_trend = (highest_price_in_last_bars-lowest_price_in_last_bars) / close[index] >= 0.15
+
     volume_is_high_in_the_last_bars = true
     for i = index+5 to index
         if volume[i] < 2000
@@ -220,10 +234,10 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
             current_high_is_higher := false
 
     current_bar_is_weaker = false
-    bars_back = 10
+    weak_finder_bars_back = 10
     if str.tonumber(timeframe.period) >= 5
-        bars_back := 5
-    for i = bars_back to 1
+        weak_finder_bars_back := 5
+    for i = weak_finder_bars_back to 1
         if high[i] - low[i] > high[index] - low[index] and open[i] > close[i] and volume[i] > volume[index]
             current_bar_is_weaker := true
 
@@ -236,6 +250,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
      and current_bar_ema_9_is_above_all
      and pattern_occurred
      and volume_is_high_in_the_last_bars
+     and current_bar_continues_up_trend
 
 run_continues_trend_indication() =>
     index = 0
@@ -250,16 +265,12 @@ run_continues_trend_indication() =>
     r_2_3_pattern = current_bar_is_strong_bar(index+2, 3)
     r_3_3_pattern = current_bar_is_strong_bar(index+3, 3)
     r_4_3_pattern = current_bar_is_strong_bar(index+4, 3)
-    r_5_3_pattern = current_bar_is_strong_bar(index+5, 3)
-    r_6_3_pattern = current_bar_is_strong_bar(index+6, 3)
 
     r_0_4_pattern = current_bar_is_strong_bar(index, 4)
     r_1_4_pattern = current_bar_is_strong_bar(index+1, 4)
     r_2_4_pattern = current_bar_is_strong_bar(index+2, 4)
     r_3_4_pattern = current_bar_is_strong_bar(index+3, 4)
     r_4_4_pattern = current_bar_is_strong_bar(index+4, 4)
-    r_5_4_pattern = current_bar_is_strong_bar(index+5, 4)
-    r_6_4_pattern = current_bar_is_strong_bar(index+6, 4)
 
     current_bar_is_strong_in_3_bars_pattern = false
     current_bar_is_strong_in_4_bars_pattern = false
@@ -274,10 +285,6 @@ run_continues_trend_indication() =>
         current_bar_is_strong_in_3_bars_pattern := true
     else if histogram_looks_good_3_pattern and r_4_3_pattern
         current_bar_is_strong_in_3_bars_pattern := true
-    else if histogram_looks_good_3_pattern and r_5_3_pattern
-        current_bar_is_strong_in_3_bars_pattern := true
-    else if histogram_looks_good_3_pattern and r_6_3_pattern
-        current_bar_is_strong_in_3_bars_pattern := true
 
     if histogram_looks_good_4_pattern and r_0_4_pattern
         current_bar_is_strong_in_4_bars_pattern := true
@@ -289,15 +296,11 @@ run_continues_trend_indication() =>
         current_bar_is_strong_in_4_bars_pattern := true
     else if histogram_looks_good_4_pattern and r_4_4_pattern
         current_bar_is_strong_in_4_bars_pattern := true
-    else if histogram_looks_good_4_pattern and r_5_4_pattern
-        current_bar_is_strong_in_4_bars_pattern := true
-    else if histogram_looks_good_4_pattern and r_6_4_pattern
-        current_bar_is_strong_in_4_bars_pattern := true
 
     current_bar_is_strong = current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern
 
-    // if (current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern) and hour >= 6 and hour < 15
-    //     log.info("continues trend sign!")
+    if current_bar_is_strong and hour >= 6 and hour < 15
+        log.info("continues trend sign!")
 
     [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern]
 
@@ -322,6 +325,7 @@ direction_has_changed_to_upward() =>
     current_bar_touched_9_ema = low[index] <= ema_9[index] and close[index] > ema_9[index]
     current_bar_is_strong = (close[index] - open[index]) / (high[index] - close[index] + open[index] - low[index]) >= 0.6
     current_bar_changed_direction = high[index+1] < high[index] and not (low[index] < low[index+1] and math.abs(low[index+1]-ema_9[index+1]) < math.abs(low[index]-ema_9[index]))
+    previous_bar_is_weak = not (volume[index+1] > volume[index+2] and volume[index+1] > volume[index] and close[index+1] < open[index+1] and close[index+2] < open[index+2] and volume[index+1] > vol_avg[index+1])
 
     highest_high_index = 0
     highest_high_value = 0.0
@@ -333,6 +337,13 @@ direction_has_changed_to_upward() =>
     highest_bar_has_huge_rejection = false
     if highest_high_index-1 > 0
         highest_bar_has_huge_rejection := close[highest_high_index] > open[highest_high_index] and (high[highest_high_index-1] - low[highest_high_index-1])/(high[highest_high_index] - low[highest_high_index]) >= 0.7
+
+    highest_bar_is_negative_with_high_volume =
+     close[highest_high_index] < open[highest_high_index]
+     and close[highest_high_index+1] > open[highest_high_index+1]
+     and volume[highest_high_index] > volume[highest_high_index+1]
+     and (high[highest_high_index]-low[highest_high_index])/(high[highest_high_index+1]-low[highest_high_index+1]) >= 0.5
+     and (high[highest_high_index] - low[highest_high_index])/(high[highest_high_index+1] - low[highest_high_index+1]) >= 0.6
 
     price_action_fixing_itself_towards_9_ema = true
     for i = highest_high_index-1 to index+1
@@ -350,11 +361,29 @@ direction_has_changed_to_upward() =>
             price_is_above_9_ema_until_now := false
             break
 
+    bars_back = 20
+    lowest_price_in_last_bars = ta.lowest(low, bars_back)
+    highest_price_in_last_bars = ta.highest(close, bars_back)
+    current_bar_continues_up_trend = (highest_price_in_last_bars-lowest_price_in_last_bars) / close[index] >= 0.15
+
+    last_biggest_bar_is_not_weak = true
+    highest_volume_bar = ta.highest(volume, bars_back)
+    for i = bars_back to index
+        if volume[i] == highest_volume_bar and close[i] < open[i]
+            last_biggest_bar_is_not_weak := false
+            break
+
     current_bar_close_is_lower_than_highest_high = close[index] < highest_high_value
 
     current_bar_looks_good = current_bar_is_positive and current_bar_touched_9_ema and current_bar_is_strong and current_bar_changed_direction and current_bar_close_is_lower_than_highest_high and not highest_bar_has_huge_rejection
 
-    current_bar_looks_good and price_action_fixing_itself_towards_9_ema and price_is_above_9_ema_until_now
+    current_bar_looks_good
+     and price_action_fixing_itself_towards_9_ema
+     and price_is_above_9_ema_until_now
+     and not highest_bar_is_negative_with_high_volume
+     and current_bar_continues_up_trend
+     and previous_bar_is_weak
+     and last_biggest_bar_is_not_weak
 
 direction_has_changed_to_upward = direction_has_changed_to_upward()
 if direction_has_changed_to_upward and hour >= 4 and hour < 15
