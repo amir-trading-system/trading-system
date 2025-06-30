@@ -11,6 +11,44 @@ relevant_timezone = "America/New_York"
 
 ////           9 EMA Support Indication           ////
 ema_support_indication_sign = "🛫👆"
+breaks_new_high_indication_sign = "✅"
+
+break_last_high(index, ema_9, vol_avg) =>
+    bars_back = 30
+    if str.tonumber(timeframe.period) >= 5
+        bars_back := 10
+
+    highest_high_value = 0.0
+    highest_high_index = 0
+    biggest_bar_value = 0.0
+    biggest_bar_index = 0
+
+    for i = index+bars_back to index+1
+        if i-1 < 0
+            continue
+        if high[i] > highest_high_value and high[i] > high[i+1] and high[i] > high[i-1]
+            highest_high_value := high[i]
+            highest_high_index := i
+        if high[i] - low[i] > biggest_bar_value
+            biggest_bar_value := high[i] - low[i]
+            biggest_bar_index := i
+
+    biggest_bar_is_the_first_bar_in_the_session = dayofmonth[biggest_bar_index] != dayofmonth[biggest_bar_index+1] and biggest_bar_index - highest_high_index < 5
+
+    low_is_still_high = true
+    no_bar_crossed_yet_highest_bar = true
+    for i = highest_high_index-1 to index
+        if i < 0
+            continue
+        if low[i]/highest_high_value <= 0.4
+            low_is_still_high := false
+        if i > index and high[i] > highest_high_value
+            no_bar_crossed_yet_highest_bar := false
+
+    current_bar_is_positive = close[index] > open[index] and open[index] > ema_9[index] and volume[index] >= vol_avg[index] and vol_avg[index] > 10000
+    current_bar_crossed_last_high = low[index] < highest_high_value
+    current_bar_makes_new_high = close[index] > highest_high_value and low_is_still_high and current_bar_is_positive and current_bar_crossed_last_high and biggest_bar_is_the_first_bar_in_the_session and no_bar_crossed_yet_highest_bar
+    current_bar_makes_new_high
 
 ema_support_indication(index) =>
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
@@ -69,6 +107,12 @@ ema_support_indication(index) =>
     bar_is_positive = bar_full_body_is_strong_than_candles and close[index] > open[index] and high[index] > high[index+1] and open[index] > open[index+1]
     ema_is_supporting = math.abs(ema_9[index+1] - low[index+1])/(close[index]-low[index]) <= 0.2 and not ema_was_crossed_down
 
+    break_last_high = break_last_high(index, ema_9, vol_avg)
+
+    breaks_new_high_indication = break_last_high
+     and current_bar_continues_up_trend
+     and at_least_one_bar_is_red
+
     ema_support_indication = macd_is_positive
      and above_vwap
      and buyers_coming_in
@@ -81,14 +125,18 @@ ema_support_indication(index) =>
      and not highest_is_on_weak_bar
      and no_weak_bar_between
 
-    ema_support_indication
+    [ema_support_indication, breaks_new_high_indication]
 
-ema_support_indication = ema_support_indication(0)
+[ema_support_indication, breaks_new_high_indication] = ema_support_indication(0)
 
 if ema_support_indication and hour >= 4 and hour < 15
     log.info("Ema Support Indication!")
 
+if breaks_new_high_indication and hour >= 4 and hour < 15
+    log.info("Breaks New High Indication!")
+
 plotshape(hour >= 4 and hour < 15 ? ema_support_indication : false, title="EMA Support Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = ema_support_indication_sign)
+plotshape(hour >= 4 and hour < 15 ? breaks_new_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_new_high_indication_sign)
 
 
 
