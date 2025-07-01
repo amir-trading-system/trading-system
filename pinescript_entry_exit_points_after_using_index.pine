@@ -33,10 +33,15 @@ break_last_high(index, ema_9, vol_avg) =>
             biggest_bar_value := high[i] - low[i]
             biggest_bar_index := i
 
-    biggest_bar_is_the_first_bar_in_the_session = (dayofmonth[biggest_bar_index] != dayofmonth[biggest_bar_index+1] or volume[biggest_bar_index] > volume[biggest_bar_index+1] * 50) and biggest_bar_index - highest_high_index < 5
+    min_distance_from_big_bar = 4
+    if str.tonumber(timeframe.period) > 2
+        min_distance_from_big_bar := 2
+
+    biggest_bar_is_the_first_bar_in_the_session = (dayofmonth[biggest_bar_index] != dayofmonth[biggest_bar_index+1] or volume[biggest_bar_index] > volume[biggest_bar_index+1] * 50) and biggest_bar_index - highest_high_index < 5 and biggest_bar_index - index >= min_distance_from_big_bar
 
     low_is_still_high = true
     no_bar_crossed_yet_highest_bar = true
+    didnt_crossed_down_9_ema = true
     for i = highest_high_index-1 to index
         if i < 0
             continue
@@ -44,6 +49,8 @@ break_last_high(index, ema_9, vol_avg) =>
             low_is_still_high := false
         if i > index and high[i] > highest_high_value
             no_bar_crossed_yet_highest_bar := false
+        if close[i] < ema_9[i]
+            didnt_crossed_down_9_ema := false
 
     current_bar_is_positive = close[index] > open[index] and open[index] > ema_9[index] and volume[index] >= vol_avg[index] and vol_avg[index] > 10000
     current_bar_crossed_last_high = low[index] < highest_high_value
@@ -54,6 +61,7 @@ break_last_high(index, ema_9, vol_avg) =>
      and current_bar_crossed_last_high
      and biggest_bar_is_the_first_bar_in_the_session
      and no_bar_crossed_yet_highest_bar
+     and didnt_crossed_down_9_ema
 
 ema_support_indication(index) =>
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
