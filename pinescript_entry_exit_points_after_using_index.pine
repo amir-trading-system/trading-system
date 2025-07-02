@@ -13,7 +13,7 @@ relevant_timezone = "America/New_York"
 ema_support_indication_sign = "🛫👆"
 breaks_new_high_indication_sign = "✅"
 
-break_last_high(index, ema_9, vol_avg) =>
+break_last_high(index, ema_9, vwap, vol_avg) =>
     bars_back = 30
     if str.tonumber(timeframe.period) >= 5
         bars_back := 10
@@ -42,6 +42,9 @@ break_last_high(index, ema_9, vol_avg) =>
     low_is_still_high = true
     no_bar_crossed_yet_highest_bar = true
     didnt_crossed_down_9_ema = true
+    didnt_crossed_down_vwap = true
+    at_least_one_red_bar = (close[highest_high_index] <= open[highest_high_index] and high[highest_high_index] != low[highest_high_index]) or (math.abs(close[highest_high_index]-open[highest_high_index])/(high[highest_high_index]-low[highest_high_index])) <= 0.05
+
     for i = highest_high_index-1 to index
         if i < 0
             continue
@@ -51,6 +54,10 @@ break_last_high(index, ema_9, vol_avg) =>
             no_bar_crossed_yet_highest_bar := false
         if close[i] < ema_9[i]
             didnt_crossed_down_9_ema := false
+        if close[i] < vwap[i] and close[i] < ema_9[i]
+            didnt_crossed_down_vwap := false
+        if close[i] < open[i] or (math.abs(close[i]-open[i])/(high[i]-low[i])) <= 0.05
+            at_least_one_red_bar := true
 
     current_bar_is_positive = close[index] > open[index] and open[index] > ema_9[index] and volume[index] >= vol_avg[index] and vol_avg[index] > 10000
     current_bar_crossed_last_high = low[index] < highest_high_value
@@ -62,6 +69,8 @@ break_last_high(index, ema_9, vol_avg) =>
      and biggest_bar_is_the_first_bar_in_the_session
      and no_bar_crossed_yet_highest_bar
      and didnt_crossed_down_9_ema
+     and at_least_one_red_bar
+     and didnt_crossed_down_vwap
 
 ema_support_indication(index) =>
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
@@ -120,7 +129,7 @@ ema_support_indication(index) =>
     bar_is_positive = bar_full_body_is_strong_than_candles and close[index] > open[index] and high[index] > high[index+1] and open[index] > open[index+1]
     ema_is_supporting = math.abs(ema_9[index+1] - low[index+1])/(close[index]-low[index]) <= 0.2 and not ema_was_crossed_down
 
-    break_last_high = break_last_high(index, ema_9, vol_avg)
+    break_last_high = break_last_high(index, ema_9, vwap, vol_avg)
 
     breaks_new_high_indication = break_last_high
      and current_bar_continues_up_trend
@@ -142,8 +151,8 @@ ema_support_indication(index) =>
 
 [ema_support_indication, breaks_new_high_indication] = ema_support_indication(0)
 
-if ema_support_indication and hour >= 4 and hour < 15
-    log.info("Ema Support Indication!")
+// if ema_support_indication and hour >= 4 and hour < 15
+//     log.info("Ema Support Indication!")
 
 if breaks_new_high_indication and hour >= 4 and hour < 15
     log.info("Breaks New High Indication!")
@@ -366,8 +375,8 @@ run_continues_trend_indication() =>
 
     current_bar_is_strong = current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern
 
-    if current_bar_is_strong and hour >= 6 and hour < 15
-        log.info("continues trend sign!")
+    // if current_bar_is_strong and hour >= 6 and hour < 15
+    //     log.info("continues trend sign!")
 
     [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern]
 
@@ -453,8 +462,8 @@ direction_has_changed_to_upward() =>
      and last_biggest_bar_is_not_weak
 
 direction_has_changed_to_upward = direction_has_changed_to_upward()
-if direction_has_changed_to_upward and hour >= 4 and hour < 15
-    log.info("Direction has changed!")
+// if direction_has_changed_to_upward and hour >= 4 and hour < 15
+//     log.info("Direction has changed!")
 
 plotshape(hour >= 4 and hour < 15 ? direction_has_changed_to_upward : false, title="Change Direction up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = change_direction_up_indication_sign)
 
