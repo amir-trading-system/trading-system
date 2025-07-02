@@ -467,4 +467,4 @@ direction_has_changed_to_upward = direction_has_changed_to_upward()
 
 plotshape(hour >= 4 and hour < 15 ? direction_has_changed_to_upward : false, title="Change Direction up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = change_direction_up_indication_sign)
 
-alertcondition(current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern or ema_support_indication or direction_has_changed_to_upward, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern or ema_support_indication or direction_has_changed_to_upward or breaks_new_high_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
