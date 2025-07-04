@@ -26,7 +26,7 @@ break_last_high(index, ema_9, vwap, vol_avg) =>
     for i = index+bars_back to index+1
         if i-1 < 0
             continue
-        if high[i] > highest_high_value and high[i] > high[i+1] and high[i] > high[i-1]
+        if high[i] > highest_high_value+0.01 and high[i] > high[i+1] and high[i] > high[i-1]
             highest_high_value := high[i]
             highest_high_index := i
         if high[i] - low[i] > biggest_bar_value
@@ -39,11 +39,16 @@ break_last_high(index, ema_9, vwap, vol_avg) =>
 
     current_timeframe = str.tonumber(timeframe.period)
 
+    market_start_time = timestamp(relevant_timezone, year, month, dayofmonth, 9, 30)
+
     last_bars_has_time_gaps = false
-    for i = highest_high_index+10 to highest_high_index
+    for i = highest_high_index+5 to highest_high_index
         if i-1 < 0
             continue
-        if (time[i-1] - time[i])/1000/60/current_timeframe > current_timeframe
+        if (time[i-1] - time[i])/1000/60/current_timeframe > current_timeframe and time < market_start_time
+            last_bars_has_time_gaps := true
+            break
+        if dayofmonth[i] != dayofmonth[i+1]
             last_bars_has_time_gaps := true
             break
 
@@ -60,7 +65,7 @@ break_last_high(index, ema_9, vwap, vol_avg) =>
             continue
         if low[i]/highest_high_value <= 0.4
             low_is_still_high := false
-        if ((i > index and current_timeframe > 1) or (i > index+1 and current_timeframe == 1)) and high[i] > highest_high_value
+        if ((i > index and current_timeframe > 1) or (i > index+1 and current_timeframe == 1)) and high[i] > highest_high_value+0.01
             no_bar_crossed_yet_highest_bar := false
         if close[i] < ema_9[i]
             didnt_crossed_down_9_ema := false
