@@ -10,7 +10,12 @@ relevant_timezone = "America/New_York"
 
 
 ////           Breaks Last High Indication           ////
-breaks_last_high_indication_sign = "✅"
+breaks_last_high_sign_to_show = "✅"
+breaks_last_high_sign_to_show_number_1 = "✅ AND highest far from start"
+breaks_last_high_sign_to_show_number_2 = "✅ AND start is far from current bar"
+breaks_last_high_sign_to_show_number_3 = "✅ AND too high from highest bar"
+breaks_last_high_sign_to_show_number_4 = "✅ AND last red bar already crossed"
+breaks_last_high_sign_to_show_number_5 = "✅ AND highest bar is weak"
 
 breaks_last_high_indication(index) =>
     ema_9 = ta.ema(close, 9)
@@ -136,7 +141,7 @@ breaks_last_high_indication(index) =>
 
     biggest_and_highest_are_the_same_but_strong = biggest_bar_index == highest_high_index and math.abs(close[highest_high_index]-open[highest_high_index])/math.abs(high[highest_high_index]-close[highest_high_index]) >= 0.4
 
-    current_bar_is_similar_in_size_for_highest_one = ((close[index]-open[index])/(close[highest_high_index]-open[highest_high_index]) >= 0.5) or volume[index] > volume[highest_high_index] * 2
+    current_bar_is_similar_in_size_for_highest_one = ((close[index]-open[index])/(close[highest_high_index]-open[highest_high_index]) >= 0.5) or volume[index] > volume[highest_high_index] * 1.2
 
     // if time == timestamp(relevant_timezone, year, 3, 19, 8, 35) and timeframe.period == "5"
     //     log.info("start_of_trend_bar_index: {0}. highest_high_index: {1}. ", start_of_trend_bar_index, highest_high_index)
@@ -166,14 +171,48 @@ breaks_last_high_indication(index) =>
     if breaks_last_high_indication
         log.info("start_of_trend_bar_index: {0}. highest_high_index: {1}. ", start_of_trend_bar_index, highest_high_index)
 
-    breaks_last_high_indication
+    highest_bar_is_weak = (high[highest_high_index] - low[highest_high_index])/(high[highest_high_index+1] - low[highest_high_index+1]) < 0.6
 
-breaks_last_high_indication = breaks_last_high_indication(0)
+    last_red_bar_already_broke_the_high = false
+    for i = index+5 to index
+        is_red_bar = close[i] < open[i]
+        crossed_the_highest = high[i] > high[highest_high_index] or highest_high_index == i
+        if is_red_bar and crossed_the_highest
+            last_red_bar_already_broke_the_high := true
+            break
 
-// if breaks_last_high_indication and hour >= 4 and hour < 15
-//     log.info("Breaks New High Indication!")
+    number_to_show = 0
+    if last_red_bar_already_broke_the_high
+        number_to_show := 4
+    if not (low[index] < high[highest_high_index] or low[index+1] < high[highest_high_index])
+        number_to_show := 3
+    if highest_bar_is_weak
+        number_to_show := 5
 
-plotshape(hour >= 4 and hour < 15 ? breaks_last_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_last_high_indication_sign)
+    if current_timeframe == 5
+        highest_bar_is_close_to_trend_start_bar = start_of_trend_bar_index - highest_high_index < 4
+        if not highest_bar_is_close_to_trend_start_bar
+            number_to_show := 1
+        if not (start_of_trend_bar_index - index <= 10)
+            number_to_show := 2
+
+    if current_timeframe == 15
+        highest_bar_is_close_to_trend_start_bar = start_of_trend_bar_index - highest_high_index < 3
+        if not highest_bar_is_close_to_trend_start_bar
+            number_to_show := 1
+        if not (start_of_trend_bar_index - index <= 6)
+            number_to_show := 2
+
+    [breaks_last_high_indication, number_to_show]
+
+[breaks_last_high_indication, sign_to_show_number] = breaks_last_high_indication(0)
+
+plotshape(hour >= 4 and hour < 15 and sign_to_show_number == 0 ? breaks_last_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_last_high_sign_to_show)
+plotshape(hour >= 4 and hour < 15 and sign_to_show_number == 1 ? breaks_last_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_last_high_sign_to_show_number_1)
+plotshape(hour >= 4 and hour < 15 and sign_to_show_number == 2 ? breaks_last_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_last_high_sign_to_show_number_2)
+plotshape(hour >= 4 and hour < 15 and sign_to_show_number == 3 ? breaks_last_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_last_high_sign_to_show_number_3)
+plotshape(hour >= 4 and hour < 15 and sign_to_show_number == 4 ? breaks_last_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_last_high_sign_to_show_number_4)
+plotshape(hour >= 4 and hour < 15 and sign_to_show_number == 5 ? breaks_last_high_indication : false, title="Breaks New High Indication", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = breaks_last_high_sign_to_show_number_5)
 
 ////           9 EMA Support Indication           ////
 
@@ -490,10 +529,11 @@ direction_has_changed_to_upward() =>
     vol_avg = ta.sma(volume, 20)
     vwap = ta.vwap(hlc3)
 
-    current_bar_is_positive = close[index] > open[index] and low[index] > vwap[index] and volume[index] > 10000 and close[index] - open[index] > 0.1
+    // and low[index] > vwap[index]
+    current_bar_is_positive = close[index] > open[index] and volume[index] > 10000 and close[index] - open[index] > 0.1
     current_bar_touched_9_ema = low[index] <= ema_9[index] and close[index] > ema_9[index]
     current_bar_is_strong = (close[index] - open[index]) / (high[index] - close[index] + open[index] - low[index]) >= 0.6
-    current_bar_changed_direction = high[index+1] < high[index] and not (low[index] < low[index+1] and math.abs(low[index+1]-ema_9[index+1]) < math.abs(low[index]-ema_9[index]))
+    current_bar_changed_direction = open[index+1] < close[index] and not (low[index] < low[index+1] and math.abs(low[index+1]-ema_9[index+1]) < math.abs(low[index]-ema_9[index]))
     previous_bar_is_weak = not (volume[index+1] > volume[index+2] and volume[index+1] > volume[index] and close[index+1] < open[index+1] and close[index+2] < open[index+2] and volume[index+1] > vol_avg[index+1])
 
     highest_high_index = 0
@@ -513,14 +553,6 @@ direction_has_changed_to_upward() =>
      and volume[highest_high_index] > volume[highest_high_index+1]
      and (high[highest_high_index]-low[highest_high_index])/(high[highest_high_index+1]-low[highest_high_index+1]) >= 0.5
      and (high[highest_high_index] - low[highest_high_index])/(high[highest_high_index+1] - low[highest_high_index+1]) >= 0.6
-
-    price_action_fixing_itself_towards_9_ema = true
-    for i = highest_high_index-1 to index+1
-        if i < 0 or i-1 < 0
-            continue
-        if i-1 != index and (high[i] < high[i-1] or low[i] < vwap[i] or low[i] < ema_20[i] or open[i] == close[i])
-            price_action_fixing_itself_towards_9_ema := false
-            break
 
     price_is_above_9_ema_until_now = true
     for i = highest_high_index-1 to index+1
@@ -544,15 +576,19 @@ direction_has_changed_to_upward() =>
 
     current_bar_close_is_lower_than_highest_high = close[index] < highest_high_value
 
-    current_bar_looks_good = current_bar_is_positive and current_bar_touched_9_ema and current_bar_is_strong and current_bar_changed_direction and current_bar_close_is_lower_than_highest_high and not highest_bar_has_huge_rejection
-
-    current_bar_looks_good
-     and price_action_fixing_itself_towards_9_ema
+    current_bar_is_positive
+     and current_bar_touched_9_ema
+     and current_bar_is_strong
+     and current_bar_changed_direction
+     and current_bar_close_is_lower_than_highest_high
+     and not highest_bar_has_huge_rejection
      and price_is_above_9_ema_until_now
      and not highest_bar_is_negative_with_high_volume
      and current_bar_continues_up_trend
      and previous_bar_is_weak
      and last_biggest_bar_is_not_weak
+     and str.tonumber(timeframe.period) >= 5
+     and volume[index] > vol_avg[index]
 
 direction_has_changed_to_upward = direction_has_changed_to_upward()
 // if direction_has_changed_to_upward and hour >= 4 and hour < 15
