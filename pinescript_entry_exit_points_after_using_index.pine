@@ -140,6 +140,8 @@ breaks_last_high_indication(index) =>
     if close[highest_high_index] > open[index]
         current_bar_is_stronger_than_highest_bar := (high[highest_high_index] - open[index])/(high[index]-low[index]) <= 0.3
 
+    bar_before_does_not_decide_yet = (close[index+1] - open[index+1])/(high[index+1] - low[index+1]) < 0.6 and (current_timeframe == 1 or current_timeframe == 2) and volume[index] < volume[index+1] * 3
+
     breaks_last_high_indication = close[index] > highest_high_value
      and low_is_still_high
      and current_bar_is_positive
@@ -157,6 +159,7 @@ breaks_last_high_indication(index) =>
      and fixed_more_than_enough
      and not trend_started_way_too_strong
      and current_bar_is_stronger_than_highest_bar
+     and not bar_before_does_not_decide_yet
 
     // if breaks_last_high_indication
     //     log.info("start_of_trend_bar_index: {0}. highest_high_index: {1}. ", start_of_trend_bar_index, highest_high_index)
@@ -302,7 +305,9 @@ current_bar_ema_9_is_above_all(index, vwap) =>
     ema_20_is_strong = (ema_20[index] > vwap[index] or ema_20[index]/vwap[index] >= 0.85)
     ema_9[index] > ema_20[index] and ema_9[index] > vwap[index] and ema_20_is_strong
 
-histogram_looks_good(index, histogram, pattern_size, vol_avg) =>
+histogram_looks_good(index, pattern_size, vol_avg) =>
+    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
+
     bar_is_strong = close[index] > open[index] and (close[index] - open[index]) > (open[index] - low[index]) and (close[index] - open[index]) > (high[index] - close[index])
     histogram_looks_good = false
     if pattern_size == 3
@@ -314,14 +319,21 @@ histogram_looks_good(index, histogram, pattern_size, vol_avg) =>
         if not histogram_looks_good
             histogram_looks_good := histogram[index] > 0.01 and histogram[index+1] < histogram[index] and histogram[index+2]/histogram[index+1] >= 0.95 and bar_is_strong
 
-
     histogram_is_not_so_low = true
     for i = index+10 to index
         if histogram[index]/histogram[i] < 0.4 and histogram[i] > 0
             histogram_is_not_so_low := false
             break
 
-    histogram_looks_good and histogram_is_not_so_low and volume[index] > vol_avg[index]
+    macd_crossed_signal_above_zero_line = false
+    for i = index to index+40
+        macd_crossed_signal_line = macdLine[i+1] < signalLine[i+1] and macdLine[i] > signalLine[i]
+        macd_and_signal_are_above_zero = macdLine[i+1] > 0 and signalLine[i+1] > 0
+        if macd_crossed_signal_line and macd_and_signal_are_above_zero
+            macd_crossed_signal_above_zero_line := true
+            break
+
+    histogram_looks_good and histogram_is_not_so_low and macd_crossed_signal_above_zero_line and volume[index] > vol_avg[index]
 
 current_bar_is_strong_bar(index, bars_count_pattern) =>
     min_volume_threshold_for_first_strong_bar = 30000
@@ -330,12 +342,14 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
     vwap = ta.vwap(hlc3)
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
     previous_positive_bar_is_strong = false
+    previous_positive_bar_is_strong_bar_back = false
 
     pattern_occurred = false
     if bars_count_pattern == 3
         lows_above_vwap = open[index+2] > vwap[index+2] and open[index+1] > vwap[index+1] and low[index] > vwap[index]
         highs_above_vwap = high[index+2] > vwap[index+2] and high[index+1] > vwap[index+1] and high[index] > vwap[index]
         previous_positive_bar_is_strong := previous_positive_bar_is_strong(index+2, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
+        previous_positive_bar_is_strong_bar_back := previous_positive_bar_is_strong(index+3, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
         previous_positive_bar_is_stronger_than_before = (high[index+2]-open[index+2]) > (high[index+3]-open[index+3]) and (high[index+2]-open[index+2]) > (high[index+4]-open[index+4]) and (histogram[index+2]/histogram[index+3] >= 0.75 or histogram[index+2] > histogram[index+3]) and (histogram[index]/histogram[index+2] >= 0.8 or histogram[index] > histogram[index+2])
         previous_positive_bar_is_stronger_than_before_check_number_2 = true
         for i = index+8 to index+3
@@ -354,18 +368,25 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
             previous_negative_bar_is_weak := previous_negative_bar_is_weak and volume[index+1]/volume[index+2] <= 0.8
         current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and (volume[index] >= vol_avg[index] * 2 or volume[index] >= min_volume_threshold_for_first_strong_bar)
 
+        at_least_one_bar_is_red_before = false
+        for i = index+7 to index+2
+            if close[i] < open[i]
+                at_least_one_bar_is_red_before := true
+                break
+
         pattern_occurred := lows_above_vwap
          and highs_above_vwap
          and previous_negative_bar_is_weak
          and current_bar_is_positive_and_strong
          and (previous_positive_bar_is_stronger_than_before or previous_positive_bar_is_stronger_than_before_check_number_2)
          and no_under_ema_bars_before
+         and at_least_one_bar_is_red_before
     else
         previous_positive_bar_is_strong := previous_positive_bar_is_strong(index+3, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
-        four_pattern_lows_above_vwap = open[index+3] > vwap[index+3] and open[index+2] > vwap[index+2] and open[index+1] > vwap[index+1] and low[index] > vwap[index]
+        previous_positive_bar_is_strong_bar_back := previous_positive_bar_is_strong(index+4, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
+        four_pattern_close_above_vwap = close[index] > vwap[index]
         four_pattern_previous_positive_bar_is_stronger_than_before = high[index+3] > high[index+4] and high[index+3] > high[index+5] and ((volume[index+3] > volume[index+4] and open[index+4] > close[index+4]) or open[index+4] < close[index+4]) and (histogram[index+3]/histogram[index+4] >= 0.75 or histogram[index+3] > histogram[index+4]) and (histogram[index]/histogram[index+3] >= 0.8 or histogram[index] > histogram[index+3])
-        four_pattern_previous_negative_bar_is_weak = open[index+2] > close[index+2] and volume[index+2] < volume[index+3] and low[index+2] > low[index+3]
-        four_pattern_third_bar_is_stronger = (close[index+1] > open[index+1] and close[index+1] - open[index+1] > 0.1 and volume[index+1]/volume[index] <= 0.6 and (close[index]-open[index]) > (close[index+1]-open[index+1])) or (open[index+1] > close[index+1] and volume[index+1] < volume[index+2])
+        four_pattern_third_bar_is_stronger = (close[index+1] > open[index+1] and close[index+1] - open[index+1] > 0.1 and volume[index+1] < volume[index] and (close[index]-open[index]) > (close[index+1]-open[index+1]))
         four_pattern_current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1]
         four_pattern_weak_bar_before_is_really_weak = low[index+1] < low[index+2] and low[index+1] < low[index+3] and volume[index+1] > vol_avg[index+1]
 
@@ -375,12 +396,24 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
                 previous_positive_bar_is_stronger_than_before := false
                 break
 
-        pattern_occurred := four_pattern_lows_above_vwap
-         and four_pattern_previous_negative_bar_is_weak
+        at_least_one_bar_is_red = close[index+2] < open[index+2] or close[index+1] < open[index+1]
+
+        at_least_one_bar_is_red_before = false
+        for i = index+8 to index+3
+            if close[i] < open[i]
+                at_least_one_bar_is_red_before := true
+                break
+
+        // if time == timestamp(relevant_timezone, year, 7, 14, 7, 15) and timeframe.period == "5"
+        //     log.info("lowest_i: {0}, highest_i: {1}. r: {2}", lowest_index, highest_index, (highest - lowest)/open[index])
+
+        pattern_occurred := four_pattern_close_above_vwap
          and four_pattern_current_bar_is_positive_and_strong
          and four_pattern_third_bar_is_stronger
          and (four_pattern_previous_positive_bar_is_stronger_than_before or previous_positive_bar_is_stronger_than_before)
          and not four_pattern_weak_bar_before_is_really_weak
+         and at_least_one_bar_is_red
+         and at_least_one_bar_is_red_before
 
     macd_is_positive = macdLine[index] > 0 and signalLine[index] > 0 and histogram[index] > 0
     current_bar_is_mostly_above_previous_one = (high[index+1] - low[index]) / (high[index] - low[index]) <= 0.5
@@ -398,18 +431,18 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
 
     highest_in_the_last_bars = 0.0
     highest_in_the_last_bars_index = 0
-    for i = 15 to index+1
+    for i = 5 to index+1
         if high[index+i] > highest_in_the_last_bars
             highest_in_the_last_bars := high[index+i]
             highest_in_the_last_bars_index := index+i
 
     current_bar_is_highest_in_the_last_bars = high[index] > highest_in_the_last_bars
-    current_bar_ema_9_is_above_all = current_bar_ema_9_is_above_all(index, vwap)
     current_high_is_higher = true
-    highest_bar_index = 0
+    highest_high_index = 0
     for i = index+10 to index+1
         if high[i] > high[index]
             current_high_is_higher := false
+            highest_high_index := i
 
     price_is_above_ema = true
     for i = highest_in_the_last_bars_index-1 to index
@@ -432,8 +465,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
      and macd_is_positive
      and current_bar_is_mostly_above_previous_one
      and current_bar_is_highest_in_the_last_bars
-     and previous_positive_bar_is_strong
-     and current_bar_ema_9_is_above_all
+     and (previous_positive_bar_is_strong or previous_positive_bar_is_strong_bar_back)
      and pattern_occurred
      and volume_is_high_in_the_last_bars
      and current_bar_continues_up_trend
@@ -441,53 +473,26 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
 
 run_continues_trend_indication() =>
     index = 0
-    [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
     vol_avg = ta.sma(volume, 20)
 
-    histogram_looks_good_3_pattern = histogram_looks_good(index, histogram, 3, vol_avg) and close[index] > open[index]
-    histogram_looks_good_4_pattern = histogram_looks_good(index, histogram, 4, vol_avg) and close[index] > open[index]
+    histogram_looks_good_3_pattern = histogram_looks_good(index, 3, vol_avg) and close[index] > open[index]
+    histogram_looks_good_4_pattern = histogram_looks_good(index, 4, vol_avg) and close[index] > open[index]
 
-    r_0_3_pattern = current_bar_is_strong_bar(index, 3)
-    r_1_3_pattern = current_bar_is_strong_bar(index+1, 3)
-    r_2_3_pattern = current_bar_is_strong_bar(index+2, 3)
-    r_3_3_pattern = current_bar_is_strong_bar(index+3, 3)
-    r_4_3_pattern = current_bar_is_strong_bar(index+4, 3)
-
-    r_0_4_pattern = current_bar_is_strong_bar(index, 4)
-    r_1_4_pattern = current_bar_is_strong_bar(index+1, 4)
-    r_2_4_pattern = current_bar_is_strong_bar(index+2, 4)
-    r_3_4_pattern = current_bar_is_strong_bar(index+3, 4)
-    r_4_4_pattern = current_bar_is_strong_bar(index+4, 4)
+    three_bars_pattern = current_bar_is_strong_bar(index, 3)
+    four_bars_pattern = current_bar_is_strong_bar(index, 4)
 
     current_bar_is_strong_in_3_bars_pattern = false
     current_bar_is_strong_in_4_bars_pattern = false
 
-    if histogram_looks_good_3_pattern and r_0_3_pattern
-        current_bar_is_strong_in_3_bars_pattern := true
-    else if histogram_looks_good_3_pattern and r_1_3_pattern
-        current_bar_is_strong_in_3_bars_pattern := true
-    else if histogram_looks_good_3_pattern and r_2_3_pattern
-        current_bar_is_strong_in_3_bars_pattern := true
-    else if histogram_looks_good_3_pattern and r_3_3_pattern
-        current_bar_is_strong_in_3_bars_pattern := true
-    else if histogram_looks_good_3_pattern and r_4_3_pattern
+    if histogram_looks_good_3_pattern and three_bars_pattern
         current_bar_is_strong_in_3_bars_pattern := true
 
-    if histogram_looks_good_4_pattern and r_0_4_pattern
-        current_bar_is_strong_in_4_bars_pattern := true
-    else if histogram_looks_good_4_pattern and r_1_4_pattern
-        current_bar_is_strong_in_4_bars_pattern := true
-    else if histogram_looks_good_4_pattern and r_2_4_pattern
-        current_bar_is_strong_in_4_bars_pattern := true
-    else if histogram_looks_good_4_pattern and r_3_4_pattern
-        current_bar_is_strong_in_4_bars_pattern := true
-    else if histogram_looks_good_4_pattern and r_4_4_pattern
+    if histogram_looks_good_4_pattern and four_bars_pattern
         current_bar_is_strong_in_4_bars_pattern := true
 
     current_bar_is_strong = current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern
-
-    // if current_bar_is_strong and hour >= 6 and hour < 15
-    //     log.info("continues trend sign!")
+    if current_bar_is_strong and hour >= 4 and hour < 15
+        log.info("continues trend sign!")
 
     [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern]
 
@@ -615,8 +620,8 @@ direction_has_changed_to_upward() =>
      and last_red_bar_volume < volume[index]
      and last_bars_has_time_gaps
 
-    if direction_has_changed_to_upward and hour >= 4 and hour < 15
-        log.info("Direction has changed. highest_high_index: {0}", highest_high_index)
+    // if direction_has_changed_to_upward and hour >= 4 and hour < 15
+    //     log.info("Direction has changed. highest_high_index: {0}", highest_high_index)
 
     direction_has_changed_to_upward
 
