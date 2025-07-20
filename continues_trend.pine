@@ -13,24 +13,6 @@ continues_trend_sign_3_pattern = "🛫3️⃣"
 continues_trend_sign_4_pattern = "🛫4️⃣"
 reversal_sign = "🌠"
 
-previous_positive_bar_is_strong(index, current_index, min_volume_threshold, vol_avg, vwap, ema_9) =>
-    bar_is_positive = close[index] > open[index] and high[index] > high[index+1] and close[index] > close[index+1]
-    volume_is_strong = (volume[index] > min_volume_threshold and volume[index] > vol_avg[index]) or (volume[index+1] > min_volume_threshold and volume[index+1] > vol_avg[index+1])
-    bar_closes_near_to_high = (close[index] - low[index]) >= (high[index] - close[index]) * 1.2 and high[index] - open[index] > open[index] - low[index]
-    current_bar_is_volatile = false
-    if open[index] > 1
-        current_bar_is_volatile := high[index] - open[index] >= 0.15 and high[current_index] - open[current_index] >= 0.15
-    else
-        current_bar_is_volatile := high[index] - open[index] >= 0.05
-
-    previous_bar_is_strong = bar_is_positive
-     and volume_is_strong
-     and bar_closes_near_to_high
-     and current_bar_is_volatile
-     and (close[index-1]-low[index-1]) / (close[index] - low[index]) < 0.7
-
-    previous_bar_is_strong
-
 bar_value_is_volatile(index) =>
     current_timeframe = str.tonumber(timeframe.period)
     bar_value_is_volatile = false
@@ -76,15 +58,11 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
     ema_20 = ta.ema(close, 20)
     vwap = ta.vwap(hlc3)
     [macdLine, signalLine, histogram] = ta.macd(close, 12, 26, 9)
-    previous_positive_bar_is_strong = false
-    previous_positive_bar_is_strong_bar_back = false
 
     pattern_occurred = false
     if bars_count_pattern == 3
         lows_above_vwap = open[index+2] > vwap[index+2] and open[index+1] > vwap[index+1] and open[index] > vwap[index]
         highs_above_vwap = high[index+2] > vwap[index+2] and high[index+1] > vwap[index+1] and high[index] > vwap[index]
-        previous_positive_bar_is_strong := previous_positive_bar_is_strong(index+2, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
-        previous_positive_bar_is_strong_bar_back := previous_positive_bar_is_strong(index+3, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
 
         no_under_ema_bars_before = true
         for i = index+5 to index
@@ -120,8 +98,6 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
          and red_bars_are_weak
          and weak_bar_crossed_green_bar
     else
-        previous_positive_bar_is_strong := previous_positive_bar_is_strong(index+3, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
-        previous_positive_bar_is_strong_bar_back := previous_positive_bar_is_strong(index+4, index, min_volume_threshold_for_first_strong_bar, vol_avg, vwap, ema_9)
         four_pattern_close_above_vwap = close[index] > vwap[index]
         four_pattern_previous_positive_bar_is_stronger_than_before = high[index+3] > high[index+4] and high[index+3] > high[index+5] and ((volume[index+3] > volume[index+4] and open[index+4] > close[index+4]) or open[index+4] < close[index+4]) and (histogram[index+3]/histogram[index+4] >= 0.75 or histogram[index+3] > histogram[index+4]) and (histogram[index]/histogram[index+3] >= 0.8 or histogram[index] > histogram[index+3])
         four_pattern_third_bar_is_stronger = (close[index+1] > open[index+1] and close[index+1] - open[index+1] > 0.1 and volume[index+1] < volume[index] and (close[index]-open[index]) > (close[index+1]-open[index+1])) or (open[index+1] > close[index+1] and volume[index+1] < volume[index+2])
@@ -165,10 +141,11 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
     trend_started_bar_index = 0
     for i = index+30 to index+1
         bar_is_positive = close[i] > open[i]
-        bar_is_volatile = volume[i] > vol_avg[i] and volume[i] > volume[i+1] and vol_avg[i] > vol_avg[i+1]
+        bar_is_volatile = volume[i] > vol_avg[i] and volume[i] > volume[i+1] and vol_avg[i] > vol_avg[i+1] and volume[i] > 20000
         crossed_vwap_upwards = low[i] < vwap[i] and close[i] > vwap[i]
         time_is_after_market_time = hour[i] >= 8
-        if bar_is_positive and bar_is_volatile and crossed_vwap_upwards and time_is_after_market_time
+        bar_value_is_volatile = (high[i]-low[i]) > (high[i+1]-low[i+1]) * 2
+        if bar_is_positive and bar_is_volatile and crossed_vwap_upwards and time_is_after_market_time and bar_value_is_volatile
             trend_started_bar_index := i
             break
 
@@ -227,17 +204,15 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
     bar_value_is_volatile = bar_value_is_volatile(index)
 
     result = pattern_occurred
-     and current_high_is_higher
      and not current_bar_is_weaker
      and macd_is_positive
      and current_bar_is_highest_in_the_last_bars
-     and (previous_positive_bar_is_strong or previous_positive_bar_is_strong_bar_back)
      and current_bar_continues_up_trend
      and price_is_above_ema
      and above_vwap_for_the_last_bars
      and not current_bar_is_too_strong
      and bar_value_is_volatile
-     and volume[index] >= 100000
+     and volume[index] >= 50000
      and pullbacks_are_looks_good
 
     [result, trend_started_bar_index, pullbacks_counter]
