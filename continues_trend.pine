@@ -286,7 +286,7 @@ bar_is_acting_as_reversal_upwards(index) =>
     current_bar_is_positive = close[index] > open[index] and high[index] > close[index]
     current_bar_is_still_lower_than_bar_before = high[index] <= high[index+1]
     bar_has_inverted_hammer_pattern = (open[index] == low[index] or (open[index] - low[index])/(high[index] - low[index]) <= 0.2) and (high[index] - close[index])/(close[index] - low[index]) >= 0.3
-    current_bar_is_close_to_9_ema = (low[index] - ema_9[index]) < (close[index]-open[index])
+    current_bar_is_close_to_9_ema = (low[index] - ema_9[index]) < (high[index]-low[index])
     most_of_the_bar_is_above_ema_9 = (math.abs(ema_9[index] - open[index])/(close[index] - open[index]) <= 0.5) or open[index] >= ema_9[index]
     bar_is_volatile = volume[index] > 50000
     macd_is_positive = histogram[index] > 0 and macd[index] > 0
