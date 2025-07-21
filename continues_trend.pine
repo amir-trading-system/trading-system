@@ -203,6 +203,29 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
 
     bar_value_is_volatile = bar_value_is_volatile(index)
 
+    current_timeframe = str.tonumber(timeframe.period)
+    already_moved_up = false
+    bars_back := int(120/current_timeframe)
+    for i = index+bars_back to index+1
+        if volume[i] > volume[index] and close[i] > high[index]
+            already_moved_up := true
+            break
+
+    current_bar_touches_9_ema = low[index] <= ema_9[index] or (low[index] - ema_9[index]) < (high[index+1] - low[index+1])
+    previous_bar_touches_9_ema = low[index+1] <= ema_9[index+1] or (low[index+1] - ema_9[index+1])/(high[index+1] - low[index+1]) <= 0.5
+    previous_low_is_weak = low[index+1] <= low[index+2] and math.abs(close[index+1] - open[index+1])/(high[index+1] - low[index+1]) <= 0.3
+    if close[index+2] < open[index+2]
+        previous_low_is_weak := previous_low_is_weak and math.abs(low[index+1] - ema_9[index+1]) < (low[index+1] - ema_9[index+2])
+
+    start_of_trend_bar_too_strong = true
+    start_of_trend_bar_value = high[trend_started_bar_index] - low[trend_started_bar_index]
+    for i = trend_started_bar_index+1 to index
+        if high[i] - low[i] > start_of_trend_bar_value
+            start_of_trend_bar_too_strong := false
+            break
+
+    weak_bars_before_are_strong = (((open[index+1] - close[index+1])/(high[index+1] - low[index+1]) <= 0.5 or (open[index+1] - close[index+1])/(high[index+2] - low[index+2]) <= 0.5) and close[index+1] < open[index+1]) or (((open[index+2] - close[index+2])/(high[index+2] - low[index+2]) <= 0.5 or (open[index+2] - close[index+2])/(high[index+3] - low[index+3]) <= 0.5) and close[index+2] < open[index+2])
+
     result = pattern_occurred
      and not current_bar_is_weaker
      and macd_is_positive
@@ -214,6 +237,10 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
      and bar_value_is_volatile
      and volume[index] >= 50000
      and pullbacks_are_looks_good
+     and not already_moved_up
+     and (current_bar_touches_9_ema or previous_bar_touches_9_ema or previous_low_is_weak)
+     and not (start_of_trend_bar_too_strong and pullbacks_counter <= 1)
+     and weak_bars_before_are_strong
 
     [result, trend_started_bar_index, pullbacks_counter]
 
@@ -277,7 +304,7 @@ run_continues_trend_indication() =>
     [current_bar_is_strong_in_4_bars_pattern, trend_started_bar_index_4, pullbacks_counter_4] = current_bar_is_strong_bar(index, 4)
     bar_is_acting_as_reversal_upwards = bar_is_acting_as_reversal_upwards(index)
 
-    if bar_is_acting_as_reversal_upwards and hour >= 9 and hour < 17
+    if bar_is_acting_as_reversal_upwards and hour >= 9 and hour < 16
         log.info("Shooting Star!")
 
     start_index = 0
@@ -292,15 +319,15 @@ run_continues_trend_indication() =>
     if pullbacks_counter_4 != 0
         pullbacks_counter := pullbacks_counter_4
 
-    if (current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern) and hour >= 6 and hour < 15
+    if (current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern) and hour >= 9 and hour < 16
         log.info("continues trend. start_index: {0}. pb_counter: {1}", start_index, pullbacks_counter)
 
     [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern, bar_is_acting_as_reversal_upwards]
 
 [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern, bar_is_acting_as_reversal_upwards] = run_continues_trend_indication()
 
-plotshape(hour >= 6 and hour < 15 ? current_bar_is_strong_in_3_bars_pattern : false, title="Continues trend indication 3 pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign_3_pattern)
-plotshape(hour >= 6 and hour < 15 ? current_bar_is_strong_in_4_bars_pattern : false, title="Continues trend indication 4 pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign_4_pattern)
-plotshape(hour >= 6 and hour < 17 ? bar_is_acting_as_reversal_upwards : false, title="Reversal pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = reversal_sign)
+plotshape(hour >= 9 and hour < 16 ? current_bar_is_strong_in_3_bars_pattern : false, title="Continues trend indication 3 pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign_3_pattern)
+plotshape(hour >= 9 and hour < 16 ? current_bar_is_strong_in_4_bars_pattern : false, title="Continues trend indication 4 pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = continues_trend_sign_4_pattern)
+plotshape(hour >= 9 and hour < 16 ? bar_is_acting_as_reversal_upwards : false, title="Reversal pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = reversal_sign)
 
 alertcondition(bar_is_acting_as_reversal_upwards, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
