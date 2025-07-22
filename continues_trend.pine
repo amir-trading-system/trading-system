@@ -13,8 +13,13 @@ continues_trend_sign_3_pattern = "🛫3️⃣"
 continues_trend_sign_4_pattern = "🛫4️⃣"
 reversal_sign = "🌠"
 
+is_crossed_up(l, v, c) =>
+    l < v and c > v
+
 had_at_least_one_pullback_and_less_than_three(index, ema_9, vwap, trend_started_bar_index) =>
     pullbacks_counter = 0
+    previous_pullback_low = 0.0
+    previous_pullback_index = 100
     for i = trend_started_bar_index to index
         previous_bar_is_red = (close[i+1] < open[i+1] and i+1 < trend_started_bar_index) or (close[i+2] < open[i+2] and i+2 < trend_started_bar_index)
         current_high_is_higher = high[i] > high[i+1]
@@ -29,11 +34,15 @@ had_at_least_one_pullback_and_less_than_three(index, ema_9, vwap, trend_started_
          and current_bar_is_positive
          and bar_is_strong
          and price_is_above_vwap
-            pullbacks_counter += 1
-            // if time == timestamp(relevant_timezone, 2025, 7, 8, 10, 00) and timeframe.period == "5"
-            //     log.info("i: {0}", i)
+            current_pullback_low = low[i+1] < low[i+2] ? low[i+1] : low[i+2]
+            if current_pullback_low > previous_pullback_low and previous_pullback_index != i+1
+                pullbacks_counter += 1
+                previous_pullback_low := current_pullback_low
+                previous_pullback_index := i
+                // if time == timestamp(relevant_timezone, 2025, 6, 17, 10, 25) and timeframe.period == "5"
+                //     log.info("i: {0}. trend_started_bar_index: {1}", i, trend_started_bar_index)
 
-    [pullbacks_counter >= 1 and pullbacks_counter <= 2, pullbacks_counter]
+    [pullbacks_counter >= 1 and pullbacks_counter <= 4, pullbacks_counter]
 
 current_bar_is_strong_bar(index, bars_count_pattern) =>
     min_volume_threshold_for_first_strong_bar = 30000
@@ -122,14 +131,51 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
     macd_is_positive = macdLine[index] > 0 and signalLine[index] > 0 and histogram[index] > 0
     current_bar_is_mostly_above_previous_one = (high[index+1] - low[index]) / (high[index] - low[index]) <= 0.7
 
+    current_timeframe = str.tonumber(timeframe.period)
     trend_started_bar_index = 0
-    for i = index+30 to index+1
-        bar_is_positive = close[i] > open[i]
-        bar_is_volatile = volume[i] > vol_avg[i] and volume[i] > volume[i+1] and vol_avg[i] > vol_avg[i+1] and volume[i] > 2000
-        crossed_vwap_upwards = low[i] < vwap[i] and close[i] > vwap[i]
-        time_is_after_market_time = hour[i] >= 8
-        bar_value_is_volatile = (high[i]-low[i]) > (high[i+1]-low[i+1]) * 2
-        if bar_is_positive and bar_is_volatile and crossed_vwap_upwards and time_is_after_market_time and bar_value_is_volatile
+    back = index+20
+    if current_timeframe >= 5
+        back := index+30
+
+    for i = back to index+1
+        if hour[i] < 7
+            continue
+
+        low_i = low[i]
+        close_i = close[i]
+        high_i = high[i]
+        open_i = open[i]
+        volume_i = volume[i]
+        vwap_i = vwap[i]
+
+        volume_i1 = volume[i+1]
+        low_i1 = low[i+1]
+        vwap_i1 = vwap[i+1]
+        close_i1 = close[i+1]
+        high_i1 = high[i+1]
+
+        low_i2 = low[i+2]
+        close_i2 = close[i+2]
+        vwap_i2 = vwap[i+1]
+
+        bar_is_positive = close_i > open_i
+        if not bar_is_positive
+            continue
+
+        bar_is_volatile = volume_i > vol_avg[i] and volume_i > volume_i1 and vol_avg[i] > vol_avg[i+1] and volume_i > 2000
+        if not bar_is_volatile
+            continue
+        crossed_vwap_upwards = is_crossed_up(low_i, vwap_i, close_i)
+         or is_crossed_up(low_i1, vwap_i1, close_i1)
+         or is_crossed_up(low_i2, vwap_i2, close_i2)
+        if not crossed_vwap_upwards
+            continue
+
+        bar_value_is_volatile = (high_i-low_i) > (high_i1-low_i1) * 2
+        if not bar_value_is_volatile
+            continue
+
+        if bar_is_positive and bar_is_volatile and crossed_vwap_upwards and bar_value_is_volatile
             trend_started_bar_index := i
             break
 
@@ -145,7 +191,8 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
 
     above_vwap_for_the_last_bars = true
     for i = trend_started_bar_index to index
-        if (vwap[i] > close[i] or vwap[i] > open[i]) and close[i] < open[i] and volume[i] > vol_avg[i] and close[i] < ema_20[i]
+        price_is_under_half_of_started_bar = close[i]/(high[trend_started_bar_index] - low[trend_started_bar_index]) < 0.5
+        if (vwap[i] > close[i] or vwap[i] > open[i]) and close[i] < open[i] and volume[i] > vol_avg[i] and close[i] < ema_20[i] and price_is_under_half_of_started_bar
             above_vwap_for_the_last_bars := false
 
     highest_in_the_last_bars = 0.0
@@ -185,9 +232,8 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
             current_bar_is_too_strong := false
             break
 
-    bar_value_is_volatile = math.abs(close[index+1]-open[index+1])/(close[index+1]-open[index+1]) <= 0.5
+    bar_value_is_volatile = (math.abs(close[index+1]-open[index+1])/(close[index]-open[index]) <= 0.5 and close[index+1] < open[index+1]) or (math.abs(close[index+2]-open[index+2])/(close[index]-open[index]) <= 0.5 and close[index+2] < open[index+2])
 
-    current_timeframe = str.tonumber(timeframe.period)
     already_moved_up = false
     bars_back := int(120/current_timeframe)
     for i = index+bars_back to index+1
@@ -223,13 +269,65 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
      and pullbacks_are_looks_good
      and not already_moved_up
      and (current_bar_touches_9_ema or previous_bar_touches_9_ema or previous_low_is_weak)
-     and not (start_of_trend_bar_too_strong and pullbacks_counter <= 1)
+     and not (start_of_trend_bar_too_strong and pullbacks_counter < 1)
      and weak_bars_before_are_strong
 
-    // if time == timestamp(relevant_timezone, 2025, 7, 22, 09, 40) and timeframe.period == "5"
+    if result
+        at_least_one_bar_touched_ema_9 = false
+        closest_to_ema_until_now_index = 0
+        closest_to_ema_until_now_distance = 100.0
+        for i = trend_started_bar_index-1 to index
+            if trend_started_bar_index-1 < 1
+                continue
+
+            if low[i] > ema_9[i] and low[i] - ema_9[i] < closest_to_ema_until_now_distance
+                closest_to_ema_until_now_distance := low[i] - ema_9[i]
+                closest_to_ema_until_now_index := i
+
+            if low[i] <= ema_9[i]
+                at_least_one_bar_touched_ema_9 := true
+                break
+
+        bars_back := 0
+        back := 0
+        lower_timeframe = ""
+
+        if not at_least_one_bar_touched_ema_9
+            switch timeframe.period
+                "15" =>
+                    bars_back := 15/5
+                    back := closest_to_ema_until_now_index * (bars_back)
+                    lower_timeframe := "5"
+                "5" =>
+                    bars_back := 5/1
+                    back := closest_to_ema_until_now_index * (bars_back)
+                    lower_timeframe := "1"
+                "2" =>
+                    bars_back := 2/1
+                    back := closest_to_ema_until_now_index * (bars_back)
+                    lower_timeframe := "1"
+                "1" =>
+                    bars_back := 1/1
+                    back := closest_to_ema_until_now_index * (bars_back)
+                    lower_timeframe := "1"
+
+            [lows, ema_9s] = request.security_lower_tf(syminfo.tickerid, lower_timeframe, [low[back], ta.ema(close, 9)[back]])
+            if array.size(lows) == bars_back
+                for i = array.size(lows) to 1
+                    l = array.get(lows, i-1)
+                    e = array.get(ema_9s, i-1)
+                    if i <= e
+                        at_least_one_bar_touched_ema_9 := true
+                        break
+
+        result := result and at_least_one_bar_touched_ema_9
+
+    // if time == timestamp(relevant_timezone, 2025, 6, 26, 10, 45) and timeframe.period == "15"
     //     log.info("pullbacks_counter: {0}. s_i: {1}", pullbacks_counter, trend_started_bar_index)
 
-    [result, trend_started_bar_index, pullbacks_counter]
+    if result
+        log.info("continues trend. start_index: {0}. pb_counter: {1}", trend_started_bar_index, pullbacks_counter)
+    result
 
 bar_is_acting_as_reversal_upwards(index) =>
     vwap = ta.vwap(hlc3)
@@ -287,27 +385,15 @@ bar_is_acting_as_reversal_upwards(index) =>
 run_continues_trend_indication() =>
     index = 0
 
-    [current_bar_is_strong_in_3_bars_pattern, trend_started_bar_index_3, pullbacks_counter_3] = current_bar_is_strong_bar(index, 3)
-    [current_bar_is_strong_in_4_bars_pattern, trend_started_bar_index_4, pullbacks_counter_4] = current_bar_is_strong_bar(index, 4)
+    current_bar_is_strong_in_3_bars_pattern = current_bar_is_strong_bar(index, 3)
+    current_bar_is_strong_in_4_bars_pattern = current_bar_is_strong_bar(index, 4)
     bar_is_acting_as_reversal_upwards = bar_is_acting_as_reversal_upwards(index)
 
     if bar_is_acting_as_reversal_upwards and hour >= 9 and hour < 16
         log.info("Shooting Star!")
 
-    start_index = 0
-    if trend_started_bar_index_3 != 0
-        start_index := trend_started_bar_index_3
-    if trend_started_bar_index_4 != 0
-        start_index := trend_started_bar_index_4
-
-    pullbacks_counter = 0
-    if pullbacks_counter_3 != 0
-        pullbacks_counter := pullbacks_counter_3
-    if pullbacks_counter_4 != 0
-        pullbacks_counter := pullbacks_counter_4
-
     if (current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern) and hour >= 9 and hour < 16
-        log.info("continues trend. start_index: {0}. pb_counter: {1}", start_index, pullbacks_counter)
+        log.info("continues trend!")
 
     [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern, bar_is_acting_as_reversal_upwards]
 
