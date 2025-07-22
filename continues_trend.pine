@@ -13,22 +13,7 @@ continues_trend_sign_3_pattern = "🛫3️⃣"
 continues_trend_sign_4_pattern = "🛫4️⃣"
 reversal_sign = "🌠"
 
-bar_value_is_volatile(index) =>
-    current_timeframe = str.tonumber(timeframe.period)
-    bar_value_is_volatile = false
-
-    if current_timeframe == 1
-        bar_value_is_volatile := close[index] - open[index] >= 0.1
-    if current_timeframe == 2
-        bar_value_is_volatile := close[index] - open[index] >= 0.15
-    if current_timeframe == 5
-        bar_value_is_volatile := close[index] - open[index] >= 0.2
-    if current_timeframe == 15
-        bar_value_is_volatile := close[index] - open[index] >= 0.3
-
-    bar_value_is_volatile
-
-had_at_least_one_pullback_and_less_than_three(index, ema_9, trend_started_bar_index) =>
+had_at_least_one_pullback_and_less_than_three(index, ema_9, vwap, trend_started_bar_index) =>
     pullbacks_counter = 0
     for i = trend_started_bar_index to index
         previous_bar_is_red = (close[i+1] < open[i+1] and i+1 < trend_started_bar_index) or (close[i+2] < open[i+2] and i+2 < trend_started_bar_index)
@@ -36,18 +21,17 @@ had_at_least_one_pullback_and_less_than_three(index, ema_9, trend_started_bar_in
         current_bar_close_to_9_ema = open[i] > ema_9[i] and math.abs(low[i] - ema_9[i]) < (high[i] - low[i])
         current_bar_is_positive = close[i] > open[i] and volume[i] > volume[i+1]
         bar_is_strong = (close[i] - open[i])/(high[i]-low[i]) >= 0.1
+        price_is_above_vwap = open[i] > vwap[i]
 
         if previous_bar_is_red
          and current_high_is_higher
          and current_bar_close_to_9_ema
          and current_bar_is_positive
          and bar_is_strong
+         and price_is_above_vwap
             pullbacks_counter += 1
             // if time == timestamp(relevant_timezone, 2025, 7, 8, 10, 00) and timeframe.period == "5"
             //     log.info("i: {0}", i)
-
-    // if time == timestamp(relevant_timezone, 2025, 7, 15, 10, 21) and timeframe.period == "1"
-    //     log.info("pullbacks_counter: {0}", pullbacks_counter)
 
     [pullbacks_counter >= 1 and pullbacks_counter <= 2, pullbacks_counter]
 
@@ -70,7 +54,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
                 no_under_ema_bars_before := false
                 break
 
-        previous_negative_bar_is_weak = open[index+1] > close[index+1] and volume[index+1] < volume[index+2] and close[index+1] > vwap[index+1] and close[index+1] > ema_9[index+1]
+        previous_negative_bar_is_weak = open[index+1] > close[index+1] and (open[index+1] - close[index+1])/(high[index+1]-low[index+1]) <= 0.5
         current_bar_is_positive_and_strong = close[index] > open[index] and high[index] > high[index+1] and (volume[index] >= vol_avg[index] * 2 or volume[index] >= min_volume_threshold_for_first_strong_bar)
 
         at_least_one_bar_is_red_before = false
@@ -152,7 +136,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
     // if time == timestamp(relevant_timezone, 2025, 7, 11, 10, 00) and timeframe.period == "1"
     //     log.info("trend_started_bar_index: {0}", trend_started_bar_index)
 
-    [pullbacks_are_looks_good, pullbacks_counter] = had_at_least_one_pullback_and_less_than_three(index, ema_9, trend_started_bar_index)
+    [pullbacks_are_looks_good, pullbacks_counter] = had_at_least_one_pullback_and_less_than_three(index, ema_9, vwap, trend_started_bar_index)
 
     bars_back = 20
     lowest_price_in_last_bars = ta.lowest(low, bars_back)
@@ -197,11 +181,11 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
 
     current_bar_is_too_strong = volume[index] > vol_avg[index] * 3
     for i = index+5 to index+1
-        if volume[i] > vol_avg[i] * 3 and close[i] > open[i]
+        if volume[i] > vol_avg[i] * 3
             current_bar_is_too_strong := false
             break
 
-    bar_value_is_volatile = bar_value_is_volatile(index)
+    bar_value_is_volatile = math.abs(close[index+1]-open[index+1])/(close[index+1]-open[index+1]) <= 0.5
 
     current_timeframe = str.tonumber(timeframe.period)
     already_moved_up = false
@@ -242,7 +226,7 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
      and not (start_of_trend_bar_too_strong and pullbacks_counter <= 1)
      and weak_bars_before_are_strong
 
-    // if time == timestamp(relevant_timezone, 2025, 7, 22, 11, 00) and timeframe.period == "5"
+    // if time == timestamp(relevant_timezone, 2025, 7, 22, 09, 40) and timeframe.period == "5"
     //     log.info("pullbacks_counter: {0}. s_i: {1}", pullbacks_counter, trend_started_bar_index)
 
     [result, trend_started_bar_index, pullbacks_counter]
