@@ -331,10 +331,11 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
      and not (start_of_trend_bar_too_strong and pullbacks_counter < 1)
      and weak_bars_before_are_strong
 
+    closest_to_ema_until_now_index = 0
+    at_least_one_bar_touched_ema_9 = false
+    closest_to_ema_until_now_distance = 100.0
+
     if result
-        at_least_one_bar_touched_ema_9 = false
-        closest_to_ema_until_now_index = 0
-        closest_to_ema_until_now_distance = 100.0
         for i = trend_started_bar_index-1 to index
             if trend_started_bar_index-1 < 1
                 continue
@@ -347,44 +348,19 @@ current_bar_is_strong_bar(index, bars_count_pattern) =>
                 at_least_one_bar_touched_ema_9 := true
                 break
 
-        bars_back = 0
-        back = 0
-        lower_timeframe = ""
-
         if not at_least_one_bar_touched_ema_9
-            switch timeframe.period
-                "15" =>
-                    bars_back := 15/5
-                    back := closest_to_ema_until_now_index * (bars_back)
-                    lower_timeframe := "5"
-                "5" =>
-                    bars_back := 5/1
-                    back := closest_to_ema_until_now_index * (bars_back)
-                    lower_timeframe := "1"
-                "2" =>
-                    bars_back := 2/1
-                    back := closest_to_ema_until_now_index * (bars_back)
-                    lower_timeframe := "1"
-                "1" =>
-                    bars_back := 10/1
-                    back := closest_to_ema_until_now_index * (bars_back)
-                    lower_timeframe := "10S"
-
-            [lows, ema_9s] = request.security_lower_tf(syminfo.tickerid, lower_timeframe, [low[back], ta.ema(close, 9)[back]])
-            if array.size(lows) == bars_back
-                for i = array.size(lows) to 1
-                    l = array.get(lows, i-1)
-                    e = array.get(ema_9s, i-1)
-                    if i <= e
-                        at_least_one_bar_touched_ema_9 := true
-                        break
+            touched_ema = false
+            if low[closest_to_ema_until_now_index] <= ema_9[closest_to_ema_until_now_index]
+                touched_ema := true
+            else
+                touched_ema := (low[closest_to_ema_until_now_index] - ema_9[closest_to_ema_until_now_index])/(high[closest_to_ema_until_now_index] - low[closest_to_ema_until_now_index]) < 0.1
 
         result := result and at_least_one_bar_touched_ema_9
 
     // if time == timestamp(relevant_timezone, 2025, 6, 26, 10, 45) and timeframe.period == "15"
     //     log.info("pullbacks_counter: {0}. s_i: {1}", pullbacks_counter, trend_started_bar_index)
 
-    [result, trend_started_bar_index, pullbacks_counter]
+    [result, trend_started_bar_index, pullbacks_counter, closest_to_ema_until_now_index]
 
 bar_is_acting_as_reversal_upwards(index) =>
     vwap = ta.vwap(hlc3)
@@ -443,9 +419,10 @@ run_continues_trend_indication() =>
     index = 0
     trend_started_bar_index = 0
     pullbacks_counter = 0
+    closest_to_ema_until_now_index = 0
 
-    [current_bar_is_strong_in_3_bars_pattern, t_3, pb_3] = current_bar_is_strong_bar(index, 3)
-    [current_bar_is_strong_in_4_bars_pattern, t_4, pb_4] = current_bar_is_strong_bar(index, 4)
+    [current_bar_is_strong_in_3_bars_pattern, t_3, pb_3, closest_to_ema_until_now_index_3] = current_bar_is_strong_bar(index, 3)
+    [current_bar_is_strong_in_4_bars_pattern, t_4, pb_4, closest_to_ema_until_now_index_4] = current_bar_is_strong_bar(index, 4)
     if t_3 != 0
         trend_started_bar_index := t_3
     if t_4 != 0
@@ -454,13 +431,17 @@ run_continues_trend_indication() =>
         pullbacks_counter := pb_3
     if pb_4 != 0
         pullbacks_counter := pb_4
+    if closest_to_ema_until_now_index_3 != 0
+        closest_to_ema_until_now_index := closest_to_ema_until_now_index_3
+    if closest_to_ema_until_now_index_4 != 0
+        closest_to_ema_until_now_index := closest_to_ema_until_now_index_4
     bar_is_acting_as_reversal_upwards = bar_is_acting_as_reversal_upwards(index)
 
     if bar_is_acting_as_reversal_upwards and hour >= 9 and hour < 16
         log.info("Shooting Star!")
 
-    if (current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern) and hour >= 9 and hour < 16
-        log.info("continues trend. start_index: {0}. pb_counter: {1}", trend_started_bar_index, pullbacks_counter)
+    if (current_bar_is_strong_in_3_bars_pattern or current_bar_is_strong_in_4_bars_pattern) and hour >= 8 and hour < 16
+        log.info("continues trend. start_index: {0}. pb_counter: {1}. closest_to_ema_until_now_index: {2}", trend_started_bar_index, pullbacks_counter, closest_to_ema_until_now_index)
 
     [current_bar_is_strong_in_3_bars_pattern, current_bar_is_strong_in_4_bars_pattern, bar_is_acting_as_reversal_upwards]
 
