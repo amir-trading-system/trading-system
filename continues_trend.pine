@@ -131,15 +131,14 @@ current_bar_is_in_volume_trend(index, trend_started_bar_index, vol_avg, vwap) =>
 get_trend_started_bar_index(index, current_timeframe, vwap, ema_9, vol_avg) =>
     trend_started_bar_index = 0
 
-    for i = index+60 to index+1
+    for i = index+49 to index+1
         if hour[i] < 7
             continue
 
         current_bar_is_weak = false
         for j = i+10 to i+1
-            price_is_higher = high[j] - low[j] > high[i] - low[i]
-            volume_is_higher = volume[j] > volume[i]
-            if price_is_higher and volume_is_higher
+            price_is_higher = high[j] - low[j] > high[i] - low[i] and high[i] < high[j]
+            if price_is_higher
                 current_bar_is_weak := true
                 break
 
@@ -331,7 +330,7 @@ bar_ema_is_changing_up(index) =>
     if result and hour >= 8 and hour < 16
         log.info("EMA is changing up!. start_index: {0}. strong_odds: {1}", trend_started_bar_index, closed_percentage)
         l = label.new(x=bar_index-1, y=close + 1, textcolor = color.yellow, size = size.small, style = label.style_label_right)
-        label.set_text(id=l, text=str.format("Start Index: {0}.\nAt: {2}:{3}.\nStrong Odds: {1}.", trend_started_bar_index, closed_percentage, hour[trend_started_bar_index], minute[trend_started_bar_index]))
+        label.set_text(id=l, text=str.format("Start Index: {0}.\nStrong Odds: {1}.", trend_started_bar_index, closed_percentage))
 
     result
 
