@@ -355,7 +355,7 @@ bar_ema_is_changing_up(index) =>
 buyers_coming_in(index) =>
     result = false
 
-    bar_is_strong = (open[index] - low[index])/(high[index]-low[index]) < 0.2
+    bar_is_strong = (open[index] - low[index])/(high[index]-low[index]) < 0.5
      and (close[index] - open[index])/(high[index]-low[index]) >= 0.5
      and high[index] > high[index+1]
      and volume[index] > volume[index+1] * 2
@@ -364,16 +364,18 @@ buyers_coming_in(index) =>
     trend_started_bar_index = get_trend_started_bar_index(index, vwap, ema_9, vol_avg)
 
     ema_200_day_is_close = high[index]/ema_200_days >= 0.75 and open[index] < ema_200_days
-    // if time == timestamp(relevant_timezone, year, 6, 30, 8, 25) and timeframe.period == "5"
-    //     log.info("200_d_ema: {0}", ema_200_days)
 
     if bar_is_strong and moved_already_at_least_20_percent_since_yesterday and trend_started_bar_index >= 4 and not ema_200_day_is_close
         bar_ema_9_sum = 0.0
         volume_is_highest = true
         bar_is_weak = false
+        no_bar_is_higher = true
         for i = trend_started_bar_index-1 to index
             if i < 0
                 continue
+
+            if high[i] > close[index] and i > index
+                no_bar_is_higher := false
 
             bar_ema_9_sum += ema_9[i] - ema_9[i+1]
             if volume[i] > volume[index] or vol_avg[i] > vol_avg[index] or vol_avg[index] > volume[index]
@@ -405,19 +407,20 @@ buyers_coming_in(index) =>
          and not bar_is_weak
          and red_before_is_weak
          and strongest_bar_is_close_to_current_bar
+         and no_bar_is_higher
 
         if result
             log.info("Buyers Coming In!. start_index: {0}", trend_started_bar_index)
             l = label.new(x=bar_index-1, y=close + 0.5, textcolor = color.yellow, size = size.small, style = label.style_label_right)
-            label.set_text(id=l, text=str.format("Start Index: {0}.", trend_started_bar_index))
+            label.set_text(id=l, text=str.format("s: {0}.", trend_started_bar_index))
     result
 
 bar_is_acting_as_reversal_upwards = bar_is_acting_as_reversal_upwards(0)
-//bar_ema_is_changing_up = bar_ema_is_changing_up(0) and hour >= 8 and hour < 16
-buyers_coming_in_indication = buyers_coming_in(0)
+bar_ema_is_changing_up = bar_ema_is_changing_up(0) and hour >= 8 and hour < 16
+buyers_coming_in_indication = buyers_coming_in(0) and hour >= 8 and hour < 16
 
 plotshape(hour >= 8 and hour < 16 ? bar_is_acting_as_reversal_upwards : false, title="Reversal pattern", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = reversal_sign)
-//plotshape(bar_ema_is_changing_up, title="EMA is changing up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "📈")
+plotshape(bar_ema_is_changing_up, title="EMA is changing up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "📈")
 plotshape(buyers_coming_in_indication, title="Buyers Coming In", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "🛫")
 
-alertcondition(bar_is_acting_as_reversal_upwards or buyers_coming_in_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(bar_is_acting_as_reversal_upwards or buyers_coming_in_indication or bar_ema_is_changing_up, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
