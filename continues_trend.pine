@@ -96,7 +96,9 @@ _get_trend_started_bar_index(index, vwap, ema_9, vol_avg) =>
             volume_is_higher = volume[j] > vol_avg[j] and volume[j] > volume[i]
             if price_is_higher or volume_is_higher
                 current_bar_is_weak := true
-            if vol_avg[j] * 2 > vol_avg[i] and j - 2 > i
+            if i-1 < 0
+                continue
+            if vol_avg[j] * 2 > vol_avg[i-1] and j - 2 > i
                 volume_avg_has_been_changed := false
 
         if current_bar_is_weak or not volume_avg_has_been_changed
@@ -160,7 +162,7 @@ _bar_is_strong(index) =>
 _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
     bar_ema_9_sum = 0.0
     volume_is_highest = true
-    bar_is_weak = false
+    close_under_20_ema_counter = 0
     no_bar_is_higher = true
     for i = trend_started_bar_index-1 to index
         if i < 0
@@ -174,8 +176,9 @@ _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
             volume_is_highest := false
 
         if close[i] < ema_20[i]
-            bar_is_weak := true
+            close_under_20_ema_counter += 1
 
+    bar_is_weak = close_under_20_ema_counter > 1
     bar_ema_9_avg = bar_ema_9_sum/trend_started_bar_index
     bar_ema_change_is_highest = ema_9[index] - ema_9[index+1] > bar_ema_9_avg
     current_bar_closes_to_9_ema = true
@@ -241,7 +244,7 @@ buyers_coming_in_indication(index) =>
 
     if result
         log.info("Buyers Coming In!. start_index: {0}", trend_started_bar_index)
-        l = label.new(x=bar_index-1, y=high + 3, textcolor = color.yellow, size = size.small, style = label.style_label_lower_right)
+        l = label.new(x=bar_index-1, y=high + 0.5, textcolor = color.yellow, size = size.small, style = label.style_label_lower_right)
         label.set_text(id=l, text=str.format("s: {0}.", trend_started_bar_index))
 
     result
