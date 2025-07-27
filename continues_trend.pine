@@ -107,12 +107,13 @@ _get_trend_started_bar_index(index, vwap, ema_9, vol_avg) =>
          or (low[i+1] < vwap[i+1] and close[i+1] > vwap[i+1] and vwap[i+1] > ema_9[i+1])
          or (low[i+2] < vwap[i+2] and close[i+2] > vwap[i+2] and vwap[i+2] > ema_9[i+2])
 
-        bar_is_strong = (close[i] - open[i])/(high[i] - low[i]) >= 0.6
+        bar_is_strong = (close[i] - open[i])/(high[i] - low[i]) >= 0.4
         if i-1 > 0 and not bar_is_strong
             bar_is_strong := (close[i-1] - open[i-1])/(high[i-1] - low[i-1]) >= 0.4
         bar_is_positive = close[i] > open[i]
         bar_is_volatile = volume[i] > vol_avg[i] and volume[i] > volume[i+1] and vol_avg[i] > vol_avg[i+1]
         bar_value_is_volatile = (high[i]-low[i]) > (high[i+1]-low[i+1]) * 2 or (close[i] - open[i]) > (close[i+1] - open[i+1])
+
         if crossed_vwap_upwards
          and bar_is_positive
          and bar_is_volatile
@@ -124,7 +125,7 @@ _get_trend_started_bar_index(index, vwap, ema_9, vol_avg) =>
         close_is_above_vwap = close[i] > vwap[i]
         if not crossed_vwap_upwards
          and close_is_above_vwap
-         and hour[i] > 9
+         and hour[i] >= 9
          and bar_is_positive
          and bar_is_volatile
          and bar_value_is_volatile
@@ -167,7 +168,7 @@ _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
             no_bar_is_higher := false
 
         bar_ema_9_sum += ema_9[i] - ema_9[i+1]
-        if vol_avg[i] > vol_avg[index] or vol_avg[index] > volume[index]
+        if (vol_avg[i] > vol_avg[index] and volume[i] > volume[index]) or vol_avg[index] > volume[index]
             volume_is_highest := false
 
         if close[i] < ema_20[i]
@@ -193,11 +194,22 @@ _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
 _most_of_bars_above_volume_average(index, trend_started_bar_index) =>
     above_volume_average_counter = 0
     for i = trend_started_bar_index to index
-        if volume[i] > vol_avg[i] and vol_avg[i] > 15000
+        if volume[i] > vol_avg[i]
             above_volume_average_counter += 1
 
+    most_of_bars_above_volume_average = above_volume_average_counter/(trend_started_bar_index+1) > 0.5
 
-    most_of_bars_above_volume_average = above_volume_average_counter/trend_started_bar_index > 0.5
+// try to use it to remove false positive
+_biggest_bar_is_positive(index, trend_started_bar_index) =>
+    biggest_bar_value = 0.0
+    biggest_bar_index = 0
+
+    for i = trend_started_bar_index to index
+        if biggest_bar_value < high[i] - low[i]
+            biggest_bar_value := high[i] - low[i]
+            biggest_bar_index := i
+
+    close[biggest_bar_index] > open[biggest_bar_index]
 
 buyers_coming_in_indication(index) =>
     yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
@@ -207,6 +219,7 @@ buyers_coming_in_indication(index) =>
     moved_already_at_least_20_percent_since_yesterday = (close[index] - yesterday_close)/close[index] >= 0.2
     ema_change_is_highest_on_current_bar = _ema_change_is_highest_on_current_bar(index, trend_started_bar_index)
     most_of_bars_above_volume_average = _most_of_bars_above_volume_average(index, trend_started_bar_index)
+    biggest_bar_is_positive = _biggest_bar_is_positive(index, trend_started_bar_index)
 
     red_before_is_weak = true
     bar_before_is_red = close[index+1] < open[index+1]
@@ -223,6 +236,8 @@ buyers_coming_in_indication(index) =>
      and red_before_is_weak
      and price_is_volatile
      and most_of_bars_above_volume_average
+     and close[index] > 1
+     and biggest_bar_is_positive
 
     if result
         log.info("Buyers Coming In!. start_index: {0}", trend_started_bar_index)
