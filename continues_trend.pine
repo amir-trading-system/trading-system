@@ -80,7 +80,6 @@ _get_trend_started_bar_index(index, vwap, ema_9, vol_avg) =>
 
         if before_7_am
          or volume_is_low
-         or histogram_is_negative
          or high_before_is_higher
             continue
 
@@ -90,14 +89,17 @@ _get_trend_started_bar_index(index, vwap, ema_9, vol_avg) =>
             continue
 
         current_bar_is_weak = false
+        volume_avg_has_been_changed = true
+
         for j = i+10 to i+1
             price_is_higher = high[j] - low[j] > high[i] - low[i] and high[i] < high[j]
             volume_is_higher = volume[j] > vol_avg[j] and volume[j] > volume[i]
             if price_is_higher or volume_is_higher
                 current_bar_is_weak := true
-                break
+            if vol_avg[j] * 2 > vol_avg[i] and j - 2 > i
+                volume_avg_has_been_changed := false
 
-        if current_bar_is_weak
+        if current_bar_is_weak or not volume_avg_has_been_changed
             continue
 
         if dayofmonth[i] != dayofmonth[index]
@@ -175,15 +177,13 @@ _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
             bar_is_weak := true
 
     bar_ema_9_avg = bar_ema_9_sum/trend_started_bar_index
-    // if time == timestamp(relevant_timezone, year, 7, 25, 10, 55) and timeframe.period == "5"
-    //     log.info("bar_ema_9_sum: {0}. trend_started_bar_index: {1}. current_distance: {2}", bar_ema_9_sum, trend_started_bar_index, ema_9[index] - ema_9[index+1])
     bar_ema_change_is_highest = ema_9[index] - ema_9[index+1] > bar_ema_9_avg
     current_bar_closes_to_9_ema = true
     if low[index] > ema_9[index]
-        distance_lower_than_half_from_last_bar = true
+        distance_lower_than_last_bar = true
         if close[index+1] != open[index+1]
-            distance_lower_than_half_from_last_bar := low[index] - ema_9[index] < (high[index+1] - low[index+1])/2
-        current_bar_closes_to_9_ema := (low[index] - ema_9[index])/ema_9[index] <= 0.05 and distance_lower_than_half_from_last_bar
+            distance_lower_than_last_bar := low[index] - ema_9[index] < math.abs(high[index+1] - low[index+1])
+        current_bar_closes_to_9_ema := (low[index] - ema_9[index])/ema_9[index] <= 0.05 and distance_lower_than_last_bar
 
     bar_ema_change_is_highest
      and not bar_is_weak
@@ -241,7 +241,7 @@ buyers_coming_in_indication(index) =>
 
     if result
         log.info("Buyers Coming In!. start_index: {0}", trend_started_bar_index)
-        l = label.new(x=bar_index-1, y=close + 0.5, textcolor = color.yellow, size = size.small, style = label.style_label_right)
+        l = label.new(x=bar_index-1, y=high + 3, textcolor = color.yellow, size = size.small, style = label.style_label_lower_right)
         label.set_text(id=l, text=str.format("s: {0}.", trend_started_bar_index))
 
     result
