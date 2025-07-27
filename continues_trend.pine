@@ -15,6 +15,7 @@ ema_20 = ta.ema(close, 20)
 vwap = ta.vwap(hlc3)
 vol_avg = ta.sma(volume, 20)
 ema_200_days = request.security(syminfo.tickerid, "D", ema_9, lookahead = barmerge.lookahead_on)
+yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
 
 bar_is_acting_as_reversal_upwards(index) =>
     [macd, signal, histogram] = ta.macd(close, 12, 26, 9)
@@ -90,18 +91,38 @@ _get_trend_started_bar_index(index, vwap, ema_9, vol_avg) =>
 
         current_bar_is_weak = false
         volume_avg_has_been_changed = true
+        ema_9_was_under_vwap_at_least_once = false
+        highest_since_now = 0.0
+        highest_since_now_index = 0
 
         for j = i+10 to i+1
             price_is_higher = high[j] - low[j] > high[i] - low[i] and high[i] < high[j]
             volume_is_higher = volume[j] > vol_avg[j] and volume[j] > volume[i]
             if price_is_higher or volume_is_higher
                 current_bar_is_weak := true
+            if ema_9[j] < vwap[j] or (close[j] < ema_20[j] and close[j] < ema_9[j] and close[j] < vwap[j])
+                ema_9_was_under_vwap_at_least_once := true
+            if high[j] > highest_since_now
+                highest_since_now := high[j]
+                highest_since_now_index := j
             if i-1 < 0
                 continue
-            if vol_avg[j] * 2 > vol_avg[i-1] and j - 2 > i
+            if vol_avg[j] * 2 > vol_avg[i-1] and j - 2 > i or vol_avg[i-1] < 8000
                 volume_avg_has_been_changed := false
 
-        if current_bar_is_weak or not volume_avg_has_been_changed
+        lowest_since_now = highest_since_now
+        for j = highest_since_now_index-1 to i+1
+            if j < 0
+                continue
+            if low[j] < lowest_since_now
+                lowest_since_now := low[j]
+
+        moved_already_at_least_20_percent_since_yesterday_and_finished = (highest_since_now - yesterday_close)/close[i+1] >= 0.2 and (lowest_since_now - yesterday_close)/close[i+1] < 0.15
+
+        if current_bar_is_weak
+         or not volume_avg_has_been_changed
+         or not ema_9_was_under_vwap_at_least_once
+         or moved_already_at_least_20_percent_since_yesterday_and_finished
             continue
 
         if dayofmonth[i] != dayofmonth[index]
@@ -172,7 +193,9 @@ _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
             no_bar_is_higher := false
 
         bar_ema_9_sum += ema_9[i] - ema_9[i+1]
-        if (vol_avg[i] > vol_avg[index] and volume[i] > volume[index]) or vol_avg[index] > volume[index]
+        if (vol_avg[i] > vol_avg[index] and volume[i] > volume[index])
+         or vol_avg[index] > volume[index]
+         or (vol_avg[index+1]/vol_avg[index] > 0.95 and volume[index+1] > vol_avg[index+1])
             volume_is_highest := false
 
         if close[i] < ema_20[i]
@@ -195,14 +218,44 @@ _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
      and current_bar_closes_to_9_ema
 
 _most_of_bars_above_volume_average(index, trend_started_bar_index) =>
+    red_bars_under_vol_avg_counter = 0
+    red_bars_counter = 0
+    green_bars_above_vol_avg_counter = 0
+    green_bars_counter = 0
+    strong_green_bars_counter = 0
     above_volume_average_counter = 0
+    red_bars_indexes_sum = 0
+    green_bars_indexes_sum = 0
     for i = trend_started_bar_index to index
         if volume[i] > vol_avg[i]
             above_volume_average_counter += 1
+        if close[i] < open[i]
+            red_bars_counter += 1
+            red_bars_indexes_sum += i
+            if vol_avg[i]/volume[i] >= 0.75
+                red_bars_under_vol_avg_counter += 1
+        if close[i] > open[i]
+            green_bars_counter += 1
+            if i != trend_started_bar_index
+                green_bars_indexes_sum += i
+            if volume[i] > vol_avg[i]
+                green_bars_above_vol_avg_counter += 1
+                if (close[i]-open[i])/(high[i]-low[i]) > 0.5
+                    strong_green_bars_counter += 1
 
     most_of_bars_above_volume_average = above_volume_average_counter/(trend_started_bar_index+1) > 0.5
+    most_of_red_bars_under_vol_avg = red_bars_under_vol_avg_counter/red_bars_counter > 0.4
+    most_of_green_bars_above_vol_avg = green_bars_above_vol_avg_counter/green_bars_counter > 0.5
+    most_of_green_bars_are_strong = strong_green_bars_counter/green_bars_above_vol_avg_counter >= 0.5
 
-// try to use it to remove false positive
+    green_bars_are_closer = green_bars_indexes_sum < red_bars_indexes_sum and green_bars_counter > red_bars_counter
+
+    result = most_of_bars_above_volume_average and most_of_green_bars_are_strong
+    if red_bars_counter/green_bars_counter >= 0.75
+        result := result and ((most_of_red_bars_under_vol_avg and most_of_green_bars_above_vol_avg) or green_bars_are_closer)
+
+    result
+
 _biggest_bar_is_positive(index, trend_started_bar_index) =>
     biggest_bar_value = 0.0
     biggest_bar_index = 0
@@ -214,15 +267,26 @@ _biggest_bar_is_positive(index, trend_started_bar_index) =>
 
     close[biggest_bar_index] > open[biggest_bar_index]
 
-buyers_coming_in_indication(index) =>
-    yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
+_current_bar_just_crossed_highest_from_trend_start(index, trend_started_bar_index) =>
+    highest_until_now_from_trend_start = 0.0
+    highest_until_now_from_trend_start_index = 0
+    for i = trend_started_bar_index to index+1
+        if high[i] > highest_until_now_from_trend_start
+            highest_until_now_from_trend_start := high[i]
+            highest_until_now_from_trend_start_index := i
 
+    low[index] < highest_until_now_from_trend_start
+     and high[index] >= highest_until_now_from_trend_start
+     and (low[highest_until_now_from_trend_start_index] - ema_9[highest_until_now_from_trend_start_index])/(high[highest_until_now_from_trend_start_index] - low[highest_until_now_from_trend_start_index]) >= 0.5
+
+buyers_coming_in_indication(index) =>
     bar_is_strong = _bar_is_strong(index)
     trend_started_bar_index = _get_trend_started_bar_index(index, vwap, ema_9, vol_avg)
     moved_already_at_least_20_percent_since_yesterday = (close[index] - yesterday_close)/close[index] >= 0.2
     ema_change_is_highest_on_current_bar = _ema_change_is_highest_on_current_bar(index, trend_started_bar_index)
     most_of_bars_above_volume_average = _most_of_bars_above_volume_average(index, trend_started_bar_index)
     biggest_bar_is_positive = _biggest_bar_is_positive(index, trend_started_bar_index)
+    current_bar_just_crossed_highest_from_trend_start = _current_bar_just_crossed_highest_from_trend_start(index, trend_started_bar_index)
 
     red_before_is_weak = true
     bar_before_is_red = close[index+1] < open[index+1]
@@ -230,7 +294,8 @@ buyers_coming_in_indication(index) =>
     if bar_before_is_red and bar_before_that_is_green
         red_before_is_weak := (open[index+1] - close[index+1])/(close[index+2]-open[index+2]) <= 0.5
 
-    price_is_volatile = high[index] - low[index] > 0.05
+    current_price_action_stronger_than_bar_before = close[index] - open[index] > (close[index+1] - open[index+1]) * 1.5
+    price_is_volatile = high[index] - low[index] > 0.05 and current_price_action_stronger_than_bar_before
 
     result = bar_is_strong
      and moved_already_at_least_20_percent_since_yesterday
@@ -244,7 +309,7 @@ buyers_coming_in_indication(index) =>
 
     if result
         log.info("Buyers Coming In!. start_index: {0}", trend_started_bar_index)
-        l = label.new(x=bar_index-1, y=high + 0.5, textcolor = color.yellow, size = size.small, style = label.style_label_lower_right)
+        l = label.new(x=bar_index-trend_started_bar_index, y=high, textcolor = color.yellow, size = size.small, style = label.style_label_down)
         label.set_text(id=l, text=str.format("s: {0}.", trend_started_bar_index))
 
     result
