@@ -22,7 +22,7 @@ _get_trend_started_bar_index(index) =>
     [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
     trend_started_bar_index = 0
 
-    for i = index+2 to index+49
+    for i = index+49 to index+1
         before_7_am = hour[i] < 7
         volume_is_low = volume[i] < 5000
         histogram_is_negative = histogram[i] < 0
@@ -153,7 +153,6 @@ _current_volume_is_highest(index, trend_started_bar_index) =>
     volume_is_highest = true
     for i = start_index to index+1
         if (vol_avg[i] > vol_avg[index] and volume[i] > volume[index])
-         //or volume[i] > volume[index]
          or vol_avg[index] > volume[index]
          or (vol_avg[index+1]/vol_avg[index] > 0.95 and volume[index+1] > vol_avg[index+1])
             volume_is_highest := false
@@ -294,9 +293,71 @@ buyers_coming_in_indication(index) =>
 
     result
 
+ema_support_near_start_of_trend(index) =>
+    result = false
+    after_market_open = (hour[0] == 9 and minute[0] >= 30) or hour[0] > 9
+    on_higher_timeframes_only = current_timeframe >= 5
+    trend_started_bar_index = _get_trend_started_bar_index(index)
+
+    if after_market_open and on_higher_timeframes_only
+        has_trend = trend_started_bar_index > 0
+        bar_is_positive = close[index] > open[index]
+        bar_has_more_volume = volume[index] > vol_avg[index] and volume[index]/volume[index+1] >= 0.8
+        bar_continues_last_bar = open[index] == close[index+1] or math.abs(close[index+1] - open[index])/(close[index+1] - open[index+1]) < 0.10
+        above_ema = close[index] > ema_9[index]
+        above_vwap = close[index] > vwap[index]
+        low_under_vwap = low[index] <= vwap[index]
+
+        whole_bar_value = high[index] - low[index]
+        lower_bar_value = open[index] - low[index]
+        bar_body_value = close[index] - open[index]
+        bar_fix_value = lower_bar_value/whole_bar_value
+        upper_bar_value = high[index] - close[index]
+        previous_bar_value = high[index+1] - low[index+1]
+        bar_continues_strong_bar = high[index+1] == close[index+1] or (high[index+1] - close[index+1])/(high[index+1]-low[index+1]) < 0.1
+        current_bar_is_strong = bar_body_value/whole_bar_value >= 0.3
+
+        bar_made_good_fix = true
+         and lower_bar_value/whole_bar_value <= 0.75
+         and lower_bar_value/whole_bar_value >= 0.2
+         and lower_bar_value < previous_bar_value
+         and bar_continues_strong_bar
+         and current_bar_is_strong
+
+        has_at_least_one_negative_bar_before = false
+        for i = trend_started_bar_index to index+1
+            if close[i] < open[i]
+                has_at_least_one_negative_bar_before := true
+
+        // if time == timestamp(relevant_timezone, year, 4, 4, 12, 5) and timeframe.period == "5"
+        //     log.info("trend_started_bar_index: {0}", trend_started_bar_index)
+
+        result := has_trend
+         and bar_is_positive
+         and bar_has_more_volume
+         and bar_continues_last_bar
+         and bar_made_good_fix
+         and above_ema
+         and above_vwap
+         and after_market_open
+         and on_higher_timeframes_only
+
+        if not has_at_least_one_negative_bar_before
+            result := result
+             and low_under_vwap
+
+    if result
+        log.info("Ema support! trend_started_bar_index: {0}", trend_started_bar_index)
+        l = label.new(x=bar_index-trend_started_bar_index, y=high, textcolor = color.yellow, size = size.small, style = label.style_label_down)
+        label.set_text(id=l, text=str.format("s: {0}.", trend_started_bar_index))
+
+    result
+
 ///          Indications          ///
 buyers_coming_in_indication = buyers_coming_in_indication(0)
+ema_support_near_start_of_trend = ema_support_near_start_of_trend(0)
 
 plotshape(buyers_coming_in_indication, title="Buyers Coming In", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "🛫")
+plotshape(ema_support_near_start_of_trend, title="Ema Support", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "📈")
 
-alertcondition(buyers_coming_in_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(buyers_coming_in_indication or ema_support_near_start_of_trend, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
