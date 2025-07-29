@@ -16,6 +16,7 @@ vwap = ta.vwap(hlc3)
 vol_avg = ta.sma(volume, 20)
 ema_200_days = request.security(syminfo.tickerid, "D", ema_9, lookahead = barmerge.lookahead_on)
 yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
+current_timeframe = str.tonumber(timeframe.period)
 
 bar_is_acting_as_reversal_upwards(index) =>
     [macd, signal, histogram] = ta.macd(close, 12, 26, 9)
@@ -32,7 +33,6 @@ bar_is_acting_as_reversal_upwards(index) =>
     bar_is_volatile = volume[index] > 50000
     macd_is_positive = histogram[index] > 0 and macd[index] > 0
 
-    current_timeframe = str.tonumber(timeframe.period)
     bars_back = int(30/current_timeframe)
 
     weak_bar_found = false
@@ -165,31 +165,6 @@ _get_trend_started_bar_index(index, vwap, ema_9, vol_avg) =>
 
     trend_started_bar_index
 
-_bar_is_strong(index) =>
-    there_are_buyers_at_the_bottom = (open[index] - low[index])/(high[index]-low[index]) < 0.5
-    bar_closes_with_buyers = (close[index] - open[index])/(high[index]-low[index]) >= 0.5
-    bar_higher_than_bar_before = high[index] > high[index+1]
-    bar_stronger_than_bar_before = volume[index] > volume[index+1] * 2
-
-    there_are_buyers_at_the_bottom
-     and bar_closes_with_buyers
-     and bar_higher_than_bar_before
-     and bar_stronger_than_bar_before
-
-_current_volume_is_highest(index, trend_started_bar_index) =>
-    start_index = trend_started_bar_index
-    if trend_started_bar_index > 10
-        start_index := 10
-
-    volume_is_highest = true
-    for i = start_index to index+1
-        if (vol_avg[i] > vol_avg[index] and volume[i] > volume[index])
-         or vol_avg[index] > volume[index]
-         or (vol_avg[index+1]/vol_avg[index] > 0.95 and volume[index+1] > vol_avg[index+1])
-            volume_is_highest := false
-
-    volume_is_highest
-
 _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
     bar_ema_9_sum = 0.0
     for i = trend_started_bar_index-1 to index
@@ -208,17 +183,64 @@ _ema_change_is_highest_on_current_bar(index, trend_started_bar_index) =>
 
     bar_ema_change_is_highest and current_bar_closes_to_9_ema
 
+_bar_is_strong(index) =>
+    there_are_buyers_at_the_bottom = (open[index] - low[index])/(high[index]-low[index]) < 0.5
+    bar_closes_with_buyers = (close[index] - open[index])/(high[index]-low[index]) >= 0.5
+    bar_higher_than_bar_before = high[index] > high[index+1]
+    bar_stronger_than_bar_before = volume[index] > volume[index+1] * 1.75 and volume[index] > volume[index+2]
+    most_of_bar_is_above_vwap = (vwap[index] - low[index])/(high[index] - low[index]) < 0.5
+    // if time == timestamp(relevant_timezone, year, 7, 28, 10, 56) and timeframe.period == "2"
+    //     log.info("most_of_bar_is_above_vwap: {0}", (vwap[index] - low[index])/(high[index] - low[index]))
+
+    next_timeframe_current_bar_closes_to_9_ema = true
+    if current_timeframe == 1 or current_timeframe == 2
+        [n_ema_9, n_low, n_open, n_close, n_high] = request.security(syminfo.tickerid, "5", [ema_9, low, open, close, high], lookahead = barmerge.lookahead_on)
+        if n_low[index] > n_ema_9[index]
+            next_timeframe_distance_lower_than_last_bar = true
+            if n_close[index+1] != n_open[index+1]
+                next_timeframe_distance_lower_than_last_bar := n_low[index] - n_ema_9[index] < math.abs(n_high[index+1] - n_low[index+1])
+            next_timeframe_current_bar_closes_to_9_ema := (low[index] - n_ema_9[index])/n_ema_9[index] <= 0.05 and next_timeframe_distance_lower_than_last_bar
+            // if time == timestamp(relevant_timezone, year, 3, 17, 10, 20) and timeframe.period == "1"
+            //     log.info("distance: {0}", (low[index] - n_ema_9[index])/n_ema_9[index])
+
+    there_are_buyers_at_the_bottom
+     and bar_closes_with_buyers
+     and bar_higher_than_bar_before
+     and bar_stronger_than_bar_before
+     and next_timeframe_current_bar_closes_to_9_ema
+     and most_of_bar_is_above_vwap
+
+_current_volume_is_highest(index, trend_started_bar_index) =>
+    start_index = trend_started_bar_index
+    if trend_started_bar_index > 10
+        if current_timeframe == 1 or current_timeframe == 2
+            start_index := 10
+        if current_timeframe >= 5
+            start_index := 5
+
+    volume_is_highest = true
+    for i = start_index to index+1
+        if (vol_avg[i] > vol_avg[index] and volume[i] > volume[index])
+         or volume[i] > volume[index]
+         or vol_avg[index] > volume[index]
+         or (vol_avg[index+1]/vol_avg[index] > 0.95 and volume[index+1] > vol_avg[index+1])
+            volume_is_highest := false
+
+    volume_is_highest
+
 _more_buyers_than_sellers(index, trend_started_bar_index) =>
     buyers_bars_sum = 0.0
     sellers_bars_sum = 0.0
 
     for i = trend_started_bar_index to index
         if close[i] > open[i]
-            buyers_bars_sum += high[i] - low[i]
+            buyers_bars_sum += volume[i]
         else
-            sellers_bars_sum += high[i] - low[i]
+            sellers_bars_sum += volume[i]
 
     there_are_more_buyers_than_sellers = buyers_bars_sum > sellers_bars_sum
+    // if time == timestamp(relevant_timezone, year, 7, 28, 13, 15) and timeframe.period == "15"
+    //     log.info("buyers_bars_sum: {0}. sellers_bars_sum: {1}", buyers_bars_sum, sellers_bars_sum)
 
     there_are_more_buyers_than_sellers
 
@@ -283,6 +305,7 @@ buyers_coming_in_indication(index) =>
      and at_least_one_red_bar_until_now
      and bar_before_is_not_strong
      and current_volume_is_highest
+     and high[index] > high[trend_started_bar_index]
 
     if result
         log.info("Buyers Coming In!. start_index: {0}", trend_started_bar_index)
