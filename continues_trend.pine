@@ -18,6 +18,16 @@ current_timeframe = str.tonumber(timeframe.period)
 
 ///          Buyers Coming In Indication          ///
 
+_has_time_gaps(index) =>
+    last_bars_has_time_gaps = false
+    if index-1 > 0
+        last_bar_has_time_gap = (time[index] - time[index+1])/1000/60 > current_timeframe
+        current_bar_start_the_trend = volume[index-1] > volume[index] and volume[index-1] > vol_avg[index-1]
+        if last_bar_has_time_gap and current_bar_start_the_trend
+            last_bars_has_time_gaps := true
+
+    last_bars_has_time_gaps
+
 _get_trend_started_bar_index(index) =>
     [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
     trend_started_bar_index = 0
@@ -38,57 +48,60 @@ _get_trend_started_bar_index(index) =>
         if low[i-1] < low[i]
             continue
 
-        current_bar_is_weak = false
-        volume_avg_has_been_changed = true
-        highest_since_now = 0.0
-        highest_since_now_index = 0
+        if _has_time_gaps(i)
+            trend_started_bar_index := i-1
+        else
+            current_bar_is_weak = false
+            volume_avg_has_been_changed = true
+            highest_since_now = 0.0
+            highest_since_now_index = 0
 
-        for j = i+10 to i+1
-            price_is_higher = high[j] - low[j] > high[i] - low[i] and high[i] < high[j]
-            volume_is_higher = volume[j] > vol_avg[j] and volume[j] > volume[i]
-            if price_is_higher or volume_is_higher
-                current_bar_is_weak := true
-            if high[j] > highest_since_now
-                highest_since_now := high[j]
-                highest_since_now_index := j
-            if i-1 < 0
+            for j = i+10 to i+1
+                price_is_higher = high[j] - low[j] > high[i] - low[i] and high[i] < high[j]
+                volume_is_higher = volume[j] > vol_avg[j] and volume[j] > volume[i]
+                if price_is_higher or volume_is_higher
+                    current_bar_is_weak := true
+                if high[j] > highest_since_now
+                    highest_since_now := high[j]
+                    highest_since_now_index := j
+                if i-1 < 0
+                    continue
+                if vol_avg[j] * 2 > vol_avg[i-1] and j - 2 > i or vol_avg[i-1] < 8000
+                    volume_avg_has_been_changed := false
+
+            lowest_since_now = highest_since_now
+            for j = highest_since_now_index-1 to i+1
+                if j < 0
+                    continue
+                if low[j] < lowest_since_now
+                    lowest_since_now := low[j]
+
+            if current_bar_is_weak
+             or not volume_avg_has_been_changed
                 continue
-            if vol_avg[j] * 2 > vol_avg[i-1] and j - 2 > i or vol_avg[i-1] < 8000
-                volume_avg_has_been_changed := false
 
-        lowest_since_now = highest_since_now
-        for j = highest_since_now_index-1 to i+1
-            if j < 0
+            if dayofmonth[i] != dayofmonth[index]
                 continue
-            if low[j] < lowest_since_now
-                lowest_since_now := low[j]
 
-        if current_bar_is_weak
-         or not volume_avg_has_been_changed
-            continue
+            crossed_vwap_upwards = low[i] < vwap[i]
+             and close[i] > vwap[i]
+             and vwap[i] > ema_9[i]
 
-        if dayofmonth[i] != dayofmonth[index]
-            continue
-
-        crossed_vwap_upwards = low[i] < vwap[i]
-         and close[i] > vwap[i]
-         and vwap[i] > ema_9[i]
-
-        bar_is_strong = (close[i] - open[i])/(high[i] - low[i]) >= 0.4
-        if i-1 > 0 and not bar_is_strong
-            bar_is_strong := (close[i-1] - open[i-1])/(high[i-1] - low[i-1]) >= 0.4
-        bar_is_positive = close[i] > open[i]
-        bar_is_volatile = volume[i] > vol_avg[i] and volume[i] > volume[i+1] and vol_avg[i] > vol_avg[i+1]
-        bar_value_is_volatile = (high[i]-low[i]) > (high[i+1]-low[i+1]) * 2 or (close[i] - open[i]) > (close[i+1] - open[i+1])
+            bar_is_strong = (close[i] - open[i])/(high[i] - low[i]) >= 0.4
+            if i-1 > 0 and not bar_is_strong
+                bar_is_strong := (close[i-1] - open[i-1])/(high[i-1] - low[i-1]) >= 0.4
+            bar_is_positive = close[i] > open[i]
+            bar_is_volatile = volume[i] > vol_avg[i] and volume[i] > volume[i+1] and vol_avg[i] > vol_avg[i+1]
+            bar_value_is_volatile = (high[i]-low[i]) > (high[i+1]-low[i+1]) * 2 or (close[i] - open[i]) > (close[i+1] - open[i+1])
 
 
-        if (crossed_vwap_upwards or volume[i] > volume[i+1] * 20)
-         and bar_is_positive
-         and bar_is_volatile
-         and bar_value_is_volatile
-         and bar_is_strong
-            trend_started_bar_index := i
-            break
+            if (crossed_vwap_upwards or volume[i] > volume[i+1] * 20)
+             and bar_is_positive
+             and bar_is_volatile
+             and bar_value_is_volatile
+             and bar_is_strong
+                trend_started_bar_index := i
+                break
 
     trend_started_bar_index
 
