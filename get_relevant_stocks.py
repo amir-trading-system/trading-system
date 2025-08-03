@@ -1,7 +1,6 @@
 import csv
 import tqdm
 import yfinance
-import datetime
 
 FLOAT_THRESHOLD = 20000000
 
