@@ -3,23 +3,26 @@ import tqdm
 import yfinance
 import datetime
 
-float_threshold = 10000000
+FLOAT_THRESHOLD = 20000000
 
 def get_stocks_by_volume():
     t = tqdm.tqdm()
     with open("stocks.csv", "r") as csv_file:
         reader = csv.DictReader(csv_file)
         with open("stocks_by_volume.csv", "w") as csv_write_file:
-            writer = csv.DictWriter(csv_write_file, fieldnames=["Symbol", "Float", "Date", "Volume"])
+            writer = csv.DictWriter(
+                csv_write_file,
+                fieldnames=["Symbol", "Float", "Date", "Volume"],
+            )
             writer.writeheader()
             for row in reader:
                 symbol = row["Symbol"]
                 market_cap = int(float(row["Market Cap"]))
-                price = float(row["Last Sale"].removeprefix("$"))
+                price = float(row["Price"])
 
                 if market_cap > 0 and price > 1:
                     stock_float = int(market_cap/price)
-                    if stock_float > float_threshold:
+                    if stock_float > FLOAT_THRESHOLD:
                         continue
 
                     ticker = yfinance.Ticker(symbol)
@@ -53,17 +56,20 @@ def get_stocks_by_price_change():
     with open("stocks.csv", "r") as csv_file:
         reader = csv.DictReader(csv_file)
         with open("stocks_by_price_change.csv", "w") as csv_write_file:
-            writer = csv.DictWriter(csv_write_file, fieldnames=["Symbol", "Date", "Open To High Ratio"])
+            writer = csv.DictWriter(
+                csv_write_file,
+                fieldnames=["Symbol", "Date", "Open To High Ratio"],
+            )
             writer.writeheader()
             for row in reader:
                 open_to_high = {}
                 symbol = row["Symbol"]
                 market_cap = int(float(row["Market Cap"]))
-                price = float(row["Last Sale"].removeprefix("$"))
+                price = float(row["Price"])
 
                 if market_cap > 0 and price > 1:
                     stock_float = int(market_cap/price)
-                    if stock_float > float_threshold:
+                    if stock_float > FLOAT_THRESHOLD:
                         continue
 
                     historical_data = yfinance.download(
