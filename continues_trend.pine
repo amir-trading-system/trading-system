@@ -160,8 +160,11 @@ _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index) =
     bar_has_resistant_by_volatility = most_volatile_bar_is_negative or most_volatile_bar_is_weak
 
     current_bar_is_very_close_to_resistance_level_by_volatility = bar_has_resistant_by_volatility
-     and high[most_volatile_bar_index]/high[index] >= 0.9
-     and most_volatile_bar_index - index > 2
+     and low[most_volatile_bar_index] == close[most_volatile_bar_index]
+     and most_volatile_bar_index - index >= 2
+    // if time == timestamp(relevant_timezone, year, 7, 14, 10, 00) and timeframe.period == "15"
+    //     log.info("current_bar_is_very_close_to_resistance_level_by_volatility: {0}", current_bar_is_very_close_to_resistance_level_by_volatility)
+
 
     highest_bar_is_negative = close[highest_bar_index] < open[highest_bar_index]
     highest_bar_is_weak = close[highest_bar_index] > open[highest_bar_index]
@@ -194,16 +197,20 @@ _is_false_positive(index, trend_started_bar_index) =>
 
     distance_from_trend_start = trend_started_bar_index - index
 
-    most_bars_under_vwap = bars_under_vwap/trend_started_bar_index > 0.5 and distance_from_trend_start < 10 and distance_from_trend_start > 3
-    most_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index > 0.5 and distance_from_trend_start < 10 and distance_from_trend_start > 3
+    most_bars_under_vwap = bars_under_vwap/trend_started_bar_index > 0.5 and distance_from_trend_start > 3
+    most_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index >= 0.7 and distance_from_trend_start > 3
     almost_all_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index > 0.8
     most_bars_are_weak = (most_bars_under_vwap and most_bars_under_vwap) or almost_all_bars_with_low_volume and distance_from_trend_start > 3
     current_bar_is_very_close_to_resistance_level = _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index)
 
+    // if time == timestamp(relevant_timezone, year, 7, 21, 11, 45) and timeframe.period == "5"
+    //     log.info("bars_under_vwap: {0}. trend_started_bar_index: {1}", bars_under_vwap, trend_started_bar_index)
+
     too_close_to_open_on_15_minutes_chart
      or started_index_is_too_close_to_bar_on_5_minutes_chart
      or volume_is_too_low
-     or (most_bars_under_vwap and most_bars_with_low_volume and current_timeframe == 5)
+     or (most_bars_under_vwap and current_timeframe == 5)
+     or (most_bars_with_low_volume and current_timeframe == 5)
      or (most_bars_are_weak and current_timeframe == 15)
      or current_bar_is_very_close_to_resistance_level
 
@@ -319,6 +326,9 @@ full_bar_continues_indication(index) =>
             if current_bar_full_size/2 < bar_size
                 bars_much_bigger_than_before := false
                 break
+
+        // if time == timestamp(relevant_timezone, year, 7, 7, 12, 15) and timeframe.period == "15"
+        //     log.info("trend_started_bar_index: {0}", trend_started_bar_index)
 
         result := has_trend
          and bars_are_positive

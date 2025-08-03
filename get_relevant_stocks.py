@@ -37,7 +37,7 @@ def get_stocks_by_volume():
                         auto_adjust=False,
                         progress=False,
                     )
-                    filtered_data_by_volume = historical_data.Volume[symbol][historical_data.Volume[symbol] > 10000000]
+                    filtered_data_by_volume = historical_data.Volume[symbol][historical_data.Volume[symbol] > 15000000]
                     if not filtered_data_by_volume.empty:
                         for date, volume in filtered_data_by_volume.items():
                             t.update(1)
@@ -49,6 +49,7 @@ def get_stocks_by_volume():
                                     "Volume": volume,
                                 }
                             )
+                            csv_write_file.flush()
 
 def get_stocks_by_price_change():
     t = tqdm.tqdm()
@@ -116,7 +117,7 @@ def get_stocks_by_price_change():
                             if not price.get("open", None):
                                 continue
                             ratio = (price["high"] - price["open"])/price["open"]
-                            if ratio < 0.8:
+                            if ratio < 0.4:
                                 continue
                             t.update(1)
                             writer.writerow(
@@ -126,6 +127,7 @@ def get_stocks_by_price_change():
                                     "Open To High Ratio": ratio,
                                 }
                             )
+                            csv_write_file.flush()
 
 if __name__ == "__main__":
     get_stocks_by_price_change()
