@@ -320,9 +320,6 @@ full_bar_continues_indication(index) =>
                 bars_much_bigger_than_before := false
                 break
 
-        // if time == timestamp(relevant_timezone, year, 7, 7, 12, 15) and timeframe.period == "15"
-        //     log.info("trend_started_bar_index: {0}", trend_started_bar_index)
-
         result := has_trend
          and bars_are_positive
          and bar_has_more_volume
