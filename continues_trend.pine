@@ -141,6 +141,43 @@ _current_bar_has_decent_amount_of_volume(index, trend_started_bar_index) =>
 
     current_bar_has_decent_amount_of_volume
 
+_current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index) =>
+    most_volatile_bar_volume = 0.0
+    most_volatile_bar_index = 0
+    highest_bar_high = 0.0
+    highest_bar_index = 0
+    for i = trend_started_bar_index to index+1
+        if volume[i] > most_volatile_bar_volume
+            most_volatile_bar_volume := volume[i]
+            most_volatile_bar_index := i
+        if high[i] > highest_bar_high
+            highest_bar_high := high[i]
+            highest_bar_index := i
+
+    most_volatile_bar_is_negative = close[most_volatile_bar_index] < open[most_volatile_bar_index]
+    most_volatile_bar_is_weak = close[most_volatile_bar_index] > open[most_volatile_bar_index]
+     and (close[most_volatile_bar_index] - open[most_volatile_bar_index])/(high[most_volatile_bar_index] - low[most_volatile_bar_index]) <= 0.5
+    bar_has_resistant_by_volatility = most_volatile_bar_is_negative or most_volatile_bar_is_weak
+
+    current_bar_is_very_close_to_resistance_level_by_volatility = bar_has_resistant_by_volatility
+     and high[most_volatile_bar_index]/high[index] >= 0.9
+     and most_volatile_bar_index - index > 2
+
+    highest_bar_is_negative = close[highest_bar_index] < open[highest_bar_index]
+    highest_bar_is_weak = close[highest_bar_index] > open[highest_bar_index]
+     and (close[highest_bar_index] - open[highest_bar_index])/(high[highest_bar_index] - low[highest_bar_index]) <= 0.5
+     and (high[highest_bar_index] - close[highest_bar_index])/(high[highest_bar_index] - low[highest_bar_index]) >= 0.4
+    bar_has_resistant_by_high = highest_bar_is_negative or highest_bar_is_weak
+
+    current_bar_is_very_close_to_resistance_level_by_high = bar_has_resistant_by_high
+     and high[highest_bar_index]/high[index] >= 0.9
+     and highest_bar_index - index > 2
+
+    current_bar_is_very_close_to_resistance_level = current_bar_is_very_close_to_resistance_level_by_volatility
+     or current_bar_is_very_close_to_resistance_level_by_high
+
+    current_bar_is_very_close_to_resistance_level
+
 _is_false_positive(index, trend_started_bar_index) =>
     started_index_is_too_close_to_bar = trend_started_bar_index - index == 1
     too_close_to_open_on_15_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 15 and hour[index] < 10
@@ -157,17 +194,18 @@ _is_false_positive(index, trend_started_bar_index) =>
 
     distance_from_trend_start = trend_started_bar_index - index
 
-    most_bars_under_vwap = bars_under_vwap/trend_started_bar_index > 0.5 and distance_from_trend_start > 6
-    most_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index > 0.5 and distance_from_trend_start > 6
+    most_bars_under_vwap = bars_under_vwap/trend_started_bar_index > 0.5 and distance_from_trend_start < 10 and distance_from_trend_start > 3
+    most_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index > 0.5 and distance_from_trend_start < 10 and distance_from_trend_start > 3
     almost_all_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index > 0.8
-    most_bars_are_weak = (most_bars_under_vwap and most_bars_under_vwap) or almost_all_bars_with_low_volume
+    most_bars_are_weak = (most_bars_under_vwap and most_bars_under_vwap) or almost_all_bars_with_low_volume and distance_from_trend_start > 3
+    current_bar_is_very_close_to_resistance_level = _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index)
 
     too_close_to_open_on_15_minutes_chart
      or started_index_is_too_close_to_bar_on_5_minutes_chart
      or volume_is_too_low
-     or (most_bars_under_vwap and current_timeframe == 5)
-     or (most_bars_with_low_volume and current_timeframe == 5)
+     or (most_bars_under_vwap and most_bars_with_low_volume and current_timeframe == 5)
      or (most_bars_are_weak and current_timeframe == 15)
+     or current_bar_is_very_close_to_resistance_level
 
 ema_support_near_start_of_trend_indication(index) =>
     result = false
