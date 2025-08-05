@@ -183,16 +183,21 @@ _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index) =
 
 _is_false_positive(index, trend_started_bar_index) =>
     started_index_is_too_close_to_bar = trend_started_bar_index - index == 1
+    until_now_made_less_than_20_percent = (close[index] - yesterday_close)/close[index] < 0.2
+
     too_close_to_open_on_15_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 15 and hour[index] < 10
-    started_index_is_too_close_to_bar_on_5_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 5
+    started_index_is_too_close_to_bar_on_5_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 5 and until_now_made_less_than_20_percent
+    still_in_the_first_five_minutes = hour[trend_started_bar_index] == 9 and minute[trend_started_bar_index] == 30 and trend_started_bar_index - index < 3
     volume_is_too_low = volume[index] < 1000000 or volume[index+1] < 500000
 
     bars_under_vwap = 0
     bars_with_low_volume = 0
     for i = trend_started_bar_index to index
-        if close[i] <= vwap[i]
+        if close[i] <= vwap[i] and volume[i] < vol_avg[i]
             bars_under_vwap += 1
-        if volume[i] < vol_avg[i] or volume[i] < 100000 or vol_avg[i] < 100000
+
+        has_big_movement = math.abs(close[i] - open[i])/(high[trend_started_bar_index] - low[trend_started_bar_index]) > 0.1
+        if has_big_movement and (volume[i] < vol_avg[i] or volume[i] < 100000 or vol_avg[i] < 100000)
             bars_with_low_volume += 1
 
     distance_from_trend_start = trend_started_bar_index - index
@@ -202,9 +207,13 @@ _is_false_positive(index, trend_started_bar_index) =>
     almost_all_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index > 0.8
     most_bars_are_weak = (most_bars_under_vwap and most_bars_under_vwap) or almost_all_bars_with_low_volume and distance_from_trend_start > 3
     current_bar_is_very_close_to_resistance_level = _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index)
+    current_bar_has_decent_amount_of_volume = _current_bar_has_decent_amount_of_volume(index, trend_started_bar_index)
+    is_before_market_open = hour[index] < 9 or (hour[index] == 9 and minute[index] < 30)
+    timeframe_is_too_low = current_timeframe < 5
+    price_lower_than_1_usd = close[index] < 1
 
-    // if time == timestamp(relevant_timezone, year, 7, 21, 11, 45) and timeframe.period == "5"
-    //     log.info("bars_under_vwap: {0}. trend_started_bar_index: {1}", bars_under_vwap, trend_started_bar_index)
+    // if time == timestamp(relevant_timezone, year, 4, 2, 11, 45) and timeframe.period == "5"
+    //     log.info("bars_with_low_volume: {0}. trend_started_bar_index: {1}", bars_with_low_volume, trend_started_bar_index)
 
     too_close_to_open_on_15_minutes_chart
      or started_index_is_too_close_to_bar_on_5_minutes_chart
@@ -213,16 +222,19 @@ _is_false_positive(index, trend_started_bar_index) =>
      or (most_bars_with_low_volume and current_timeframe == 5)
      or (most_bars_are_weak and current_timeframe == 15)
      or current_bar_is_very_close_to_resistance_level
+     or is_before_market_open
+     or timeframe_is_too_low
+     or price_lower_than_1_usd
+     or not current_bar_has_decent_amount_of_volume
+     or still_in_the_first_five_minutes
 
 ema_support_near_start_of_trend_indication(index) =>
     result = false
-    after_market_open = hour >= 8 and hour <= 13
-    on_higher_timeframes_only = current_timeframe >= 5
+
     trend_started_bar_index = _get_trend_started_bar_index(index)
-    current_bar_has_decent_amount_of_volume = _current_bar_has_decent_amount_of_volume(index, trend_started_bar_index)
     is_false_positive = _is_false_positive(index, trend_started_bar_index)
 
-    if after_market_open and on_higher_timeframes_only and not is_false_positive
+    if not is_false_positive
         has_trend = trend_started_bar_index > 0
         bar_is_positive = close[index] > open[index]
         bar_has_more_volume = volume[index] > vol_avg[index] and volume[index]/volume[index+1] >= 0.5
@@ -261,11 +273,13 @@ ema_support_near_start_of_trend_indication(index) =>
                 has_at_least_one_negative_bar_before := true
 
         highest_high = 0.0
+        highest_high_index = 0
         for i = trend_started_bar_index to index+1
             if high[i] > highest_high
                 highest_high := high[i]
+                highest_high_index := i
 
-        current_bar_is_highest = high[index] > highest_high
+        current_bar_is_highest = high[index] > highest_high or (highest_high_index == trend_started_bar_index and close[highest_high_index] < close[index])
         // if time == timestamp(relevant_timezone, year, 7, 16, 10, 00) and timeframe.period == "15"
         //     log.info("trend_started_bar_index: {0}", trend_started_bar_index)
 
@@ -278,8 +292,6 @@ ema_support_near_start_of_trend_indication(index) =>
          and above_vwap
          and current_bar_is_highest
          and current_tail_is_higher_than_previous_open
-         and current_bar_has_decent_amount_of_volume
-         and close[index] > 1
          and current_bar_is_strong_at_least_the_previous
 
         if not has_at_least_one_negative_bar_before
@@ -295,13 +307,10 @@ ema_support_near_start_of_trend_indication(index) =>
 
 full_bar_continues_indication(index) =>
     result = false
-    after_market_open = hour >= 8 and hour <= 13
-    on_higher_timeframes_only = current_timeframe >= 5
     trend_started_bar_index = _get_trend_started_bar_index(index)
-    current_bar_has_decent_amount_of_volume = _current_bar_has_decent_amount_of_volume(index, trend_started_bar_index)
     is_false_positive = _is_false_positive(index, trend_started_bar_index)
 
-    if after_market_open and on_higher_timeframes_only and not is_false_positive
+    if not is_false_positive
         has_trend = trend_started_bar_index > 0
         bars_are_positive = close[index] > open[index] and close[index+1] > open[index+1]
         bars_are_full = (close[index] - open[index])/(close[index]-low[index]) >= 0.7 and (close[index+1] - open[index+1])/(close[index+1]-open[index+1]) >= 0.7
@@ -342,8 +351,6 @@ full_bar_continues_indication(index) =>
          and bars_are_full
          and bars_closes_strong
          and current_tail_is_higher_than_previous_open
-         and current_bar_has_decent_amount_of_volume
-         and close[index] > 1
          and current_bar_is_strong_at_least_the_previous
 
     if result
