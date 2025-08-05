@@ -181,6 +181,43 @@ _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index) =
 
     current_bar_is_very_close_to_resistance_level
 
+_biggest_bar_has_lowest_volume(index, trend_started_bar_index) =>
+    biggest_bar_has_lowest_volume = false
+    lowest_volume_value = volume[index]
+    lowest_volume_index = 0
+    biggest_bar_value = 0.0
+    biggest_bar_index = 0
+    for i = trend_started_bar_index to index
+        if volume[i] < lowest_volume_value
+            lowest_volume_value := volume[i]
+            lowest_volume_index := i
+
+        bar_value = close[i] - open[i]
+        if biggest_bar_value < bar_value
+            biggest_bar_value := bar_value
+            biggest_bar_index := i
+
+    biggest_bar_index == lowest_volume_index and lowest_volume_index - index > 2
+
+_most_bars_with_volume_are_on_the_first_half(index, trend_started_bar_index) =>
+    volatile_bars_in_first_half = 0
+    volatile_bars_in_second_half = 0
+    under_vol_avg_counter = 0
+    for i = trend_started_bar_index-1 to index+1
+        if i < 0
+            continue
+
+        volume_above_vol_avg = volume[i] > vol_avg[i]
+        if volume_above_vol_avg
+            if (trend_started_bar_index - i) < (i - index)
+                volatile_bars_in_first_half += 1
+            else
+                volatile_bars_in_second_half += 1
+        else
+            under_vol_avg_counter += 1
+
+    volatile_bars_in_first_half > volatile_bars_in_second_half and under_vol_avg_counter/trend_started_bar_index >= 0.5
+
 _is_false_positive(index, trend_started_bar_index) =>
     started_index_is_too_close_to_bar = trend_started_bar_index - index == 1
     until_now_made_less_than_20_percent = (close[index] - yesterday_close)/close[index] < 0.2
@@ -189,6 +226,20 @@ _is_false_positive(index, trend_started_bar_index) =>
     started_index_is_too_close_to_bar_on_5_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 5 and until_now_made_less_than_20_percent
     still_in_the_first_five_minutes = hour[trend_started_bar_index] == 9 and minute[trend_started_bar_index] == 30 and trend_started_bar_index - index < 3
     volume_is_too_low = volume[index] < 1000000 or volume[index+1] < 500000
+
+    straight_bars_under_volume_average_more_than_hour = false
+    volume_under_vol_avg_counter = 0
+    for i = trend_started_bar_index to index
+        if current_timeframe == 5 and volume_under_vol_avg_counter >= 12
+            straight_bars_under_volume_average_more_than_hour := true
+            break
+        if current_timeframe == 15 and volume_under_vol_avg_counter >= 4
+            straight_bars_under_volume_average_more_than_hour := true
+            break
+        if volume[i] < vol_avg[i]
+            volume_under_vol_avg_counter += 1
+        else
+            volume_under_vol_avg_counter := 0
 
     bars_under_vwap = 0
     bars_with_low_volume = 0
@@ -211,6 +262,8 @@ _is_false_positive(index, trend_started_bar_index) =>
     is_before_market_open = hour[index] < 9 or (hour[index] == 9 and minute[index] < 30)
     timeframe_is_too_low = current_timeframe < 5
     price_lower_than_1_usd = close[index] < 1
+    biggest_bar_has_lowest_volume = _biggest_bar_has_lowest_volume(index, trend_started_bar_index)
+    most_bars_with_volume_are_on_the_first_half = _most_bars_with_volume_are_on_the_first_half(index, trend_started_bar_index)
 
     // if time == timestamp(relevant_timezone, year, 4, 2, 11, 45) and timeframe.period == "5"
     //     log.info("bars_with_low_volume: {0}. trend_started_bar_index: {1}", bars_with_low_volume, trend_started_bar_index)
@@ -227,6 +280,9 @@ _is_false_positive(index, trend_started_bar_index) =>
      or price_lower_than_1_usd
      or not current_bar_has_decent_amount_of_volume
      or still_in_the_first_five_minutes
+     or straight_bars_under_volume_average_more_than_hour
+     or biggest_bar_has_lowest_volume
+     or most_bars_with_volume_are_on_the_first_half
 
 ema_support_near_start_of_trend_indication(index) =>
     result = false
@@ -300,7 +356,7 @@ ema_support_near_start_of_trend_indication(index) =>
 
     if result
         log.info("Ema support! trend_started_bar_index: {0}. volume: {1}", trend_started_bar_index, volume[index])
-        l = label.new(x=bar_index-trend_started_bar_index-1, y=high[index+1], textcolor = color.yellow, size = size.small, style = label.style_label_lower_right)
+        l = label.new(x=bar_index-trend_started_bar_index, y=high[index], textcolor = color.yellow, size = size.small, style = label.style_arrowdown)
         label.set_text(id=l, text=str.format("s: {0}.", trend_started_bar_index))
 
     result
@@ -355,7 +411,7 @@ full_bar_continues_indication(index) =>
 
     if result
         log.info("Full Bar Continues! trend_started_bar_index: {0}. volume: {1}", trend_started_bar_index, volume[index])
-        l = label.new(x=bar_index-trend_started_bar_index-1, y=high[index+1], textcolor = color.yellow, size = size.small, style = label.style_label_lower_right)
+        l = label.new(x=bar_index-trend_started_bar_index, y=high[index], textcolor = color.yellow, size = size.small, style = label.style_arrowdown)
         label.set_text(id=l, text=str.format("s: {0}.", trend_started_bar_index))
 
     result
