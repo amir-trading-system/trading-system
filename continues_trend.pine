@@ -250,9 +250,10 @@ _is_false_positive(index, trend_started_bar_index) =>
 
     bars_under_vwap = 0
     bars_with_low_volume = 0
-    no_red_bar_since_trend_started = true
+    no_red_bar_since_trend_started = trend_started_bar_index - index > 1
     most_of_bars_under_half_million_counter = 0
     bars_over_vol_avg_counter = 0
+    bars_with_low_value_counter = 0
     for i = trend_started_bar_index to index
         before_market_open = hour[i] < 9 or (hour[i] == 9 and minute[i] < 30)
         if close[i] <= vwap[i] and volume[i] < vol_avg[i]
@@ -263,6 +264,9 @@ _is_false_positive(index, trend_started_bar_index) =>
 
         if volume[i] < 500000 and (close[i] - open[i])/(high[i] - low[i]) < 0.5 and before_market_open
             most_of_bars_under_half_million_counter += 1
+
+        if high[i] - low[i] < 0.2
+            bars_with_low_value_counter += 1
 
         if vol_avg[i] < volume[i]
             bars_over_vol_avg_counter += 1
@@ -285,6 +289,7 @@ _is_false_positive(index, trend_started_bar_index) =>
     biggest_bar_has_lowest_volume = _biggest_bar_has_lowest_volume(index, trend_started_bar_index)
     most_bars_with_volume_are_on_the_first_half = _most_bars_with_volume_are_on_the_first_half(index, trend_started_bar_index)
     most_of_bars_under_half_million = most_of_bars_under_half_million_counter/trend_started_bar_index > 0.5
+    most_of_bars_are_with_low_value = bars_with_low_value_counter/trend_started_bar_index > 0.75 and trend_started_bar_index >= 10
 
     // if time == timestamp(relevant_timezone, year, 8, 4, 09, 35) and timeframe.period == "5"
     //     log.info("bars_volume_are_not_so_strong_counter: {0}. trend_started_bar_index: {1}", bars_volume_are_not_so_strong_counter, trend_started_bar_index)
@@ -309,6 +314,7 @@ _is_false_positive(index, trend_started_bar_index) =>
      or bar_before_is_red
      or start_trend_bar_is_weak
      or most_of_bars_under_half_million
+     or most_of_bars_are_with_low_value
 
 ema_support_near_start_of_trend_indication(index) =>
     result = false
