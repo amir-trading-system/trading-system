@@ -24,7 +24,7 @@ _get_trend_started_bar_index(index) =>
 
     for i = index+49 to index+1
         before_6_am = hour[i] < 6
-        volume_is_low = volume[i] < 150000
+        volume_is_low = volume[i] < 100000
         looks_like_trend_started_before = volume[i+1] >= 500000
         histogram_is_negative = histogram[i] < 0
         high_before_is_higher = high[i+1] >= high[i]
@@ -226,6 +226,13 @@ _is_false_positive(index, trend_started_bar_index) =>
     started_index_is_too_close_to_bar_on_5_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 5 and until_now_made_less_than_20_percent
     still_in_the_first_five_minutes = hour[trend_started_bar_index] == 9 and minute[trend_started_bar_index] == 30 and trend_started_bar_index - index < 3
     volume_is_too_low = volume[index] < 1000000 or volume[index+1] < 500000
+    current_close_is_under_previous_high = close[index] <= high[index+1]
+    bar_before_is_red = close[index+1] < open[index+1]
+
+    trend_started_bar_index_body_ratio = (close[trend_started_bar_index] - open[trend_started_bar_index])/(high[trend_started_bar_index] - low[trend_started_bar_index])
+    start_trend_bar_is_weak = trend_started_bar_index_body_ratio <= 0.25
+
+
 
     straight_bars_under_volume_average_more_than_hour = false
     volume_under_vol_avg_counter = 0
@@ -243,9 +250,22 @@ _is_false_positive(index, trend_started_bar_index) =>
 
     bars_under_vwap = 0
     bars_with_low_volume = 0
+    no_red_bar_since_trend_started = true
+    most_of_bars_under_half_million_counter = 0
+    bars_over_vol_avg_counter = 0
     for i = trend_started_bar_index to index
+        before_market_open = hour[i] < 9 or (hour[i] == 9 and minute[i] < 30)
         if close[i] <= vwap[i] and volume[i] < vol_avg[i]
             bars_under_vwap += 1
+
+        if close[i] < open[i] or (close[i] - open[i])/(high[i] - low[i]) <= 0.1
+            no_red_bar_since_trend_started := false
+
+        if volume[i] < 500000 and (close[i] - open[i])/(high[i] - low[i]) < 0.5 and before_market_open
+            most_of_bars_under_half_million_counter += 1
+
+        if vol_avg[i] < volume[i]
+            bars_over_vol_avg_counter += 1
 
         has_big_movement = math.abs(close[i] - open[i])/(high[trend_started_bar_index] - low[trend_started_bar_index]) > 0.1
         if has_big_movement and (volume[i] < vol_avg[i] or volume[i] < 100000 or vol_avg[i] < 100000)
@@ -254,7 +274,7 @@ _is_false_positive(index, trend_started_bar_index) =>
     distance_from_trend_start = trend_started_bar_index - index
 
     most_bars_under_vwap = bars_under_vwap/trend_started_bar_index > 0.5 and distance_from_trend_start > 3
-    most_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index >= 0.7 and distance_from_trend_start > 3
+    most_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index >= 0.7 and distance_from_trend_start > 5
     almost_all_bars_with_low_volume = bars_with_low_volume/trend_started_bar_index > 0.8
     most_bars_are_weak = (most_bars_under_vwap and most_bars_under_vwap) or almost_all_bars_with_low_volume and distance_from_trend_start > 3
     current_bar_is_very_close_to_resistance_level = _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index)
@@ -264,9 +284,10 @@ _is_false_positive(index, trend_started_bar_index) =>
     price_lower_than_1_usd = close[index] < 1
     biggest_bar_has_lowest_volume = _biggest_bar_has_lowest_volume(index, trend_started_bar_index)
     most_bars_with_volume_are_on_the_first_half = _most_bars_with_volume_are_on_the_first_half(index, trend_started_bar_index)
+    most_of_bars_under_half_million = most_of_bars_under_half_million_counter/trend_started_bar_index > 0.5
 
-    // if time == timestamp(relevant_timezone, year, 4, 2, 11, 45) and timeframe.period == "5"
-    //     log.info("bars_with_low_volume: {0}. trend_started_bar_index: {1}", bars_with_low_volume, trend_started_bar_index)
+    // if time == timestamp(relevant_timezone, year, 8, 4, 09, 35) and timeframe.period == "5"
+    //     log.info("bars_volume_are_not_so_strong_counter: {0}. trend_started_bar_index: {1}", bars_volume_are_not_so_strong_counter, trend_started_bar_index)
 
     too_close_to_open_on_15_minutes_chart
      or started_index_is_too_close_to_bar_on_5_minutes_chart
@@ -283,6 +304,11 @@ _is_false_positive(index, trend_started_bar_index) =>
      or straight_bars_under_volume_average_more_than_hour
      or biggest_bar_has_lowest_volume
      or most_bars_with_volume_are_on_the_first_half
+     or no_red_bar_since_trend_started
+     or current_close_is_under_previous_high
+     or bar_before_is_red
+     or start_trend_bar_is_weak
+     or most_of_bars_under_half_million
 
 ema_support_near_start_of_trend_indication(index) =>
     result = false
