@@ -27,12 +27,15 @@ _get_trend_started_bar_index(index) =>
         volume_is_low = volume[i] < 100000
         looks_like_trend_started_before = volume[i+1] >= 500000
         histogram_is_negative = histogram[i] < 0
+        macd_and_signal_are_negative = macd[i] < 0 and signal_line[i] < 0
         high_before_is_higher = high[i+1] >= high[i]
 
         if before_6_am
          or volume_is_low
          or high_before_is_higher
          or looks_like_trend_started_before
+         or histogram_is_negative
+         or macd_and_signal_are_negative
             continue
 
         if i-1 < 0
@@ -88,6 +91,12 @@ _get_trend_started_bar_index(index) =>
          and volume_is_much_stronger_than_before
             trend_started_bar_index := i
             break
+
+    if trend_started_bar_index != 0
+        for j = trend_started_bar_index+20 to trend_started_bar_index+1
+            if high[j] > high[trend_started_bar_index]
+                trend_started_bar_index := 0
+                break
 
     trend_started_bar_index
 
@@ -179,12 +188,14 @@ _current_bar_is_very_close_to_resistance_level(index, trend_started_bar_index) =
     current_bar_is_very_close_to_resistance_level
 
 _biggest_bar_has_lowest_volume(index, trend_started_bar_index) =>
-    biggest_bar_has_lowest_volume = false
     lowest_volume_value = volume[index]
     lowest_volume_index = 0
     biggest_bar_value = 0.0
     biggest_bar_index = 0
+    volume_does_not_as_expected = false
     for i = trend_started_bar_index to index
+        if volume[i] < volume[i+1]
+            volume_does_not_as_expected := true
         if volume[i] < lowest_volume_value
             lowest_volume_value := volume[i]
             lowest_volume_index := i
@@ -194,7 +205,7 @@ _biggest_bar_has_lowest_volume(index, trend_started_bar_index) =>
             biggest_bar_value := bar_value
             biggest_bar_index := i
 
-    biggest_bar_index == lowest_volume_index and lowest_volume_index - index > 2
+    biggest_bar_index == lowest_volume_index and lowest_volume_index - index > 2 and not volume_does_not_as_expected
 
 _most_bars_with_volume_are_on_the_first_half(index, trend_started_bar_index) =>
     volatile_bars_in_first_half = 0
@@ -215,13 +226,77 @@ _most_bars_with_volume_are_on_the_first_half(index, trend_started_bar_index) =>
 
     volatile_bars_in_first_half > volatile_bars_in_second_half and under_vol_avg_counter/trend_started_bar_index >= 0.5
 
+_current_bar_has_strong_rejection(index) =>
+    high[index] - close[index] > close[index] - open[index]
+
+_previous_bar_has_strong_rejection(index) =>
+    is_negative = close[index+1] < open[index+1]
+    volume_is_above_vol_avg = volume[index+1] > vol_avg[index+1]
+    previous_bar_middle_point = high[index+2] - (high[index+2] - low[index+2])/2
+    previous_bar_deleted_more_than_50_percent_of_its_previous = low[index+1] < previous_bar_middle_point
+
+    bar_is_negative_with_strong_rejection = is_negative
+     and volume_is_above_vol_avg
+     and previous_bar_deleted_more_than_50_percent_of_its_previous
+
+    is_positive = close[index+1] > open[index+1]
+    deleted_more_than_50_percent = (high[index+1] - close[index+1]) > (close[index+1] - open[index+1])
+
+    bar_is_positive_with_strong_rejection = is_positive
+     and volume_is_above_vol_avg
+     and deleted_more_than_50_percent
+
+    bar_is_negative_with_strong_rejection
+     or bar_is_positive_with_strong_rejection
+
+_most_bars_are_overlapping(index, trend_started_bar_index) =>
+    overlapped_bars_counter = 0
+    overlapped_bars_after_market_open_counter = 0
+    for i = trend_started_bar_index-1 to index
+        if i < 0
+            continue
+        above_vwap = high[i] > vwap[i]
+        with_high_volume = volume[i] > vol_avg[i]
+        previous_bar_middle_point = high[i+1] - (high[i+1] - low[i+1])/2
+        current_bar_deleted_more_than_50_percent_of_previous = low[i] < previous_bar_middle_point
+        current_bar_did_not_make_any_real_progress = (close[i] - close[i+1])/(high[i+1] - low[i+1]) <= 0.5
+        current_bar_didnt_make_progress_at_all = close[i] < close[i+1] and open[i] < close[i+1] and open[i] > low[i+1]
+
+        if above_vwap
+         and with_high_volume
+         and ((current_bar_deleted_more_than_50_percent_of_previous and current_bar_did_not_make_any_real_progress) or current_bar_didnt_make_progress_at_all)
+            overlapped_bars_counter += 1
+            if hour[index] >= 10 and ((hour[i] == 9 and minute[i] > 30) or hour[i] > 9)
+                overlapped_bars_after_market_open_counter += 1
+
+    most_of_bars_are_overlapping = overlapped_bars_counter/trend_started_bar_index >= 0.4
+    if hour[index] >= 10
+        bars_to_count_from = (((hour[index] - 9) * 60) + (minute[index] - 30)) / current_timeframe
+        if bars_to_count_from > trend_started_bar_index
+            bars_to_count_from := trend_started_bar_index
+        most_of_bars_are_overlapping := overlapped_bars_after_market_open_counter/bars_to_count_from >= 0.4
+        // if time == timestamp(relevant_timezone, year, 7, 14, 12, 15) and timeframe.period == "15"
+        //     log.info("overlapped_bars_counter: {0}. bars_to_count_from: {1}.", overlapped_bars_after_market_open_counter, bars_to_count_from)
+
+
+    most_of_bars_are_overlapping
+     and trend_started_bar_index - index > 6
+
+_most_bars_are_with_low_volume(index, trend_started_bar_index) =>
+    low_volume_bars_counter = 0
+    for i = trend_started_bar_index to index+1
+        if volume[i] < 500000
+            low_volume_bars_counter += 1
+
+    low_volume_bars_counter/trend_started_bar_index > 0.5
+
 _is_false_positive(index, trend_started_bar_index) =>
     started_index_is_too_close_to_bar = trend_started_bar_index - index == 1
 
     too_close_to_open_on_15_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 15 and hour[index] < 10
     started_index_is_too_close_to_bar_on_5_minutes_chart = started_index_is_too_close_to_bar and current_timeframe == 5 and (close[index] - high[index+1])/(high[index+1] - low[index+1]) < 0.1
 
-    still_in_the_first_five_minutes = hour[trend_started_bar_index] == 9 and minute[trend_started_bar_index] == 30 and trend_started_bar_index - index < 2
+    still_in_the_first_five_minutes = hour[index] == 9 and minute[index] == 30 and trend_started_bar_index - index < 4
     volume_is_too_low = volume[index] < 1000000 or volume[index+1] < 500000
     bar_before_is_red = close[index+1] < open[index+1]
 
@@ -248,7 +323,7 @@ _is_false_positive(index, trend_started_bar_index) =>
         if close[i] <= vwap[i] and volume[i] < vol_avg[i]
             bars_under_vwap += 1
 
-        if high[i] - low[i] < 0.2
+        if high[i] - low[i] < 0.2 and high[i] > 2
             bars_with_low_value_counter += 1
 
         has_big_movement = math.abs(close[i] - open[i])/(high[trend_started_bar_index] - low[trend_started_bar_index]) > 0.1
@@ -270,28 +345,10 @@ _is_false_positive(index, trend_started_bar_index) =>
     most_bars_with_volume_are_on_the_first_half = _most_bars_with_volume_are_on_the_first_half(index, trend_started_bar_index)
     most_bars_has_low_value = bars_with_low_value_counter/trend_started_bar_index > 0.6
 
-    overlapped_bars_counter = 0
-    overlapped_bars_after_market_open_counter = 0
-    for i = trend_started_bar_index-1 to index
-        if i < 0
-            continue
-        above_vwap = high[i] > vwap[i]
-        current_bar_deleted_more_than_50_percent_of_previous = (high[i+1]-low[i])/(high[i+1]-low[i+1]) > 0.5
-        if above_vwap and current_bar_deleted_more_than_50_percent_of_previous
-            overlapped_bars_counter += 1
-            if hour[index] >= 10 and ((hour[i] == 9 and minute[i] > 30) or hour[i] > 9)
-                overlapped_bars_after_market_open_counter += 1
-
-    most_of_bars_are_overlapping = overlapped_bars_counter/trend_started_bar_index >= 0.5
-    if trend_started_bar_index > 10 and not most_of_bars_are_overlapping
-        most_of_bars_are_overlapping := overlapped_bars_counter/trend_started_bar_index >= 0.4
-    if hour[index] >= 10
-        most_of_bars_are_overlapping := overlapped_bars_after_market_open_counter/trend_started_bar_index >= 0.5
-        if trend_started_bar_index > 10 and not most_of_bars_are_overlapping
-            most_of_bars_are_overlapping := overlapped_bars_after_market_open_counter/trend_started_bar_index >= 0.4
-
-    // if time == timestamp(relevant_timezone, year, 7, 15, 9, 45) and timeframe.period == "15"
-    //     log.info("overlapped_bars_counter: {0}. trend_started_bar_index: {1}.", overlapped_bars_counter, trend_started_bar_index)
+    most_bars_are_overlapping = _most_bars_are_overlapping(index, trend_started_bar_index)
+    previous_bar_has_strong_rejection = _previous_bar_has_strong_rejection(index)
+    current_bar_has_strong_rejection = _current_bar_has_strong_rejection(index)
+    most_bars_are_with_low_volume = _most_bars_are_with_low_volume(index, trend_started_bar_index)
 
     too_close_to_open_on_15_minutes_chart
      or started_index_is_too_close_to_bar_on_5_minutes_chart
@@ -300,16 +357,17 @@ _is_false_positive(index, trend_started_bar_index) =>
      or (most_bars_with_low_volume and current_timeframe == 5)
      or (most_bars_are_weak and current_timeframe == 15)
      or current_bar_is_very_close_to_resistance_level
-     or is_before_market_open
      or timeframe_is_too_low
      or price_lower_than_1_usd
      or not current_bar_has_decent_amount_of_volume
      or still_in_the_first_five_minutes
      or straight_bars_under_volume_average_more_than_hour
-     or biggest_bar_has_lowest_volume
      or most_bars_with_volume_are_on_the_first_half
      or most_bars_has_low_value
-     or most_of_bars_are_overlapping
+     or most_bars_are_overlapping
+     or previous_bar_has_strong_rejection
+     or current_bar_has_strong_rejection
+     or most_bars_are_with_low_volume
 
 ema_support_near_start_of_trend_indication(index) =>
     result = false
