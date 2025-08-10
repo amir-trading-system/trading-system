@@ -201,8 +201,19 @@ momentum_trend_continue(index) =>
 
     result
 
+just_crossed_last_high(index) =>
+    after_market_open = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
+    bars_back = int(360/current_timeframe)
+    today_highest = ta.highest(high[index+1], bars_back)
+    just_crossed_last_high = close[index] > today_highest
+
+    just_crossed_last_high
+     and after_market_open
+
 momentum_trend_continue = momentum_trend_continue(0)
+just_crossed_last_high = just_crossed_last_high(0)
 
 plotshape(momentum_trend_continue, title="Trend Continue", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "✅")
+plotshape(just_crossed_last_high, title="Just crossed last high", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
 
-alertcondition(momentum_trend_continue, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(momentum_trend_continue or just_crossed_last_high, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
