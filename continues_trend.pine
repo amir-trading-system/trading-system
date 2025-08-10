@@ -32,8 +32,15 @@ _close_to_9_ema(index, allowed_distance_threshold) =>
 
 _price_above_all_indicators_for_last_bars(index, last_bars) =>
     price_above_all_indicators_for_last_bars = true
-    for i = index+last_bars to index
-        if close[i] < vwap[i] and ((hour[i] == 9 and minute[i] >= 30) or hour[i] > 9)
+    for i = index+10 to index
+        after_market_open = (hour[i] == 9 and minute[i] >= 30) or hour[i] > 9
+        if true
+         and close[i] < vwap[i]
+         and close[i] < ema_9[i]
+         and low[i] < low[i+1]
+         and after_market_open
+         and volume[i] > 10000
+         and vol_avg[i] > 10000
             price_above_all_indicators_for_last_bars := false
 
     price_above_all_indicators_for_last_bars
@@ -49,26 +56,17 @@ _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
 
 _current_bar_is_strong(index) =>
     bar_is_positive = close[index] > open[index]
-    bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2 and low[index] > low[index+1]
+    bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
+     and low[index] > low[index+1]
+     and high[index] > vwap[index]
     bar_is_highest_in_the_last_bars = true
     for i = index+30 to index+1
-        if high[i] > high[index]
+        if high[i] > high[index] and volume[i] > volume[index]
             bar_is_highest_in_the_last_bars := false
 
     bar_is_positive
      and bar_is_strong
      and bar_is_highest_in_the_last_bars
-
-_last_strongest_bar(index) =>
-    strongest_bar_value = 0.0
-    strongest_bar_index = 0
-
-    for i = index+50 to index+5
-        if high[i] > strongest_bar_value and volume[i] > volume[i+1] and volume[i] > vol_avg[i]
-            strongest_bar_value := high[i]
-            strongest_bar_index := i
-
-    strongest_bar_index
 
 _most_bars_are_overlapping(index) =>
     overlapped_bars_counter = 0
@@ -95,17 +93,35 @@ _most_bars_are_overlapping(index) =>
 
     most_of_bars_are_overlapping
 
+_macd_didnt_make_too_strong_movements_yet(index, histogram) =>
+    macd_didnt_make_too_strong_movements_yet = true
+    for i = index+5 to index+1
+        if histogram[i+1] * 2 < histogram[i] and histogram[i] > 0.01
+         and histogram[i+1] > 0
+            macd_didnt_make_too_strong_movements_yet := false
+            break
+
+    macd_didnt_make_too_strong_movements_yet
+
 _macd_looks_positive(index) =>
     [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
     macd_looks_positive = true
+    macd_didnt_make_too_strong_movements_yet = _macd_didnt_make_too_strong_movements_yet(index, histogram)
+
     for i = index+10 to index
-        if macd[i] < 0 and volume[i] > vol_avg[i] and vol_avg[i] > 20000
+        if macd[i] < 0
+         and signal_line[i] < 0
+         and volume[i] > vol_avg[i]
+         and vol_avg[i] > 20000
             macd_looks_positive := false
             break
 
-    macd_looks_positive
-     and macd[index] > 0.02
+
+    true
+     and macd_looks_positive
+     and macd[index] > 0
      and signal_line[index] > 0
+     and macd_didnt_make_too_strong_movements_yet
 
 _volume_is_the_highest_until_now(index) =>
     volume_is_the_highest_until_now = true
@@ -128,7 +144,7 @@ _volume_average_indicate_on_trend(index) =>
             volume_average_indicate_on_trend := false
             break
 
-    volume[index] > vol_avg[index]
+    volume[index] > vol_avg[index] * 1.5
      and vol_avg[index] > 20000
      and volume_average_indicate_on_trend
 
