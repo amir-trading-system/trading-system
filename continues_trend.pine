@@ -103,10 +103,18 @@ _macd_didnt_make_too_strong_movements_yet(index, histogram) =>
 
     macd_didnt_make_too_strong_movements_yet
 
+_macd_trend_goes_up(index, macd, histogram) =>
+    bars_back_for_one_hour_before = int(60/current_timeframe)
+    last_highest_histogram = ta.highest(histogram, bars_back_for_one_hour_before)
+    last_highest_macd = ta.highest(macd, bars_back_for_one_hour_before)
+    histogram[index] > last_highest_histogram/1.5
+     and macd[index] > last_highest_macd/1.5
+
 _macd_looks_positive(index) =>
     [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
     macd_looks_positive = true
     macd_didnt_make_too_strong_movements_yet = _macd_didnt_make_too_strong_movements_yet(index, histogram)
+    macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
 
     for i = index+10 to index
         if macd[i] < 0
@@ -115,13 +123,12 @@ _macd_looks_positive(index) =>
          and vol_avg[i] > 20000
             macd_looks_positive := false
             break
-
-
     true
      and macd_looks_positive
      and macd[index] > 0
      and signal_line[index] > 0
      and macd_didnt_make_too_strong_movements_yet
+     and macd_trend_goes_up
 
 _volume_is_the_highest_until_now(index) =>
     volume_is_the_highest_until_now = true
@@ -152,10 +159,12 @@ _price_movement_is_big(index) =>
     price_movement_is_big = true
     for i = index+6 to index+1
         if (close[i] - low[i]) > (high[index] - low[index])
+         and (close[i+1] - low[i+1])/(close[i] - low[i]) > 0.6
             price_movement_is_big := false
             break
 
     price_movement_is_big
+     and high[index] - low[index] > 0.1
 
 _only_on_market_movement_time(index) =>
     result = false
@@ -181,10 +190,9 @@ momentum_trend_continue(index) =>
     result = true
      and made_more_than_usual_percentage_already
      and current_bar_is_strong
-     and volume_is_the_highest_until_now
      and macd_looks_positive
      and volume_average_indicate_on_trend
-     and price_movement_is_big
+     and (price_movement_is_big or volume_is_the_highest_until_now)
      and only_on_market_movement_time
      and ema_to_price_ratio_looks_good
 
