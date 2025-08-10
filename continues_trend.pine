@@ -32,14 +32,19 @@ _close_to_9_ema(index, allowed_distance_threshold) =>
 
 _price_above_all_indicators_for_last_bars(index, last_bars) =>
     price_above_all_indicators_for_last_bars = true
+    close_i = close
+    low_i = low
+    volume_i = volume
+    hour_i = hour
+    minute_i = minute
     for i = index+10 to index
-        after_market_open = (hour[i] == 9 and minute[i] >= 30) or hour[i] > 9
+        after_market_open = (hour_i[i] == 9 and minute_i[i] >= 30) or hour_i[i] > 9
         if true
-         and close[i] < vwap[i]
-         and close[i] < ema_9[i]
-         and low[i] < low[i+1]
+         and close_i[i] < vwap[i]
+         and close_i[i] < ema_9[i]
+         and low_i[i] < low_i[i+1]
          and after_market_open
-         and volume[i] > 10000
+         and volume_i[i] > 10000
          and vol_avg[i] > 10000
             price_above_all_indicators_for_last_bars := false
 
@@ -116,10 +121,12 @@ _macd_looks_positive(index) =>
     macd_didnt_make_too_strong_movements_yet = _macd_didnt_make_too_strong_movements_yet(index, histogram)
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
 
+    volume_i = volume
+
     for i = index+10 to index
         if macd[i] < 0
          and signal_line[i] < 0
-         and volume[i] > vol_avg[i]
+         and volume_i[i] > vol_avg[i]
          and vol_avg[i] > 20000
             macd_looks_positive := false
             break
@@ -132,13 +139,15 @@ _macd_looks_positive(index) =>
 
 _volume_is_the_highest_until_now(index) =>
     volume_is_the_highest_until_now = true
+    volume_i = volume
+    high_i = high
     for i = index+6 to index+1
         if i < 0
             continue
 
-        if (volume[i] > volume[index] and high[i] > high[index])
-         or volume[index]/volume[i] < 0.75
-         or volume[index] < volume[index+1]
+        if (volume_i[i] > volume_i[index] and high_i[i] > high_i[index])
+         or volume_i[index]/volume_i[i] < 0.75
+         or volume_i[index] < volume_i[index+1]
             volume_is_the_highest_until_now := false
             break
 
@@ -157,14 +166,17 @@ _volume_average_indicate_on_trend(index) =>
 
 _price_movement_is_big(index) =>
     price_movement_is_big = true
+    close_i = close
+    low_i = low
+    high_i = high
     for i = index+6 to index+1
-        if (close[i] - low[i]) > (high[index] - low[index])
-         and (close[i+1] - low[i+1])/(close[i] - low[i]) > 0.6
+        if (close_i[i] - low_i[i]) > (high_i[index] - low_i[index])
+         and (close_i[i+1] - low_i[i+1])/(close_i[i] - low_i[i]) > 0.6
             price_movement_is_big := false
             break
 
     price_movement_is_big
-     and high[index] - low[index] > 0.1
+     and high_i[index] - low_i[index] > 0.1
 
 _only_on_market_movement_time(index) =>
     result = false
