@@ -60,7 +60,7 @@ _current_bar_is_strong(index) =>
      and low[index] > low[index+1]
      and high[index] > vwap[index]
     bar_is_highest_in_the_last_bars = true
-    for i = index+30 to index+1
+    for i = index+10 to index+1
         if high[i] > high[index] and volume[i] > volume[index]
             bar_is_highest_in_the_last_bars := false
 
@@ -104,9 +104,9 @@ _macd_didnt_make_too_strong_movements_yet(index, histogram) =>
     macd_didnt_make_too_strong_movements_yet
 
 _macd_trend_goes_up(index, macd, histogram) =>
-    bars_back_for_one_hour_before = int(60/current_timeframe)
-    last_highest_histogram = ta.highest(histogram, bars_back_for_one_hour_before)
-    last_highest_macd = ta.highest(macd, bars_back_for_one_hour_before)
+    bars_back_for_30_minutes_before = int(30/current_timeframe)
+    last_highest_histogram = ta.highest(histogram, bars_back_for_30_minutes_before)
+    last_highest_macd = ta.highest(macd, bars_back_for_30_minutes_before)
     histogram[index] > last_highest_histogram/1.5
      and macd[index] > last_highest_macd/1.5
 
