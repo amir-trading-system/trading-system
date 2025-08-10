@@ -51,7 +51,7 @@ _current_bar_is_strong(index) =>
     bar_is_positive = close[index] > open[index]
     bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2 and low[index] > low[index+1]
     bar_is_highest_in_the_last_bars = true
-    for i = index+5 to index+1
+    for i = index+30 to index+1
         if high[i] > high[index]
             bar_is_highest_in_the_last_bars := false
 
@@ -156,7 +156,6 @@ momentum_trend_continue(index) =>
     allowed_distance_threshold = 0.2
     current_bar_is_strong = _current_bar_is_strong(index)
     macd_looks_positive = _macd_looks_positive(index)
-    most_bars_are_overlapping = _most_bars_are_overlapping(index)
     volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index)
     volume_average_indicate_on_trend = _volume_average_indicate_on_trend(index)
     price_movement_is_big = _price_movement_is_big(index)
