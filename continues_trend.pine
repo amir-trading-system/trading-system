@@ -37,7 +37,7 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
     volume_i = volume
     hour_i = hour
     minute_i = minute
-    for i = index+10 to index
+    for i = index+last_bars to index
         after_market_open = (hour_i[i] == 9 and minute_i[i] >= 30) or hour_i[i] > 9
         if true
          and close_i[i] < vwap[i]
@@ -51,7 +51,7 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
     price_above_all_indicators_for_last_bars
 
 _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
-    last_bars = 10
+    last_bars = 5
 
     close_to_9_ema = _close_to_9_ema(index, allowed_distance_threshold)
     price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
@@ -100,7 +100,7 @@ _most_bars_are_overlapping(index) =>
 
 _macd_didnt_make_too_strong_movements_yet(index, histogram) =>
     macd_didnt_make_too_strong_movements_yet = true
-    for i = index+5 to index+1
+    for i = index+4 to index+1
         if histogram[i+1] * 2 < histogram[i] and histogram[i] > 0.01
          and histogram[i+1] > 0
             macd_didnt_make_too_strong_movements_yet := false
@@ -188,7 +188,7 @@ _only_on_market_movement_time(index) =>
     result
 
 momentum_trend_continue(index) =>
-    percentage = 0.25
+    percentage = 0.2
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     allowed_distance_threshold = 0.2
     current_bar_is_strong = _current_bar_is_strong(index)
