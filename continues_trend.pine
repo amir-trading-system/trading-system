@@ -10,9 +10,10 @@ relevant_timezone = "America/New_York"
 
 ema_9 = ta.ema(close, 9)
 ema_20 = ta.ema(close, 20)
+ema_200 = ta.ema(close, 200)
 vwap = ta.vwap(hlc3)
 vol_avg = ta.sma(volume, 20)
-ema_200_days = request.security(syminfo.tickerid, "D", ema_9, lookahead = barmerge.lookahead_on)
+ema_200_days = request.security(syminfo.tickerid, "D", ema_200, lookahead = barmerge.lookahead_on)
 yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
 current_timeframe = str.tonumber(timeframe.period)
 
@@ -50,14 +51,23 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
 
     price_above_all_indicators_for_last_bars
 
+_not_too_close_to_ema_200_day(index) =>
+    not_too_close_to_ema_200_day = true
+    if ema_200_days[index] > high[index]
+        not_too_close_to_ema_200_day := ema_200_days - high[index] > 0.5
+
+    not_too_close_to_ema_200_day
+
 _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
     last_bars = 5
 
     close_to_9_ema = _close_to_9_ema(index, allowed_distance_threshold)
     price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
+    not_too_close_to_ema_200_day = _not_too_close_to_ema_200_day(index)
 
     close_to_9_ema
      and price_above_all_indicators_for_last_bars
+     and not_too_close_to_ema_200_day
 
 _current_bar_is_strong(index) =>
     bar_is_positive = close[index] > open[index]
