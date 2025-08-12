@@ -52,7 +52,7 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
     price_above_all_indicators_for_last_bars
 
 _not_too_close_to_ema_200_day(index) =>
-    not_too_close_to_ema_200_day = true
+    not_too_close_to_ema_200_day = ema_200_days[index] < low[index]
     if ema_200_days[index] > high[index]
         not_too_close_to_ema_200_day := ema_200_days - high[index] > 0.5
 
