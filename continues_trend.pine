@@ -59,7 +59,7 @@ _not_too_close_to_ema_200_day(index) =>
     not_too_close_to_ema_200_day
 
 _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
-    last_bars = 5
+    last_bars = 2
 
     close_to_9_ema = _close_to_9_ema(index, allowed_distance_threshold)
     price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
