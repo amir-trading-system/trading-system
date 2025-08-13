@@ -130,6 +130,7 @@ _macd_looks_positive(index) =>
     macd_looks_positive = true
     macd_didnt_make_too_strong_movements_yet = _macd_didnt_make_too_strong_movements_yet(index, histogram)
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
+    previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
     volume_i = volume
 
@@ -146,6 +147,7 @@ _macd_looks_positive(index) =>
      and signal_line[index] > 0
      and macd_didnt_make_too_strong_movements_yet
      and macd_trend_goes_up
+     and previous_histogram_lower_than_current
 
 _volume_is_the_highest_until_now(index) =>
     volume_is_the_highest_until_now = true
@@ -251,7 +253,6 @@ just_crossed_last_high(index) =>
       or momentum_trend_continue_8
       or momentum_trend_continue_9
       or momentum_trend_continue_10)
-
 
 momentum_trend_continue = momentum_trend_continue(0)
 just_crossed_last_high = just_crossed_last_high(0)
