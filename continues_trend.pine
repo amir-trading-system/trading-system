@@ -172,7 +172,8 @@ _volume_average_indicate_on_trend(index) =>
             volume_average_indicate_on_trend := false
             break
 
-    volume[index] > vol_avg[index] * 1.5
+    true
+     and (volume[index] > vol_avg[index] * 1.5 or (volume[index] > vol_avg[index] and volume[index] > volume[index+1] * 1.5))
      and vol_avg[index] > 20000
      and volume_average_indicate_on_trend
 
