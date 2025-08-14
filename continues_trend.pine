@@ -118,10 +118,18 @@ _macd_didnt_make_too_strong_movements_yet(index, histogram) =>
 
     macd_didnt_make_too_strong_movements_yet
 
+_macd_trend_goes_up(index, macd, histogram) =>
+    bars_back_for_30_minutes_before = int(30/current_timeframe)
+    last_highest_histogram = ta.highest(histogram, bars_back_for_30_minutes_before)
+    last_highest_macd = ta.highest(macd, bars_back_for_30_minutes_before)
+    histogram[index] > last_highest_histogram/1.5
+     and macd[index] > last_highest_macd/1.5
+
 _macd_looks_positive(index) =>
     [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
     macd_looks_positive = true
     macd_didnt_make_too_strong_movements_yet = _macd_didnt_make_too_strong_movements_yet(index, histogram)
+    macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
     previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
     volume_i = volume
@@ -138,6 +146,7 @@ _macd_looks_positive(index) =>
      and macd[index] > 0
      and signal_line[index] > 0
      and macd_didnt_make_too_strong_movements_yet
+     and macd_trend_goes_up
      and previous_histogram_lower_than_current
 
 _volume_is_the_highest_until_now(index) =>
@@ -232,19 +241,21 @@ just_crossed_last_high(index) =>
     momentum_trend_continue_9 = momentum_trend_continue(index+9)
     momentum_trend_continue_10 = momentum_trend_continue(index+10)
 
+    momentum_happend_before = momentum_trend_continue_0
+     or momentum_trend_continue_1
+     or momentum_trend_continue_2
+     or momentum_trend_continue_3
+     or momentum_trend_continue_4
+     or momentum_trend_continue_5
+     or momentum_trend_continue_6
+     or momentum_trend_continue_7
+     or momentum_trend_continue_8
+     or momentum_trend_continue_9
+     or momentum_trend_continue_10
+
     just_crossed_last_high
      and after_market_open
-     and (momentum_trend_continue_0
-      or momentum_trend_continue_1
-      or momentum_trend_continue_2
-      or momentum_trend_continue_3
-      or momentum_trend_continue_4
-      or momentum_trend_continue_5
-      or momentum_trend_continue_6
-      or momentum_trend_continue_7
-      or momentum_trend_continue_8
-      or momentum_trend_continue_9
-      or momentum_trend_continue_10)
+     and momentum_happend_before
 
 momentum_trend_continue = momentum_trend_continue(0)
 just_crossed_last_high = just_crossed_last_high(0)
