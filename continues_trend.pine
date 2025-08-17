@@ -54,6 +54,7 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
          and volume_i[i] > 10000
          and vol_avg[i] > 10000
             price_above_all_indicators_for_last_bars := false
+            break
 
     price_above_all_indicators_for_last_bars
 
@@ -143,17 +144,19 @@ _macd_looks_positive(index) =>
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
     previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
-    volume_i = volume
-    macd_i = macd
-    signal_line_i = signal_line
-
-    for i = index+10 to index
-        if macd_i[i] < 0
-         and signal_line_i[i] < 0
-         and volume_i[i] > vol_avg[i]
-         and vol_avg[i] > 20000
-            macd_looks_positive := false
-            break
+    if macd_didnt_make_too_strong_movements_yet
+     and macd_trend_goes_up
+     and previous_histogram_lower_than_current
+        volume_i = volume
+        macd_i = macd
+        signal_line_i = signal_line
+        for i = index+10 to index
+            if macd_i[i] < 0
+             and signal_line_i[i] < 0
+             and volume_i[i] > vol_avg[i]
+             and vol_avg[i] > 20000
+                macd_looks_positive := false
+                break
     true
      and macd_looks_positive
      and macd[index] > 0
