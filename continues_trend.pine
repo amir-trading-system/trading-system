@@ -23,11 +23,15 @@ _made_more_than_usual_percentage_already(index, percentage) =>
 
 _close_to_9_ema(index, allowed_distance_threshold) =>
     distance_from_9_ema = math.abs(low[index] - ema_9[index])/(high[index] - low[index])
+    previous_distance_from_9_ema = math.abs(low[index+1] - ema_9[index+1])/(high[index+1] - low[index+1])
+
+    current_distance_smaller_than_previous_and_strong_bar = distance_from_9_ema < previous_distance_from_9_ema and volume[index] > volume[index+1] * 1.2
 
     crossed_9_ema_up = low[index] <= ema_9[index] and (ema_9[index] - low[index])/(close[index] - ema_9[index]) < 0.1
 
     close_to_9_ema = (distance_from_9_ema < allowed_distance_threshold or distance_from_9_ema < 0.1)
      or crossed_9_ema_up
+     or current_distance_smaller_than_previous_and_strong_bar
 
     close_to_9_ema
 
@@ -65,14 +69,16 @@ _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
     price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
     not_too_close_to_ema_200_day = _not_too_close_to_ema_200_day(index)
 
-    close_to_9_ema
+    true
+     and close_to_9_ema
      and price_above_all_indicators_for_last_bars
      and not_too_close_to_ema_200_day
 
 _current_bar_is_strong(index) =>
     bar_is_positive = close[index] > open[index]
+    bar_strong = (close[index] - open[index])/(high[index] - low[index])
     bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
-     and low[index] > low[index+1]
+     and low[index] >= low[index+1]
      and high[index] > vwap[index]
     bar_is_highest_in_the_last_bars = true
     for i = index+10 to index+1
@@ -203,13 +209,13 @@ _only_on_market_movement_time(index) =>
 momentum_trend_continue(index) =>
     percentage = 0.2
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    allowed_distance_threshold = 0.2
     current_bar_is_strong = _current_bar_is_strong(index)
     macd_looks_positive = _macd_looks_positive(index)
     volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index)
     volume_average_indicate_on_trend = _volume_average_indicate_on_trend(index)
     price_movement_is_big = _price_movement_is_big(index)
     only_on_market_movement_time = _only_on_market_movement_time(index)
+    allowed_distance_threshold = 0.2
     ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index, allowed_distance_threshold)
 
     result = true
