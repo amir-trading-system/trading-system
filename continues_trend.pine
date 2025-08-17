@@ -29,7 +29,7 @@ _close_to_9_ema(index, allowed_distance_threshold) =>
 
     crossed_9_ema_up = low[index] <= ema_9[index] and (ema_9[index] - low[index])/(close[index] - ema_9[index]) < 0.1
 
-    close_to_9_ema = (distance_from_9_ema < allowed_distance_threshold or distance_from_9_ema < 0.1)
+    close_to_9_ema = distance_from_9_ema < allowed_distance_threshold
      or crossed_9_ema_up
      or current_distance_smaller_than_previous_and_strong_bar
 
