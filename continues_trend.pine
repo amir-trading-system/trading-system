@@ -13,6 +13,7 @@ ema_20 = ta.ema(close, 20)
 ema_200 = ta.ema(close, 200)
 vwap = ta.vwap(hlc3)
 vol_avg = ta.sma(volume, 20)
+[macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
 ema_200_days = request.security(syminfo.tickerid, "D", ema_200, lookahead = barmerge.lookahead_on)
 yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
 current_timeframe = str.tonumber(timeframe.period)
@@ -44,6 +45,7 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
     minute_i = minute
     for i = index+last_bars to index
         after_market_open = (hour_i[i] == 9 and minute_i[i] >= 30) or hour_i[i] > 9
+
         if true
          and close_i[i] < vwap[i]
          and close_i[i] < ema_9[i]
@@ -75,6 +77,8 @@ _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
      and not_too_close_to_ema_200_day
 
 _current_bar_is_strong(index) =>
+    high_i = high
+    volume_i = volume
     bar_is_positive = close[index] > open[index]
     bar_strong = (close[index] - open[index])/(high[index] - low[index])
     bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
@@ -82,8 +86,9 @@ _current_bar_is_strong(index) =>
      and high[index] > vwap[index]
     bar_is_highest_in_the_last_bars = true
     for i = index+10 to index+1
-        if high[i] > high[index] and volume[i] > volume[index]
+        if high_i[i] > high_i[index] and volume_i[i] > volume_i[index]
             bar_is_highest_in_the_last_bars := false
+            break
 
     bar_is_positive
      and bar_is_strong
@@ -117,7 +122,8 @@ _most_bars_are_overlapping(index) =>
 _macd_didnt_make_too_strong_movements_yet(index, histogram) =>
     macd_didnt_make_too_strong_movements_yet = true
     for i = index+4 to index+1
-        if histogram[i+1] * 2 < histogram[i] and histogram[i] > 0.01
+        if histogram[i+1] * 2 < histogram[i]
+         and histogram[i] > 0.01
          and histogram[i+1] > 0
             macd_didnt_make_too_strong_movements_yet := false
             break
@@ -126,23 +132,24 @@ _macd_didnt_make_too_strong_movements_yet(index, histogram) =>
 
 _macd_trend_goes_up(index, macd, histogram) =>
     bars_back_for_30_minutes_before = int(30/current_timeframe)
-    last_highest_histogram = ta.highest(histogram, bars_back_for_30_minutes_before)
-    last_highest_macd = ta.highest(macd, bars_back_for_30_minutes_before)
+    last_highest_histogram = ta.highest(histogram[index], bars_back_for_30_minutes_before)
+    last_highest_macd = ta.highest(macd[index], bars_back_for_30_minutes_before)
     histogram[index] > last_highest_histogram/1.5
      and macd[index] > last_highest_macd/1.5
 
 _macd_looks_positive(index) =>
-    [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
     macd_looks_positive = true
     macd_didnt_make_too_strong_movements_yet = _macd_didnt_make_too_strong_movements_yet(index, histogram)
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
     previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
     volume_i = volume
+    macd_i = macd
+    signal_line_i = signal_line
 
     for i = index+10 to index
-        if macd[i] < 0
-         and signal_line[i] < 0
+        if macd_i[i] < 0
+         and signal_line_i[i] < 0
          and volume_i[i] > vol_avg[i]
          and vol_avg[i] > 20000
             macd_looks_positive := false
@@ -163,9 +170,15 @@ _volume_is_the_highest_until_now(index) =>
         if i < 0
             continue
 
+        if volume_i[index] < volume_i[index+1]
+            volume_is_the_highest_until_now := false
+            break
+
         if (volume_i[i] > volume_i[index] and high_i[i] > high_i[index])
-         or volume_i[index]/volume_i[i] < 0.75
-         or volume_i[index] < volume_i[index+1]
+            volume_is_the_highest_until_now := false
+            break
+
+        if volume_i[index]/volume_i[i] < 0.75
             volume_is_the_highest_until_now := false
             break
 
@@ -235,11 +248,38 @@ just_crossed_last_high(index) =>
     today_highest = ta.highest(high[index+1], bars_back)
     just_crossed_last_high = close[index] > today_highest
 
+    momentum_trend_continue_0 = momentum_trend_continue(index)
+    momentum_trend_continue_1 = momentum_trend_continue(index+1)
+    momentum_trend_continue_2 = momentum_trend_continue(index+2)
+    momentum_trend_continue_3 = momentum_trend_continue(index+3)
+    momentum_trend_continue_4 = momentum_trend_continue(index+4)
+    momentum_trend_continue_5 = momentum_trend_continue(index+5)
+    momentum_trend_continue_6 = momentum_trend_continue(index+6)
+    momentum_trend_continue_7 = momentum_trend_continue(index+7)
+    momentum_trend_continue_8 = momentum_trend_continue(index+8)
+    momentum_trend_continue_9 = momentum_trend_continue(index+9)
+    momentum_trend_continue_10 = momentum_trend_continue(index+10)
+
+    momentum_happend_before = momentum_trend_continue_0
+     or momentum_trend_continue_1
+     or momentum_trend_continue_2
+     or momentum_trend_continue_3
+     or momentum_trend_continue_4
+     or momentum_trend_continue_5
+     or momentum_trend_continue_6
+     or momentum_trend_continue_7
+     or momentum_trend_continue_8
+     or momentum_trend_continue_9
+     or momentum_trend_continue_10
+
     just_crossed_last_high
      and after_market_open
+     and momentum_happend_before
 
 momentum_trend_continue = momentum_trend_continue(0)
 just_crossed_last_high = just_crossed_last_high(0)
+if just_crossed_last_high
+    log.info("Get In!!")
 
 plotshape(momentum_trend_continue, title="Trend Continue", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "✅")
 plotshape(just_crossed_last_high, title="Just crossed last high", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
