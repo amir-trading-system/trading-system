@@ -235,33 +235,8 @@ just_crossed_last_high(index) =>
     today_highest = ta.highest(high[index+1], bars_back)
     just_crossed_last_high = close[index] > today_highest
 
-    momentum_trend_continue_0 = momentum_trend_continue(index)
-    momentum_trend_continue_1 = momentum_trend_continue(index+1)
-    momentum_trend_continue_2 = momentum_trend_continue(index+2)
-    momentum_trend_continue_3 = momentum_trend_continue(index+3)
-    momentum_trend_continue_4 = momentum_trend_continue(index+4)
-    momentum_trend_continue_5 = momentum_trend_continue(index+5)
-    momentum_trend_continue_6 = momentum_trend_continue(index+6)
-    momentum_trend_continue_7 = momentum_trend_continue(index+7)
-    momentum_trend_continue_8 = momentum_trend_continue(index+8)
-    momentum_trend_continue_9 = momentum_trend_continue(index+9)
-    momentum_trend_continue_10 = momentum_trend_continue(index+10)
-
-    momentum_happend_before = momentum_trend_continue_0
-     or momentum_trend_continue_1
-     or momentum_trend_continue_2
-     or momentum_trend_continue_3
-     or momentum_trend_continue_4
-     or momentum_trend_continue_5
-     or momentum_trend_continue_6
-     or momentum_trend_continue_7
-     or momentum_trend_continue_8
-     or momentum_trend_continue_9
-     or momentum_trend_continue_10
-
     just_crossed_last_high
      and after_market_open
-     and momentum_happend_before
 
 momentum_trend_continue = momentum_trend_continue(0)
 just_crossed_last_high = just_crossed_last_high(0)
