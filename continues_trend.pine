@@ -38,20 +38,16 @@ _close_to_9_ema(index, allowed_distance_threshold) =>
 
 _price_above_all_indicators_for_last_bars(index, last_bars) =>
     price_above_all_indicators_for_last_bars = true
-    close_i = close
-    low_i = low
-    volume_i = volume
-    hour_i = hour
-    minute_i = minute
+
     for i = index+last_bars to index
-        after_market_open = (hour_i[i] == 9 and minute_i[i] >= 30) or hour_i[i] > 9
+        after_market_open = (hour[i] == 9 and minute[i] >= 30) or hour[i] > 9
 
         if true
-         and close_i[i] < vwap[i]
-         and close_i[i] < ema_9[i]
-         and low_i[i] < low_i[i+1]
+         and close[i] < vwap[i]
+         and close[i] < ema_9[i]
+         and low[i] < low[i+1]
          and after_market_open
-         and volume_i[i] > 10000
+         and volume[i] > 10000
          and vol_avg[i] > 10000
             price_above_all_indicators_for_last_bars := false
             break
@@ -78,8 +74,6 @@ _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
      and not_too_close_to_ema_200_day
 
 _current_bar_is_strong(index) =>
-    high_i = high
-    volume_i = volume
     bar_is_positive = close[index] > open[index]
     bar_strong = (close[index] - open[index])/(high[index] - low[index])
     bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
@@ -87,7 +81,7 @@ _current_bar_is_strong(index) =>
      and high[index] > vwap[index]
     bar_is_highest_in_the_last_bars = true
     for i = index+10 to index+1
-        if high_i[i] > high_i[index] and volume_i[i] > volume_i[index]
+        if high[i] > high[index] and volume[i] > volume[index]
             bar_is_highest_in_the_last_bars := false
             break
 
@@ -120,17 +114,6 @@ _most_bars_are_overlapping(index) =>
 
     most_of_bars_are_overlapping
 
-_macd_didnt_make_too_strong_movements_yet(index, histogram) =>
-    macd_didnt_make_too_strong_movements_yet = true
-    for i = index+4 to index+1
-        if histogram[i+1] * 2 < histogram[i]
-         and histogram[i] > 0.01
-         and histogram[i+1] > 0
-            macd_didnt_make_too_strong_movements_yet := false
-            break
-
-    macd_didnt_make_too_strong_movements_yet
-
 _macd_trend_goes_up(index, macd, histogram) =>
     bars_back_for_30_minutes_before = int(30/current_timeframe)
     last_highest_histogram = ta.highest(histogram[index], bars_back_for_30_minutes_before)
@@ -140,20 +123,15 @@ _macd_trend_goes_up(index, macd, histogram) =>
 
 _macd_looks_positive(index) =>
     macd_looks_positive = true
-    macd_didnt_make_too_strong_movements_yet = _macd_didnt_make_too_strong_movements_yet(index, histogram)
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
     previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
-    if macd_didnt_make_too_strong_movements_yet
-     and macd_trend_goes_up
+    if macd_trend_goes_up
      and previous_histogram_lower_than_current
-        volume_i = volume
-        macd_i = macd
-        signal_line_i = signal_line
         for i = index+10 to index
-            if macd_i[i] < 0
-             and signal_line_i[i] < 0
-             and volume_i[i] > vol_avg[i]
+            if macd[i] < 0
+             and signal_line[i] < 0
+             and volume[i] > vol_avg[i]
              and vol_avg[i] > 20000
                 macd_looks_positive := false
                 break
@@ -161,27 +139,24 @@ _macd_looks_positive(index) =>
      and macd_looks_positive
      and macd[index] > 0
      and signal_line[index] > 0
-     and macd_didnt_make_too_strong_movements_yet
      and macd_trend_goes_up
      and previous_histogram_lower_than_current
 
 _volume_is_the_highest_until_now(index) =>
     volume_is_the_highest_until_now = true
-    volume_i = volume
-    high_i = high
     for i = index+6 to index+1
         if i < 0
             continue
 
-        if volume_i[index] < volume_i[index+1]
+        if volume[index] < volume[index+1]
             volume_is_the_highest_until_now := false
             break
 
-        if (volume_i[i] > volume_i[index] and high_i[i] > high_i[index])
+        if (volume[i] > volume[index] and high[i] > high[index])
             volume_is_the_highest_until_now := false
             break
 
-        if volume_i[index]/volume_i[i] < 0.75
+        if volume[index]/volume[i] < 0.75
             volume_is_the_highest_until_now := false
             break
 
@@ -201,17 +176,14 @@ _volume_average_indicate_on_trend(index) =>
 
 _price_movement_is_big(index) =>
     price_movement_is_big = true
-    close_i = close
-    low_i = low
-    high_i = high
     for i = index+6 to index+1
-        if (close_i[i] - low_i[i]) > (high_i[index] - low_i[index])
-         and (close_i[i+1] - low_i[i+1])/(close_i[i] - low_i[i]) > 0.6
+        if (close[i] - low[i]) > (high[index] - low[index])
+         and (close[i+1] - low[i+1])/(close[i] - low[i]) > 0.6
             price_movement_is_big := false
             break
 
     price_movement_is_big
-     and high_i[index] - low_i[index] > 0.1
+     and high[index] - low[index] > 0.1
 
 _only_on_market_movement_time(index) =>
     result = false
@@ -222,6 +194,60 @@ _only_on_market_movement_time(index) =>
 
     result
 
+_has_volatility_smile_pattern(index, good_to_go_for_check) =>
+    has_volatility_smile_pattern = false
+    first_pick_bar_index = 0
+    if good_to_go_for_check
+        bars_back = int(360/current_timeframe)
+        for i = index + bars_back to index+3
+            if i-1 < 0 or i-2 < 0
+                continue
+
+            if dayofmonth[i] != dayofmonth[index]
+                continue
+
+            is_price_action_first_pick = high[i] > high[i+1]
+             and high[i] > high[i+2]
+             and high[i] > high[i-1]
+             and high[i] > high[i-2]
+             and high[i] > vwap[i]
+             and close[i] > vwap[i]
+             and high[i] > ema_9[i]
+             and close[i] > ema_9[i]
+
+            is_volume_first_pick = volume[i] > vol_avg[i] * 2
+             and volume[i+1] > vol_avg[i+1]
+             and volume[i] > volume[i+1]
+             and volume[i] > volume[i+2]
+             and volume[i] > volume[i-1]
+
+            first_pick_bars_back = int(120/current_timeframe)
+            highest_high_until_now = 0.0
+            highest_volume_until_now = 0.0
+            for j = first_pick_bars_back to i
+                if high[j] > highest_high_until_now
+                    highest_high_until_now := high[j]
+                if volume[j] > highest_volume_until_now
+                    highest_volume_until_now := volume[j]
+
+            if is_price_action_first_pick
+             and is_volume_first_pick
+             and highest_high_until_now == high[i]
+             and highest_volume_until_now == volume[i]
+                first_pick_bar_index := i
+                break
+
+        if first_pick_bar_index != 0
+            bars_with_low_volume_counter = 0
+            for i = first_pick_bar_index+1 to index
+                if volume[i] < volume[first_pick_bar_index]
+                 and volume[i] < volume[index]
+                    bars_with_low_volume_counter += 1
+
+            has_volatility_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index > 0.8
+
+    [has_volatility_smile_pattern, first_pick_bar_index]
+
 momentum_trend_continue(index) =>
     percentage = 0.2
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
@@ -230,7 +256,6 @@ momentum_trend_continue(index) =>
     volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index)
     volume_average_indicate_on_trend = _volume_average_indicate_on_trend(index)
     price_movement_is_big = _price_movement_is_big(index)
-    only_on_market_movement_time = _only_on_market_movement_time(index)
     allowed_distance_threshold = 0.2
     ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index, allowed_distance_threshold)
 
@@ -240,16 +265,25 @@ momentum_trend_continue(index) =>
      and macd_looks_positive
      and volume_average_indicate_on_trend
      and (price_movement_is_big or volume_is_the_highest_until_now)
-     and only_on_market_movement_time
      and ema_to_price_ratio_looks_good
 
-    result
+    good_to_go_for_check = false
+    if result
+        good_to_go_for_check := true
+
+    [has_volatility_smile_pattern, first_pick_bar_index] = _has_volatility_smile_pattern(index, good_to_go_for_check)
+
+    result and has_volatility_smile_pattern
 
 just_crossed_last_high(index) =>
     after_market_open = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
     bars_back = int(360/current_timeframe)
-    today_highest = ta.highest(high[index+1], bars_back)
-    just_crossed_last_high = close[index] > today_highest
+    today_highest = ta.highest(high, bars_back)
+    just_crossed_last_high = false
+    if today_highest == high[index]
+        just_crossed_last_high := true
+    else
+        just_crossed_last_high := close[index] > today_highest and today_highest != high[index+1]
 
     momentum_trend_continue_0 = momentum_trend_continue(index)
     momentum_trend_continue_1 = momentum_trend_continue(index+1)
