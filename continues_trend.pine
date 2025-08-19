@@ -199,21 +199,12 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
     first_pick_bar_index = 0
     if good_to_go_for_check
         bars_back = int(360/current_timeframe)
-        for i = index + bars_back to index+3
+        for i = index + bars_back to index+1
             if i-1 < 0 or i-2 < 0
                 continue
 
             if dayofmonth[i] != dayofmonth[index]
                 continue
-
-            is_price_action_first_pick = high[i] > high[i+1]
-             and high[i] > high[i+2]
-             and high[i] > high[i-1]
-             and high[i] > high[i-2]
-             and high[i] > vwap[i]
-             and close[i] > vwap[i]
-             and high[i] > ema_9[i]
-             and close[i] > ema_9[i]
 
             is_volume_first_pick = volume[i] > vol_avg[i] * 2
              and volume[i+1] > vol_avg[i+1]
@@ -230,10 +221,11 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                 if volume[j] > highest_volume_until_now
                     highest_volume_until_now := volume[j]
 
-            if is_price_action_first_pick
+            if true
              and is_volume_first_pick
              and highest_high_until_now == high[i]
              and highest_volume_until_now == volume[i]
+             and volume[i] > 10000
                 first_pick_bar_index := i
                 break
 
@@ -244,6 +236,8 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                  and volume[i] < volume[index]
                     bars_with_low_volume_counter += 1
 
+            // if time == timestamp(relevant_timezone, year, 8, 19, 11, 20) and current_timeframe == 5
+            //     log.info("bars_with_low_volume_counter: {0}. first_pick_bar_index: {1}", bars_with_low_volume_counter, first_pick_bar_index)
             has_volatility_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index > 0.8
 
     [has_volatility_smile_pattern, first_pick_bar_index]
@@ -276,6 +270,7 @@ momentum_trend_continue(index) =>
     result and has_volatility_smile_pattern
 
 just_crossed_last_high(index) =>
+    is_positive = close[index] > open[index]
     after_market_open = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
     bars_back = int(360/current_timeframe)
     today_highest = ta.highest(high, bars_back)
@@ -312,6 +307,7 @@ just_crossed_last_high(index) =>
     just_crossed_last_high
      and after_market_open
      and momentum_happend_before
+     and is_positive
 
 momentum_trend_continue = momentum_trend_continue(0)
 just_crossed_last_high = just_crossed_last_high(0)
