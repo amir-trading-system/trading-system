@@ -77,7 +77,7 @@ _current_bar_is_strong(index) =>
     bar_is_positive = close[index] > open[index]
     bar_strong = (close[index] - open[index])/(high[index] - low[index])
     bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
-     and low[index] >= low[index+1]
+     and open[index] >= low[index+1]
      and high[index] > vwap[index]
     bar_is_highest_in_the_last_bars = true
     for i = index+10 to index+1
@@ -229,6 +229,7 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                 first_pick_bar_index := i
                 break
 
+        no_negative_bar_is_stronger = true
         if first_pick_bar_index != 0
             bars_with_low_volume_counter = 0
             for i = first_pick_bar_index+1 to index
@@ -236,9 +237,15 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                  and volume[i] < volume[index]
                     bars_with_low_volume_counter += 1
 
-            // if time == timestamp(relevant_timezone, year, 8, 19, 11, 20) and current_timeframe == 5
+                if close[i] < open[i]
+                 and volume[i] > volume[index]
+                    no_negative_bar_is_stronger := false
+
+            // if time == timestamp(relevant_timezone, year, 8, 21, 10, 35) and current_timeframe == 5
             //     log.info("bars_with_low_volume_counter: {0}. first_pick_bar_index: {1}", bars_with_low_volume_counter, first_pick_bar_index)
-            has_volatility_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index > 0.8
+            has_volatility_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
+             and volume[first_pick_bar_index] < volume[index]
+             and no_negative_bar_is_stronger
 
     [has_volatility_smile_pattern, first_pick_bar_index]
 
@@ -267,7 +274,8 @@ momentum_trend_continue(index) =>
 
     [has_volatility_smile_pattern, first_pick_bar_index] = _has_volatility_smile_pattern(index, good_to_go_for_check)
 
-    result and has_volatility_smile_pattern
+    result
+     and has_volatility_smile_pattern
 
 just_crossed_last_high(index) =>
     is_positive = close[index] > open[index]
