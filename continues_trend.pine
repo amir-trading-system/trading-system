@@ -207,7 +207,7 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                 continue
 
             is_volume_first_pick = volume[i] > vol_avg[i] * 2
-             and volume[i+1] > vol_avg[i+1]
+             and (volume[i+1] > vol_avg[i+1] or volume[i] > volume[i+1] * 10)
              and volume[i] > volume[i+1]
              and volume[i] > volume[i+2]
              and volume[i] > volume[i-1]
@@ -220,6 +220,9 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                     highest_high_until_now := high[j]
                 if volume[j] > highest_volume_until_now
                     highest_volume_until_now := volume[j]
+
+            // if time == timestamp(relevant_timezone, year, 8, 20, 9, 45) and current_timeframe == 15
+            //     log.info("is_volume_first_pick: {0}", is_volume_first_pick)
 
             if true
              and is_volume_first_pick
@@ -241,10 +244,9 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                  and volume[i] > volume[index]
                     no_negative_bar_is_stronger := false
 
-            // if time == timestamp(relevant_timezone, year, 8, 21, 10, 35) and current_timeframe == 5
+            // if time == timestamp(relevant_timezone, year, 8, 20, 9, 45) and current_timeframe == 15
             //     log.info("bars_with_low_volume_counter: {0}. first_pick_bar_index: {1}", bars_with_low_volume_counter, first_pick_bar_index)
             has_volatility_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
-             and volume[first_pick_bar_index] < volume[index]
              and no_negative_bar_is_stronger
 
     [has_volatility_smile_pattern, first_pick_bar_index]
