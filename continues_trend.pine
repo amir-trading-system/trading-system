@@ -199,7 +199,7 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
     first_pick_bar_index = 0
     if good_to_go_for_check
         bars_back = int(360/current_timeframe)
-        for i = index + bars_back to index+1
+        for i = index+1 to index+bars_back
             if i-1 < 0 or i-2 < 0
                 continue
 
@@ -210,32 +210,39 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
              and (volume[i+1] > vol_avg[i+1] or volume[i] > volume[i+1] * 10)
              and volume[i] > volume[i+1]
              and volume[i] > volume[i+2]
-             and volume[i] > volume[i-1]
+
+            is_highest_on_histogram = histogram[i] > histogram[i+1]
+             and histogram[i] > histogram[i-1]
+             and histogram[i] > 0
+             and histogram[i+1] > 0
+             and histogram[i-1] > 0
+             and macd[i] > 0
+             and signal_line[i] > 0
 
             first_pick_bars_back = int(120/current_timeframe)
             highest_high_until_now = 0.0
-            highest_volume_until_now = 0.0
             for j = first_pick_bars_back to i
                 if high[j] > highest_high_until_now
                     highest_high_until_now := high[j]
-                if volume[j] > highest_volume_until_now
-                    highest_volume_until_now := volume[j]
 
-            // if time == timestamp(relevant_timezone, year, 8, 20, 9, 45) and current_timeframe == 15
-            //     log.info("is_volume_first_pick: {0}", is_volume_first_pick)
+            // if time == timestamp(relevant_timezone, year, 7, 18, 10, 45) and current_timeframe == 5 and i == 11
+            //     log.info("is_highest_on_histogram: {0}", is_highest_on_histogram)
 
             if true
              and is_volume_first_pick
+             and is_highest_on_histogram
              and highest_high_until_now == high[i]
-             and highest_volume_until_now == volume[i]
              and volume[i] > 10000
                 first_pick_bar_index := i
                 break
 
         no_negative_bar_is_stronger = true
+        bars_volume_sum = 0.0
+        bars_with_low_volume_counter = 0
         if first_pick_bar_index != 0
-            bars_with_low_volume_counter = 0
-            for i = first_pick_bar_index+1 to index
+            for i = first_pick_bar_index-1 to index+1
+                bars_volume_sum += volume[i]
+
                 if volume[i] < volume[first_pick_bar_index]
                  and volume[i] < volume[index]
                     bars_with_low_volume_counter += 1
@@ -244,10 +251,22 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                  and volume[i] > volume[index]
                     no_negative_bar_is_stronger := false
 
-            // if time == timestamp(relevant_timezone, year, 8, 20, 9, 45) and current_timeframe == 15
-            //     log.info("bars_with_low_volume_counter: {0}. first_pick_bar_index: {1}", bars_with_low_volume_counter, first_pick_bar_index)
+            // if time == timestamp(relevant_timezone, year, 8, 19, 11, 20) and current_timeframe == 5
+            //     log.info("bars_with_low_volume_counter: {0}. first_pick_bar_index_time: {1}:{2}", bars_with_low_volume_counter, hour[first_pick_bar_index], minute[first_pick_bar_index])
+
+        no_strong_bar_in_the_middle = true
+        for i = first_pick_bar_index-2 to index+2
+            if i < 0
+                continue
+            if volume[i] > bars_volume_sum * 2
+             or volume[i]/volume[index] > 0.9
+             or (first_pick_bar_index-2) - (index+2) < 3
+                no_strong_bar_in_the_middle := false
+
+        if bars_with_low_volume_counter != 0
             has_volatility_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
              and no_negative_bar_is_stronger
+             and no_strong_bar_in_the_middle
 
     [has_volatility_smile_pattern, first_pick_bar_index]
 
@@ -275,6 +294,10 @@ momentum_trend_continue(index) =>
         good_to_go_for_check := true
 
     [has_volatility_smile_pattern, first_pick_bar_index] = _has_volatility_smile_pattern(index, good_to_go_for_check)
+
+
+    if result and has_volatility_smile_pattern
+        log.info("momnetum trend continue! for first pick go back: {0} hours", (first_pick_bar_index * current_timeframe)/60)
 
     result
      and has_volatility_smile_pattern
@@ -321,8 +344,8 @@ just_crossed_last_high(index) =>
 
 momentum_trend_continue = momentum_trend_continue(0)
 just_crossed_last_high = just_crossed_last_high(0)
-if just_crossed_last_high
-    log.info("Get In!!")
+// if just_crossed_last_high
+//     log.info("Get In!!")
 
 plotshape(momentum_trend_continue, title="Trend Continue", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "✅")
 plotshape(just_crossed_last_high, title="Just crossed last high", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
