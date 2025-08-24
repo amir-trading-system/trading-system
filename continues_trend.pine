@@ -85,9 +85,12 @@ _current_bar_is_strong(index) =>
             bar_is_highest_in_the_last_bars := false
             break
 
+    bar_body_is_solid = (close[index] - open[index]) > (open[index] - low[index])
+
     bar_is_positive
      and bar_is_strong
      and bar_is_highest_in_the_last_bars
+     and bar_body_is_solid
 
 _most_bars_are_overlapping(index) =>
     overlapped_bars_counter = 0
@@ -218,7 +221,8 @@ _has_volatility_smile_on_price_action(index, first_pick_bar_index) =>
      and negative_bars_are_weak
 
 _has_volatility_smile_pattern(index, good_to_go_for_check) =>
-    has_volatility_smile_pattern = false
+    has_smile_pattern = false
+    smile_type = ""
     first_pick_bar_index = 0
     if good_to_go_for_check
         bars_back = int(360/current_timeframe)
@@ -274,19 +278,32 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
         has_enough_time_between_borders = (first_pick_bar_index - index) * current_timeframe >= 20
 
         if bars_with_low_volume_counter != 0
-            has_volatility_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
+            has_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
              and no_negative_bar_is_stronger
              and no_strong_bar_in_the_middle
              and has_enough_time_between_borders
 
-            if not has_volatility_smile_pattern
-                has_volatility_smile_pattern := has_volatility_smile_on_price_action
-                 and has_enough_time_between_borders
+            if has_smile_pattern
+                smile_type := "v"
+            else
+                no_strong_bar_in_the_middle := true
+                for i = first_pick_bar_index-1 to index+1
+                    bar_is_stronger_than_current = math.abs(close[i] - open[i]) > (close[index] - open[index])
+                    bar_has_volume = volume[i]/volume[index] > 0.5
+                    if bar_is_stronger_than_current and bar_has_volume
+                        no_strong_bar_in_the_middle := false
 
-    [has_volatility_smile_pattern, first_pick_bar_index]
+                has_smile_pattern := has_volatility_smile_on_price_action
+                 and has_enough_time_between_borders
+                 and no_strong_bar_in_the_middle
+                if has_smile_pattern
+                    smile_type := "p"
+
+    [has_smile_pattern, first_pick_bar_index, smile_type]
 
 momentum_trend_continue(index, enable_logging) =>
     percentage = 0.2
+    after_market_starts_to_move = hour[index] >= 9
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     current_bar_is_strong = _current_bar_is_strong(index)
     macd_looks_positive = _macd_looks_positive(index)
@@ -295,6 +312,9 @@ momentum_trend_continue(index, enable_logging) =>
     price_movement_is_big = _price_movement_is_big(index)
     allowed_distance_threshold = 0.2
     ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index, allowed_distance_threshold)
+    not_on_the_first_candle = true
+    if hour[index] == 9 and minute[index] == 30
+        not_on_the_first_candle := false
 
     result = true
      and made_more_than_usual_percentage_already
@@ -303,17 +323,18 @@ momentum_trend_continue(index, enable_logging) =>
      and volume_average_indicate_on_trend
      and (price_movement_is_big or volume_is_the_highest_until_now)
      and ema_to_price_ratio_looks_good
+     and not_on_the_first_candle
+     and after_market_starts_to_move
 
     good_to_go_for_check = false
     if result
         good_to_go_for_check := true
 
-    [has_volatility_smile_pattern, first_pick_bar_index] = _has_volatility_smile_pattern(index, good_to_go_for_check)
-
+    [has_volatility_smile_pattern, first_pick_bar_index, smile_type] = _has_volatility_smile_pattern(index, good_to_go_for_check)
 
     if result and has_volatility_smile_pattern and index == 0 and enable_logging
         log.info("momnetum trend continue! for first pick go back: {0} minutes", first_pick_bar_index * current_timeframe)
-        label.new(bar_index-first_pick_bar_index, high, text=str.format("m: {0}", first_pick_bar_index * current_timeframe), size = size.small, style = label.style_label_lower_right)
+        label.new(bar_index-first_pick_bar_index, high, text=str.format("m: {0}. smile: {1}", first_pick_bar_index * current_timeframe, smile_type), size = size.small, style = label.style_label_lower_right)
 
     result
      and has_volatility_smile_pattern
