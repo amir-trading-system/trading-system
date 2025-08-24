@@ -92,31 +92,6 @@ _current_bar_is_strong(index) =>
      and bar_is_highest_in_the_last_bars
      and bar_body_is_solid
 
-_most_bars_are_overlapping(index) =>
-    overlapped_bars_counter = 0
-    overlapped_bars_after_market_open_counter = 0
-
-    for i = index+6 to index+1
-        if i < 0
-            continue
-        above_vwap = high[i] > vwap[i]
-        previous_bar_middle_point = high[i+1] - (high[i+1] - low[i+1])/2
-        current_bar_deleted_more_than_50_percent_of_previous = low[i] < previous_bar_middle_point
-        current_bar_did_not_make_any_real_progress = (close[i] - close[i+1])/(high[i+1] - low[i+1]) <= 0.5
-        current_bar_didnt_make_progress_at_all = close[i] < close[i+1] and open[i] < close[i+1] and open[i] > low[i+1]
-        after_pre_market = (hour[i] == 9 and minute[i] >= 30) or hour[i] > 9
-
-        if above_vwap
-         and after_pre_market
-         and ((current_bar_deleted_more_than_50_percent_of_previous and current_bar_did_not_make_any_real_progress) or current_bar_didnt_make_progress_at_all)
-            overlapped_bars_counter += 1
-            if hour[index] >= 10 and ((hour[i] == 9 and minute[i] > 30) or hour[i] > 9)
-                overlapped_bars_after_market_open_counter += 1
-
-    most_of_bars_are_overlapping = overlapped_bars_counter/index+6 >= 0.4
-
-    most_of_bars_are_overlapping
-
 _macd_trend_goes_up(index, macd, histogram) =>
     bars_back_for_30_minutes_before = int(30/current_timeframe)
     last_highest_histogram = ta.highest(histogram[index], bars_back_for_30_minutes_before)
@@ -188,37 +163,47 @@ _price_movement_is_big(index) =>
     price_movement_is_big
      and high[index] - low[index] > 0.1
 
-_only_on_market_movement_time(index) =>
-    result = false
-    if hour[index] == 9
-        result := minute[index] >= 30
-    if hour[index] > 9
-        result := hour[index] > 9 and hour[index] <= 16
-
-    result
-
 _has_volatility_smile_on_price_action(index, first_pick_bar_index) =>
     price_under_borders = true
     negative_bars_are_weak = true
     lowest_low = 100.0
-    for i = first_pick_bar_index to index+1
-        if close[i] > close[first_pick_bar_index]
+    for i = first_pick_bar_index-1 to index+1
+        if i < 0
+            continue
+
+        if (high[i] > high[first_pick_bar_index] and low[i] > low[first_pick_bar_index])
          or close[i] > close[index]
             price_under_borders := false
-
-        is_negative = close[i] < open[i]
-        if is_negative
-         and low[i] > low[i+1]
-            negative_bars_are_weak := false
 
         if low[i] < lowest_low
             lowest_low := low[i]
 
-    lowest_value_deleted_most_of_value_before = (high[first_pick_bar_index] - lowest_low) > (high[first_pick_bar_index] - low[first_pick_bar_index])
+    lowest_value_deleted_most_of_value_before = (high[first_pick_bar_index] - lowest_low) > (high[first_pick_bar_index] - low[first_pick_bar_index])/2
 
-    price_under_borders
+    price_action_has_smile_pattern = true
+    didnt_reach_lowest_low = true
+    for i = first_pick_bar_index-1 to index+1
+        if i < 0 or i-1 < 0
+            continue
+
+        if low[i] == lowest_low
+            didnt_reach_lowest_low := false
+            continue
+
+        if high[i] < high[i-1]
+         and didnt_reach_lowest_low
+         and low[i-1] != lowest_low
+            price_action_has_smile_pattern := false
+
+        if not didnt_reach_lowest_low
+         and low[i] < low[i+1]
+         and open[i] < open[i+1]
+            price_action_has_smile_pattern := false
+
+    true
+     and price_under_borders
      and lowest_value_deleted_most_of_value_before
-     and negative_bars_are_weak
+     and price_action_has_smile_pattern
 
 _has_volatility_smile_pattern(index, good_to_go_for_check) =>
     has_smile_pattern = false
@@ -293,7 +278,8 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                     if bar_is_stronger_than_current and bar_has_volume
                         no_strong_bar_in_the_middle := false
 
-                has_smile_pattern := has_volatility_smile_on_price_action
+                has_smile_pattern := true
+                 and has_volatility_smile_on_price_action
                  and has_enough_time_between_borders
                  and no_strong_bar_in_the_middle
                 if has_smile_pattern
