@@ -257,6 +257,7 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
             if i < 0
                 continue
             if volume[i]/volume[index] > 0.5
+             and high[i] > open[index]
                 no_strong_bar_in_the_middle := false
 
         has_volatility_smile_on_price_action = _has_volatility_smile_on_price_action(index, first_pick_bar_index)
