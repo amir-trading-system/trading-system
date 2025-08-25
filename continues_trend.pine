@@ -253,7 +253,7 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
             //     log.info("bars_with_low_volume_counter: {0}. first_pick_bar_index_time: {1}:{2}", bars_with_low_volume_counter, hour[first_pick_bar_index], minute[first_pick_bar_index])
 
         no_strong_bar_in_the_middle = true
-        for i = index+1 to first_pick_bar_index-2
+        for i = index+2 to first_pick_bar_index-2
             if i < 0
                 continue
             if volume[i]/volume[index] > 0.5
@@ -261,7 +261,7 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                 no_strong_bar_in_the_middle := false
 
         has_volatility_smile_on_price_action = _has_volatility_smile_on_price_action(index, first_pick_bar_index)
-        has_enough_time_between_borders = (first_pick_bar_index - index) * current_timeframe >= 20
+        has_enough_time_between_borders = (first_pick_bar_index - index) * current_timeframe >= 30
 
         if bars_with_low_volume_counter != 0
             has_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
