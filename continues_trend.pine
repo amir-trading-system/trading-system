@@ -262,6 +262,8 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
 
         has_volatility_smile_on_price_action = _has_volatility_smile_on_price_action(index, first_pick_bar_index)
         has_enough_time_between_borders = (first_pick_bar_index - index) * current_timeframe >= 30
+        if current_timeframe < 5
+            has_enough_time_between_borders := (first_pick_bar_index - index) * current_timeframe >= 10
 
         if bars_with_low_volume_counter != 0
             has_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
