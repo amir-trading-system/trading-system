@@ -17,7 +17,8 @@ vol_avg = ta.sma(volume, 20)
 ema_200_days = request.security(syminfo.tickerid, "D", ema_200, lookahead = barmerge.lookahead_on)
 yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
 current_timeframe = str.tonumber(timeframe.period)
-
+if timeframe.period == "10S"
+    current_timeframe := 10
 
 _made_more_than_usual_percentage_already(index, percentage) =>
     (close[index] - yesterday_close)/open[index] > percentage
@@ -66,7 +67,6 @@ _ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
 
 _current_bar_is_strong(index) =>
     bar_is_positive = close[index] > open[index]
-    bar_strong = (close[index] - open[index])/(high[index] - low[index])
     bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
      and open[index] >= low[index+1]
      and high[index] > vwap[index]
@@ -297,7 +297,7 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
 
 momentum_trend_continue(index, enable_logging) =>
     percentage = 0.15
-    after_market_starts_to_move = hour[index] >= 9
+    after_market_starts_to_move = (hour[index] == 9 and minute[index] > 30) or hour[index] > 9
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     current_bar_is_strong = _current_bar_is_strong(index)
     macd_looks_positive = _macd_looks_positive(index)
@@ -325,10 +325,12 @@ momentum_trend_continue(index, enable_logging) =>
         good_to_go_for_check := true
 
     [has_volatility_smile_pattern, first_pick_bar_index, smile_type] = _has_volatility_smile_pattern(index, good_to_go_for_check)
+    current_bar_is_bigger_than_first_pick = high[index] - low[index] > high[first_pick_bar_index] - low[first_pick_bar_index]
 
     result := true
      and result
      and has_volatility_smile_pattern
+     and current_bar_is_bigger_than_first_pick
 
     if result
      and index == 0
@@ -350,7 +352,7 @@ just_crossed_last_high(index) =>
         just_crossed_last_high := close[index] > today_highest and today_highest != high[index+1]
 
     [momentum_trend_continue_0, first_pick_bar_index_0] = momentum_trend_continue(index, false)
-    [momentum_trend_continue_1, first_pick_bar_index_1] = momentum_trend_continue(index+1, false)
+    [momentum_trend_continue_1, _] = momentum_trend_continue(index+1, false)
     [momentum_trend_continue_2, _] = momentum_trend_continue(index+2, false)
     [momentum_trend_continue_3, _] = momentum_trend_continue(index+3, false)
     [momentum_trend_continue_4, _] = momentum_trend_continue(index+4, false)
@@ -373,15 +375,13 @@ just_crossed_last_high(index) =>
      or momentum_trend_continue_9
      or momentum_trend_continue_10
 
-    passed_above_first_pick = close[index] > high[first_pick_bar_index_0] or close[index] > high[first_pick_bar_index_1]
-    low_is_above_first_pick_high = low[index] < high[first_pick_bar_index_0] or low[index+1] < high[first_pick_bar_index_1]
+    passed_above_first_pick = close[index] > high[first_pick_bar_index_0] or close[index+1] > high[first_pick_bar_index_0]
 
     just_crossed_last_high
      and after_market_open
      and momentum_happend_before
      and is_positive
      and passed_above_first_pick
-     and low_is_above_first_pick_high
 
 [momentum_trend_continue, _] = momentum_trend_continue(0, true)
 just_crossed_last_high = just_crossed_last_high(0)
