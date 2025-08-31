@@ -324,6 +324,54 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
 
     [has_smile_pattern, first_pick_bar_index, smile_type]
 
+_has_volatility_smile_pattern_v2(index) =>
+    has_smile_pattern = false
+    current_index_closes_potentially_smile = true
+     and close[index] > open[index]
+     and close[index] > vwap[index]
+     and close[index] > ema_9[index]
+     and volume[index] > vol_avg[index]
+     and volume[index+1]/vol_avg[index+1] < 1.2
+     and high[index] > high[index+1]
+     and close[index] - open[index] > close[index+1] - open[index+1]
+     and volume[index] > 100000
+
+    start_of_smile_index = 0
+    if current_index_closes_potentially_smile
+        for i = int(index+(60/current_timeframe)) to index+1
+            if i-1 < 0
+                continue
+            potential_start_on_smile = true
+             and volume[i] > vol_avg[i]
+             and volume[i] > volume[i-1] * 1.2
+             and volume[i-1]/vol_avg[i-1] < 0.8
+             and high[i] > high[i+1]
+
+            before_volume_sum = 0.0
+            for j = i+1 to i+6
+                before_volume_sum += volume[j]
+
+            after_volume_sum = 0.0
+            for j = i-1 to i-6
+                if j < 0
+                    continue
+                after_volume_sum += volume[j]
+
+            if potential_start_on_smile
+             and before_volume_sum > after_volume_sum
+                has_smile_pattern := true
+                start_of_smile_index := i
+                for k = index+1 to start_of_smile_index-1
+                    if volume[k] > volume[start_of_smile_index]
+                     or volume[k] > volume[index]
+                     or vol_avg[k] > vol_avg[k+1]
+                        has_smile_pattern := false
+                        break
+
+    if has_smile_pattern
+        label.new(bar_index, high+1, text=str.format("i_back: {0}", start_of_smile_index), size = size.small, style = label.style_label_lower_right)
+    has_smile_pattern
+
 momentum_trend_continue(index, enable_logging) =>
     percentage = 0.15
     after_market_starts_to_move = (hour[index] == 9 and minute[index] > 30) or hour[index] > 9
@@ -413,6 +461,7 @@ just_crossed_last_high(index) =>
 
 [momentum_trend_continue, _] = momentum_trend_continue(0, true)
 just_crossed_last_high = just_crossed_last_high(0)
+res = _has_volatility_smile_pattern_v2(0)
 
 plotshape(momentum_trend_continue, title="Trend Continue", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "✅")
 plotshape(just_crossed_last_high, title="Just crossed last high", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
