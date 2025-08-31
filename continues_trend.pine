@@ -57,8 +57,9 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
 
     price_above_all_indicators_for_last_bars
 
-_ema_to_price_ratio_looks_good(index, allowed_distance_threshold) =>
+_ema_to_price_ratio_looks_good(index) =>
     last_bars = 2
+    allowed_distance_threshold = 0.3
 
     close_to_9_ema = _close_to_9_ema(index, allowed_distance_threshold)
     price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
@@ -110,7 +111,6 @@ _macd_looks_positive(index) =>
      and macd_looks_positive
      and macd[index] > 0
      and signal_line[index] > 0
-     and macd_trend_goes_up
      and previous_histogram_lower_than_current
 
 _volume_is_the_highest_until_now(index) =>
@@ -211,10 +211,35 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
             if dayofmonth[i] != dayofmonth[index]
                 continue
 
-            is_volume_first_pick = volume[i] > vol_avg[i] * 2
+            no_bar_with_more_volume_before = true
+            for j = i+5 to i+1
+                if volume[j] >= volume[i]
+                    no_bar_with_more_volume_before := false
+                    break
+
+            no_bar_higher_after = true
+            for j = i-1 to i-5
+                if j < 0
+                    continue
+
+                if open[j] > open[i]
+                 and close[j] > close[i]
+                 and high[j] > high[i]
+                 and volume[j]/volume[i] >= 0.75
+                 and j > index+1
+                    no_bar_higher_after := false
+                    break
+
+            is_volume_first_pick = true
+             and volume[i] > vol_avg[i]
              and (volume[i+1] > vol_avg[i+1] or volume[i] > volume[i+1] * 10)
              and volume[i] > volume[i+1]
              and volume[i] > volume[i+2]
+             and no_bar_with_more_volume_before
+             and no_bar_higher_after
+
+            // if time == timestamp(relevant_timezone, year, 4, 2, 11, 30) and current_timeframe == 5 and i == 6
+            //     log.info("res: {0}", true)
 
             first_pick_bars_back = int(120/current_timeframe)
             highest_high_until_now = 0.0
@@ -222,13 +247,11 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                 if high[j] > highest_high_until_now
                     highest_high_until_now := high[j]
 
-            // if time == timestamp(relevant_timezone, year, 7, 31, 10, 00) and current_timeframe == 15 and is_volume_first_pick
-            //     log.info("i: {0}", i)
-
             if true
              and is_volume_first_pick
              and highest_high_until_now == high[i]
              and volume[i] > 10000
+             and close[i] > vwap[i]
                 first_pick_bar_index := i
                 break
 
@@ -254,6 +277,10 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
                 continue
             if volume[i]/volume[index] > 0.5
              and high[i] > open[index]
+             and low[i] < low[first_pick_bar_index]
+                // if time == timestamp(relevant_timezone, year, 8, 28, 11, 10) and current_timeframe == 5
+                //     log.info("i: {0}", i)
+
                 no_strong_bar_in_the_middle := false
 
         has_volatility_smile_on_price_action = _has_volatility_smile_on_price_action(index, first_pick_bar_index)
@@ -306,8 +333,7 @@ momentum_trend_continue(index, enable_logging) =>
     volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index)
     volume_average_indicate_on_trend = _volume_average_indicate_on_trend(index)
     price_movement_is_big = _price_movement_is_big(index)
-    allowed_distance_threshold = 0.2
-    ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index, allowed_distance_threshold)
+    ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index)
     not_on_the_first_candle = true
     if hour[index] == 9 and minute[index] == 30
         not_on_the_first_candle := false
