@@ -1,0 +1,114 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © TheFirstPatienceTrader
+
+indicator(title="Change Upwards", overlay = true, max_bars_back = 5000)
+import TradingView/ta/10
+
+//@version=6
+
+relevant_timezone = "America/New_York"
+
+ema_9 = ta.ema(close, 9)
+ema_20 = ta.ema(close, 20)
+vwap = ta.vwap(hlc3)
+vol_avg = ta.sma(volume, 20)
+[macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
+current_timeframe = str.tonumber(timeframe.period)
+if timeframe.period == "10S"
+    current_timeframe := 10
+
+_made_more_than_usual_percentage_already(index, percentage) =>
+    yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
+    if (hour[index] == 9 and minute[index] < 30) or hour[index] < 9
+        yesterday_close := request.security(syminfo.tickerid, "D", close, lookahead = barmerge.lookahead_on)
+    (close[index] - yesterday_close)/open[index] > percentage
+
+_close_to_9_ema(index, allowed_distance_threshold) =>
+    distance_from_9_ema = math.abs(low[index] - ema_9[index])/(high[index] - low[index])
+    previous_distance_from_9_ema = math.abs(low[index+1] - ema_9[index+1])/(high[index+1] - low[index+1])
+
+    current_distance_smaller_than_previous_and_strong_bar = distance_from_9_ema < previous_distance_from_9_ema and volume[index] > volume[index+1] * 1.2
+
+    crossed_9_ema_up = low[index] <= ema_9[index] and (ema_9[index] - low[index])/(close[index] - ema_9[index]) < 0.1
+
+    close_to_9_ema = distance_from_9_ema < allowed_distance_threshold
+     or crossed_9_ema_up
+     or current_distance_smaller_than_previous_and_strong_bar
+
+    close_to_9_ema
+
+_price_above_all_indicators_for_last_bars(index, last_bars) =>
+    price_above_all_indicators_for_last_bars = true
+
+    for i = index+last_bars to index
+        after_market_open = (hour[i] == 9 and minute[i] >= 30) or hour[i] > 9
+
+        if true
+         and close[i] < vwap[i]
+         and close[i] < ema_9[i]
+         and low[i] < low[i+1]
+         and after_market_open
+         and volume[i] > 10000
+         and vol_avg[i] > 10000
+            price_above_all_indicators_for_last_bars := false
+            break
+
+    price_above_all_indicators_for_last_bars
+
+_ema_to_price_ratio_looks_good(index) =>
+    last_bars = 2
+    allowed_distance_threshold = 0.3
+
+    close_to_9_ema = _close_to_9_ema(index, allowed_distance_threshold)
+    price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
+
+    true
+     and close_to_9_ema
+     and price_above_all_indicators_for_last_bars
+
+change_upwards_indication(index) =>
+    percentage = 0.15
+    after_market_starts_to_move = (hour[index] == 9 and minute[index] > 30) or hour[index] > 9
+    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+    ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index)
+    bar_is_above_all_indicators = open[index] > ema_9[index]
+     and open[index] > vwap[index]
+
+    macd_before_is_positive_but_weaker = true
+     and histogram[index+1] > 0
+     and macd[index+1] > 0
+     and signal_line[index+1] > 0
+     and histogram[index] > histogram[index+1]
+     and histogram[index+2] > histogram[index+1]
+
+    volume_is_stronger_than_before = true
+     and volume[index] > volume[index+1]
+     and volume[index] > 100000
+     and volume[index+1] > 100000
+
+    for i = index+10 to index
+        if volume[i] < 20000
+            volume_is_stronger_than_before := false
+            break
+
+    only_on_higher_timeframes = current_timeframe >= 5
+
+    result = true
+     and after_market_starts_to_move
+     and made_more_than_usual_percentage_already
+     and ema_to_price_ratio_looks_good
+     and bar_is_above_all_indicators
+     and macd_before_is_positive_but_weaker
+     and volume_is_stronger_than_before
+     and only_on_higher_timeframes
+
+    if result
+        log.info("Change upwards!")
+
+    result
+
+change_upwards_indication = change_upwards_indication(0)
+
+plotshape(change_upwards_indication, title="Change upwards", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "📊")
+
+alertcondition(change_upwards_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
