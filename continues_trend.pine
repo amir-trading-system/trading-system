@@ -319,8 +319,13 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
             if high[i] > high[first_pick_bar_index]
                 no_previous_bar_passed_above_first_pick := false
 
+    current_bar_overlappes_with_firs_pick_bar = low[index] < high[first_pick_bar_index]
+     or low[index+1] < high[first_pick_bar_index]
+
     has_smile_pattern := has_smile_pattern
      and no_previous_bar_passed_above_first_pick
+     and current_bar_overlappes_with_firs_pick_bar
+     and volume[index] > 100000
 
     [has_smile_pattern, first_pick_bar_index, smile_type]
 
@@ -362,16 +367,16 @@ _has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
              and before_volume_sum > after_volume_sum
                 borders_bigger_significantly_than_middle_bars = true
                 bars_between_under_vol_avg_counter = 0
-                for k = index+1 to start_of_smile_index-1
+                for k = index+1 to i-1
                     if k < 0
                         continue
                     if volume[k]/vol_avg[k] < 1.1
                         bars_between_under_vol_avg_counter += 1
                     if volume[k]/volume[index] >= 0.8
-                     or volume[k]/volume[start_of_smile_index] >= 0.8
+                     or volume[k]/volume[i] >= 0.8
                         borders_bigger_significantly_than_middle_bars := false
 
-                most_bars_between_under_vol_avg = bars_between_under_vol_avg_counter/start_of_smile_index >= 0.5
+                most_bars_between_under_vol_avg = bars_between_under_vol_avg_counter/i >= 0.5
                  or borders_bigger_significantly_than_middle_bars
 
                 has_enough_time_between_borders = i * current_timeframe >= 15
@@ -422,7 +427,8 @@ momentum_trend_continue(index, enable_logging) =>
 
     [has_volatility_smile_pattern, first_pick_bar_index, smile_type] = _has_volatility_smile_pattern(index, good_to_go_for_check)
     [has_volatility_smile_pattern_v2, first_pick_bar_index_v2] = _has_volatility_smile_pattern_v2(index, good_to_go_for_check)
-    current_bar_is_bigger_than_first_pick = high[index] - low[index] > high[first_pick_bar_index] - low[first_pick_bar_index]
+    current_bar_is_bigger_than_first_pick = close[index] - open[index] > close[first_pick_bar_index] - open[first_pick_bar_index]
+     and volume[index] > volume[first_pick_bar_index]
 
     result := true
      and result
@@ -430,11 +436,12 @@ momentum_trend_continue(index, enable_logging) =>
      and current_bar_is_bigger_than_first_pick
 
     relevant_index = 0
-    smile_version = "v1"
+    smile_version = ""
     if has_volatility_smile_pattern_v2
         relevant_index := first_pick_bar_index_v2
         smile_version := "v2"
     else if has_volatility_smile_pattern
+        smile_version := "v1"
         relevant_index := first_pick_bar_index
 
     if result
@@ -443,30 +450,27 @@ momentum_trend_continue(index, enable_logging) =>
         log.info("momnetum trend continue! for first pick go back: {0} minutes", relevant_index * current_timeframe)
         label.new(bar_index-relevant_index, high, text=str.format("m: {0}.  v: {1}", relevant_index * current_timeframe, smile_version), size = size.small, style = label.style_label_lower_right)
 
-    [result, relevant_index]
+    result
 
 just_crossed_last_high(index) =>
     is_positive = close[index] > open[index]
     after_market_open = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
     bars_back = int(360/current_timeframe)
-    today_highest = ta.highest(high, bars_back)
+    today_highest = ta.highest(high[1], bars_back)
     just_crossed_last_high = false
-    if today_highest == high[index]
-        just_crossed_last_high := true
-    else
-        just_crossed_last_high := close[index] > today_highest and today_highest != high[index+1]
+    just_crossed_last_high := close[index] > today_highest
 
-    [momentum_trend_continue_0, first_pick_bar_index_0] = momentum_trend_continue(index, false)
-    [momentum_trend_continue_1, _] = momentum_trend_continue(index+1, false)
-    [momentum_trend_continue_2, _] = momentum_trend_continue(index+2, false)
-    [momentum_trend_continue_3, _] = momentum_trend_continue(index+3, false)
-    [momentum_trend_continue_4, _] = momentum_trend_continue(index+4, false)
-    [momentum_trend_continue_5, _] = momentum_trend_continue(index+5, false)
-    [momentum_trend_continue_6, _] = momentum_trend_continue(index+6, false)
-    [momentum_trend_continue_7, _] = momentum_trend_continue(index+7, false)
-    [momentum_trend_continue_8, _] = momentum_trend_continue(index+8, false)
-    [momentum_trend_continue_9, _] = momentum_trend_continue(index+9, false)
-    [momentum_trend_continue_10, _] = momentum_trend_continue(index+10, false)
+    momentum_trend_continue_0 = momentum_trend_continue(index, false)
+    momentum_trend_continue_1 = momentum_trend_continue(index+1, false)
+    momentum_trend_continue_2 = momentum_trend_continue(index+2, false)
+    momentum_trend_continue_3 = momentum_trend_continue(index+3, false)
+    momentum_trend_continue_4 = momentum_trend_continue(index+4, false)
+    momentum_trend_continue_5 = momentum_trend_continue(index+5, false)
+    momentum_trend_continue_6 = momentum_trend_continue(index+6, false)
+    momentum_trend_continue_7 = momentum_trend_continue(index+7, false)
+    momentum_trend_continue_8 = momentum_trend_continue(index+8, false)
+    momentum_trend_continue_9 = momentum_trend_continue(index+9, false)
+    momentum_trend_continue_10 = momentum_trend_continue(index+10, false)
 
     momentum_happend_before = momentum_trend_continue_0
      or momentum_trend_continue_1
@@ -480,15 +484,12 @@ just_crossed_last_high(index) =>
      or momentum_trend_continue_9
      or momentum_trend_continue_10
 
-    passed_above_first_pick = close[index] > high[first_pick_bar_index_0] or close[index+1] > high[first_pick_bar_index_0]
-
     just_crossed_last_high
      and after_market_open
      and momentum_happend_before
      and is_positive
-     and passed_above_first_pick
 
-[momentum_trend_continue, _] = momentum_trend_continue(0, true)
+momentum_trend_continue = momentum_trend_continue(0, true)
 just_crossed_last_high = just_crossed_last_high(0)
 
 plotshape(momentum_trend_continue, title="Trend Continue", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "✅")
