@@ -68,7 +68,7 @@ _ema_to_price_ratio_looks_good(index) =>
 
 change_upwards_indication(index) =>
     percentage = 0.15
-    after_market_starts_to_move = (hour[index] == 9 and minute[index] > 30) or hour[index] > 9
+    after_market_starts_to_move = hour[index] >= 10 or (hour[index] == 9 and minute[index] >= 45)
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index)
     bar_is_above_all_indicators = open[index] > ema_9[index]

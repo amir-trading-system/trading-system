@@ -454,7 +454,7 @@ momentum_trend_continue(index, enable_logging) =>
 
 just_crossed_last_high(index) =>
     is_positive = close[index] > open[index]
-    after_market_open = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
+    after_market_open = hour[index] >= 10 or (hour[index] == 9 and minute[index] >= 45)
     bars_back = int(360/current_timeframe)
     today_highest = ta.highest(high[1], bars_back)
     just_crossed_last_high = false
