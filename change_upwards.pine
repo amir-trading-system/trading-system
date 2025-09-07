@@ -78,6 +78,13 @@ change_upwards_indication(index) =>
             histogram_was_positive_until_now := false
             break
 
+    highest_histogram = 0.0
+    for i = start_index to index
+        if histogram[i] > highest_histogram
+            highest_histogram := histogram[i]
+
+    current_histogram_is_high_enough = histogram[index]/highest_histogram >= 0.5
+
     volume_is_stronger_than_before = true
      and volume[index] > volume[index+1]
      and volume[index] > 100000
@@ -114,6 +121,7 @@ change_upwards_indication(index) =>
      and start_index != 0
      and not most_of_move_already_happend
      and no_bar_before_has_bigger_volume
+     and current_histogram_is_high_enough
 
     if result
         label.new(bar_index-start_index, high[start_index], text=str.format("s: {0}.", start_index), size = size.small, style = label.style_label_lower_right)
@@ -123,6 +131,6 @@ change_upwards_indication(index) =>
 
 change_upwards_indication = change_upwards_indication(0)
 
-plotshape(change_upwards_indication, title="Change upwards", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "📊")
+plotshape(change_upwards_indication, title="Change upwards", color=color.green, display = display.pane, style = shape.labeldown, size = size.small, location = location.abovebar, text = "📊")
 
 alertcondition(change_upwards_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
