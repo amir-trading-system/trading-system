@@ -23,56 +23,36 @@ _made_more_than_usual_percentage_already(index, percentage) =>
         yesterday_close := request.security(syminfo.tickerid, "D", close, lookahead = barmerge.lookahead_on)
     (close[index] - yesterday_close)/open[index] > percentage
 
-_close_to_9_ema(index, allowed_distance_threshold) =>
-    distance_from_9_ema = math.abs(low[index] - ema_9[index])/(high[index] - low[index])
-    previous_distance_from_9_ema = math.abs(low[index+1] - ema_9[index+1])/(high[index+1] - low[index+1])
+change_upwards_indication(index) =>
+    percentage = 0.1
+    after_market_starts_to_move = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
+    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+    bar_is_above_all_indicators = close[index] > ema_9[index]-0.01
+     and close[index] > vwap[index]-0.01
 
-    current_distance_smaller_than_previous_and_strong_bar = distance_from_9_ema < previous_distance_from_9_ema and volume[index] > volume[index+1] * 1.2
+    minutes_back_to_market_start = ((hour[index] - 7) * 60) + minute[index]
 
-    crossed_9_ema_up = low[index] <= ema_9[index] and (ema_9[index] - low[index])/(close[index] - ema_9[index]) < 0.1
+    bars_back = int(minutes_back_to_market_start/current_timeframe)
 
-    close_to_9_ema = distance_from_9_ema < allowed_distance_threshold
-     or crossed_9_ema_up
-     or current_distance_smaller_than_previous_and_strong_bar
-
-    close_to_9_ema
-
-_price_above_all_indicators_for_last_bars(index, last_bars) =>
-    price_above_all_indicators_for_last_bars = true
-
-    for i = index+last_bars to index
-        after_market_open = (hour[i] == 9 and minute[i] >= 30) or hour[i] > 9
+    start_index = 0
+    for i = bars_back to index+1
+        if i < 0
+            continue
+        volume_starts_to_move = volume[i] > volume[i+1] * 10
+        price_starts_to_move = (high[i] - low[i]) > (high[i+1] - low[i+1]) * 2
+        histogram_became_positive = (histogram[i+1] < 0 and histogram[i] > 0)
+         or (histogram[i] > histogram[i+1] * 5 and histogram[i+1] > 0)
+        bar_is_positive = close[i] > open[i]
 
         if true
-         and close[i] < vwap[i]
-         and close[i] < ema_9[i]
-         and low[i] < low[i+1]
-         and after_market_open
-         and volume[i] > 10000
-         and vol_avg[i] > 10000
-            price_above_all_indicators_for_last_bars := false
+         and volume_starts_to_move
+         and price_starts_to_move
+         and bar_is_positive
+         and histogram_became_positive
+            start_index := i
+            // if time == timestamp(relevant_timezone, year, 8, 25, 12, 00) and current_timeframe == 15
+            //     log.info("i: {0}", i)
             break
-
-    price_above_all_indicators_for_last_bars
-
-_ema_to_price_ratio_looks_good(index) =>
-    last_bars = 2
-    allowed_distance_threshold = 0.3
-
-    close_to_9_ema = _close_to_9_ema(index, allowed_distance_threshold)
-    price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
-
-    true
-     and close_to_9_ema
-     and price_above_all_indicators_for_last_bars
-
-change_upwards_indication(index) =>
-    percentage = 0.15
-    after_market_starts_to_move = hour[index] >= 10 or (hour[index] == 9 and minute[index] >= 45)
-    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index)
-    bar_is_above_all_indicators = open[index] > ema_9[index]
-     and open[index] > vwap[index]
 
     macd_before_is_positive_but_weaker = true
      and histogram[index+1] > 0
@@ -81,29 +61,51 @@ change_upwards_indication(index) =>
      and histogram[index] > histogram[index+1]
      and histogram[index+2] > histogram[index+1]
 
+    histogram_was_positive_until_now = true
+    for i = start_index to index
+        if histogram[i] < 0
+            histogram_was_positive_until_now := false
+            break
+
     volume_is_stronger_than_before = true
      and volume[index] > volume[index+1]
      and volume[index] > 100000
      and volume[index+1] > 100000
+     and volume[index] > vol_avg[index]
 
-    for i = index+10 to index
+    for i = start_index to index
         if volume[i] < 20000
             volume_is_stronger_than_before := false
-            break
+
+    most_of_move_already_happend = false
+    for i = index to start_index
+        if i-1 < 0
+            continue
+        momentum_change_downwards = histogram[i] > histogram[i+1]
+         and histogram[i] > histogram[i-1]
+
+        if momentum_change_downwards
+            distance_from_start = start_index - i
+            if distance_from_start > (i-1) * 3
+                most_of_move_already_happend := true
+                break
 
     only_on_higher_timeframes = current_timeframe >= 5
 
     result = true
      and after_market_starts_to_move
      and made_more_than_usual_percentage_already
-     and ema_to_price_ratio_looks_good
      and bar_is_above_all_indicators
      and macd_before_is_positive_but_weaker
      and volume_is_stronger_than_before
      and only_on_higher_timeframes
+     and histogram_was_positive_until_now
+     and start_index != 0
+     and not most_of_move_already_happend
 
     if result
-        log.info("Change upwards!")
+        label.new(bar_index-start_index, high[start_index], text=str.format("s: {0}.", start_index), size = size.small, style = label.style_label_lower_right)
+        log.info("Change upwards! start index: {0}", start_index)
 
     result
 
