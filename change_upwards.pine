@@ -40,18 +40,29 @@ change_upwards_indication(index) =>
             continue
         volume_starts_to_move = volume[i] > volume[i+1] * 10
         price_starts_to_move = (high[i] - low[i]) > (high[i+1] - low[i+1]) * 2
-        histogram_became_positive = (histogram[i+1] < 0 and histogram[i] > 0)
-         or (histogram[i] > histogram[i+1] * 5 and histogram[i+1] > 0)
+        histogram_became_positive = histogram[i] > 0
+         and (histogram[i+1] < 0
+              or histogram[i] > histogram[i+1] * 5
+              or (histogram[i+1] < histogram[i+2] and histogram[i+1] < histogram[i]))
+
         bar_is_positive = close[i] > open[i]
+        volume_avg_has_changed = vol_avg[i] > vol_avg[i+1] * 2
 
         if true
          and volume_starts_to_move
          and price_starts_to_move
          and bar_is_positive
          and histogram_became_positive
+         and volume_avg_has_changed
             start_index := i
             // if time == timestamp(relevant_timezone, year, 8, 25, 12, 00) and current_timeframe == 15
             //     log.info("i: {0}", i)
+            break
+
+    no_bar_before_has_bigger_volume = true
+    for j = start_index + int(60/current_timeframe)*4 to start_index+1
+        if close[j] > close[start_index]
+            no_bar_before_has_bigger_volume := false
             break
 
     macd_before_is_positive_but_weaker = true
@@ -102,6 +113,7 @@ change_upwards_indication(index) =>
      and histogram_was_positive_until_now
      and start_index != 0
      and not most_of_move_already_happend
+     and no_bar_before_has_bigger_volume
 
     if result
         label.new(bar_index-start_index, high[start_index], text=str.format("s: {0}.", start_index), size = size.small, style = label.style_label_lower_right)
