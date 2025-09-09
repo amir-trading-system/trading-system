@@ -30,7 +30,7 @@ change_upwards_indication(index) =>
     bar_is_above_all_indicators = close[index] > ema_9[index]-0.01
      and close[index] > vwap[index]-0.01
 
-    minutes_back_to_market_start = ((hour[index] - 7) * 60) + minute[index]
+    minutes_back_to_market_start = ((hour[index] - 6) * 60) + minute[index]
 
     bars_back = int(minutes_back_to_market_start/current_timeframe)
 
@@ -83,7 +83,7 @@ change_upwards_indication(index) =>
         if histogram[i] > highest_histogram
             highest_histogram := histogram[i]
 
-    current_histogram_is_high_enough = histogram[index]/highest_histogram >= 0.5
+    current_histogram_is_high_enough = histogram[index]/highest_histogram >= 0.4
 
     volume_is_stronger_than_before = true
      and volume[index] > volume[index+1]
@@ -104,14 +104,14 @@ change_upwards_indication(index) =>
 
         if momentum_change_downwards
             distance_from_start = start_index - i
-            if distance_from_start > (i-1) * 3
+            if distance_from_start > (i-1) * 3 and not current_histogram_is_high_enough
                 most_of_move_already_happend := true
                 break
 
-    only_on_higher_timeframes = current_timeframe >= 5
+    only_on_higher_timeframes = current_timeframe >= 2
 
     result = true
-     and after_market_starts_to_move
+    //  and after_market_starts_to_move
      and made_more_than_usual_percentage_already
      and bar_is_above_all_indicators
      and macd_before_is_positive_but_weaker
