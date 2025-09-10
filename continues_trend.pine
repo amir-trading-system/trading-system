@@ -50,7 +50,7 @@ _price_above_all_indicators_for_last_bars(index, last_bars) =>
          and close[i] < vwap[i]
          and close[i] < ema_9[i]
          and low[i] < low[i+1]
-         and after_market_open
+        //  and after_market_open
          and volume[i] > 10000
          and vol_avg[i] > 10000
             price_above_all_indicators_for_last_bars := false
@@ -94,14 +94,14 @@ _macd_trend_goes_up(index, macd, histogram) =>
     histogram[index] > last_highest_histogram/1.5
      and macd[index] > last_highest_macd/1.5
 
-_macd_looks_positive(index) =>
+_macd_looks_positive(index, first_pick_index) =>
     macd_looks_positive = true
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
     previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
     if macd_trend_goes_up
      and previous_histogram_lower_than_current
-        for i = index+10 to index
+        for i = first_pick_index to index
             if macd[i] < 0
              and signal_line[i] < 0
              and volume[i] > vol_avg[i]
@@ -423,7 +423,6 @@ momentum_trend_continue(index, enable_logging) =>
     after_market_starts_to_move = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     current_bar_is_strong = _current_bar_is_strong(index)
-    macd_looks_positive = _macd_looks_positive(index)
     volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index)
 
     price_movement_is_big = _price_movement_is_big(index)
@@ -435,11 +434,10 @@ momentum_trend_continue(index, enable_logging) =>
     result = true
      and made_more_than_usual_percentage_already
      and current_bar_is_strong
-     and macd_looks_positive
      and (price_movement_is_big or volume_is_the_highest_until_now)
      and ema_to_price_ratio_looks_good
      and not_on_the_first_candle
-     and after_market_starts_to_move
+    //  and after_market_starts_to_move
 
     good_to_go_for_check = false
     if result
@@ -464,9 +462,11 @@ momentum_trend_continue(index, enable_logging) =>
         relevant_index := first_pick_bar_index
 
     volume_average_indicate_on_trend = _volume_average_indicate_on_trend(index, relevant_index)
+    macd_looks_positive = _macd_looks_positive(index, relevant_index)
 
     result := result
      and volume_average_indicate_on_trend
+     and macd_looks_positive
 
     if result
      and index == 0
@@ -509,7 +509,7 @@ just_crossed_last_high(index) =>
      or momentum_trend_continue_10
 
     just_crossed_last_high
-     and after_market_open
+    //  and after_market_open
      and momentum_happend_before
      and is_positive
 
