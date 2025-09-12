@@ -69,6 +69,26 @@ change_upwards_indication(index) =>
         if volume[j]/volume[index] > 0.8
          and close[j] < open[j]
             no_bar_before_has_strong_volume := false
+            break
+
+    lower_histogram_start_index = 0
+    for j = index+1 to start_index
+        if j-1 < 0
+            continue
+        if histogram[j] > histogram[j+1]
+         and histogram[j] > histogram[j-1]
+            lower_histogram_start_index := j-1
+            break
+
+    upper_histogram_bars_counter = 0
+    for j = lower_histogram_start_index+1 to start_index
+        if histogram[j] < histogram[j+1]
+            break
+        upper_histogram_bars_counter += 1
+
+    if time == timestamp(relevant_timezone, year, 9, 12, 9, 35) and current_timeframe == 5
+        log.info("upper_histogram_bars_counter: {0}. lower_histogram_start_index: {1}", upper_histogram_bars_counter, lower_histogram_start_index)
+    trend_is_strong = upper_histogram_bars_counter/lower_histogram_start_index >= 0.5
 
     macd_before_is_positive_but_weaker = true
      and histogram[index+1] > 0
@@ -127,6 +147,7 @@ change_upwards_indication(index) =>
      and no_bar_before_has_bigger_volume
      and current_histogram_is_high_enough
      and no_bar_before_has_strong_volume
+     and trend_is_strong
 
     if result
         label.new(bar_index-start_index, high[start_index], text=str.format("s: {0}.", start_index), size = size.small, style = label.style_label_lower_right)
