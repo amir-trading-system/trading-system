@@ -25,7 +25,6 @@ _made_more_than_usual_percentage_already(index, percentage) =>
 
 change_upwards_indication(index) =>
     percentage = 0.1
-    after_market_starts_to_move = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     bar_is_above_all_indicators = close[index] > ema_9[index]-0.01
      and close[index] > vwap[index]-0.01
@@ -38,7 +37,7 @@ change_upwards_indication(index) =>
     for i = bars_back to index+1
         if i < 0
             continue
-        volume_starts_to_move = volume[i] > volume[i+1] * 10
+        volume_starts_to_move = volume[i] > volume[i+1] * 4
         price_starts_to_move = (high[i] - low[i]) > (high[i+1] - low[i+1]) * 2
         histogram_became_positive = histogram[i] > 0
          and (histogram[i+1] < 0
@@ -64,6 +63,12 @@ change_upwards_indication(index) =>
         if close[j] > close[start_index]
             no_bar_before_has_bigger_volume := false
             break
+
+    no_bar_before_has_strong_volume = true
+    for j = start_index to index+1
+        if volume[j]/volume[index] > 0.8
+         and close[j] < open[j]
+            no_bar_before_has_strong_volume := false
 
     macd_before_is_positive_but_weaker = true
      and histogram[index+1] > 0
@@ -111,7 +116,6 @@ change_upwards_indication(index) =>
     only_on_higher_timeframes = current_timeframe >= 2
 
     result = true
-    //  and after_market_starts_to_move
      and made_more_than_usual_percentage_already
      and bar_is_above_all_indicators
      and macd_before_is_positive_but_weaker
@@ -122,6 +126,7 @@ change_upwards_indication(index) =>
      and not most_of_move_already_happend
      and no_bar_before_has_bigger_volume
      and current_histogram_is_high_enough
+     and no_bar_before_has_strong_volume
 
     if result
         label.new(bar_index-start_index, high[start_index], text=str.format("s: {0}.", start_index), size = size.small, style = label.style_label_lower_right)
