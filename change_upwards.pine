@@ -56,6 +56,25 @@ change_upwards_indication(index) =>
             start_index := i
             break
 
+    if start_index == 0
+        for i = index+1 to bars_back
+            if i < 0
+                continue
+            volume_starts_to_move = volume[i] > volume[i+1] * 3
+            price_starts_to_move = (high[i] - low[i]) > (high[i+1] - low[i+1]) * 2
+            histogram_became_positive = histogram[i] > 0
+            bar_is_positive = close[i] > open[i]
+            crossed_vwap = open[i] < vwap[i]
+             and close[i] > vwap[i]
+
+            if true
+             and volume_starts_to_move
+             and price_starts_to_move
+             and bar_is_positive
+             and histogram_became_positive
+                start_index := i
+                break
+
     lower_histogram_start_index = 0
     for j = index+1 to start_index
         if j-1 < 0
@@ -84,8 +103,11 @@ change_upwards_indication(index) =>
 
     no_bar_before_has_strong_volume = true
     for j = lower_histogram_start_index to index+1
+        if j - index <= 1
+            break
         if volume[j] > volume[index]
          and close[j] < open[j]
+         and high[j] > high[index]
             no_bar_before_has_strong_volume := false
             break
 
@@ -97,10 +119,11 @@ change_upwards_indication(index) =>
      and histogram[index+2] > histogram[index+1]
 
     histogram_was_positive_until_now = true
-    for i = start_index to index
-        if histogram[i] < 0
-            histogram_was_positive_until_now := false
-            break
+    if hour[start_index] > 9 or hour[start_index] == 9 and minute[start_index] > 30
+        for i = start_index to index
+            if histogram[i] < 0
+                histogram_was_positive_until_now := false
+                break
 
     highest_histogram = 0.0
     for i = start_index to index
@@ -110,7 +133,6 @@ change_upwards_indication(index) =>
     current_histogram_is_high_enough = histogram[index]/highest_histogram >= 0.4
 
     volume_is_stronger_than_before = true
-     and volume[index] > volume[index+1]
      and volume[index] > 100000
      and volume[index+1] > 100000
      and volume[index] > vol_avg[index]

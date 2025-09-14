@@ -96,6 +96,9 @@ _histogram_looks_good_and_strong(index, first_pick_bar_index) =>
      and signal_line[index+1] > 0
 
     histogram_changed_direction = false
+    close_to_current = 5
+    if current_timeframe > 5
+        close_to_current := 2
     if histogram_looks_good_and_strong and first_pick_bar_index > 0
         for i = first_pick_bar_index to index
             if i-1 < 0
@@ -110,8 +113,10 @@ _histogram_looks_good_and_strong(index, first_pick_bar_index) =>
              and i != index
              and i != first_pick_bar_index-1
              and i != first_pick_bar_index
+             and i - index < close_to_current
 
             if histogram_does_not_going_into_strong_direction
+
                 histogram_looks_good_and_strong := false
 
     true
@@ -194,6 +199,19 @@ _price_movement_is_big(index, first_pick_bar_index) =>
     price_movement_is_big
      and high[index] - low[index] > 0.1
 
+_bars_are_full(index, first_pick_bar_index) =>
+    bars_are_full_counter = 0
+    if first_pick_bar_index > 0
+        for i = first_pick_bar_index-1 to index
+            if math.abs(close[i] - open[i])/(high[i] - low[i]) > 0.6
+             or (close[i] < open[i] and (close[i] - low[i])/(high[i] - low[i]) > 0.5)
+                bars_are_full_counter += 1
+
+    result = bars_are_full_counter/(first_pick_bar_index-1) >= 0.7
+    // if time == timestamp(relevant_timezone, year, 8, 25, 10, 10) and current_timeframe == 5
+    //     log.info("bars_are_full_counter: {0}, total: {1}", bars_are_full_counter, first_pick_bar_index-1)
+    result
+
 _has_volatility_smile_on_price_action(index, first_pick_bar_index) =>
     price_under_borders = true
     negative_bars_are_weak = true
@@ -235,40 +253,6 @@ _has_volatility_smile_on_price_action(index, first_pick_bar_index) =>
      and price_under_borders
      and lowest_value_deleted_most_of_value_before
      and price_action_has_smile_pattern
-
-_volume_volatility_smile_found(index, first_pick_index) =>
-    lowest_volume_bar_index = 0
-    lowest_volume_bar_value = 10000000.0
-    for i = first_pick_index to index
-        if volume[i] < lowest_volume_bar_value
-            lowest_volume_bar_value := volume[i]
-            lowest_volume_bar_index := i
-
-    volume_and_price_going_down_until_middle_point = true
-    for i = first_pick_index-1 to lowest_volume_bar_index
-        if i < 0
-            continue
-        if true
-         and volume[i] > volume[i+1]
-         and high[i] > high[i+1]
-            volume_and_price_going_down_until_middle_point := false
-            break
-
-    volume_and_price_goes_up_from_middle_point = true
-    for i = lowest_volume_bar_index - 1 to index
-        if i < 0
-            continue
-        if true
-         and volume[i] < volume[i+1]
-         and high[i] < high[i+1]
-         and volume[i] < lowest_volume_bar_value
-            volume_and_price_goes_up_from_middle_point := false
-            break
-
-    true
-     and volume_and_price_going_down_until_middle_point
-     and volume_and_price_goes_up_from_middle_point
-     and lowest_volume_bar_index != 0
 
 _has_volatility_smile_pattern(index, good_to_go_for_check) =>
     has_smile_pattern = false
@@ -324,6 +308,8 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
              and highest_high_until_now == high[i]
              and volume[i] > 10000
              and close[i] > vwap[i]
+                // if time == timestamp(relevant_timezone, year, 8, 19, 11, 20) and current_timeframe == 5
+                //     log.info("i: {0}", i)
                 first_pick_bar_index := i
                 break
 
@@ -391,15 +377,12 @@ _has_volatility_smile_pattern(index, good_to_go_for_check) =>
             if high[i] > high[first_pick_bar_index]
                 no_previous_bar_passed_above_first_pick := false
 
-    current_bar_overlappes_with_firs_pick_bar = low[index] < high[first_pick_bar_index]
+    current_bar_overlappes_with_first_pick_bar = low[index] < high[first_pick_bar_index]
      or low[index+1] < high[first_pick_bar_index]
-
-    volume_volatility_smile_found = _volume_volatility_smile_found(index, first_pick_bar_index)
 
     has_smile_pattern := has_smile_pattern
      and no_previous_bar_passed_above_first_pick
-     and current_bar_overlappes_with_firs_pick_bar
-     and volume_volatility_smile_found
+     and current_bar_overlappes_with_first_pick_bar
      and volume[index] > 100000
 
     [has_smile_pattern, first_pick_bar_index, smile_type]
@@ -448,7 +431,8 @@ _has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
              and before_volume_sum > after_volume_sum
                 has_enough_time_between_borders = i * current_timeframe >= 15
 
-                has_smile_pattern := potential_start_on_smile
+                has_smile_pattern := true
+                 and potential_start_on_smile
                  and before_volume_sum > after_volume_sum
                  and has_enough_time_between_borders
                  and no_bar_with_more_volume_before
@@ -456,17 +440,15 @@ _has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
                 if has_smile_pattern
                     first_pick_bar_index := i
 
-    volume_volatility_smile_found = _volume_volatility_smile_found(index, first_pick_bar_index)
-    has_smile_pattern := has_smile_pattern
-     and volume_volatility_smile_found
-
     [has_smile_pattern, first_pick_bar_index]
 
 momentum_trend_continue(index, enable_logging) =>
     percentage = 0.075
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index)
-    must_have_significant_volume = volume[index] > 400000
+    must_have_significant_volume = volume[index] > 500000
+    previous_bar_is_positive_too = close[index+1] > open[index+1]
+     or (close[index+1] - low[index+1])/(high[index+1] - low[index+1]) > 0.7
     not_on_the_first_candle = true
     if hour[index] == 9 and minute[index] == 30 and current_timeframe < 5
         not_on_the_first_candle := false
@@ -476,6 +458,7 @@ momentum_trend_continue(index, enable_logging) =>
      and ema_to_price_ratio_looks_good
      and not_on_the_first_candle
      and must_have_significant_volume
+     and previous_bar_is_positive_too
 
     good_to_go_for_check = false
     if result
@@ -499,17 +482,20 @@ momentum_trend_continue(index, enable_logging) =>
     current_bar_is_strong = _current_bar_is_strong(index, relevant_index)
     volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index, relevant_index)
     price_movement_is_big = _price_movement_is_big(index, relevant_index)
+    bars_are_full = _bars_are_full(index, relevant_index)
 
     result := result
+     and current_bar_is_strong
      and volume_average_indicate_on_trend
      and macd_looks_positive
      and current_bar_is_bigger_than_first_pick
      and (price_movement_is_big or volume_is_the_highest_until_now)
      and (has_volatility_smile_pattern or has_volatility_smile_pattern_v2)
+     and bars_are_full
 
     if result
      and enable_logging
-        label.new(bar_index-relevant_index, high, text=str.format("m: {0}.  v: {1}", relevant_index * current_timeframe, smile_version), size = size.small, style = label.style_label_lower_right)
+        label.new(bar_index-relevant_index, high[relevant_index], text=str.format("m: {0}.  v: {1}", relevant_index * current_timeframe, smile_version), size = size.small, style = label.style_label_lower_right)
 
     result
 
