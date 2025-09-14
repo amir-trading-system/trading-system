@@ -69,16 +69,19 @@ _ema_to_price_ratio_looks_good(index) =>
      and close_to_9_ema
      and price_above_all_indicators_for_last_bars
 
-_current_bar_is_strong(index) =>
+_current_bar_is_strong(index, first_pick_bar_index) =>
     bar_is_positive = close[index] > open[index]
     bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
      and open[index] >= low[index+1]
      and high[index] > vwap[index]
     bar_is_highest_in_the_last_bars = true
-    for i = index+10 to index+1
-        if high[i] > high[index] and volume[i] > volume[index]
-            bar_is_highest_in_the_last_bars := false
-            break
+    if first_pick_bar_index > 0
+        for i = first_pick_bar_index-1 to index+1
+            if i < 0
+                continue
+            if high[i] > high[index] and volume[i] > volume[index]
+                bar_is_highest_in_the_last_bars := false
+                break
 
     bar_body_is_solid = (close[index] - open[index]) > (open[index] - low[index])
 
@@ -87,14 +90,14 @@ _current_bar_is_strong(index) =>
      and bar_is_highest_in_the_last_bars
      and bar_body_is_solid
 
-_histogram_looks_good_and_strong(index, first_pick_index) =>
+_histogram_looks_good_and_strong(index, first_pick_bar_index) =>
     histogram_looks_good_and_strong = histogram[index] > histogram[index+1]
      and macd[index+1] > 0
      and signal_line[index+1] > 0
 
     histogram_changed_direction = false
-    if histogram_looks_good_and_strong
-        for i = first_pick_index to index
+    if histogram_looks_good_and_strong and first_pick_bar_index > 0
+        for i = first_pick_bar_index to index
             if i-1 < 0
                 continue
 
@@ -105,8 +108,8 @@ _histogram_looks_good_and_strong(index, first_pick_index) =>
             histogram_does_not_going_into_strong_direction = histogram[i] > histogram[i+1]
              and histogram[i] > histogram[i-1]
              and i != index
-             and i != first_pick_index-1
-             and i != first_pick_index
+             and i != first_pick_bar_index-1
+             and i != first_pick_bar_index
 
             if histogram_does_not_going_into_strong_direction
                 histogram_looks_good_and_strong := false
@@ -122,15 +125,16 @@ _macd_trend_goes_up(index, macd, histogram) =>
     histogram[index] > last_highest_histogram/1.5
      and macd[index] > last_highest_macd/1.5
 
-_macd_looks_positive(index, first_pick_index) =>
-    macd_looks_positive = true
+_macd_looks_positive(index, first_pick_bar_index) =>
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
-    histogram_looks_good_and_strong = _histogram_looks_good_and_strong(index, first_pick_index)
+    histogram_looks_good_and_strong = _histogram_looks_good_and_strong(index, first_pick_bar_index)
     previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
+    macd_looks_positive = first_pick_bar_index > 0
     if macd_trend_goes_up
      and previous_histogram_lower_than_current
-        for i = first_pick_index to index
+     and macd_looks_positive
+        for i = first_pick_bar_index to index
             if macd[i] < 0
              and signal_line[i] < 0
              and volume[i] > vol_avg[i]
@@ -144,45 +148,48 @@ _macd_looks_positive(index, first_pick_index) =>
      and previous_histogram_lower_than_current
      and histogram_looks_good_and_strong
 
-_volume_is_the_highest_until_now(index) =>
+_volume_is_the_highest_until_now(index, first_pick_bar_index) =>
     volume_is_the_highest_until_now = true
-    for i = index+6 to index+1
-        if i < 0
-            continue
+    if first_pick_bar_index > 0
+        for i = first_pick_bar_index-1 to index+1
+            if i < 0
+                continue
 
-        if volume[index] < volume[index+1]
-            volume_is_the_highest_until_now := false
-            break
+            if volume[index] < volume[index+1]
+                volume_is_the_highest_until_now := false
+                break
 
-        if (volume[i] > volume[index] and high[i] > high[index])
-            volume_is_the_highest_until_now := false
-            break
+            if (volume[i] > volume[index] and high[i] > high[index])
+                volume_is_the_highest_until_now := false
+                break
 
-        if volume[index]/volume[i] < 0.75
-            volume_is_the_highest_until_now := false
-            break
+            if volume[index]/volume[i] < 0.75
+                volume_is_the_highest_until_now := false
+                break
 
     volume_is_the_highest_until_now
 
-_volume_average_indicate_on_trend(index, first_index) =>
-    volume_average_indicate_on_trend = true
-    for i = first_index to index
-        if vol_avg[i] < 10000
-            volume_average_indicate_on_trend := false
-            break
+_volume_average_indicate_on_trend(index, first_pick_bar_index) =>
+    volume_average_indicate_on_trend = first_pick_bar_index > 0
+    if volume_average_indicate_on_trend
+        for i = first_pick_bar_index to index
+            if vol_avg[i] < 10000
+                volume_average_indicate_on_trend := false
+                break
 
     true
      and (volume[index] > vol_avg[index] * 1.5 or (volume[index] > vol_avg[index] and volume[index] > volume[index+1] * 1.5))
      and vol_avg[index] > 20000
      and volume_average_indicate_on_trend
 
-_price_movement_is_big(index) =>
+_price_movement_is_big(index, first_pick_bar_index) =>
     price_movement_is_big = true
-    for i = index+6 to index+1
-        if (close[i] - low[i]) > (high[index] - low[index])
-         and (close[i+1] - low[i+1])/(close[i] - low[i]) > 0.6
-            price_movement_is_big := false
-            break
+    if first_pick_bar_index > 0
+        for i = first_pick_bar_index-1 to index+1
+            if (close[i] - low[i]) > (high[index] - low[index])
+             and (close[i+1] - low[i+1])/(close[i] - low[i]) > 0.6
+                price_movement_is_big := false
+                break
 
     price_movement_is_big
      and high[index] - low[index] > 0.1
@@ -458,21 +465,17 @@ _has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
 momentum_trend_continue(index, enable_logging) =>
     percentage = 0.075
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    current_bar_is_strong = _current_bar_is_strong(index)
-    volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index)
-
-    price_movement_is_big = _price_movement_is_big(index)
     ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index)
+    must_have_significant_volume = volume[index] > 400000
     not_on_the_first_candle = true
     if hour[index] == 9 and minute[index] == 30 and current_timeframe < 5
         not_on_the_first_candle := false
 
     result = true
      and made_more_than_usual_percentage_already
-     and current_bar_is_strong
-     and (price_movement_is_big or volume_is_the_highest_until_now)
      and ema_to_price_ratio_looks_good
      and not_on_the_first_candle
+     and must_have_significant_volume
 
     good_to_go_for_check = false
     if result
@@ -480,12 +483,6 @@ momentum_trend_continue(index, enable_logging) =>
 
     [has_volatility_smile_pattern, first_pick_bar_index, smile_type] = _has_volatility_smile_pattern(index, good_to_go_for_check)
     [has_volatility_smile_pattern_v2, first_pick_bar_index_v2] = _has_volatility_smile_pattern_v2(index, good_to_go_for_check)
-    current_bar_is_bigger_than_first_pick = close[index] - open[index] > close[first_pick_bar_index] - open[first_pick_bar_index]
-
-    result := true
-     and result
-     and (has_volatility_smile_pattern or has_volatility_smile_pattern_v2)
-     and current_bar_is_bigger_than_first_pick
 
     relevant_index = 0
     smile_version = ""
@@ -496,12 +493,19 @@ momentum_trend_continue(index, enable_logging) =>
         smile_version := "v1"
         relevant_index := first_pick_bar_index
 
+    current_bar_is_bigger_than_first_pick = close[index] - open[index] > math.abs(close[relevant_index] - open[relevant_index])
     volume_average_indicate_on_trend = _volume_average_indicate_on_trend(index, relevant_index)
     macd_looks_positive = _macd_looks_positive(index, relevant_index)
+    current_bar_is_strong = _current_bar_is_strong(index, relevant_index)
+    volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index, relevant_index)
+    price_movement_is_big = _price_movement_is_big(index, relevant_index)
 
     result := result
      and volume_average_indicate_on_trend
      and macd_looks_positive
+     and current_bar_is_bigger_than_first_pick
+     and (price_movement_is_big or volume_is_the_highest_until_now)
+     and (has_volatility_smile_pattern or has_volatility_smile_pattern_v2)
 
     if result
      and enable_logging

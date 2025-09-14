@@ -32,7 +32,7 @@ def get_stocks_by_volume():
 
                     historical_data = yfinance.download(
                         symbol,
-                        period="1mo",
+                        period="1y",
                         interval="1d",
                         auto_adjust=False,
                         progress=False,
@@ -130,4 +130,4 @@ def get_stocks_by_price_change():
                             csv_write_file.flush()
 
 if __name__ == "__main__":
-    get_stocks_by_price_change()
+    get_stocks_by_volume()
