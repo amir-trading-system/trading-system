@@ -87,6 +87,34 @@ _current_bar_is_strong(index) =>
      and bar_is_highest_in_the_last_bars
      and bar_body_is_solid
 
+_histogram_looks_good_and_strong(index, first_pick_index) =>
+    histogram_looks_good_and_strong = histogram[index] > histogram[index+1]
+     and macd[index+1] > 0
+     and signal_line[index+1] > 0
+
+    histogram_changed_direction = false
+    if histogram_looks_good_and_strong
+        for i = first_pick_index to index
+            if i-1 < 0
+                continue
+
+            if histogram[i] < histogram[i+1]
+             and histogram[i] < histogram[i-1]
+                histogram_changed_direction := true
+
+            histogram_does_not_going_into_strong_direction = histogram[i] > histogram[i+1]
+             and histogram[i] > histogram[i-1]
+             and i != index
+             and i != first_pick_index-1
+             and i != first_pick_index
+
+            if histogram_does_not_going_into_strong_direction
+                histogram_looks_good_and_strong := false
+
+    true
+     and histogram_looks_good_and_strong
+     and histogram_changed_direction
+
 _macd_trend_goes_up(index, macd, histogram) =>
     bars_back_for_30_minutes_before = int(30/current_timeframe)
     last_highest_histogram = ta.highest(histogram[index], bars_back_for_30_minutes_before)
@@ -97,6 +125,7 @@ _macd_trend_goes_up(index, macd, histogram) =>
 _macd_looks_positive(index, first_pick_index) =>
     macd_looks_positive = true
     macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
+    histogram_looks_good_and_strong = _histogram_looks_good_and_strong(index, first_pick_index)
     previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
 
     if macd_trend_goes_up
@@ -113,6 +142,7 @@ _macd_looks_positive(index, first_pick_index) =>
      and macd[index] > 0
      and signal_line[index] > 0
      and previous_histogram_lower_than_current
+     and histogram_looks_good_and_strong
 
 _volume_is_the_highest_until_now(index) =>
     volume_is_the_highest_until_now = true
@@ -400,6 +430,12 @@ _has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
                     continue
                 after_volume_sum += volume[j]
 
+            no_bar_with_more_volume_before = true
+            for j = i+5 to i+1
+                if volume[j] >= volume[i]
+                 and high[j] > high[i]
+                    no_bar_with_more_volume_before := false
+                    break
 
             if potential_start_on_smile
              and before_volume_sum > after_volume_sum
@@ -408,6 +444,7 @@ _has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
                 has_smile_pattern := potential_start_on_smile
                  and before_volume_sum > after_volume_sum
                  and has_enough_time_between_borders
+                 and no_bar_with_more_volume_before
 
                 if has_smile_pattern
                     first_pick_bar_index := i
@@ -420,7 +457,6 @@ _has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
 
 momentum_trend_continue(index, enable_logging) =>
     percentage = 0.075
-    after_market_starts_to_move = (hour[index] == 9 and minute[index] >= 30) or hour[index] > 9
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     current_bar_is_strong = _current_bar_is_strong(index)
     volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index)
@@ -437,7 +473,6 @@ momentum_trend_continue(index, enable_logging) =>
      and (price_movement_is_big or volume_is_the_highest_until_now)
      and ema_to_price_ratio_looks_good
      and not_on_the_first_candle
-    //  and after_market_starts_to_move
 
     good_to_go_for_check = false
     if result
@@ -469,32 +504,35 @@ momentum_trend_continue(index, enable_logging) =>
      and macd_looks_positive
 
     if result
-     and index == 0
      and enable_logging
-        log.info("momnetum trend continue! for first pick go back: {0} minutes", relevant_index * current_timeframe)
         label.new(bar_index-relevant_index, high, text=str.format("m: {0}.  v: {1}", relevant_index * current_timeframe, smile_version), size = size.small, style = label.style_label_lower_right)
 
     result
 
 just_crossed_last_high(index) =>
     is_positive = close[index] > open[index]
-    after_market_open = hour[index] >= 10 or (hour[index] == 9 and minute[index] >= 45)
     bars_back = int(360/current_timeframe)
     today_highest = ta.highest(high[1], bars_back)
     just_crossed_last_high = false
     just_crossed_last_high := close[index] > today_highest
 
-    momentum_trend_continue_0 = momentum_trend_continue(index, false)
-    momentum_trend_continue_1 = momentum_trend_continue(index+1, false)
-    momentum_trend_continue_2 = momentum_trend_continue(index+2, false)
-    momentum_trend_continue_3 = momentum_trend_continue(index+3, false)
-    momentum_trend_continue_4 = momentum_trend_continue(index+4, false)
-    momentum_trend_continue_5 = momentum_trend_continue(index+5, false)
-    momentum_trend_continue_6 = momentum_trend_continue(index+6, false)
-    momentum_trend_continue_7 = momentum_trend_continue(index+7, false)
-    momentum_trend_continue_8 = momentum_trend_continue(index+8, false)
-    momentum_trend_continue_9 = momentum_trend_continue(index+9, false)
-    momentum_trend_continue_10 = momentum_trend_continue(index+10, false)
+    should_label_first_pick = true
+    momentum_trend_continue_0 = momentum_trend_continue(index, should_label_first_pick)
+    if momentum_trend_continue_0
+        should_label_first_pick := false
+    momentum_trend_continue_1 = momentum_trend_continue(index+1, should_label_first_pick)
+    if momentum_trend_continue_1
+        should_label_first_pick := false
+    momentum_trend_continue_2 = momentum_trend_continue(index+2, should_label_first_pick)
+    if momentum_trend_continue_2
+        should_label_first_pick := false
+    momentum_trend_continue_3 = momentum_trend_continue(index+3, should_label_first_pick)
+    if momentum_trend_continue_3
+        should_label_first_pick := false
+    momentum_trend_continue_4 = momentum_trend_continue(index+4, should_label_first_pick)
+    if momentum_trend_continue_4
+        should_label_first_pick := false
+    momentum_trend_continue_5 = momentum_trend_continue(index+5, should_label_first_pick)
 
     momentum_happend_before = momentum_trend_continue_0
      or momentum_trend_continue_1
@@ -502,16 +540,15 @@ just_crossed_last_high(index) =>
      or momentum_trend_continue_3
      or momentum_trend_continue_4
      or momentum_trend_continue_5
-     or momentum_trend_continue_6
-     or momentum_trend_continue_7
-     or momentum_trend_continue_8
-     or momentum_trend_continue_9
-     or momentum_trend_continue_10
 
-    just_crossed_last_high
-    //  and after_market_open
+    result = just_crossed_last_high
      and momentum_happend_before
      and is_positive
+
+    if result
+        log.info("momentum trend continue!")
+
+    result
 
 momentum_trend_continue = momentum_trend_continue(0, true)
 just_crossed_last_high = just_crossed_last_high(0)
