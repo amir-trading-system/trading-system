@@ -111,12 +111,35 @@ change_upwards_indication(index) =>
             no_bar_before_has_strong_volume := false
             break
 
-    macd_before_is_positive_but_weaker = true
+    if no_bar_before_has_strong_volume
+        for j = lower_histogram_start_index to index
+            is_strong_negative_bar = volume[j] > vol_avg[j] * 3
+             and close[j] < open[j]
+
+            is_strong_positive_bar_but_weaker = is_strong_negative_bar
+             and volume[j+1]/volume[j] > 0.5
+             and volume[j+1] > 1000000
+             and volume[j+1] < volume[j]
+             and close[j+1] > open[j+1]
+
+            if is_strong_positive_bar_but_weaker
+                if time == timestamp(relevant_timezone, year, 4, 4, 11, 30) and current_timeframe == 15
+                    log.info("j: {0}, lower_histogram_start_index: {1}", j, lower_histogram_start_index)
+                no_bar_before_has_strong_volume := false
+                break
+
+    histogram_before_is_positive_but_weaker = true
      and histogram[index+1] > 0
      and macd[index+1] > 0
      and signal_line[index+1] > 0
      and histogram[index] > histogram[index+1]
      and histogram[index+2] > histogram[index+1]
+
+    if current_timeframe < 15
+        previous_bar_is_much_weaker = math.abs(close[index+1] - open[index+1])/(close[index] - open[index]) < 0.5
+         and volume[index] > volume[index+1] * 2
+        histogram_before_is_positive_but_weaker := histogram_before_is_positive_but_weaker
+         and (histogram[index+2] < histogram[index+3] or previous_bar_is_much_weaker)
 
     histogram_was_positive_until_now = true
     if hour[start_index] > 9 or hour[start_index] == 9 and minute[start_index] > 30
@@ -172,10 +195,13 @@ change_upwards_indication(index) =>
             //     log.info("i: {0}, distance: {1}", i, ema_9[i]/low[i])
             crossed_at_least_ones_under_9_ema := true
 
+    current_bar_body_is_solid = (close[index] - open[index])/(high[index] - low[index]) >= 0.5
+    current_bar_volume_is_solid = volume[index] >= 500000
+
     result = true
      and made_more_than_usual_percentage_already
      and bar_is_above_all_indicators
-     and macd_before_is_positive_but_weaker
+     and histogram_before_is_positive_but_weaker
      and volume_is_stronger_than_before
      and only_on_higher_timeframes
      and histogram_was_positive_until_now
@@ -187,6 +213,8 @@ change_upwards_indication(index) =>
      and no_too_much_lower_histogram
      and no_lower_bar_is_higher_or_stronger_than_start
      and crossed_at_least_ones_under_9_ema
+     and current_bar_body_is_solid
+     and current_bar_volume_is_solid
 
     if result
         label.new(bar_index-start_index, high[start_index], text=str.format("s: {0}.", start_index), size = size.small, style = label.style_label_lower_right)
@@ -198,4 +226,4 @@ change_upwards_indication = change_upwards_indication(0)
 
 plotshape(change_upwards_indication, title="Change upwards", color=color.green, display = display.pane, style = shape.labeldown, size = size.small, location = location.abovebar, text = "📊")
 
-alertcondition(change_upwards_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(change_upwards_indication, title="Change Upwards", message="Change Upwards")
