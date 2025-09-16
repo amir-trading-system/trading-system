@@ -123,8 +123,8 @@ change_upwards_indication(index) =>
              and close[j+1] > open[j+1]
 
             if is_strong_positive_bar_but_weaker
-                if time == timestamp(relevant_timezone, year, 4, 4, 11, 30) and current_timeframe == 15
-                    log.info("j: {0}, lower_histogram_start_index: {1}", j, lower_histogram_start_index)
+                // if time == timestamp(relevant_timezone, year, 4, 4, 11, 30) and current_timeframe == 15
+                //     log.info("j: {0}, lower_histogram_start_index: {1}", j, lower_histogram_start_index)
                 no_bar_before_has_strong_volume := false
                 break
 
