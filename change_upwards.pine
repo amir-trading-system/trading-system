@@ -184,18 +184,22 @@ change_upwards_indication(index) =>
     most_bars_are_not_overlapped = overlapped_bars/lower_histogram_start_index < 0.5
 
     crossed_at_least_ones_under_9_ema = false
-    for i = start_index-1 to index+1
-        if i < 0
-            continue
+    if current_timeframe == 15
+        crossed_at_least_ones_under_9_ema := true
+    else
+        for i = start_index-1 to index+1
+            if i < 0
+                continue
 
-        if (low[i] < ema_9[i] or ema_9[i]/low[i] > 0.95)
-         and close[i] > ema_9[i]
-         and start_index - i > i - index
-            // if time == timestamp(relevant_timezone, year, 5, 6, 9, 05) and current_timeframe == 5
-            //     log.info("i: {0}, distance: {1}", i, ema_9[i]/low[i])
-            crossed_at_least_ones_under_9_ema := true
+            if (low[i] < ema_9[i] or ema_9[i]/low[i] > 0.95)
+             and close[i] > ema_9[i]
+             and start_index - i > i - index
+                // if time == timestamp(relevant_timezone, year, 5, 6, 9, 05) and current_timeframe == 5
+                //     log.info("i: {0}, distance: {1}", i, ema_9[i]/low[i])
+                crossed_at_least_ones_under_9_ema := true
 
     current_bar_body_is_solid = (close[index] - open[index])/(high[index] - low[index]) >= 0.5
+     or (close[index] > close[index+1] and (close[index] - open[index])/(high[index] - open[index]) > 0.5)
     current_bar_volume_is_solid = volume[index] >= 500000
 
     result = true

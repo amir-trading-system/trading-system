@@ -203,7 +203,7 @@ _bars_are_full(index, first_pick_bar_index) =>
     bars_are_full_counter = 0
     if first_pick_bar_index > 0
         for i = first_pick_bar_index-1 to index
-            if math.abs(close[i] - open[i])/(high[i] - low[i]) > 0.6
+            if math.abs(close[i] - open[i])/(high[i] - low[i]) > 0.5
              or (close[i] < open[i] and (close[i] - low[i])/(high[i] - low[i]) > 0.5)
                 bars_are_full_counter += 1
 
