@@ -540,10 +540,163 @@ just_crossed_last_high(index) =>
 
     result
 
-momentum_trend_continue = momentum_trend_continue(0, true)
+_current_bar_is_bigger_than_other_positive_previous_bars(index) =>
+    current_bar_is_bigger_than_other_positive_previous_bars = true
+    for i = index+6 to index+1
+        if i-1 < 0
+            continue
+        bar_is_positive = close[i] > open[i]
+        if not bar_is_positive
+            continue
+
+        if high[i] > high[i+1] and high[i] > high[i-1]
+            continue
+
+        if (close[i] - open[i])/(close[index] - open[index]) > 0.7
+            current_bar_is_bigger_than_other_positive_previous_bars := false
+            break
+
+        current_bar_value = high[index] - low[index]
+        previous_bar_value = high[i] - low[i]
+        if previous_bar_value/current_bar_value >= 0.9
+            current_bar_is_bigger_than_other_positive_previous_bars := false
+            break
+
+    current_bar_is_bigger_than_other_positive_previous_bars
+
+_price_didnt_move_a_lot_in_the_previous_bars(index) =>
+    highest_close = 0.0
+    lowest_close = 100.0
+    for i = index+6 to index+1
+        if close[i] > highest_close
+            highest_close := close[i]
+        if close[i] < lowest_close
+            lowest_close := close[i]
+
+    price_didnt_move_a_lot_in_the_previous_bars = highest_close - lowest_close < high[index] - low[index]
+
+_current_bar_volume_is_moving_up_for_real(index) =>
+    bars_back = 10
+    last_bars_volume_sum = 0.0
+    for i = bars_back+index to index+1
+        last_bars_volume_sum += volume[i]
+
+    volume_threshold = 1000000
+    last_bars_volume_is_high = last_bars_volume_sum > volume_threshold
+
+    current_volume_is_much_higher = true
+     and volume[index] > 1000000
+     and volume[index] > vol_avg[index]
+     and volume[index] > volume[index+1] * 3
+
+    current_price_movement_is_much_higher = true
+     and high[index] - low[index] > (high[index+1] - low[index+1]) * 2
+     and (close[index+1] - open[index])/(close[index] - open[index]) < 0.3
+
+    current_volume_is_higher_than_last_bars = true
+    current_high_is_higher_than_last_bars = true
+    for i = index+5 to index+1
+        if volume[i] > volume[index]
+            current_volume_is_higher_than_last_bars := false
+
+        if high[i] > high[index]
+            current_high_is_higher_than_last_bars := false
+
+    current_bars_volume_sum = 0.0
+    previous_bars_volume_sum = 0.0
+
+    for i = index+20 to index+11
+        previous_bars_volume_sum += volume[i]
+
+    for i = index+10 to index+1
+        current_bars_volume_sum += volume[i]
+
+    volume_is_the_last_bars_is_higher_than_before = current_bars_volume_sum > previous_bars_volume_sum
+
+    at_least_one_bar_before_above_vwap = false
+    for i = index+10 to index+1
+        if close[i] > vwap[i]
+            at_least_one_bar_before_above_vwap := true
+            break
+
+    basic_scenario = true
+     and last_bars_volume_is_high
+     and current_volume_is_much_higher
+     and current_price_movement_is_much_higher
+     and current_volume_is_higher_than_last_bars
+     and current_high_is_higher_than_last_bars
+     and at_least_one_bar_before_above_vwap
+
+    current_bar_is_right_after_market_starts_to_move = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] < 11)
+    bar_closing_high = (high[index] - close[index])/(high[index] - low[index]) < 0.3
+    volume_is_strong = true
+     and volume[index] > vol_avg[index]
+     and volume[index] > volume[index+1]
+     and volume[index] > 100000
+
+    specific_scenario = true
+     and current_price_movement_is_much_higher
+     and current_high_is_higher_than_last_bars
+     and current_bar_is_right_after_market_starts_to_move
+     and bar_closing_high
+     and volume_is_strong
+     and at_least_one_bar_before_above_vwap
+
+    true
+     and (basic_scenario or specific_scenario)
+
+_bar_is_positive(index) =>
+    bar_is_positive = close[index] > open[index]
+    bar_above_all_indicators = true
+     and high[index] > ema_9[index]
+     and high[index] > vwap[index]
+
+    true
+     and bar_is_positive
+     and bar_above_all_indicators
+
+_current_high_is_the_highest(index, movement_is_after_market_start) =>
+    current_high_is_the_highest = false
+    if movement_is_after_market_start
+        current_high_is_the_highest := true
+        bars_back = (((hour[index] - 9) * 60) + (minute[index] - 30))/current_timeframe
+        for i = bars_back to index+1
+            if high[i] > high[index]
+                current_high_is_the_highest := false
+                break
+
+    current_high_is_the_highest
+
+moving_up_indication(index) =>
+    percentage = 0.15
+    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or hour[index] > 9
+    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+    current_bar_volume_is_moving_up_for_real = _current_bar_volume_is_moving_up_for_real(index)
+    bar_is_positive = _bar_is_positive(index)
+    current_bar_is_bigger_than_other_positive_previous_bars = _current_bar_is_bigger_than_other_positive_previous_bars(index)
+    price_didnt_move_a_lot_in_the_previous_bars = _price_didnt_move_a_lot_in_the_previous_bars(index)
+    current_high_is_the_highest = _current_high_is_the_highest(index, movement_is_after_market_start)
+
+    result = true
+     and made_more_than_usual_percentage_already
+     and current_bar_volume_is_moving_up_for_real
+     and bar_is_positive
+     and current_bar_is_bigger_than_other_positive_previous_bars
+     and price_didnt_move_a_lot_in_the_previous_bars
+     and movement_is_after_market_start
+     and current_high_is_the_highest
+
+    if result
+        log.info("Moving up!")
+
+    result
+
+
+///////////// indications /////////////
 just_crossed_last_high = just_crossed_last_high(0)
+moving_up_indication = moving_up_indication(0)
 
-plotshape(momentum_trend_continue, title="Trend Continue", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "✅")
 plotshape(just_crossed_last_high, title="Just crossed last high", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
+plotshape(moving_up_indication, title="Moving up", color=color.green, display = display.pane, style = shape.labeldown, size = size.small, location = location.abovebar, text = "🆙")
 
-alertcondition(just_crossed_last_high, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(just_crossed_last_high or moving_up_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
