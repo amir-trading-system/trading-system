@@ -174,7 +174,7 @@ _current_high_is_the_highest(index, movement_is_after_market_start) =>
     current_high_is_the_highest
 
 moving_up_indication(index) =>
-    percentage = 0.4
+    percentage = 0.2
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
 
@@ -191,7 +191,7 @@ moving_up_indication(index) =>
     result
 
 changed_direction_indication(index) =>
-    percentage = 0.4
+    percentage = 0.2
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
 
     only_on_bigger_timeframes = current_timeframe >= 5
@@ -205,8 +205,6 @@ changed_direction_indication(index) =>
     volume_is_high_enough = true
      and volume[index] > vol_avg[index]
      and vol_avg[index] > vol_avg[index+4]
-    //  and volume[index] > volume[index+1]
-    //  and volume[index+4] > vol_avg[index+4]
 
     bar_above_all_indicators = true
      and high[index] > ema_9[index]
@@ -234,7 +232,7 @@ changed_direction_indication(index) =>
 changed_direction_indication = changed_direction_indication(0)
 moving_up_indication = moving_up_indication(0)
 
-plotshape(changed_direction_indication, title="Changed direction", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
+plotshape(changed_direction_indication, title="Changed direction", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "📈")
 plotshape(moving_up_indication, title="Moving up", color=color.green, display = display.pane, style = shape.labeldown, size = size.small, location = location.abovebar, text = "🆙")
 
 alertcondition(moving_up_indication or changed_direction_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
