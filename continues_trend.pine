@@ -14,7 +14,6 @@ ema_200 = ta.ema(close, 200)
 vwap = ta.vwap(hlc3)
 vol_avg = ta.sma(volume, 20)
 [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
-ema_200_days = request.security(syminfo.tickerid, "D", ema_200, lookahead = barmerge.lookahead_on)
 current_timeframe = str.tonumber(timeframe.period)
 if timeframe.period == "10S"
     current_timeframe := 10
@@ -22,520 +21,6 @@ if timeframe.period == "10S"
 _made_more_than_usual_percentage_already(index, percentage) =>
     yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
     (close[index] - yesterday_close)/open[index] > percentage
-
-_close_to_9_ema(index, allowed_distance_threshold) =>
-    distance_from_9_ema = math.abs(low[index] - ema_9[index])/(high[index] - low[index])
-    previous_distance_from_9_ema = math.abs(low[index+1] - ema_9[index+1])/(high[index+1] - low[index+1])
-
-    current_distance_smaller_than_previous_and_strong_bar = distance_from_9_ema < previous_distance_from_9_ema and volume[index] > volume[index+1] * 1.2
-
-    crossed_9_ema_up = low[index] <= ema_9[index] and (ema_9[index] - low[index])/(close[index] - ema_9[index]) < 0.1
-
-    close_to_9_ema = distance_from_9_ema < allowed_distance_threshold
-     or crossed_9_ema_up
-     or current_distance_smaller_than_previous_and_strong_bar
-
-    close_to_9_ema
-
-_price_above_all_indicators_for_last_bars(index, last_bars) =>
-    price_above_all_indicators_for_last_bars = true
-
-    for i = index+last_bars to index
-        after_market_open = (hour[i] == 9 and minute[i] >= 30) or hour[i] > 9
-
-        if true
-         and close[i] < vwap[i]
-         and close[i] < ema_9[i]
-         and low[i] < low[i+1]
-        //  and after_market_open
-         and volume[i] > 10000
-         and vol_avg[i] > 10000
-            price_above_all_indicators_for_last_bars := false
-            break
-
-    price_above_all_indicators_for_last_bars
-
-_ema_to_price_ratio_looks_good(index) =>
-    last_bars = 2
-    allowed_distance_threshold = 0.3
-
-    close_to_9_ema = _close_to_9_ema(index, allowed_distance_threshold)
-    price_above_all_indicators_for_last_bars = _price_above_all_indicators_for_last_bars(index, last_bars)
-
-    true
-     and close_to_9_ema
-     and price_above_all_indicators_for_last_bars
-
-_current_bar_is_strong(index, first_pick_bar_index) =>
-    bar_is_positive = close[index] > open[index]
-    bar_is_strong = (close[index] - open[index])/(high[index] - low[index]) >= 0.2
-     and open[index] >= low[index+1]
-     and high[index] > vwap[index]
-    bar_is_highest_in_the_last_bars = true
-    if first_pick_bar_index > 0
-        for i = first_pick_bar_index-1 to index+1
-            if i < 0
-                continue
-            if high[i] > high[index] and volume[i] > volume[index]
-                bar_is_highest_in_the_last_bars := false
-                break
-
-    bar_body_is_solid = (close[index] - open[index]) > (open[index] - low[index])
-
-    bar_is_positive
-     and bar_is_strong
-     and bar_is_highest_in_the_last_bars
-     and bar_body_is_solid
-
-_histogram_looks_good_and_strong(index, first_pick_bar_index) =>
-    histogram_looks_good_and_strong = histogram[index] > histogram[index+1]
-     and macd[index+1] > 0
-     and signal_line[index+1] > 0
-
-    histogram_changed_direction = false
-    close_to_current = 5
-    if current_timeframe > 5
-        close_to_current := 2
-    if histogram_looks_good_and_strong and first_pick_bar_index > 0
-        for i = first_pick_bar_index to index
-            if i-1 < 0
-                continue
-
-            if histogram[i] < histogram[i+1]
-             and histogram[i] < histogram[i-1]
-                histogram_changed_direction := true
-
-            histogram_does_not_going_into_strong_direction = histogram[i] > histogram[i+1]
-             and histogram[i] > histogram[i-1]
-             and i != index
-             and i != first_pick_bar_index-1
-             and i != first_pick_bar_index
-             and i - index < close_to_current
-
-            if histogram_does_not_going_into_strong_direction
-
-                histogram_looks_good_and_strong := false
-
-    true
-     and histogram_looks_good_and_strong
-     and histogram_changed_direction
-
-_macd_trend_goes_up(index, macd, histogram) =>
-    bars_back_for_30_minutes_before = int(30/current_timeframe)
-    last_highest_histogram = ta.highest(histogram[index], bars_back_for_30_minutes_before)
-    last_highest_macd = ta.highest(macd[index], bars_back_for_30_minutes_before)
-    histogram[index] > last_highest_histogram/1.5
-     and macd[index] > last_highest_macd/1.5
-
-_macd_looks_positive(index, first_pick_bar_index) =>
-    macd_trend_goes_up = _macd_trend_goes_up(index, macd, histogram)
-    histogram_looks_good_and_strong = _histogram_looks_good_and_strong(index, first_pick_bar_index)
-    previous_histogram_lower_than_current = histogram[index+1] < histogram[index]
-
-    macd_looks_positive = first_pick_bar_index > 0
-    if macd_trend_goes_up
-     and previous_histogram_lower_than_current
-     and macd_looks_positive
-        for i = first_pick_bar_index to index
-            if macd[i] < 0
-             and signal_line[i] < 0
-             and volume[i] > vol_avg[i]
-             and vol_avg[i] > 20000
-                macd_looks_positive := false
-                break
-    true
-     and macd_looks_positive
-     and macd[index] > 0
-     and signal_line[index] > 0
-     and previous_histogram_lower_than_current
-     and histogram_looks_good_and_strong
-
-_volume_is_the_highest_until_now(index, first_pick_bar_index) =>
-    volume_is_the_highest_until_now = true
-    if first_pick_bar_index > 0
-        for i = first_pick_bar_index-1 to index+1
-            if i < 0
-                continue
-
-            if volume[index] < volume[index+1]
-                volume_is_the_highest_until_now := false
-                break
-
-            if (volume[i] > volume[index] and high[i] > high[index])
-                volume_is_the_highest_until_now := false
-                break
-
-            if volume[index]/volume[i] < 0.75
-                volume_is_the_highest_until_now := false
-                break
-
-    volume_is_the_highest_until_now
-
-_volume_average_indicate_on_trend(index, first_pick_bar_index) =>
-    volume_average_indicate_on_trend = first_pick_bar_index > 0
-    if volume_average_indicate_on_trend
-        for i = first_pick_bar_index to index
-            if vol_avg[i] < 10000
-                volume_average_indicate_on_trend := false
-                break
-
-    true
-     and (volume[index] > vol_avg[index] * 1.5 or (volume[index] > vol_avg[index] and volume[index] > volume[index+1] * 1.5))
-     and vol_avg[index] > 20000
-     and volume_average_indicate_on_trend
-
-_price_movement_is_big(index, first_pick_bar_index) =>
-    price_movement_is_big = true
-    if first_pick_bar_index > 0
-        for i = first_pick_bar_index-1 to index+1
-            if (close[i] - low[i]) > (high[index] - low[index])
-             and (close[i+1] - low[i+1])/(close[i] - low[i]) > 0.6
-                price_movement_is_big := false
-                break
-
-    price_movement_is_big
-     and high[index] - low[index] > 0.1
-
-_bars_are_full(index, first_pick_bar_index) =>
-    bars_are_full_counter = 0
-    if first_pick_bar_index > 0
-        for i = first_pick_bar_index-1 to index
-            if math.abs(close[i] - open[i])/(high[i] - low[i]) > 0.5
-             or (close[i] < open[i] and (close[i] - low[i])/(high[i] - low[i]) > 0.5)
-                bars_are_full_counter += 1
-
-    result = bars_are_full_counter/(first_pick_bar_index-1) >= 0.7
-    // if time == timestamp(relevant_timezone, year, 8, 25, 10, 10) and current_timeframe == 5
-    //     log.info("bars_are_full_counter: {0}, total: {1}", bars_are_full_counter, first_pick_bar_index-1)
-    result
-
-_has_volatility_smile_on_price_action(index, first_pick_bar_index) =>
-    price_under_borders = true
-    negative_bars_are_weak = true
-    lowest_low = 100.0
-    for i = first_pick_bar_index-1 to index+1
-        if i < 0
-            continue
-
-        if (high[i] > high[first_pick_bar_index] and low[i] > low[first_pick_bar_index])
-         or close[i] > close[index]
-            price_under_borders := false
-
-        if low[i] < lowest_low
-            lowest_low := low[i]
-
-    lowest_value_deleted_most_of_value_before = (high[first_pick_bar_index] - lowest_low) > (high[first_pick_bar_index] - low[first_pick_bar_index])/2
-
-    price_action_has_smile_pattern = true
-    didnt_reach_lowest_low = true
-    for i = first_pick_bar_index-1 to index+1
-        if i < 0 or i-1 < 0
-            continue
-
-        if low[i] == lowest_low
-            didnt_reach_lowest_low := false
-            continue
-
-        if high[i] < high[i-1]
-         and didnt_reach_lowest_low
-         and low[i-1] != lowest_low
-            price_action_has_smile_pattern := false
-
-        if not didnt_reach_lowest_low
-         and low[i] < low[i+1]
-         and open[i] < open[i+1]
-            price_action_has_smile_pattern := false
-
-    true
-     and price_under_borders
-     and lowest_value_deleted_most_of_value_before
-     and price_action_has_smile_pattern
-
-_has_volatility_smile_pattern(index, good_to_go_for_check) =>
-    has_smile_pattern = false
-    smile_type = ""
-    first_pick_bar_index = 0
-    if good_to_go_for_check
-        bars_back = int(360/current_timeframe)
-        for i = index+3 to index+bars_back
-            if i-1 < 0 or i-2 < 0
-                continue
-
-            if dayofmonth[i] != dayofmonth[index]
-                continue
-
-            no_bar_with_more_volume_before = true
-            for j = i+5 to i+1
-                if volume[j] >= volume[i]
-                    no_bar_with_more_volume_before := false
-                    break
-
-            no_bar_higher_after = true
-            for j = i-1 to i-5
-                if j < 0
-                    continue
-
-                if open[j] > open[i]
-                 and close[j] > close[i]
-                 and high[j] > high[i]
-                 and volume[j]/volume[i] >= 0.75
-                 and j > index+1
-                    no_bar_higher_after := false
-                    break
-
-            is_volume_first_pick = true
-             and volume[i] > vol_avg[i]
-             and (volume[i+1] > vol_avg[i+1] or volume[i] > volume[i+1] * 10)
-             and volume[i] > volume[i+1]
-             and volume[i] > volume[i+2]
-             and no_bar_with_more_volume_before
-             and no_bar_higher_after
-
-            // if time == timestamp(relevant_timezone, year, 4, 2, 11, 30) and current_timeframe == 5 and i == 6
-            //     log.info("res: {0}", true)
-
-            first_pick_bars_back = int(120/current_timeframe)
-            highest_high_until_now = 0.0
-            for j = first_pick_bars_back to i
-                if high[j] > highest_high_until_now
-                    highest_high_until_now := high[j]
-
-            if true
-             and is_volume_first_pick
-             and highest_high_until_now == high[i]
-             and volume[i] > 10000
-             and close[i] > vwap[i]
-                // if time == timestamp(relevant_timezone, year, 8, 19, 11, 20) and current_timeframe == 5
-                //     log.info("i: {0}", i)
-                first_pick_bar_index := i
-                break
-
-        no_negative_bar_is_stronger = true
-        bars_with_low_volume_counter = 0
-        if first_pick_bar_index != 0
-            for i = first_pick_bar_index-1 to index+1
-
-                if volume[i] < volume[first_pick_bar_index]
-                 and volume[i] < volume[index]
-                    bars_with_low_volume_counter += 1
-
-                if close[i] < open[i]
-                 and volume[i] > volume[index]
-                    no_negative_bar_is_stronger := false
-
-            // if time == timestamp(relevant_timezone, year, 7, 18, 10, 45) and current_timeframe == 5
-            //     log.info("bars_with_low_volume_counter: {0}. first_pick_bar_index_time: {1}:{2}", bars_with_low_volume_counter, hour[first_pick_bar_index], minute[first_pick_bar_index])
-
-        no_strong_bar_in_the_middle = true
-        for i = index+2 to first_pick_bar_index-2
-            if i < 0
-                continue
-            if volume[i]/volume[index] > 0.5
-             and high[i] > open[index]
-             and low[i] < low[first_pick_bar_index]
-                // if time == timestamp(relevant_timezone, year, 8, 28, 11, 10) and current_timeframe == 5
-                //     log.info("i: {0}", i)
-
-                no_strong_bar_in_the_middle := false
-
-        has_volatility_smile_on_price_action = _has_volatility_smile_on_price_action(index, first_pick_bar_index)
-        has_enough_time_between_borders = (first_pick_bar_index - index) * current_timeframe >= 30
-        if current_timeframe < 5
-            has_enough_time_between_borders := (first_pick_bar_index - index) * current_timeframe >= 10
-
-        if bars_with_low_volume_counter != 0
-            has_smile_pattern := bars_with_low_volume_counter/first_pick_bar_index >= 0.6
-             and no_negative_bar_is_stronger
-             and no_strong_bar_in_the_middle
-             and has_enough_time_between_borders
-
-            if has_smile_pattern
-                smile_type := "v"
-            else
-                no_strong_bar_in_the_middle := true
-                for i = first_pick_bar_index-1 to index+1
-                    bar_is_stronger_than_current = math.abs(close[i] - open[i]) > (close[index] - open[index])
-                    bar_has_volume = volume[i]/volume[index] > 0.5
-                    if bar_is_stronger_than_current and bar_has_volume
-                        no_strong_bar_in_the_middle := false
-
-                has_smile_pattern := true
-                 and has_volatility_smile_on_price_action
-                 and has_enough_time_between_borders
-                 and no_strong_bar_in_the_middle
-                if has_smile_pattern
-                    smile_type := "p"
-
-    no_previous_bar_passed_above_first_pick = true
-    if has_smile_pattern and smile_type == "p"
-        for i = first_pick_bar_index-1 to index+2
-            if i < 0
-                continue
-            if high[i] > high[first_pick_bar_index]
-                no_previous_bar_passed_above_first_pick := false
-
-    current_bar_overlappes_with_first_pick_bar = low[index] < high[first_pick_bar_index]
-     or low[index+1] < high[first_pick_bar_index]
-
-    has_smile_pattern := has_smile_pattern
-     and no_previous_bar_passed_above_first_pick
-     and current_bar_overlappes_with_first_pick_bar
-     and volume[index] > 100000
-
-    [has_smile_pattern, first_pick_bar_index, smile_type]
-
-_has_volatility_smile_pattern_v2(index, good_to_go_for_check) =>
-    has_smile_pattern = false
-    current_index_closes_potentially_smile = true
-     and close[index] > open[index]
-     and close[index] > vwap[index]
-     and close[index] > ema_9[index]
-     and volume[index] > vol_avg[index]
-     and volume[index+1]/vol_avg[index+1] < 1.5
-     and high[index] > high[index+1]
-     and close[index] - open[index] > close[index+1] - open[index+1]
-     and volume[index] > 100000
-
-    first_pick_bar_index = 0
-    if current_index_closes_potentially_smile and good_to_go_for_check
-        for i = int(index+(60/current_timeframe)) to index+1
-            if i-1 < 0
-                continue
-            potential_start_on_smile = true
-             and volume[i] > vol_avg[i]
-             and volume[i] > volume[i-1]
-             and high[i] > high[i+1]
-             and high[i] > high[i-1]
-
-            before_volume_sum = volume[i]
-            for j = i+1 to i+6
-                before_volume_sum += volume[j]
-
-            after_volume_sum = 0.0
-            for j = i-1 to i-6
-                if j < 0 or j <= index
-                    continue
-                after_volume_sum += volume[j]
-
-            no_bar_with_more_volume_before = true
-            for j = i+5 to i+1
-                if volume[j] >= volume[i]
-                 and high[j] > high[i]
-                    no_bar_with_more_volume_before := false
-                    break
-
-            if potential_start_on_smile
-             and before_volume_sum > after_volume_sum
-                has_enough_time_between_borders = i * current_timeframe >= 15
-
-                has_smile_pattern := true
-                 and potential_start_on_smile
-                 and before_volume_sum > after_volume_sum
-                 and has_enough_time_between_borders
-                 and no_bar_with_more_volume_before
-
-                if has_smile_pattern
-                    first_pick_bar_index := i
-
-    [has_smile_pattern, first_pick_bar_index]
-
-momentum_trend_continue(index, enable_logging) =>
-    percentage = 0.075
-    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    ema_to_price_ratio_looks_good = _ema_to_price_ratio_looks_good(index)
-    must_have_significant_volume = volume[index] > 500000
-    previous_bar_is_positive_too = close[index+1] > open[index+1]
-     or (close[index+1] - low[index+1])/(high[index+1] - low[index+1]) > 0.7
-    not_on_the_first_candle = true
-    if hour[index] == 9 and minute[index] == 30 and current_timeframe < 5
-        not_on_the_first_candle := false
-
-    result = true
-     and made_more_than_usual_percentage_already
-     and ema_to_price_ratio_looks_good
-     and not_on_the_first_candle
-     and must_have_significant_volume
-     and previous_bar_is_positive_too
-
-    good_to_go_for_check = false
-    if result
-        good_to_go_for_check := true
-
-    [has_volatility_smile_pattern, first_pick_bar_index, smile_type] = _has_volatility_smile_pattern(index, good_to_go_for_check)
-    [has_volatility_smile_pattern_v2, first_pick_bar_index_v2] = _has_volatility_smile_pattern_v2(index, good_to_go_for_check)
-
-    relevant_index = 0
-    smile_version = ""
-    if has_volatility_smile_pattern_v2
-        relevant_index := first_pick_bar_index_v2
-        smile_version := "v2"
-    else if has_volatility_smile_pattern
-        smile_version := "v1"
-        relevant_index := first_pick_bar_index
-
-    current_bar_is_bigger_than_first_pick = close[index] - open[index] > math.abs(close[relevant_index] - open[relevant_index])
-    volume_average_indicate_on_trend = _volume_average_indicate_on_trend(index, relevant_index)
-    macd_looks_positive = _macd_looks_positive(index, relevant_index)
-    current_bar_is_strong = _current_bar_is_strong(index, relevant_index)
-    volume_is_the_highest_until_now = _volume_is_the_highest_until_now(index, relevant_index)
-    price_movement_is_big = _price_movement_is_big(index, relevant_index)
-    bars_are_full = _bars_are_full(index, relevant_index)
-
-    result := result
-     and current_bar_is_strong
-     and volume_average_indicate_on_trend
-     and macd_looks_positive
-     and current_bar_is_bigger_than_first_pick
-     and (price_movement_is_big or volume_is_the_highest_until_now)
-     and (has_volatility_smile_pattern or has_volatility_smile_pattern_v2)
-     and bars_are_full
-
-    if result
-     and enable_logging
-        label.new(bar_index-relevant_index, high[relevant_index], text=str.format("m: {0}.  v: {1}", relevant_index * current_timeframe, smile_version), size = size.small, style = label.style_label_lower_right)
-
-    result
-
-just_crossed_last_high(index) =>
-    is_positive = close[index] > open[index]
-    bars_back = int(360/current_timeframe)
-    today_highest = ta.highest(high[1], bars_back)
-    just_crossed_last_high = false
-    just_crossed_last_high := close[index] > today_highest
-
-    should_label_first_pick = true
-    momentum_trend_continue_0 = momentum_trend_continue(index, should_label_first_pick)
-    if momentum_trend_continue_0
-        should_label_first_pick := false
-    momentum_trend_continue_1 = momentum_trend_continue(index+1, should_label_first_pick)
-    if momentum_trend_continue_1
-        should_label_first_pick := false
-    momentum_trend_continue_2 = momentum_trend_continue(index+2, should_label_first_pick)
-    if momentum_trend_continue_2
-        should_label_first_pick := false
-    momentum_trend_continue_3 = momentum_trend_continue(index+3, should_label_first_pick)
-    if momentum_trend_continue_3
-        should_label_first_pick := false
-    momentum_trend_continue_4 = momentum_trend_continue(index+4, should_label_first_pick)
-    if momentum_trend_continue_4
-        should_label_first_pick := false
-    momentum_trend_continue_5 = momentum_trend_continue(index+5, should_label_first_pick)
-
-    momentum_happend_before = momentum_trend_continue_0
-     or momentum_trend_continue_1
-     or momentum_trend_continue_2
-     or momentum_trend_continue_3
-     or momentum_trend_continue_4
-     or momentum_trend_continue_5
-
-    result = just_crossed_last_high
-     and momentum_happend_before
-     and is_positive
-
-    if result
-        log.info("momentum trend continue!")
-
-    result
 
 _current_bar_is_bigger_than_other_positive_previous_bars(index, start_index) =>
     current_bar_is_bigger_than_other_positive_previous_bars = true
@@ -690,8 +175,8 @@ _current_high_is_the_highest(index, movement_is_after_market_start) =>
 
 moving_up_indication(index) =>
     percentage = 0.4
-    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
 
     [bar_is_positive, start_point_index] = _bar_is_positive(index)
 
@@ -705,12 +190,51 @@ moving_up_indication(index) =>
 
     result
 
+changed_direction_indication(index) =>
+    percentage = 0.4
+    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+
+    only_on_bigger_timeframes = current_timeframe >= 5
+
+    histogram_changed_direction = true
+     and histogram[index] > histogram[index+1]
+     and histogram[index+1] < histogram[index+2]
+     and histogram[index+2] < histogram[index+3]
+     and histogram[index+3] > histogram[index+4]
+
+    volume_is_high_enough = true
+     and volume[index] > vol_avg[index]
+     and vol_avg[index] > vol_avg[index+4]
+    //  and volume[index] > volume[index+1]
+    //  and volume[index+4] > vol_avg[index+4]
+
+    bar_above_all_indicators = true
+     and high[index] > ema_9[index]
+     and high[index] > vwap[index]
+     and ema_9[index] > ema_20[index]
+
+    bar_is_positive = true
+     and close[index] > open[index]
+     and (close[index] - open[index])/(high[index] - low[index]) >= 0.5
+
+    result = true
+     and made_more_than_usual_percentage_already
+     and only_on_bigger_timeframes
+     and histogram_changed_direction
+     and volume_is_high_enough
+     and bar_above_all_indicators
+     and bar_is_positive
+
+    if result
+        log.info("changed direction!")
+
+    result
 
 ///////////// indications /////////////
-just_crossed_last_high = just_crossed_last_high(0)
+changed_direction_indication = changed_direction_indication(0)
 moving_up_indication = moving_up_indication(0)
 
-plotshape(just_crossed_last_high, title="Just crossed last high", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
+plotshape(changed_direction_indication, title="Changed direction", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
 plotshape(moving_up_indication, title="Moving up", color=color.green, display = display.pane, style = shape.labeldown, size = size.small, location = location.abovebar, text = "🆙")
 
-alertcondition(moving_up_indication or just_crossed_last_high, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(moving_up_indication or changed_direction_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
