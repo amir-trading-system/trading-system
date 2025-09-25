@@ -21,9 +21,6 @@ if timeframe.period == "10S"
 
 _made_more_than_usual_percentage_already(index, percentage) =>
     yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
-
-    if (hour[index] == 9 and minute[index] < 30) or hour[index] < 9
-        yesterday_close := request.security(syminfo.tickerid, "D", close, lookahead = barmerge.lookahead_on)
     (close[index] - yesterday_close)/open[index] > percentage
 
 _close_to_9_ema(index, allowed_distance_threshold) =>
@@ -540,10 +537,10 @@ just_crossed_last_high(index) =>
 
     result
 
-_current_bar_is_bigger_than_other_positive_previous_bars(index) =>
+_current_bar_is_bigger_than_other_positive_previous_bars(index, start_index) =>
     current_bar_is_bigger_than_other_positive_previous_bars = true
-    for i = index+6 to index+1
-        if i-1 < 0
+    for i = start_index-1 to index+1
+        if i-1 < 0 or i < 0
             continue
         bar_is_positive = close[i] > open[i]
         if not bar_is_positive
@@ -552,22 +549,18 @@ _current_bar_is_bigger_than_other_positive_previous_bars(index) =>
         if high[i] > high[i+1] and high[i] > high[i-1]
             continue
 
-        if (close[i] - open[i])/(close[index] - open[index]) > 0.7
-            current_bar_is_bigger_than_other_positive_previous_bars := false
-            break
-
-        current_bar_value = high[index] - low[index]
-        previous_bar_value = high[i] - low[i]
-        if previous_bar_value/current_bar_value >= 0.9
+        if close[i] - open[i] > close[index] - open[index]
             current_bar_is_bigger_than_other_positive_previous_bars := false
             break
 
     current_bar_is_bigger_than_other_positive_previous_bars
 
-_price_didnt_move_a_lot_in_the_previous_bars(index) =>
+_price_didnt_move_a_lot_in_the_previous_bars(index, start_index) =>
     highest_close = 0.0
     lowest_close = 100.0
-    for i = index+6 to index+1
+    for i = start_index-1 to index+1
+        if i < 0
+            continue
         if close[i] > highest_close
             highest_close := close[i]
         if close[i] < lowest_close
@@ -576,28 +569,42 @@ _price_didnt_move_a_lot_in_the_previous_bars(index) =>
     price_didnt_move_a_lot_in_the_previous_bars = highest_close - lowest_close < high[index] - low[index]
 
 _current_bar_volume_is_moving_up_for_real(index) =>
-    bars_back = 10
     last_bars_volume_sum = 0.0
-    for i = bars_back+index to index+1
+    for i = 10 to index
+        if i < 0
+            continue
         last_bars_volume_sum += volume[i]
 
     volume_threshold = 1000000
     last_bars_volume_is_high = last_bars_volume_sum > volume_threshold
 
     current_volume_is_much_higher = true
-     and volume[index] > 1000000
+     and volume[index] > 500000
      and volume[index] > vol_avg[index]
-     and volume[index] > volume[index+1] * 3
+
+    for i = index+1 to 10
+        if i < 0
+            continue
+        if close[i] > open[i]
+            continue
+        if volume[index] < volume[i] * 2
+            current_volume_is_much_higher := false
+            break
 
     current_price_movement_is_much_higher = true
-     and high[index] - low[index] > (high[index+1] - low[index+1]) * 2
+     and close[index] - open[index] > (close[index+1] - open[index+1]) * 2
      and (close[index+1] - open[index])/(close[index] - open[index]) < 0.3
+     and (high[index] - close[index])/(high[index] - low[index]) <= 0.2
 
-    current_volume_is_higher_than_last_bars = true
+    current_volume_is_significantlly_higher_than_last_bars = true
     current_high_is_higher_than_last_bars = true
-    for i = index+5 to index+1
-        if volume[i] > volume[index]
-            current_volume_is_higher_than_last_bars := false
+    for i = 10 to index+1
+        if i < 0
+            continue
+        if close[i] > open[i]
+            continue
+        if volume[i] * 2 > volume[index]
+            current_volume_is_significantlly_higher_than_last_bars := false
 
         if high[i] > high[index]
             current_high_is_higher_than_last_bars := false
@@ -605,62 +612,76 @@ _current_bar_volume_is_moving_up_for_real(index) =>
     current_bars_volume_sum = 0.0
     previous_bars_volume_sum = 0.0
 
-    for i = index+20 to index+11
+    for i = 20 to 11
         previous_bars_volume_sum += volume[i]
 
-    for i = index+10 to index+1
+    for i = 10 to index+1
+        if i < 0
+            continue
         current_bars_volume_sum += volume[i]
 
     volume_is_the_last_bars_is_higher_than_before = current_bars_volume_sum > previous_bars_volume_sum
 
     at_least_one_bar_before_above_vwap = false
-    for i = index+10 to index+1
+    for i = 10 to index+1
+        if i < 0
+            continue
         if close[i] > vwap[i]
             at_least_one_bar_before_above_vwap := true
             break
 
-    basic_scenario = true
+    result = true
      and last_bars_volume_is_high
      and current_volume_is_much_higher
      and current_price_movement_is_much_higher
-     and current_volume_is_higher_than_last_bars
+     and current_volume_is_significantlly_higher_than_last_bars
      and current_high_is_higher_than_last_bars
      and at_least_one_bar_before_above_vwap
 
-    current_bar_is_right_after_market_starts_to_move = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] < 11)
-    bar_closing_high = (high[index] - close[index])/(high[index] - low[index]) < 0.3
-    volume_is_strong = true
-     and volume[index] > vol_avg[index]
-     and volume[index] > volume[index+1]
-     and volume[index] > 100000
-
-    specific_scenario = true
-     and current_price_movement_is_much_higher
-     and current_high_is_higher_than_last_bars
-     and current_bar_is_right_after_market_starts_to_move
-     and bar_closing_high
-     and volume_is_strong
-     and at_least_one_bar_before_above_vwap
-
-    true
-     and (basic_scenario or specific_scenario)
+    result
 
 _bar_is_positive(index) =>
-    bar_is_positive = close[index] > open[index]
+    bar_is_positive = true
+     and close[index] > open[index]
+
     bar_above_all_indicators = true
      and high[index] > ema_9[index]
-     and high[index] > vwap[index]
+     and ema_9[index] > ema_20[index]
+     and high[index]/vwap[index] > 0.9
 
-    true
+    bar_is_stronger_than_before = false
+    start_point_index = 0
+    for i = index+1 to index+10
+        if volume[i] * 3 > volume[index]
+         and (close[i] < open[i] or (high[i] - close[i])/(high[i] - low[i]) > 0.5)
+         and volume[i] > volume[i-1] * 1.5
+         and volume[i] > vol_avg[i] * 1.5
+         and vol_avg[i] < vol_avg[index]
+            // if time == timestamp(relevant_timezone, year, 8, 21, 12, 33) and current_timeframe == 1
+            //     log.info("i: {0}", i)
+            start_point_index := i
+            break
+
+    if start_point_index != 0
+        bar_is_stronger_than_before := close[index] >= high[start_point_index]
+        for i = start_point_index-1 to index+1
+            if volume[i] > volume[start_point_index]
+             or volume[i] * 2 > volume[index]
+                bar_is_stronger_than_before := false
+                break
+
+    result = true
      and bar_is_positive
      and bar_above_all_indicators
+     and bar_is_stronger_than_before
+
+    [result, start_point_index]
 
 _current_high_is_the_highest(index, movement_is_after_market_start) =>
     current_high_is_the_highest = false
     if movement_is_after_market_start
         current_high_is_the_highest := true
-        bars_back = (((hour[index] - 9) * 60) + (minute[index] - 30))/current_timeframe
-        for i = bars_back to index+1
+        for i = index+10 to index+1
             if high[i] > high[index]
                 current_high_is_the_highest := false
                 break
@@ -668,26 +689,19 @@ _current_high_is_the_highest(index, movement_is_after_market_start) =>
     current_high_is_the_highest
 
 moving_up_indication(index) =>
-    percentage = 0.15
-    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or hour[index] > 9
+    percentage = 0.4
+    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    current_bar_volume_is_moving_up_for_real = _current_bar_volume_is_moving_up_for_real(index)
-    bar_is_positive = _bar_is_positive(index)
-    current_bar_is_bigger_than_other_positive_previous_bars = _current_bar_is_bigger_than_other_positive_previous_bars(index)
-    price_didnt_move_a_lot_in_the_previous_bars = _price_didnt_move_a_lot_in_the_previous_bars(index)
-    current_high_is_the_highest = _current_high_is_the_highest(index, movement_is_after_market_start)
+
+    [bar_is_positive, start_point_index] = _bar_is_positive(index)
 
     result = true
-     and made_more_than_usual_percentage_already
-     and current_bar_volume_is_moving_up_for_real
-     and bar_is_positive
-     and current_bar_is_bigger_than_other_positive_previous_bars
-     and price_didnt_move_a_lot_in_the_previous_bars
      and movement_is_after_market_start
-     and current_high_is_the_highest
+     and made_more_than_usual_percentage_already
+     and bar_is_positive
 
     if result
-        log.info("Moving up!")
+        log.info("Moving up!. start_point: {0}", start_point_index)
 
     result
 
@@ -699,4 +713,4 @@ moving_up_indication = moving_up_indication(0)
 plotshape(just_crossed_last_high, title="Just crossed last high", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "🆙")
 plotshape(moving_up_indication, title="Moving up", color=color.green, display = display.pane, style = shape.labeldown, size = size.small, location = location.abovebar, text = "🆙")
 
-alertcondition(just_crossed_last_high or moving_up_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(moving_up_indication or just_crossed_last_high, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")

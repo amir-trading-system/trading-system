@@ -27,7 +27,7 @@ def get_stocks_by_price_change_and_volume():
 
                     historical_data = yfinance.download(
                         symbol,
-                        period="1mo",
+                        period="3mo",
                         interval="1d",
                         auto_adjust=False,
                         progress=False,
