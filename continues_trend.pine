@@ -128,6 +128,7 @@ _current_bar_volume_is_moving_up_for_real(index) =>
 _bar_is_positive(index) =>
     bar_is_positive = true
      and close[index] > open[index]
+     and (close[index] - open[index])/(high[index] - low[index]) > 0.2
 
     bar_above_all_indicators = true
      and high[index] > ema_9[index]
@@ -142,6 +143,7 @@ _bar_is_positive(index) =>
          and volume[i] > volume[i-1] * 1.5
          and volume[i] > vol_avg[i] * 1.5
          and vol_avg[i] < vol_avg[index]
+         and i - index >= 5
             // if time == timestamp(relevant_timezone, year, 8, 21, 12, 33) and current_timeframe == 1
             //     log.info("i: {0}", i)
             start_point_index := i
@@ -151,7 +153,8 @@ _bar_is_positive(index) =>
         bar_is_stronger_than_before := close[index] >= high[start_point_index]
         for i = start_point_index-1 to index+1
             if volume[i] > volume[start_point_index]
-             or volume[i] * 2 > volume[index]
+             or volume[i] * 1.2 > volume[index]
+             or (volume[i] > volume[i+1] * 2 and volume[i] > volume[i-1] * 2)
                 bar_is_stronger_than_before := false
                 break
 
@@ -185,22 +188,43 @@ moving_up_indication(index) =>
      and made_more_than_usual_percentage_already
      and bar_is_positive
 
-    if result
-        log.info("Moving up!. start_point: {0}", start_point_index)
+    // if result
+    //     log.info("Moving up!. start_point: {0}", start_point_index)
 
     result
 
 changed_direction_indication(index) =>
     percentage = 0.2
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
 
     only_on_bigger_timeframes = current_timeframe >= 5
 
-    histogram_changed_direction = true
-     and histogram[index] > histogram[index+1]
-     and histogram[index+1] < histogram[index+2]
-     and histogram[index+2] < histogram[index+3]
-     and histogram[index+3] > histogram[index+4]
+    top_histogram_index = 0
+    for i = index to index+6
+        if i-1 < 0
+            continue
+        if histogram[i] > histogram[i+1]
+         and histogram[i] > histogram[i-1]
+            top_histogram_index := i
+            break
+
+    histogram_goes_down = true
+    for i = top_histogram_index-1 to index+1
+        if i-1 < 0
+            continue
+        if (histogram[i] < histogram[i-1]
+         and i-1 > index)
+         or histogram[i] < 0
+         or macd[i] < 0
+            histogram_goes_down := false
+            break
+
+    histogram_changed_direction = false
+    if histogram_goes_down
+        histogram_changed_direction := true
+         and histogram[index] > histogram[index+1]
+         and high[index] > high[top_histogram_index]
 
     volume_is_high_enough = true
      and volume[index] > vol_avg[index]
@@ -217,14 +241,16 @@ changed_direction_indication(index) =>
 
     result = true
      and made_more_than_usual_percentage_already
+     and movement_is_after_market_start
      and only_on_bigger_timeframes
      and histogram_changed_direction
      and volume_is_high_enough
      and bar_above_all_indicators
      and bar_is_positive
+     and top_histogram_index >= 3
 
     if result
-        log.info("changed direction!")
+        log.info("changed direction!. top_histogram_index: {0}", top_histogram_index)
 
     result
 
