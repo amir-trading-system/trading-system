@@ -9,11 +9,8 @@ import TradingView/ta/10
 relevant_timezone = "America/New_York"
 
 ema_9 = ta.ema(close, 9)
-ema_20 = ta.ema(close, 20)
-ema_200 = ta.ema(close, 200)
 vwap = ta.vwap(hlc3)
 vol_avg = ta.sma(volume, 20)
-// today_highest = request.security(syminfo.tickerid, "D", high[0], lookahead = barmerge.lookahead_off)
 [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
 current_timeframe = str.tonumber(timeframe.period)
 if timeframe.period == "10S"
@@ -23,239 +20,7 @@ _made_more_than_usual_percentage_already(index, percentage) =>
     yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
     (close[index] - yesterday_close)/open[index] > percentage
 
-_current_bar_is_bigger_than_other_positive_previous_bars(index, start_index) =>
-    current_bar_is_bigger_than_other_positive_previous_bars = true
-    for i = start_index-1 to index+1
-        if i-1 < 0 or i < 0
-            continue
-        bar_is_positive = close[i] > open[i]
-        if not bar_is_positive
-            continue
-
-        if high[i] > high[i+1] and high[i] > high[i-1]
-            continue
-
-        if close[i] - open[i] > close[index] - open[index]
-            current_bar_is_bigger_than_other_positive_previous_bars := false
-            break
-
-    current_bar_is_bigger_than_other_positive_previous_bars
-
-_price_didnt_move_a_lot_in_the_previous_bars(index, start_index) =>
-    highest_close = 0.0
-    lowest_close = 100.0
-    for i = start_index-1 to index+1
-        if i < 0
-            continue
-        if close[i] > highest_close
-            highest_close := close[i]
-        if close[i] < lowest_close
-            lowest_close := close[i]
-
-    price_didnt_move_a_lot_in_the_previous_bars = highest_close - lowest_close < high[index] - low[index]
-
-_current_bar_volume_is_moving_up_for_real(index) =>
-    last_bars_volume_sum = 0.0
-    for i = 10 to index
-        if i < 0
-            continue
-        last_bars_volume_sum += volume[i]
-
-    volume_threshold = 1000000
-    last_bars_volume_is_high = last_bars_volume_sum > volume_threshold
-
-    current_volume_is_much_higher = true
-     and volume[index] > 500000
-     and volume[index] > vol_avg[index]
-
-    for i = index+1 to 10
-        if i < 0
-            continue
-        if close[i] > open[i]
-            continue
-        if volume[index] < volume[i] * 2
-            current_volume_is_much_higher := false
-            break
-
-    current_price_movement_is_much_higher = true
-     and close[index] - open[index] > (close[index+1] - open[index+1]) * 2
-     and (close[index+1] - open[index])/(close[index] - open[index]) < 0.3
-     and (high[index] - close[index])/(high[index] - low[index]) <= 0.2
-
-    current_volume_is_significantlly_higher_than_last_bars = true
-    current_high_is_higher_than_last_bars = true
-    for i = 10 to index+1
-        if i < 0
-            continue
-        if close[i] > open[i]
-            continue
-        if volume[i] * 2 > volume[index]
-            current_volume_is_significantlly_higher_than_last_bars := false
-
-        if high[i] > high[index]
-            current_high_is_higher_than_last_bars := false
-
-    current_bars_volume_sum = 0.0
-    previous_bars_volume_sum = 0.0
-
-    for i = 20 to 11
-        previous_bars_volume_sum += volume[i]
-
-    for i = 10 to index+1
-        if i < 0
-            continue
-        current_bars_volume_sum += volume[i]
-
-    volume_is_the_last_bars_is_higher_than_before = current_bars_volume_sum > previous_bars_volume_sum
-
-    at_least_one_bar_before_above_vwap = false
-    for i = 10 to index+1
-        if i < 0
-            continue
-        if close[i] > vwap[i]
-            at_least_one_bar_before_above_vwap := true
-            break
-
-    result = true
-     and last_bars_volume_is_high
-     and current_volume_is_much_higher
-     and current_price_movement_is_much_higher
-     and current_volume_is_significantlly_higher_than_last_bars
-     and current_high_is_higher_than_last_bars
-     and at_least_one_bar_before_above_vwap
-
-    result
-
-_bar_is_positive(index) =>
-    bar_is_positive = true
-     and close[index] > open[index]
-     and (close[index] - open[index])/(high[index] - low[index]) > 0.2
-
-    bar_above_all_indicators = true
-     and high[index] > ema_9[index]
-     and ema_9[index] > ema_20[index]
-     and high[index]/vwap[index] > 0.9
-
-    bar_is_stronger_than_before = false
-    start_point_index = 0
-    for i = index+1 to index+10
-        if volume[i] * 3 > volume[index]
-         and (close[i] < open[i] or (high[i] - close[i])/(high[i] - low[i]) > 0.5)
-         and volume[i] > volume[i-1] * 1.5
-         and volume[i] > vol_avg[i] * 1.5
-         and vol_avg[i] < vol_avg[index]
-         and i - index >= 5
-            // if time == timestamp(relevant_timezone, year, 8, 21, 12, 33) and current_timeframe == 1
-            //     log.info("i: {0}", i)
-            start_point_index := i
-            break
-
-    if start_point_index != 0
-        bar_is_stronger_than_before := close[index] >= high[start_point_index]
-        for i = start_point_index-1 to index+1
-            if volume[i] > volume[start_point_index]
-             or volume[i] * 1.2 > volume[index]
-             or (volume[i] > volume[i+1] * 2 and volume[i] > volume[i-1] * 2)
-                bar_is_stronger_than_before := false
-                break
-
-    result = true
-     and bar_is_positive
-     and bar_above_all_indicators
-     and bar_is_stronger_than_before
-
-    [result, start_point_index]
-
-_current_high_is_the_highest(index, movement_is_after_market_start) =>
-    current_high_is_the_highest = false
-    if movement_is_after_market_start
-        current_high_is_the_highest := true
-        for i = index+10 to index+1
-            if high[i] > high[index]
-                current_high_is_the_highest := false
-                break
-
-    current_high_is_the_highest
-
-moving_up_indication(index) =>
-    percentage = 0.2
-    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
-
-    [bar_is_positive, start_point_index] = _bar_is_positive(index)
-
-    result = true
-     and movement_is_after_market_start
-     and made_more_than_usual_percentage_already
-     and bar_is_positive
-
-    if result
-        log.info("Moving up!. start_point: {0}", start_point_index)
-
-    result
-
-changed_direction_indication(index) =>
-    percentage = 0.2
-    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
-
-    only_on_bigger_timeframes = current_timeframe >= 5
-
-    top_histogram_index = 0
-    for i = index to index+6
-        if i-1 < 0
-            continue
-        if histogram[i] > histogram[i+1]
-         and histogram[i] > histogram[i-1]
-            top_histogram_index := i
-            break
-
-    histogram_goes_down = true
-    for i = top_histogram_index-1 to index+1
-        if i-1 < 0
-            continue
-        if (histogram[i] < histogram[i-1]
-         and i-1 > index)
-         or histogram[i] < 0
-         or macd[i] < 0
-            histogram_goes_down := false
-            break
-
-    histogram_changed_direction = false
-    if histogram_goes_down
-        histogram_changed_direction := true
-         and histogram[index] > histogram[index+1]
-         and high[index] > high[top_histogram_index]
-
-    volume_is_high_enough = true
-     and volume[index] > vol_avg[index]
-     and vol_avg[index] > vol_avg[index+4]
-
-    bar_above_all_indicators = true
-     and high[index] > ema_9[index]
-     and high[index] > vwap[index]
-     and ema_9[index] > ema_20[index]
-
-    bar_is_positive = true
-     and close[index] > open[index]
-     and (close[index] - open[index])/(high[index] - low[index]) >= 0.5
-
-    result = true
-     and made_more_than_usual_percentage_already
-     and movement_is_after_market_start
-     and only_on_bigger_timeframes
-     and histogram_changed_direction
-     and volume_is_high_enough
-     and bar_above_all_indicators
-     and bar_is_positive
-     and top_histogram_index >= 3
-
-    if result
-        log.info("changed direction!. top_histogram_index: {0}", top_histogram_index)
-
-    result
-
-test(index) =>
+trend_continues(index) =>
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
@@ -301,30 +66,30 @@ test(index) =>
     [result, top_point_index]
 
 ///////////// indications /////////////
-test_indication() =>
+continues_trend_indication() =>
     var float index = na
     var int top_point_index = na
     already_happend_before = false
-    [test_result_0, top_point_index_0] = test(0)
-    [test_result_1, top_point_index_1] = test(1)
-    [test_result_2, top_point_index_2] = test(2)
-    [test_result_3, top_point_index_3] = test(3)
-    if test_result_0
+    [trend_continues_result_0, top_point_index_0] = trend_continues(0)
+    [trend_continues_result_1, top_point_index_1] = trend_continues(1)
+    [trend_continues_result_2, top_point_index_2] = trend_continues(2)
+    [trend_continues_result_3, top_point_index_3] = trend_continues(3)
+    if trend_continues_result_0
         index := 0
         top_point_index := top_point_index_0
         already_happend_before := true
     if na(index)
-        if test_result_1 and na(index)
+        if trend_continues_result_1 and na(index)
             index := 1
             top_point_index := top_point_index_1
             already_happend_before := true
     if na(index)
-        if test_result_2 and na(index)
+        if trend_continues_result_2 and na(index)
             index := 2
             top_point_index := top_point_index_2
             already_happend_before := true
     if na(index)
-        if test_result_3 and na(index)
+        if trend_continues_result_3 and na(index)
             index := 3
             top_point_index := top_point_index_3
             already_happend_before := true
@@ -345,12 +110,10 @@ test_indication() =>
         log.info("buyers coming in, ready for change! index: {0}. top_point_index: {1}", index, top_point_index)
         label.new(bar_index-top_point_index, high[top_point_index], text="top", size = size.small, style = label.style_label_lower_right)
 
-    result
+    result and not na(index)
 
-test_indication = test_indication()
+continues_trend_indication = continues_trend_indication()
 
-plotshape(test_indication, title="Test", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
-// plotshape(changed_direction_indication, title="Changed direction", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "📈")
-// plotshape(moving_up_indication, title="Moving up", color=color.green, display = display.pane, style = shape.labeldown, size = size.small, location = location.abovebar, text = "🆙")
+plotshape(continues_trend_indication, title="Continues Trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
 
-alertcondition(test_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(continues_trend_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
