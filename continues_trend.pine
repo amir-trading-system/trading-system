@@ -23,22 +23,17 @@ _made_more_than_usual_percentage_already(index, percentage) =>
 trend_continues(index) =>
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 14)
+    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 20)
 
     top_point_index = 0
     for i = index to index+5
         if i-1 < 0
             continue
 
-        bar_is_very_weak = close[i] < open[i]
-         and high[i] - close[i] > open[i] - low[i]
-         and volume[i] > volume[i+1]
-
         if high[i] > high[i+1]
          and high[i] > high[i-1]
          and low[i] > ema_9[i]
          and volume[i] > vol_avg[i]
-         and not bar_is_very_weak
             if (current_timeframe <= 5 and high[i] > high[i+2]) or current_timeframe > 5
                 top_point_index := i
                 break
@@ -130,7 +125,6 @@ continues_trend_indication() =>
      and histogram[1] < histogram[2]
      and close_to_9_ema_than_before
      and volume[0] > 100000
-     and volume[0] >= volume[1]
      and histogram[0]/histogram[top_point_index] >= 0.5
 
     if current_timeframe <= 2
