@@ -124,7 +124,7 @@ continues_trend_indication() =>
      and histogram[0] > histogram[1]
      and histogram[1] < histogram[2]
      and close_to_9_ema_than_before
-     and volume[0] > 100000
+     and volume[0] > 50000
      and histogram[0]/histogram[top_point_index] >= 0.5
 
     if current_timeframe <= 2
