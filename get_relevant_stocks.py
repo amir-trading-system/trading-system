@@ -45,7 +45,7 @@ def get_stocks_by_price_change_and_volume():
     with open("stocks_by_price_change.csv", "w") as csv_write_file:
         writer = csv.DictWriter(
             csv_write_file,
-            fieldnames=["Symbol", "Date", "Open To High Ratio"],
+            fieldnames=["Symbol", "Date", "Low To High Ratio"],
         )
         writer.writeheader()
         for stock in all_stocks:
@@ -61,7 +61,7 @@ def get_stocks_by_price_change_and_volume():
             if not is_valid_symbol:
                 continue
 
-            open_to_high = {}
+            low_to_high = {}
             symbol = stock["Symbol"].rstrip()
             market_cap = int(float(stock["Market Cap"]))
             price = float(stock["Price"].replace('$', ''))
@@ -77,56 +77,58 @@ def get_stocks_by_price_change_and_volume():
                     interval="1d",
                     auto_adjust=False,
                     progress=False,
+                    prepost=True,
                     threads=40,
                 )
-                filtered_data_by_price = historical_data.Open[symbol][
-                    (historical_data.Open[symbol] > 1) &
-                    (historical_data.Volume[symbol] > 15000000)
+                filtered_data_by_price = historical_data.Low[symbol][
+                    (historical_data.Low[symbol] > 1)
+                    # &
+                    # (historical_data.Volume[symbol] > 3000000)
                 ]
 
-                for date, stock_open_price in filtered_data_by_price.items():
-                    if not open_to_high.get(symbol, None):
-                        open_to_high[symbol] = {
+                for date, stock_low_price in filtered_data_by_price.items():
+                    if not low_to_high.get(symbol, None):
+                        low_to_high[symbol] = {
                             date: {
-                                "open": stock_open_price,
+                                "low": stock_low_price,
                             },
                         }
                     else:
-                        if not open_to_high[symbol].get(date, None):
-                            open_to_high[symbol][date] = {
-                                "open": stock_open_price
+                        if not low_to_high[symbol].get(date, None):
+                            low_to_high[symbol][date] = {
+                                "low": stock_low_price
                             }
                         else:
-                            open_to_high[symbol][date]["open"] = stock_open_price
+                            low_to_high[symbol][date]["low"] = stock_low_price
 
                 filtered_data_by_price = historical_data.High[symbol][historical_data.High[symbol] > 1]
                 for date, stock_high_price in filtered_data_by_price.items():
-                    if not open_to_high.get(symbol, None):
-                        open_to_high[symbol] = {
+                    if not low_to_high.get(symbol, None):
+                        low_to_high[symbol] = {
                             date: {
                                 "high": stock_high_price,
                             },
                         }
                     else:
-                        if not open_to_high[symbol].get(date, None):
-                            open_to_high[symbol][date] = {
+                        if not low_to_high[symbol].get(date, None):
+                            low_to_high[symbol][date] = {
                                 "high": stock_high_price
                             }
                         else:
-                            open_to_high[symbol][date]["high"] = stock_high_price
+                            low_to_high[symbol][date]["high"] = stock_high_price
 
-                for symbol, dates in open_to_high.items():
+                for symbol, dates in low_to_high.items():
                     for date, price in dates.items():
-                        if not price.get("open", None):
+                        if not price.get("low", None):
                             continue
-                        ratio = (price["high"] - price["open"])/price["open"]
-                        if ratio < 0.4:
+                        ratio = (price["high"] - price["low"])/price["low"]
+                        if ratio < 0.8:
                             continue
                         writer.writerow(
                             {
                                 "Symbol": symbol,
                                 "Date": date.date(),
-                                "Open To High Ratio": ratio,
+                                "Low To High Ratio": ratio,
                             }
                         )
                         csv_write_file.flush()
