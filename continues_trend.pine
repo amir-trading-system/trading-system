@@ -79,7 +79,7 @@ trend_continues(index) =>
     close_to_ema_9_than_top_index = math.abs(low[index] - ema_9[index]) < math.abs(low[top_point_index] - ema_9[top_point_index])
 
     starting_trend_index = 0
-    bars_back = (((hour[index] - 9) * 60) + (minute[index] - 30))/current_timeframe
+    bars_back = ((hour[index] - 8) * 60)/current_timeframe
     min_bars_back = math.min(bars_back, 10)
     for i = top_point_index+1 to top_point_index+min_bars_back
         if i < 0
@@ -94,15 +94,19 @@ trend_continues(index) =>
             starting_trend_index := i
             break
 
-    lowest_point_from_top_point_value = 100.0
-    lowest_point_from_top_point_index = 100
-    for i = index to top_point_index
+    lowest_point_from_top_point_value = 1000.0
+    lowest_point_from_top_point_index = 0
+    for i = index+1 to top_point_index-1
+        if i < 0
+            continue
         if low[i] < lowest_point_from_top_point_value
             lowest_point_from_top_point_value := low[i]
             lowest_point_from_top_point_index := i
 
+    fibonacci_retracement = (high[top_point_index] - low[lowest_point_from_top_point_index])/(high[top_point_index] - low[starting_trend_index])
     move_is_still_strong_due_to_fibonacci_retracement = starting_trend_index > top_point_index
-     and (high[top_point_index] - low[lowest_point_from_top_point_index])/(high[top_point_index] - low[starting_trend_index]) <= 0.65
+     and fibonacci_retracement <= 0.7
+     and fibonacci_retracement >= 0.236
 
     result = true
      and made_more_than_usual_percentage_already
