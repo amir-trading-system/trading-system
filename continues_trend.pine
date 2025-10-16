@@ -183,6 +183,7 @@ continues_trend_indication() =>
     if result and not na(index)
         log.info("index: {0}, top_point_index: {1}. lowest_point_from_top_point_index: {2}. starting_trend_index: {3}", index, top_point_index, lowest_point_from_top_point_index, starting_trend_index)
         label.new(bar_index-top_point_index, high[top_point_index], text="top", size = size.small, style = label.style_label_lower_right)
+        label.new(bar_index-starting_trend_index, high[starting_trend_index], text="start", size = size.small, style = label.style_label_lower_right)
 
     result and not na(index)
 
