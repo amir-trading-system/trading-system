@@ -105,7 +105,7 @@ trend_continues(index) =>
 
     fibonacci_retracement = (high[top_point_index] - low[lowest_point_from_top_point_index])/(high[top_point_index] - low[starting_trend_index])
     move_is_still_strong_due_to_fibonacci_retracement = starting_trend_index > top_point_index
-     and fibonacci_retracement <= 0.79
+     and fibonacci_retracement <= 0.62
      and fibonacci_retracement >= 0.236
 
     no_bar_from_top_closed_under_ema_9 = true

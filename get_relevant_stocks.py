@@ -79,6 +79,7 @@ def get_stocks_by_price_change_and_volume():
                     progress=False,
                     prepost=True,
                     threads=40,
+                    timeout=5,
                 )
                 filtered_data_by_price = historical_data.Low[symbol][
                     (historical_data.Low[symbol] > 1)
