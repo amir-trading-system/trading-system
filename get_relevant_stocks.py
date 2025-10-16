@@ -45,7 +45,7 @@ def get_stocks_by_price_change_and_volume():
     with open("stocks_by_price_change.csv", "w") as csv_write_file:
         writer = csv.DictWriter(
             csv_write_file,
-            fieldnames=["Symbol", "Date", "Low To High Ratio"],
+            fieldnames=["Symbol", "Date"],
         )
         writer.writeheader()
         for stock in all_stocks:
@@ -83,8 +83,6 @@ def get_stocks_by_price_change_and_volume():
                 )
                 filtered_data_by_price = historical_data.Low[symbol][
                     (historical_data.Low[symbol] > 1)
-                    # &
-                    # (historical_data.Volume[symbol] > 3000000)
                 ]
 
                 for date, stock_low_price in filtered_data_by_price.items():
@@ -129,7 +127,6 @@ def get_stocks_by_price_change_and_volume():
                             {
                                 "Symbol": symbol,
                                 "Date": date.date(),
-                                "Low To High Ratio": ratio,
                             }
                         )
                         csv_write_file.flush()
