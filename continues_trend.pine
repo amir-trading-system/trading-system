@@ -25,8 +25,31 @@ trend_continues(index) =>
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 20)
 
+    starting_trend_index = 0
+    bars_back = ((hour[index] - 7) * 60)/current_timeframe
+    min_bars_back = math.min(bars_back, 10)
+    for i = index+1 to index+min_bars_back
+        if i < 0
+            continue
+        is_first_bar_to_pop_up = close[i] > open[i]
+         and volume[i] > volume[i+1] * 2
+         and volume[i] > vol_avg[i]
+         and close[i] > ema_9[i]
+         and close[i] > vwap[i]
+
+        if is_first_bar_to_pop_up
+            starting_trend_index := i
+            break
+
+    highest_high = 0.0
+    highest_high_index = 0
+    for i = index+1 to starting_trend_index
+        if high[i] > highest_high
+            highest_high := high[i]
+            highest_high_index := i
+
     top_point_index = 0
-    for i = index to index+5
+    for i = index to starting_trend_index
         if i-1 < 0
             continue
 
@@ -34,9 +57,9 @@ trend_continues(index) =>
          and high[i] > high[i-1]
          and low[i] > ema_9[i]
          and volume[i] > vol_avg[i]
-            if (current_timeframe <= 5 and high[i] > high[i+2]) or current_timeframe > 5
-                top_point_index := i
-                break
+         and high[i] == highest_high
+            top_point_index := i
+            break
 
     coming_after_fall = false
     if top_point_index > 0
@@ -77,22 +100,6 @@ trend_continues(index) =>
         histogram_is_strong := histogram[index]/highest_histogram_until_now >= 0.5
 
     close_to_ema_9_than_top_index = math.abs(low[index] - ema_9[index]) < math.abs(low[top_point_index] - ema_9[top_point_index])
-
-    starting_trend_index = 0
-    bars_back = ((hour[index] - 7) * 60)/current_timeframe
-    min_bars_back = math.min(bars_back, 10)
-    for i = top_point_index+1 to top_point_index+min_bars_back
-        if i < 0
-            continue
-        is_first_bar_to_pop_up = close[i] > open[i]
-         and volume[i] > volume[i+1] * 2
-         and volume[i] > vol_avg[i]
-         and close[i] > ema_9[i]
-         and close[i] > vwap[i]
-
-        if is_first_bar_to_pop_up
-            starting_trend_index := i
-            break
 
     lowest_point_from_top_point_value = 1000.0
     lowest_point_from_top_point_index = 0
