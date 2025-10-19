@@ -16,6 +16,9 @@ current_timeframe = str.tonumber(timeframe.period)
 if timeframe.period == "10S"
     current_timeframe := 10
 
+// if time == timestamp(relevant_timezone, 2025, 9, 18, 11, 50) and current_timeframe == 5
+//     log.info("some log")
+
 _made_more_than_usual_percentage_already(index, percentage) =>
     yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
     (close[index] - yesterday_close)/open[index] > percentage
@@ -146,7 +149,6 @@ trend_continues(index) =>
 
     all_milestone_bars_are_volatile = volume[index] >= 50000
      and volume[top_point_index] >= 50000
-     and volume[starting_trend_index] >= 50000
 
     result = true
      and made_more_than_usual_percentage_already

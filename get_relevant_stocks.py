@@ -121,7 +121,7 @@ def get_stocks_by_price_change_and_volume():
                         if not price.get("low", None):
                             continue
                         ratio = (price["high"] - price["low"])/price["low"]
-                        if ratio < 0.8:
+                        if ratio < 0.8 or price["high"] < price["low"]:
                             continue
                         writer.writerow(
                             {
