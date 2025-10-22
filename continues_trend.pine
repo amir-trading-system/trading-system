@@ -229,8 +229,41 @@ continues_trend_indication() =>
 
     result and not na(index)
 
+price_goes_up(index) =>
+    percentage = 0.1
+    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 20)
+
+    bars_back = (((hour[index] - 9) * 60) + (minute[index] - 30))/current_timeframe
+
+    current_bar_is_highest_in_volume = true
+     and close[index] > open[index]
+     and high[index] > high[index+1]
+     and macd[index] > 0
+     and signal_line[index] > 0
+     and histogram[index] > 0
+     and close[index] > vwap[index]
+     and close[index] > ema_9[index]
+     and volume[index+1]/volume[index] < 0.7
+     and high[index] - low[index] > high[index+1] - low[index+1]
+     and volume[index+1] >= 100000
+
+    if current_bar_is_highest_in_volume
+     and movement_is_after_market_start
+        for i = index+1 to index+bars_back
+            if volume[i] > volume[index]
+                current_bar_is_highest_in_volume := false
+                break
+
+    result = true
+     and made_more_than_usual_percentage_already
+     and movement_is_after_market_start
+     and current_bar_is_highest_in_volume
+
+price_goes_up = price_goes_up(0)
 continues_trend_indication = continues_trend_indication()
 
+plotshape(price_goes_up, title="Price Goes Up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "🛫")
 plotshape(continues_trend_indication, title="Continues Trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
 
-alertcondition(continues_trend_indication, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
+alertcondition(continues_trend_indication or price_goes_up, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
