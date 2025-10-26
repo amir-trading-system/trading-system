@@ -37,7 +37,7 @@ _get_starting_index(index) =>
          and close[i] > vwap[i]
          and high[i] - low[i] > high[i+1] - low[i+1]
          and (close[i] - open[i])/(high[i] - low[i]) >= 0.4
-         and (histogram[i+1] < 0 or volume[i] > volume[i+1] * 10)
+         and (histogram[i+1] < 0 or histogram[i+2] < 0 or volume[i] > volume[i+1] * 10)
 
         if ema_9[i] < vwap[i]
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
