@@ -64,10 +64,9 @@ trend_continues(index) =>
 
         if high[i] > high[i+1]
          and high[i] > high[i-1]
-         and low[i] > ema_9[i]
+         and close[i] > ema_9[i]
          and volume[i] > vol_avg[i]
          and high[i] == highest_high
-         and starting_trend_index > i
             top_point_index := i
             break
 
@@ -155,6 +154,7 @@ trend_continues(index) =>
     all_milestone_bars_are_volatile = volume[index] >= 50000
      and volume[top_point_index] >= 50000
 
+
     result = true
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
@@ -172,7 +172,7 @@ trend_continues(index) =>
      and all_milestone_bars_are_volatile
      and current_timeframe >= 5
 
-    [result, top_point_index, lowest_point_from_top_point_index, starting_trend_index]
+    [result, top_point_index, lowest_point_from_top_point_index, starting_trend_index, fibonacci_retracement]
 
 ///////////// indications /////////////
 continues_trend_indication() =>
@@ -180,16 +180,18 @@ continues_trend_indication() =>
     var int top_point_index = na
     var int lowest_point_from_top_point_index = na
     var int starting_trend_index = na
+    var float fibonacci_retracement = na
     already_happend_before = false
-    [trend_continues_result_0, top_point_index_0, lowest_point_from_top_point_index_0, starting_trend_index_0] = trend_continues(0)
-    [trend_continues_result_1, top_point_index_1, lowest_point_from_top_point_index_1, starting_trend_index_1] = trend_continues(1)
-    [trend_continues_result_2, top_point_index_2, lowest_point_from_top_point_index_2, starting_trend_index_2] = trend_continues(2)
-    [trend_continues_result_3, top_point_index_3, lowest_point_from_top_point_index_3, starting_trend_index_3] = trend_continues(3)
+    [trend_continues_result_0, top_point_index_0, lowest_point_from_top_point_index_0, starting_trend_index_0, fibonacci_retracement_0] = trend_continues(0)
+    [trend_continues_result_1, top_point_index_1, lowest_point_from_top_point_index_1, starting_trend_index_1, fibonacci_retracement_1] = trend_continues(1)
+    [trend_continues_result_2, top_point_index_2, lowest_point_from_top_point_index_2, starting_trend_index_2, fibonacci_retracement_2] = trend_continues(2)
+    [trend_continues_result_3, top_point_index_3, lowest_point_from_top_point_index_3, starting_trend_index_3, fibonacci_retracement_3] = trend_continues(3)
     if trend_continues_result_0
         index := 0
         top_point_index := top_point_index_0
         lowest_point_from_top_point_index := lowest_point_from_top_point_index_0
         starting_trend_index := starting_trend_index_0
+        fibonacci_retracement := fibonacci_retracement_0
         already_happend_before := true
     if na(index)
         if trend_continues_result_1 and na(index)
@@ -197,6 +199,7 @@ continues_trend_indication() =>
             top_point_index := top_point_index_1
             lowest_point_from_top_point_index := lowest_point_from_top_point_index_1
             starting_trend_index := starting_trend_index_1
+            fibonacci_retracement := fibonacci_retracement_1
             already_happend_before := true
     if na(index)
         if trend_continues_result_2 and na(index)
@@ -204,6 +207,7 @@ continues_trend_indication() =>
             top_point_index := top_point_index_2
             lowest_point_from_top_point_index := lowest_point_from_top_point_index_2
             starting_trend_index := starting_trend_index_2
+            fibonacci_retracement := fibonacci_retracement_2
             already_happend_before := true
     if na(index)
         if trend_continues_result_3 and na(index)
@@ -211,6 +215,7 @@ continues_trend_indication() =>
             top_point_index := top_point_index_3
             lowest_point_from_top_point_index := lowest_point_from_top_point_index_3
             starting_trend_index := starting_trend_index_3
+            fibonacci_retracement := fibonacci_retracement_3
             already_happend_before := true
 
     close_to_9_ema_than_before = math.abs(low[0] - ema_9[0])/(high[0] - low[0]) <= 0.5
@@ -225,7 +230,8 @@ continues_trend_indication() =>
     if result and not na(index)
         log.info("index: {0}, top_point_index: {1}. lowest_point_from_top_point_index: {2}. starting_trend_index: {3}", index, top_point_index, lowest_point_from_top_point_index, starting_trend_index)
         label.new(bar_index-top_point_index, high[top_point_index], text="top", size = size.small, style = label.style_label_lower_right)
-        label.new(bar_index-starting_trend_index, high[starting_trend_index], text="start", size = size.small, style = label.style_label_lower_right)
+        label.new(bar_index-starting_trend_index, high[starting_trend_index], text=str.format("start: {0}\nf_r: {1}", starting_trend_index, fibonacci_retracement), size = size.small, style = label.style_label_lower_right)
+
 
     result and not na(index)
 
