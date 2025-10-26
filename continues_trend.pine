@@ -248,11 +248,8 @@ continues_trend_indication() =>
 
     if result and not na(index)
         log.info("index: {0}, top_index: {1}. lowest_point_from_top_point_index: {2}. starting_index: {3}", index, top_index, lowest_point_from_top_point_index, starting_index)
-        label.new(bar_index-top_index, high[top_index], text="top", size = size.small, style = label.style_label_lower_right)
-        label.new(bar_index-starting_index, high[starting_index], text=str.format("start: {0}\nf_r: {1}", starting_index, fibonacci_retracement), size = size.small, style = label.style_label_lower_right)
 
-
-    result and not na(index)
+    [result and not na(index), fibonacci_retracement, starting_index, top_index]
 
 price_goes_up(index) =>
     percentage = 0.1
@@ -297,9 +294,12 @@ price_goes_up(index) =>
     result
 
 price_goes_up = price_goes_up(0)
-continues_trend_indication = continues_trend_indication()
+[continues_trend_indication, fibonacci_retracement, starting_index, top_index] = continues_trend_indication()
 
 plotshape(price_goes_up, title="Price Goes Up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "🛫")
 plotshape(continues_trend_indication, title="Continues Trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
+plot(continues_trend_indication ? fibonacci_retracement : 0, "fibonacci_retracement", display = display.status_line)
+plot(continues_trend_indication ? starting_index : 0, "starting_index", display = display.status_line)
+plot(continues_trend_indication ? top_index : 0, "top_index", display = display.status_line)
 
 alertcondition(continues_trend_indication or price_goes_up, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
