@@ -25,7 +25,7 @@ _made_more_than_usual_percentage_already(index, percentage) =>
 
 _get_starting_index(index) =>
     starting_index = 0
-    bars_back = ((hour[index] - 7) * 60)/current_timeframe
+    bars_back = (((hour[index] - 7) * 60) + minute[index])/current_timeframe
     min_bars_back = math.min(bars_back, 20)
     for i = index+1 to index+min_bars_back
         if i < 0
@@ -42,10 +42,12 @@ _get_starting_index(index) =>
         if ema_9[i] < vwap[i]
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
              and macd[i] > 0
-             and signal_line[i] > 0
+             and signal_line[i] > -0.02
 
         if is_first_bar_to_pop_up
             starting_index := i
+            // if time == timestamp(relevant_timezone, 2024, 7, 9, 9, 45) and current_timeframe == 15 and index == 0
+            //     log.info("starting_index: {0}", starting_index)
             break
 
     starting_index
@@ -131,7 +133,7 @@ trend_continues(index) =>
 
     histogram_is_strong = false
     positive_histogram_start_index = 0
-    histogram_bars_back = ((hour[index] - 4) * 60)/current_timeframe
+    histogram_bars_back = (((hour[index] - 4) * 60) + minute[index])/current_timeframe
     for i = index+1 to index+histogram_bars_back
         if histogram[i] > 0
          and histogram[i+1] < 0
@@ -172,7 +174,6 @@ trend_continues(index) =>
 
     all_milestone_bars_are_volatile = volume[index] >= 50000
      and volume[top_index] >= 50000
-
 
     result = true
      and made_more_than_usual_percentage_already
