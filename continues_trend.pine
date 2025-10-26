@@ -288,18 +288,21 @@ price_goes_up(index) =>
      and current_bar_is_highest_in_volume
      and move_is_still_strong_due_to_fibonacci_retracement
 
-    if result
-        label.new(bar_index-starting_index, high[starting_index], text=str.format("start: {0}\nf_r: {1}", starting_index, fibonacci_retracement), size = size.small, style = label.style_label_lower_right)
+    [result, fibonacci_retracement, starting_index, top_index]
 
-    result
-
-price_goes_up = price_goes_up(0)
+[price_goes_up, fibonacci_retracement_price_goes_up, starting_index_price_goes_up, top_index_price_goes_up] = price_goes_up(0)
 [continues_trend_indication, fibonacci_retracement, starting_index, top_index] = continues_trend_indication()
 
+if not continues_trend_indication and price_goes_up
+    fibonacci_retracement := fibonacci_retracement_price_goes_up
+    starting_index := starting_index_price_goes_up
+    top_index := top_index_price_goes_up
+
 plotshape(price_goes_up, title="Price Goes Up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "🛫")
+
 plotshape(continues_trend_indication, title="Continues Trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
-plot(continues_trend_indication ? fibonacci_retracement : 0, "fibonacci_retracement", display = display.status_line)
-plot(continues_trend_indication ? starting_index : 0, "starting_index", display = display.status_line)
-plot(continues_trend_indication ? top_index : 0, "top_index", display = display.status_line)
+plot(continues_trend_indication or price_goes_up ? fibonacci_retracement : 0, "fibonacci_retracement", display = display.status_line)
+plot(continues_trend_indication or price_goes_up ? starting_index : 0, "starting_index", display = display.status_line)
+plot(continues_trend_indication or price_goes_up ? top_index : 0, "top_index", display = display.status_line)
 
 alertcondition(continues_trend_indication or price_goes_up, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
