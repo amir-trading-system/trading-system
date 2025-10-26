@@ -23,12 +23,8 @@ _made_more_than_usual_percentage_already(index, percentage) =>
     yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
     (close[index] - yesterday_close)/open[index] > percentage
 
-trend_continues(index) =>
-    percentage = 0.1
-    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    movement_is_after_market_start = (hour[index] == 9 and minute[index] >= 30) or (hour[index] > 9 and hour[index] <= 20)
-
-    starting_trend_index = 0
+_get_starting_index(index) =>
+    starting_index = 0
     bars_back = ((hour[index] - 7) * 60)/current_timeframe
     min_bars_back = math.min(bars_back, 20)
     for i = index+1 to index+min_bars_back
@@ -40,6 +36,8 @@ trend_continues(index) =>
          and close[i] > ema_9[i]
          and close[i] > vwap[i]
          and high[i] - low[i] > high[i+1] - low[i+1]
+         and (close[i] - open[i])/(high[i] - low[i]) >= 0.4
+         and (histogram[i+1] < 0 or volume[i] > volume[i+1] * 10)
 
         if ema_9[i] < vwap[i]
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
@@ -47,18 +45,21 @@ trend_continues(index) =>
              and signal_line[i] > 0
 
         if is_first_bar_to_pop_up
-            starting_trend_index := i
+            starting_index := i
             break
 
+    starting_index
+
+_get_top_index(index, starting_index) =>
     highest_high = 0.0
     highest_high_index = 0
-    for i = index+1 to starting_trend_index
+    for i = index+1 to starting_index
         if high[i] > highest_high
             highest_high := high[i]
             highest_high_index := i
 
-    top_point_index = 0
-    for i = index to starting_trend_index
+    top_index = 0
+    for i = index to starting_index
         if i-1 < 0
             continue
 
@@ -67,13 +68,48 @@ trend_continues(index) =>
          and close[i] > ema_9[i]
          and volume[i] > vol_avg[i]
          and high[i] == highest_high
-            top_point_index := i
+            top_index := i
             break
 
+    top_index
+
+_move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index) =>
+    fibonacci_retracement = (high[top_index] - low[lowest_point_from_top_point_index])/(high[top_index] - low[starting_index])
+    move_is_still_strong_due_to_fibonacci_retracement = starting_index > top_index
+     and fibonacci_retracement <= 0.62
+     and fibonacci_retracement >= 0.236
+
+    if not move_is_still_strong_due_to_fibonacci_retracement and top_index-1 > 0
+        move_is_still_strong_due_to_fibonacci_retracement := close[index] > high[top_index-1]
+
+    [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement]
+
+_get_lowest_point_from_top_point_index(index, top_index) =>
+    lowest_point_from_top_point_value = 1000.0
+    lowest_point_from_top_point_index = 0
+    for i = index+1 to top_index-1
+        if i < 0
+            continue
+        if low[i] < lowest_point_from_top_point_value
+            lowest_point_from_top_point_value := low[i]
+            lowest_point_from_top_point_index := i
+
+    lowest_point_from_top_point_index
+
+trend_continues(index) =>
+    percentage = 0.1
+    made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
+    movement_is_after_market_start = (hour[index] == 9 and minute[index] >= 30) or (hour[index] > 9 and hour[index] <= 20)
+
+    starting_index = _get_starting_index(index)
+    top_index = _get_top_index(index, starting_index)
+    lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
+    [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
+
     coming_after_fall = false
-    if top_point_index > 0
+    if top_index > 0
         coming_after_fall := true
-        for i = top_point_index to index+1
+        for i = top_index to index+1
             if i-1 < 0 or i-2 < 0
                 continue
             if high[i] < high[i-1]
@@ -109,32 +145,15 @@ trend_continues(index) =>
     if positive_histogram_start_index > 0
         histogram_is_strong := histogram[index]/highest_histogram_until_now >= 0.5
 
-    close_to_ema_9_than_top_index = math.abs(low[index] - ema_9[index]) < math.abs(low[top_point_index] - ema_9[top_point_index])
+    close_to_ema_9_than_top_index = math.abs(low[index] - ema_9[index]) < math.abs(low[top_index] - ema_9[top_index])
 
     if low[index] < ema_9[index]
      and close[index] > ema_9[index]
         close_to_ema_9_than_top_index := true
 
-    lowest_point_from_top_point_value = 1000.0
-    lowest_point_from_top_point_index = 0
-    for i = index+1 to top_point_index-1
-        if i < 0
-            continue
-        if low[i] < lowest_point_from_top_point_value
-            lowest_point_from_top_point_value := low[i]
-            lowest_point_from_top_point_index := i
-
-    fibonacci_retracement = (high[top_point_index] - low[lowest_point_from_top_point_index])/(high[top_point_index] - low[starting_trend_index])
-    move_is_still_strong_due_to_fibonacci_retracement = starting_trend_index > top_point_index
-     and fibonacci_retracement <= 0.62
-     and fibonacci_retracement >= 0.236
-
-    if not move_is_still_strong_due_to_fibonacci_retracement and top_point_index-1 > 0
-        move_is_still_strong_due_to_fibonacci_retracement := close[index] > high[top_point_index-1]
-
     no_bar_from_top_closed_under_ema_9 = true
     no_bar_has_flushed_more_than_30_percent = true
-    for i = top_point_index-1 to index
+    for i = top_index-1 to index
         if i < 0
             continue
         current_bar_is_weaker = high[index] - low[index] < high[i] - low[i]
@@ -146,13 +165,13 @@ trend_continues(index) =>
          and (close[i] - low[i])/(high[i] - low[i]) <= 0.2
 
         if is_strong_negative
-            flushed_more_than_30_percent = (high[i] - low[i])/(high[top_point_index] - low[starting_trend_index]) >= 0.3
+            flushed_more_than_30_percent = (high[i] - low[i])/(high[top_index] - low[starting_index]) >= 0.3
 
             if flushed_more_than_30_percent and current_bar_is_weaker
                 no_bar_has_flushed_more_than_30_percent := false
 
     all_milestone_bars_are_volatile = volume[index] >= 50000
-     and volume[top_point_index] >= 50000
+     and volume[top_index] >= 50000
 
 
     result = true
@@ -172,49 +191,49 @@ trend_continues(index) =>
      and all_milestone_bars_are_volatile
      and current_timeframe >= 5
 
-    [result, top_point_index, lowest_point_from_top_point_index, starting_trend_index, fibonacci_retracement]
+    [result, top_index, lowest_point_from_top_point_index, starting_index, fibonacci_retracement]
 
 ///////////// indications /////////////
 continues_trend_indication() =>
     var float index = na
-    var int top_point_index = na
+    var int top_index = na
     var int lowest_point_from_top_point_index = na
-    var int starting_trend_index = na
+    var int starting_index = na
     var float fibonacci_retracement = na
     already_happend_before = false
-    [trend_continues_result_0, top_point_index_0, lowest_point_from_top_point_index_0, starting_trend_index_0, fibonacci_retracement_0] = trend_continues(0)
-    [trend_continues_result_1, top_point_index_1, lowest_point_from_top_point_index_1, starting_trend_index_1, fibonacci_retracement_1] = trend_continues(1)
-    [trend_continues_result_2, top_point_index_2, lowest_point_from_top_point_index_2, starting_trend_index_2, fibonacci_retracement_2] = trend_continues(2)
-    [trend_continues_result_3, top_point_index_3, lowest_point_from_top_point_index_3, starting_trend_index_3, fibonacci_retracement_3] = trend_continues(3)
+    [trend_continues_result_0, top_index_0, lowest_point_from_top_point_index_0, starting_index_0, fibonacci_retracement_0] = trend_continues(0)
+    [trend_continues_result_1, top_index_1, lowest_point_from_top_point_index_1, starting_index_1, fibonacci_retracement_1] = trend_continues(1)
+    [trend_continues_result_2, top_index_2, lowest_point_from_top_point_index_2, starting_index_2, fibonacci_retracement_2] = trend_continues(2)
+    [trend_continues_result_3, top_index_3, lowest_point_from_top_point_index_3, starting_index_3, fibonacci_retracement_3] = trend_continues(3)
     if trend_continues_result_0
         index := 0
-        top_point_index := top_point_index_0
+        top_index := top_index_0
         lowest_point_from_top_point_index := lowest_point_from_top_point_index_0
-        starting_trend_index := starting_trend_index_0
+        starting_index := starting_index_0
         fibonacci_retracement := fibonacci_retracement_0
         already_happend_before := true
     if na(index)
         if trend_continues_result_1 and na(index)
             index := 1
-            top_point_index := top_point_index_1
+            top_index := top_index_1
             lowest_point_from_top_point_index := lowest_point_from_top_point_index_1
-            starting_trend_index := starting_trend_index_1
+            starting_index := starting_index_1
             fibonacci_retracement := fibonacci_retracement_1
             already_happend_before := true
     if na(index)
         if trend_continues_result_2 and na(index)
             index := 2
-            top_point_index := top_point_index_2
+            top_index := top_index_2
             lowest_point_from_top_point_index := lowest_point_from_top_point_index_2
-            starting_trend_index := starting_trend_index_2
+            starting_index := starting_index_2
             fibonacci_retracement := fibonacci_retracement_2
             already_happend_before := true
     if na(index)
         if trend_continues_result_3 and na(index)
             index := 3
-            top_point_index := top_point_index_3
+            top_index := top_index_3
             lowest_point_from_top_point_index := lowest_point_from_top_point_index_3
-            starting_trend_index := starting_trend_index_3
+            starting_index := starting_index_3
             fibonacci_retracement := fibonacci_retracement_3
             already_happend_before := true
 
@@ -225,12 +244,12 @@ continues_trend_indication() =>
      and histogram[1] < histogram[2]
      and close_to_9_ema_than_before
      and volume[0] > 50000
-     and histogram[0]/histogram[top_point_index] >= 0.5
+     and histogram[0]/histogram[top_index] >= 0.5
 
     if result and not na(index)
-        log.info("index: {0}, top_point_index: {1}. lowest_point_from_top_point_index: {2}. starting_trend_index: {3}", index, top_point_index, lowest_point_from_top_point_index, starting_trend_index)
-        label.new(bar_index-top_point_index, high[top_point_index], text="top", size = size.small, style = label.style_label_lower_right)
-        label.new(bar_index-starting_trend_index, high[starting_trend_index], text=str.format("start: {0}\nf_r: {1}", starting_trend_index, fibonacci_retracement), size = size.small, style = label.style_label_lower_right)
+        log.info("index: {0}, top_index: {1}. lowest_point_from_top_point_index: {2}. starting_index: {3}", index, top_index, lowest_point_from_top_point_index, starting_index)
+        label.new(bar_index-top_index, high[top_index], text="top", size = size.small, style = label.style_label_lower_right)
+        label.new(bar_index-starting_index, high[starting_index], text=str.format("start: {0}\nf_r: {1}", starting_index, fibonacci_retracement), size = size.small, style = label.style_label_lower_right)
 
 
     result and not na(index)
@@ -261,10 +280,21 @@ price_goes_up(index) =>
                 current_bar_is_highest_in_volume := false
                 break
 
+    starting_index = _get_starting_index(index)
+    top_index = _get_top_index(index, starting_index)
+    lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
+    [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
+
     result = true
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
      and current_bar_is_highest_in_volume
+     and move_is_still_strong_due_to_fibonacci_retracement
+
+    if result
+        label.new(bar_index-starting_index, high[starting_index], text=str.format("start: {0}\nf_r: {1}", starting_index, fibonacci_retracement), size = size.small, style = label.style_label_lower_right)
+
+    result
 
 price_goes_up = price_goes_up(0)
 continues_trend_indication = continues_trend_indication()
