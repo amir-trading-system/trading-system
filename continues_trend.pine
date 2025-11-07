@@ -143,9 +143,22 @@ trend_continues(index) =>
     if positive_histogram_start_index == 0
         positive_histogram_start_index := 1
 
-    highest_histogram_until_now = ta.highest(histogram, positive_histogram_start_index)
+    highest_histogram_until_now_index = 0
+    highest_histogram_until_now = 0.0
+    for i = index+1 to positive_histogram_start_index
+        if i-1 < 0
+            continue
+        if histogram[i] > histogram[i+1]
+         and histogram[i] > histogram[i-1]
+         and histogram[i] > highest_histogram_until_now
+            highest_histogram_until_now_index := i
+            highest_histogram_until_now := histogram[i]
+
     if positive_histogram_start_index > 0
-        histogram_is_strong := histogram[index]/highest_histogram_until_now >= 0.5
+     and highest_histogram_until_now_index > 0
+        lowest_histogram = histogram[index+1]
+        histogram_is_strong := lowest_histogram/highest_histogram_until_now >= 0.5
+         and highest_histogram_until_now_index <= starting_index - highest_histogram_until_now_index
 
     close_to_ema_9_than_top_index = math.abs(low[index] - ema_9[index]) < math.abs(low[top_index] - ema_9[top_index])
 
