@@ -35,10 +35,11 @@ _get_starting_index(index) =>
          and volume[i] > volume[i+1] * 2
          and volume[i] > vol_avg[i]
          and close[i] > ema_9[i]
-         and close[i] > vwap[i]
-         and high[i] - low[i] > high[i+1] - low[i+1]
+         and high[i] > vwap[i]
+         and high[i] - low[i] > (high[i+1] - low[i+1]) * 2
          and (close[i] - open[i])/(high[i] - low[i]) >= 0.4
-         and (histogram[i+1] < 0 or histogram[i+2] < 0 or volume[i] > volume[i+1] * 10)
+         and (histogram[i+1] < 0 or histogram[i+2] < 0 or histogram[i+1] * 5 < histogram[i])
+         and dayofmonth[i] == dayofmonth[index]
 
         if ema_9[i] < vwap[i]
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
@@ -182,10 +183,12 @@ trend_continues(index) =>
             if flushed_more_than_30_percent and current_bar_is_weaker
                 no_bar_has_flushed_more_than_30_percent := false
 
-    all_milestone_bars_are_volatile = volume[index] >= 50000
-     and volume[top_index] >= 50000
+    // all_milestone_bars_are_volatile = volume[index] >= 50000
+    //  and volume[top_index] >= 50000
 
     current_high_is_higher = high[index] > high[top_index]
+     or volume[index] > volume[top_index]
+     or volume[index] > vol_avg[index] * 1.5
 
     result = true
      and made_more_than_usual_percentage_already
@@ -201,7 +204,6 @@ trend_continues(index) =>
      and move_is_still_strong_due_to_fibonacci_retracement
      and no_bar_from_top_closed_under_ema_9
      and no_bar_has_flushed_more_than_30_percent
-     and all_milestone_bars_are_volatile
      and current_high_is_higher
      and current_timeframe >= 5
 
