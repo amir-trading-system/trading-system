@@ -37,14 +37,14 @@ _get_starting_index(index) =>
          and close[i] > ema_9[i]
          and high[i] > vwap[i]
          and high[i] - low[i] > (high[i+1] - low[i+1]) * 2
-         and (close[i] - open[i])/(high[i] - low[i]) >= 0.4
+         and (close[i] - open[i])/(high[i] - low[i]) >= 0.3
          and (histogram[i+1] < 0 or histogram[i+2] < 0 or histogram[i+1] * 5 < histogram[i])
          and dayofmonth[i] == dayofmonth[index]
 
         if ema_9[i] < vwap[i]
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
              and macd[i] > 0
-             and signal_line[i] > -0.02
+             and signal_line[i] > -0.05
 
         if is_first_bar_to_pop_up
             starting_index := i
@@ -155,8 +155,8 @@ trend_continues(index) =>
     if positive_histogram_start_index > 0
      and highest_histogram_until_now_index > 0
         lowest_histogram = histogram[index+1]
-        histogram_is_strong := true
-         and lowest_histogram/highest_histogram_until_now >= 0.35
+        histogram_is_strong := lowest_histogram/highest_histogram_until_now >= 0.35
+         or histogram[index]/highest_histogram_until_now >= 0.6
 
     close_to_ema_9_than_top_index = math.abs(low[index] - ema_9[index]) < math.abs(low[top_index] - ema_9[top_index])
 
