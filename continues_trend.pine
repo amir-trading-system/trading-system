@@ -27,7 +27,7 @@ _made_more_than_usual_percentage_already(index, percentage) =>
 
 _get_starting_index(index) =>
     starting_index = 0
-    min_bars_back = math.min(bars_back, 20)
+    min_bars_back = math.min(bars_back, 40)
     for i = index+1 to index+min_bars_back
         if i < 0
             continue
@@ -38,7 +38,7 @@ _get_starting_index(index) =>
          and high[i] > vwap[i]
          and high[i] - low[i] > (high[i+1] - low[i+1]) * 2
          and (close[i] - open[i])/(high[i] - low[i]) >= 0.3
-         and (histogram[i+1] < 0 or histogram[i+2] < 0 or histogram[i+1] * 5 < histogram[i])
+         and (histogram[i+1] < 0 or histogram[i+2] < 0 or histogram[i+1] * 3 < histogram[i])
          and dayofmonth[i] == dayofmonth[index]
 
         if ema_9[i] < vwap[i]
@@ -158,7 +158,7 @@ trend_continues(index) =>
         histogram_is_strong := lowest_histogram/highest_histogram_until_now >= 0.35
          or histogram[index]/highest_histogram_until_now >= 0.6
 
-    close_to_ema_9_than_top_index = math.abs(low[index] - ema_9[index]) < math.abs(low[top_index] - ema_9[top_index])
+    close_to_ema_9_than_top_index = math.abs(open[index] - ema_9[index]) < math.abs(open[top_index] - ema_9[top_index])
 
     if low[index] < ema_9[index]
      and close[index] > ema_9[index]
@@ -211,61 +211,21 @@ trend_continues(index) =>
 
 ///////////// indications /////////////
 continues_trend_indication() =>
-    var float index = na
-    var int top_index = na
-    var int lowest_point_from_top_point_index = na
-    var int starting_index = na
-    var float fibonacci_retracement = na
-    already_happend_before = false
-    [trend_continues_result_0, top_index_0, lowest_point_from_top_point_index_0, starting_index_0, fibonacci_retracement_0] = trend_continues(0)
-    [trend_continues_result_1, top_index_1, lowest_point_from_top_point_index_1, starting_index_1, fibonacci_retracement_1] = trend_continues(1)
-    [trend_continues_result_2, top_index_2, lowest_point_from_top_point_index_2, starting_index_2, fibonacci_retracement_2] = trend_continues(2)
-    [trend_continues_result_3, top_index_3, lowest_point_from_top_point_index_3, starting_index_3, fibonacci_retracement_3] = trend_continues(3)
-    if trend_continues_result_0
-        index := 0
-        top_index := top_index_0
-        lowest_point_from_top_point_index := lowest_point_from_top_point_index_0
-        starting_index := starting_index_0
-        fibonacci_retracement := fibonacci_retracement_0
-        already_happend_before := true
-    if na(index)
-        if trend_continues_result_1 and na(index)
-            index := 1
-            top_index := top_index_1
-            lowest_point_from_top_point_index := lowest_point_from_top_point_index_1
-            starting_index := starting_index_1
-            fibonacci_retracement := fibonacci_retracement_1
-            already_happend_before := true
-    if na(index)
-        if trend_continues_result_2 and na(index)
-            index := 2
-            top_index := top_index_2
-            lowest_point_from_top_point_index := lowest_point_from_top_point_index_2
-            starting_index := starting_index_2
-            fibonacci_retracement := fibonacci_retracement_2
-            already_happend_before := true
-    if na(index)
-        if trend_continues_result_3 and na(index)
-            index := 3
-            top_index := top_index_3
-            lowest_point_from_top_point_index := lowest_point_from_top_point_index_3
-            starting_index := starting_index_3
-            fibonacci_retracement := fibonacci_retracement_3
-            already_happend_before := true
+    [trend_continues_result, top_index, lowest_point_from_top_point_index, starting_index, fibonacci_retracement] = trend_continues(0)
 
     close_to_9_ema_than_before = math.abs(low[0] - ema_9[0])/(high[0] - low[0]) <= 0.5
 
-    result = already_happend_before
+    result = trend_continues_result
      and histogram[0] > histogram[1]
      and histogram[1] < histogram[2]
      and close_to_9_ema_than_before
      and volume[0] > 50000
      and histogram[0]/histogram[top_index] >= 0.5
 
-    if result and not na(index)
-        log.info("index: {0}, top_index: {1}. lowest_point_from_top_point_index: {2}. starting_index: {3}", index, top_index, lowest_point_from_top_point_index, starting_index)
+    if result
+        log.info("top_index: {1}. lowest_point_from_top_point_index: {2}. starting_index: {3}", top_index, lowest_point_from_top_point_index, starting_index)
 
-    [result and not na(index), fibonacci_retracement, starting_index, top_index]
+    [result, fibonacci_retracement, starting_index, top_index]
 
 price_goes_up(index) =>
     percentage = 0.1
@@ -316,7 +276,7 @@ plotshape(price_goes_up, title="Price Goes Up", color=color.green, display = dis
 
 plotshape(continues_trend_indication, title="Continues Trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
 plot(continues_trend_indication or price_goes_up ? fibonacci_retracement : 0, "fibonacci_retracement", display = display.status_line)
-plot(continues_trend_indication or price_goes_up ? starting_index : 0, "starting_index", display = display.status_line)
-plot(continues_trend_indication or price_goes_up ? top_index : 0, "top_index", display = display.status_line)
+plot(starting_index, "starting_index", display = display.status_line)
+plot(top_index, "top_index", display = display.status_line)
 
 alertcondition(continues_trend_indication or price_goes_up, title="Positive indication for long/short momentum", message="Positive indication for long/short momentum")
