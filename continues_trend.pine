@@ -275,7 +275,7 @@ if not continues_trend_indication and price_goes_up
 plotshape(price_goes_up, title="Price Goes Up", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.abovebar, text = "🛫")
 
 plotshape(continues_trend_indication, title="Continues Trend", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
-plot(continues_trend_indication or price_goes_up ? fibonacci_retracement : 0, "fibonacci_retracement", display = display.status_line)
+plot(fibonacci_retracement, "fibonacci_retracement", display = display.status_line)
 plot(starting_index, "starting_index", display = display.status_line)
 plot(top_index, "top_index", display = display.status_line)
 
