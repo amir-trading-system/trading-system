@@ -186,8 +186,6 @@ trend_continues(index) =>
             break
 
     current_high_is_higher = high[index] > high[top_index]
-     or volume[index] > volume[top_index]
-     or volume[index] > vol_avg[index] * 1.5
 
     result = true
      and made_more_than_usual_percentage_already
