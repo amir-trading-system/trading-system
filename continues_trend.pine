@@ -39,6 +39,8 @@ _get_starting_index(index) =>
          and high[i] - low[i] > (high[i+1] - low[i+1]) * 2
          and (close[i] - open[i])/(high[i] - low[i]) >= 0.3
          and dayofmonth[i] == dayofmonth[index]
+         and low[i] < vwap[i]
+         and high[i] > vwap[i]
 
         if ema_9[i] < vwap[i]
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
@@ -69,6 +71,7 @@ _get_top_index(index, starting_index) =>
          and close[i] > ema_9[i]
          and volume[i] > vol_avg[i]
          and high[i] == highest_high
+         and open[i] >= open[i+1]
             top_index := i
             break
 
@@ -97,6 +100,60 @@ _get_lowest_point_from_top_point_index(index, top_index) =>
 
     lowest_point_from_top_point_index
 
+_current_bar_should_be_involved_with_9_ema(index, top_index) =>
+    distance_from_ema_9 = math.abs(ema_9[index] - open[index])/(high[index] - open[index])
+
+    open_under_ema_9_but_bar_is_strong = true
+     and open[index] <= ema_9[index]
+     and math.abs(ema_9[index] - low[index])/(high[index] - low[index]) <= 0.10
+
+    open_above_ema_9_but_close = true
+     and open[index] > ema_9[index]
+     and (low[index] - ema_9[index])/(high[index] - low[index]) <= 0.10
+
+    ema_9_change_is_higher_than_before = true
+     and ema_9[index] - ema_9[index+1] > ema_9[index+1] - ema_9[index+2]
+
+    ema_9_change_from_top_index_is_highest = true
+    current_change = ema_9[index] - ema_9[index+1]
+    for i = top_index-1 to index+1
+        if i < 0
+            continue
+        if ema_9[i] - ema_9[i+1] >= current_change
+            ema_9_change_from_top_index_is_highest := false
+
+    not_close_but_strong = ema_9_change_from_top_index_is_highest
+     and histogram[index] > histogram[index+1]
+     and histogram[index+2] > histogram[index+1]
+     and histogram[index+3] > histogram[index+2]
+
+    ema_9_change_is_higher_than_before
+     and (open_under_ema_9_but_bar_is_strong or open_above_ema_9_but_close or not_close_but_strong)
+
+_milestones_are_valid(index, starting_index, top_index) =>
+    milestones_are_valid = true
+     and starting_index != top_index
+     and starting_index > index
+     and top_index > index
+     and volume[index] > 50000
+     and volume[top_index] > 50000
+
+_histogram_looks_good(index, top_index) =>
+    histogram_changed_direction = histogram[index] > histogram[index+1]
+     and histogram[index+1] < histogram[index+2]
+
+    histogram_raised_significantly = true
+     and histogram[index+2] < histogram[index+1]
+     and histogram[index+1] < histogram[index]
+     and histogram[index+2]/histogram[index+1] >= 0.85
+     and histogram[index] - histogram[index+1] > (histogram[index+1] - histogram[index+2]) * 2
+
+    histogram_changed_significantly = histogram_changed_direction
+     or histogram_raised_significantly
+
+    histogram_changed_significantly
+     and histogram[index]/histogram[top_index] >= 0.5
+
 trend_continues(index) =>
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
@@ -106,6 +163,9 @@ trend_continues(index) =>
     top_index = _get_top_index(index, starting_index)
     lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
+    current_bar_should_be_involved_with_9_ema = _current_bar_should_be_involved_with_9_ema(index, top_index)
+    milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
+    histogram_looks_good = _histogram_looks_good(index, top_index)
 
     coming_after_fall = false
     if top_index > 0
@@ -171,21 +231,8 @@ trend_continues(index) =>
             if flushed_more_than_30_percent and current_bar_is_weaker
                 no_bar_has_flushed_more_than_30_percent := false
 
-    red_bars_are_not_strong = true
-    for i = top_index - 1 to index
-        if i < 0
-            continue
-
-        bar_is_negative = close[i] < open[i]
-        bar_is_negative_and_weak = bar_is_negative
-         and (open[i] - close[i])/(high[i] - low[i]) > 0.6
-         and low[i]/close[i] > 0.9
-
-        if bar_is_negative_and_weak
-            red_bars_are_not_strong := false
-            break
-
     current_high_is_higher = high[index] > high[top_index]
+     or (volume[index] > vol_avg[index] * 1.5 and low[index] < vwap[index] and close[index] > vwap[index])
 
     result = true
      and made_more_than_usual_percentage_already
@@ -203,79 +250,52 @@ trend_continues(index) =>
      and no_bar_from_top_closed_under_ema_9
      and no_bar_has_flushed_more_than_30_percent
      and current_high_is_higher
-     and red_bars_are_not_strong
+     and current_bar_should_be_involved_with_9_ema
+     and milestones_are_valid
+     and histogram_looks_good
      and current_timeframe >= 5
-
-    [result, top_index, lowest_point_from_top_point_index, starting_index, fibonacci_retracement]
-
-///////////// indications /////////////
-continues_trend_indication() =>
-    [trend_continues_result, top_index, lowest_point_from_top_point_index, starting_index, fibonacci_retracement] = trend_continues(0)
-
-    close_to_9_ema = math.abs(low[0] - ema_9[0])/(high[0] - low[0]) <= 0.5
-
-    histogram_changed_direction = histogram[0] > histogram[1]
-     and histogram[1] < histogram[2]
-
-    histogram_raised_significantly = true
-     and histogram[2] < histogram[1]
-     and histogram[1] < histogram[0]
-     and histogram[2]/histogram[1] >= 0.85
-     and histogram[0] - histogram[1] > (histogram[1] - histogram[2]) * 2
-
-    histogram_changed_significantly = (histogram_changed_direction and close_to_9_ema)
-     or histogram_raised_significantly
-
-    result = true
-     and trend_continues_result
-     and histogram_changed_significantly
-     and volume[0] > 50000
-     and histogram[0]/histogram[top_index] >= 0.5
+     and volume[index] > 50000
 
     if result
-        log.info("top_index: {1}. lowest_point_from_top_point_index: {2}. starting_index: {3}", top_index, lowest_point_from_top_point_index, starting_index)
+        log.info("CT - starting_index: {0}. top_index: {1}.", starting_index, top_index)
 
     [result, fibonacci_retracement, starting_index, top_index]
 
+///////////// price_goes_up indications /////////////
 price_goes_up(index) =>
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
-    movement_is_after_market_start = (hour[index] == 9 and minute[index] > 30) or (hour[index] > 9 and hour[index] <= 20)
-
-    current_bar_is_highest_in_volume = true
-     and close[index] > open[index]
-     and high[index] > high[index+1]
-     and macd[index] > 0
-     and signal_line[index] > 0
-     and histogram[index] > 0
-     and close[index] > vwap[index]
-     and close[index] > ema_9[index]
-     and volume[index+1]/volume[index] < 0.7
-     and high[index] - low[index] > high[index+1] - low[index+1]
-     and volume[index+1] >= 100000
-
-    if current_bar_is_highest_in_volume
-     and movement_is_after_market_start
-        for i = index+1 to index+bars_back
-            if volume[i] > volume[index]
-                current_bar_is_highest_in_volume := false
-                break
+    movement_is_after_market_start = hour[index] >= 4 and hour[index] <= 20
 
     starting_index = _get_starting_index(index)
     top_index = _get_top_index(index, starting_index)
     lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
+    current_bar_should_be_involved_with_9_ema = _current_bar_should_be_involved_with_9_ema(index, top_index)
+    milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
+
+    bar_is_highest_from_start = true
+    for i = starting_index to index+1
+        if high[i] >= high[index]
+            bar_is_highest_from_start := false
+            break
 
     result = true
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
-     and current_bar_is_highest_in_volume
      and move_is_still_strong_due_to_fibonacci_retracement
+     and current_bar_should_be_involved_with_9_ema
+     and bar_is_highest_from_start
+     and milestones_are_valid
+     and volume[index] > 50000
+
+    if result
+        log.info("PGU - starting_index: {0}. top_index: {1}.", starting_index, top_index)
 
     [result, fibonacci_retracement, starting_index, top_index]
 
 [price_goes_up, fibonacci_retracement_price_goes_up, starting_index_price_goes_up, top_index_price_goes_up] = price_goes_up(0)
-[continues_trend_indication, fibonacci_retracement, starting_index, top_index] = continues_trend_indication()
+[continues_trend_indication, fibonacci_retracement, starting_index, top_index] = trend_continues(0)
 
 if not continues_trend_indication and price_goes_up
     fibonacci_retracement := fibonacci_retracement_price_goes_up

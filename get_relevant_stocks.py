@@ -66,7 +66,7 @@ def get_stocks_by_price_change_and_volume():
             market_cap = int(float(stock["Market Cap"]))
             price = float(stock["Price"].replace('$', ''))
 
-            if market_cap > 0 and price > 1:
+            if market_cap > 0 and market_cap < 100000000 and price > 1:
                 stock_float = int(market_cap/price)
                 if stock_float > FLOAT_THRESHOLD:
                     continue
