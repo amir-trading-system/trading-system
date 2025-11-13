@@ -154,6 +154,9 @@ _histogram_looks_good(index, top_index) =>
     histogram_changed_significantly
      and histogram[index]/histogram[top_index] >= 0.5
 
+_current_bar_close_close_to_high(index) =>
+    close[index]/high[index] >= 0.7
+
 trend_continues(index) =>
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
@@ -166,6 +169,7 @@ trend_continues(index) =>
     current_bar_should_be_involved_with_9_ema = _current_bar_should_be_involved_with_9_ema(index, top_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     histogram_looks_good = _histogram_looks_good(index, top_index)
+    current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
 
     coming_after_fall = false
     if top_index > 0
@@ -253,6 +257,7 @@ trend_continues(index) =>
      and current_bar_should_be_involved_with_9_ema
      and milestones_are_valid
      and histogram_looks_good
+     and current_bar_close_close_to_high
      and current_timeframe >= 5
      and volume[index] > 50000
 
@@ -273,6 +278,7 @@ price_goes_up(index) =>
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
     current_bar_should_be_involved_with_9_ema = _current_bar_should_be_involved_with_9_ema(index, top_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
+    current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
 
     bar_is_highest_from_start = true
     for i = starting_index to index+1
@@ -287,6 +293,7 @@ price_goes_up(index) =>
      and current_bar_should_be_involved_with_9_ema
      and bar_is_highest_from_start
      and milestones_are_valid
+     and current_bar_close_close_to_high
      and volume[index] > 50000
 
     if result
