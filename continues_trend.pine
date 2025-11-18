@@ -39,13 +39,7 @@ _get_starting_index(index) =>
          and high[i] - low[i] > (high[i+1] - low[i+1]) * 2
          and (close[i] - open[i])/(high[i] - low[i]) >= 0.3
          and dayofmonth[i] == dayofmonth[index]
-         and low[i] < vwap[i]
          and high[i] > vwap[i]
-
-        if ema_9[i] < vwap[i]
-            is_first_bar_to_pop_up := is_first_bar_to_pop_up
-             and macd[i] > 0
-             and signal_line[i] > -0.05
 
         if is_first_bar_to_pop_up
             starting_index := i
