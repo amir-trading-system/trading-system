@@ -151,15 +151,12 @@ _histogram_looks_good(index, top_index) =>
 _current_bar_close_close_to_high(index) =>
     close[index]/high[index] >= 0.7
 
-_current_volume_is_higher_than_before(index, starting_index) =>
-    current_volume_is_higher_than_before = true
+_most_of_current_body_is_above_9_ema(index) =>
+    most_of_current_body_is_above_9_ema = open[index] >= ema_9[index]
+    if not most_of_current_body_is_above_9_ema
+        most_of_current_body_is_above_9_ema := (ema_9[index] - open[index])/(high[index] - open[index]) <= 0.2
 
-    for i = index+1 to starting_index
-        if volume[index]/volume[i] < 0.75
-            current_volume_is_higher_than_before := false
-            break
-
-    current_volume_is_higher_than_before
+    most_of_current_body_is_above_9_ema
 
 trend_continues(index) =>
     percentage = 0.1
@@ -174,7 +171,7 @@ trend_continues(index) =>
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     histogram_looks_good = _histogram_looks_good(index, top_index)
     current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
-    current_volume_is_higher_than_before = _current_volume_is_higher_than_before(index, starting_index)
+    most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
 
     coming_after_fall = false
     if top_index > 0
@@ -263,7 +260,7 @@ trend_continues(index) =>
      and milestones_are_valid
      and histogram_looks_good
      and current_bar_close_close_to_high
-     and current_volume_is_higher_than_before
+     and most_of_current_body_is_above_9_ema
      and current_timeframe >= 5
      and volume[index] > 50000
 
@@ -285,7 +282,7 @@ price_goes_up(index) =>
     current_bar_should_be_involved_with_9_ema = _current_bar_should_be_involved_with_9_ema(index, top_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
-    current_volume_is_higher_than_before = _current_volume_is_higher_than_before(index, starting_index)
+    most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
 
     bar_is_highest_from_start = true
     for i = starting_index to index+1
@@ -301,7 +298,7 @@ price_goes_up(index) =>
      and bar_is_highest_from_start
      and milestones_are_valid
      and current_bar_close_close_to_high
-     and current_volume_is_higher_than_before
+     and most_of_current_body_is_above_9_ema
      and volume[index] > 50000
 
     if result
