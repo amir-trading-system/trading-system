@@ -151,6 +151,16 @@ _histogram_looks_good(index, top_index) =>
 _current_bar_close_close_to_high(index) =>
     close[index]/high[index] >= 0.7
 
+_current_volume_is_higher_than_before(index, starting_index) =>
+    current_volume_is_higher_than_before = true
+
+    for i = index+1 to starting_index
+        if volume[index]/volume[i] < 0.75
+            current_volume_is_higher_than_before := false
+            break
+
+    current_volume_is_higher_than_before
+
 trend_continues(index) =>
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
@@ -164,6 +174,7 @@ trend_continues(index) =>
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     histogram_looks_good = _histogram_looks_good(index, top_index)
     current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
+    current_volume_is_higher_than_before = _current_volume_is_higher_than_before(index, starting_index)
 
     coming_after_fall = false
     if top_index > 0
@@ -252,6 +263,7 @@ trend_continues(index) =>
      and milestones_are_valid
      and histogram_looks_good
      and current_bar_close_close_to_high
+     and current_volume_is_higher_than_before
      and current_timeframe >= 5
      and volume[index] > 50000
 
@@ -273,6 +285,7 @@ price_goes_up(index) =>
     current_bar_should_be_involved_with_9_ema = _current_bar_should_be_involved_with_9_ema(index, top_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
+    current_volume_is_higher_than_before = _current_volume_is_higher_than_before(index, starting_index)
 
     bar_is_highest_from_start = true
     for i = starting_index to index+1
@@ -288,6 +301,7 @@ price_goes_up(index) =>
      and bar_is_highest_from_start
      and milestones_are_valid
      and current_bar_close_close_to_high
+     and current_volume_is_higher_than_before
      and volume[index] > 50000
 
     if result
