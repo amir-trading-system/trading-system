@@ -69,16 +69,19 @@ _get_top_index(index, starting_index) =>
             top_index := i
             break
 
+
     top_index
 
 _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index) =>
     fibonacci_retracement = (high[top_index] - low[lowest_point_from_top_point_index])/(high[top_index] - open[starting_index])
     move_is_still_strong_due_to_fibonacci_retracement = starting_index > top_index
      and fibonacci_retracement <= 0.62
-     and fibonacci_retracement >= 0.236
+     and fibonacci_retracement >= 0.3
 
     if not move_is_still_strong_due_to_fibonacci_retracement and top_index-1 > 0
         move_is_still_strong_due_to_fibonacci_retracement := close[index] > high[top_index-1]
+         and fibonacci_retracement <= 0.8
+         and fibonacci_retracement >= 0.3
 
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement]
 
@@ -157,6 +160,7 @@ _most_of_current_body_is_above_9_ema(index) =>
         most_of_current_body_is_above_9_ema := (ema_9[index] - open[index])/(high[index] - open[index]) <= 0.2
 
     most_of_current_body_is_above_9_ema
+     and ema_9[index]/low[index] > 0.98
 
 trend_continues(index) =>
     percentage = 0.1
