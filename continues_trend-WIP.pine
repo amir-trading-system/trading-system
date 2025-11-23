@@ -175,7 +175,7 @@ _current_volume_is_strong_with_high_volume(index, top_index) =>
     current_volume_is_strong_with_high_volume = true
      and close[index] > open[index]
      and low[index]/open[index] > 0.98
-     and (close[index] - open[index])/(high[index] - low[index]) >= 0.7
+     and (close[index] - open[index])/(high[index] - low[index]) >= 0.6
 
     for i = top_index-1 to index
         if i < 0
