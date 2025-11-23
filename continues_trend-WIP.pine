@@ -200,16 +200,36 @@ _most_of_bars_are_volatile(starting_index, index) =>
     most_of_bars_are_volatile
 
 _histogram_is_positive_until_now(starting_index, index) =>
-    histogram_changed_direction = histogram[index] > histogram[index+1]
-     and histogram[index+1] < histogram[index+2]
     histogram_is_positive_until_now = true
     for i = starting_index to index
         if histogram[i] < 0
             histogram_is_positive_until_now := false
             break
 
-    histogram_is_positive_until_now
-     and histogram_changed_direction
+    top_histogram_index = 0
+    top_histogram_value = 0.0
+    for i = starting_index to index+1
+        if histogram[i] > top_histogram_value
+            top_histogram_value := histogram[i]
+            top_histogram_index := i
+
+    histogram_top_appears_count = 0
+    for i = top_histogram_index to index+1
+        if i-1 < 0
+            continue
+
+        if histogram[i] > histogram[i-1]
+         and histogram[i] > histogram[i+1]
+         and i > index
+         and i < top_histogram_index
+            histogram_top_appears_count += 1
+
+    histogram_changed_direction = histogram[index] > histogram[index+1]
+     and histogram[index+1] < histogram[index+2]
+     and histogram_top_appears_count < 2
+
+    [histogram_is_positive_until_now
+     and histogram_changed_direction, top_histogram_index]
 
 _negative_bars_volume_is_going_down(starting_index, index) =>
     negative_bars_volume_is_going_down = true
@@ -272,6 +292,22 @@ _volume_sum_is_positive(index, starting_index) =>
 
     positive_volume_sum > negative_volume_sum
 
+_current_bar_crossed_finally_highest_high(index, top_index, starting_index) =>
+    current_bar_crossed_finally_highest_high = close[index] > high[top_index]
+    cross_high_attempts = 0
+    attempts_indexes = array.new_int()
+
+    for i = starting_index to index+1
+        if high[i]/high[top_index] >= 0.95
+            cross_high_attempts += 1
+            array.push(attempts_indexes, i)
+
+    current_bar_crossed_finally_highest_high := true
+     and current_bar_crossed_finally_highest_high
+     and cross_high_attempts >= 2
+
+    [current_bar_crossed_finally_highest_high, attempts_indexes]
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index)
@@ -286,8 +322,7 @@ base_case_check(index) =>
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
-    histogram_is_positive_until_now = _histogram_is_positive_until_now(starting_index, index)
-    negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
+    [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
     volume_sum_is_positive = _volume_sum_is_positive(index, starting_index)
 
     base_indication = true
@@ -298,25 +333,27 @@ base_case_check(index) =>
      and move_is_still_strong_due_to_fibonacci_retracement
      and most_of_bars_are_volatile
      and histogram_is_positive_until_now
-     and negative_bars_volume_is_going_down
      and volume_sum_is_positive
 
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, fibonacci_retracement]
+    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement]
 
 cases(index) =>
     main_case = false
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, fibonacci_retracement] = base_case_check(index)
+    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement] = base_case_check(index)
     negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
     most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
     retracement_should_be_long_enough = _retracement_should_be_long_enough(top_index)
     starting_index_is_not_the_biggest_bar = _starting_index_is_not_the_biggest_bar(index, starting_index)
+    negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
+    [current_bar_crossed_finally_highest_high, attempts_indexes] = _current_bar_crossed_finally_highest_high(index, top_index, starting_index)
 
     case_1 = true
      and base_indication
      and negative_bars_are_weak
      and most_of_current_body_is_above_9_ema
      and current_volume_is_strong_with_high_volume
+     and negative_bars_volume_is_going_down
 
     if case_1
         log.info("case 1. starting_index: {0}. top_index: {1}.", starting_index, top_index)
@@ -326,6 +363,7 @@ cases(index) =>
      and base_indication
      and most_of_current_body_is_above_9_ema
      and current_volume_is_strong_with_high_volume
+     and negative_bars_volume_is_going_down
 
     if case_2
         log.info("case 2. starting_index: {0}. top_index: {1}.", starting_index, top_index)
@@ -335,6 +373,7 @@ cases(index) =>
      and base_indication
      and retracement_should_be_long_enough
      and starting_index_is_not_the_biggest_bar
+     and negative_bars_volume_is_going_down
      and fibonacci_retracement > 0.4
      and fibonacci_retracement < 0.5
 
@@ -342,9 +381,24 @@ cases(index) =>
         log.info("case 3. starting_index: {0}. top_index: {1}.", starting_index, top_index)
         main_case := case_3
 
-    [main_case, fibonacci_retracement, starting_index, top_index]
+    case_4 = true
+     and base_indication
+     and retracement_should_be_long_enough
+     and starting_index_is_not_the_biggest_bar
+     and current_bar_crossed_finally_highest_high
+     and fibonacci_retracement > 0.4
+     and fibonacci_retracement < 0.5
 
-[main_case, fibonacci_retracement, starting_index, top_index] = cases(0)
+    if case_4
+        log.info("case 4. starting_index: {0}. top_index: {1}.", starting_index, top_index)
+        main_case := case_4
+
+    [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes]
+
+[main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes] = cases(0)
+if main_case
+    confirmation_label = label.new(bar_index, high, text = "✅", size = size.tiny)
+    label.set_tooltip(confirmation_label, str.format("starting_index: {0}. top_index: {1}. fibonacci_retracement: {2}. lowest_point_from_top_point_index: {3}. top_histogram_index: {4}. attempts_indexes: {5}", starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes))
 
 plotshape(main_case, title="case 1", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
 
