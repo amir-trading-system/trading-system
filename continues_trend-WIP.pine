@@ -414,6 +414,23 @@ cases(index) =>
         log.info("case 4. starting_index: {0}. top_index: {1}.", starting_index, top_index)
         main_case := case_4
 
+    _volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.5)
+    case_5 = true
+     and base_indication
+     and _volume_sum_is_positive
+     and retracement_should_be_long_enough
+     and starting_index_is_not_the_biggest_bar
+     and negative_bars_volume_is_going_down
+     and fibonacci_retracement > 0.3
+     and fibonacci_retracement < 0.5
+     and starting_index >= 8
+
+    if case_5
+        log.info("case 5. starting_index: {0}. top_index: {1}.", starting_index, top_index)
+        main_case := case_5
+
+
+    ////////////       HALTED CASE       //////////// --- variables new initialization!
     _starting_index = _get_starting_index(index, false)
     _top_index = _get_top_index(index, _starting_index)
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, 0.1)
@@ -425,7 +442,7 @@ cases(index) =>
     retracement_should_be_long_enough := _retracement_should_be_long_enough(_top_index)
     current_bar_is_halted = _current_bar_is_halted(index)
 
-    halted_case_5 = true
+    halted_case = true
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
      and _move_is_still_strong_due_to_fibonacci_retracement
@@ -433,28 +450,14 @@ cases(index) =>
      and retracement_should_be_long_enough
      and current_bar_is_halted
 
-    if halted_case_5
+    if halted_case
         starting_index := _starting_index
         top_index := _top_index
         fibonacci_retracement := _fibonacci_retracement
         lowest_point_from_top_point_index := _lowest_point_from_top_point_index
 
-        log.info("HALTED SYMBOL! case 5. starting_index: {0}. top_index: {1}.", starting_index, top_index)
-        main_case := halted_case_5
-
-    _volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.5)
-    case_6 = true
-     and base_indication
-     and _volume_sum_is_positive
-     and retracement_should_be_long_enough
-     and starting_index_is_not_the_biggest_bar
-     and negative_bars_volume_is_going_down
-     and fibonacci_retracement > 0.3
-     and fibonacci_retracement < 0.5
-
-    if case_6
-        log.info("case 6. starting_index: {0}. top_index: {1}.", starting_index, top_index)
-        main_case := case_6
+        log.info("HALTED SYMBOL! halted case. starting_index: {0}. top_index: {1}.", starting_index, top_index)
+        main_case := halted_case
 
     [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes]
 
