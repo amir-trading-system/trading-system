@@ -234,12 +234,11 @@ _histogram_is_positive_until_now(starting_index, index) =>
          and i < top_histogram_index
             histogram_top_appears_count += 1
 
-    histogram_changed_direction = histogram[index] > histogram[index+1]
-     and histogram[index+1] < histogram[index+2]
-     and histogram_top_appears_count < 2
+    [histogram_is_positive_until_now and histogram_top_appears_count < 2, top_histogram_index]
 
-    [histogram_is_positive_until_now
-     and histogram_changed_direction, top_histogram_index]
+_histogram_changed_direction(index) =>
+    histogram[index] > histogram[index+1]
+     and histogram[index+1] < histogram[index+2]
 
 _negative_bars_volume_is_going_down(starting_index, index) =>
     negative_bars_volume_is_going_down = true
@@ -448,6 +447,29 @@ _indecision_histogram_from_top(index, top_index) =>
 
     indecision_histogram_from_top
 
+_current_bar_is_top_and_after_own_retracement(index, top_index, retracements_indexes) =>
+    current_bar_is_highest = high[index] >= high[top_index]
+    current_bar_after_retracement = true
+     and (open[index] - low[index])/(high[index] - low[index]) >= 0.25
+     and (high[index] - close[index])/(high[index] - low[index]) <= 0.2
+
+    current_bar_volume_is_higher_than_before = volume[index] > volume[index+1]
+     and volume[index] > vol_avg[index]
+
+    coming_right_after_retracement = false
+    for retracement_index in retracements_indexes
+        if index+1 == retracement_index
+            coming_right_after_retracement := true
+            break
+
+    result = true
+     and current_bar_is_highest
+     and current_bar_after_retracement
+     and current_bar_volume_is_higher_than_before
+     and coming_right_after_retracement
+
+    result
+
 _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
@@ -487,8 +509,6 @@ base_case_check(index) =>
     [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
     [no_more_than_2_retracements_until_now, retracements_indexes] = _no_more_than_2_retracements_until_now(index, starting_index)
     retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
-    [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
-    [too_many_tops_with_rejections_in_range_of_current_bar, tops_with_rejection_indexes] = _too_many_tops_with_rejections_in_range_of_current_bar(index, starting_index, top_index)
     bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body = _bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body(index, starting_index, top_index)
     indecision_histogram_from_top = _indecision_histogram_from_top(index, top_index)
 
@@ -503,16 +523,14 @@ base_case_check(index) =>
      and no_more_than_2_retracements_until_now
      and current_bar_high_close_to_top_high
      and retracement_should_be_long_enough
-     and not most_of_volume_are_stuck_between_top_index_to_current
-     and not too_many_tops_with_rejections_in_range_of_current_bar
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
      and not indecision_histogram_from_top
 
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement, retracements_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes]
+    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement, retracements_indexes]
 
 cases(index) =>
     main_case = false
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement, retracements_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes] = base_case_check(index)
+    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement, retracements_indexes] = base_case_check(index)
     negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
     most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
@@ -520,6 +538,10 @@ cases(index) =>
     negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
     [current_bar_crossed_finally_highest_high, attempts_indexes] = _current_bar_crossed_finally_highest_high(index, top_index, starting_index)
     volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.0)
+    current_bar_is_top_and_after_own_retracement = _current_bar_is_top_and_after_own_retracement(index, top_index, retracements_indexes)
+    histogram_changed_direction = _histogram_changed_direction(index)
+    [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
+    [too_many_tops_with_rejections_in_range_of_current_bar, tops_with_rejection_indexes] = _too_many_tops_with_rejections_in_range_of_current_bar(index, starting_index, top_index)
 
     case_1 = true
      and base_indication
@@ -528,6 +550,9 @@ cases(index) =>
      and most_of_current_body_is_above_9_ema
      and current_volume_is_strong_with_high_volume
      and negative_bars_volume_is_going_down
+     and histogram_changed_direction
+     and not most_of_volume_are_stuck_between_top_index_to_current
+     and not too_many_tops_with_rejections_in_range_of_current_bar
 
     if case_1
         log.info("case 1. starting_index: {0}. top_index: {1}.", starting_index, top_index)
@@ -539,6 +564,9 @@ cases(index) =>
      and most_of_current_body_is_above_9_ema
      and current_volume_is_strong_with_high_volume
      and negative_bars_volume_is_going_down
+     and histogram_changed_direction
+     and not most_of_volume_are_stuck_between_top_index_to_current
+     and not too_many_tops_with_rejections_in_range_of_current_bar
 
     if case_2
         log.info("case 2. starting_index: {0}. top_index: {1}.", starting_index, top_index)
@@ -551,6 +579,9 @@ cases(index) =>
      and negative_bars_volume_is_going_down
      and fibonacci_retracement > 0.4
      and fibonacci_retracement < 0.5
+     and histogram_changed_direction
+     and  not most_of_volume_are_stuck_between_top_index_to_current
+     and  not too_many_tops_with_rejections_in_range_of_current_bar
 
     if case_3
         log.info("case 3. starting_index: {0}. top_index: {1}.", starting_index, top_index)
@@ -563,6 +594,9 @@ cases(index) =>
      and current_bar_crossed_finally_highest_high
      and fibonacci_retracement > 0.4
      and fibonacci_retracement < 0.5
+     and histogram_changed_direction
+     and not most_of_volume_are_stuck_between_top_index_to_current
+     and not too_many_tops_with_rejections_in_range_of_current_bar
 
     if case_4
         log.info("case 4. starting_index: {0}. top_index: {1}.", starting_index, top_index)
@@ -577,6 +611,9 @@ cases(index) =>
      and fibonacci_retracement > 0.3
      and fibonacci_retracement < 0.5
      and starting_index >= 8
+     and histogram_changed_direction
+     and not most_of_volume_are_stuck_between_top_index_to_current
+     and not too_many_tops_with_rejections_in_range_of_current_bar
 
     if case_5
         log.info("case 5. starting_index: {0}. top_index: {1}.", starting_index, top_index)
@@ -589,10 +626,21 @@ cases(index) =>
      and fibonacci_retracement > 0.5
      and fibonacci_retracement < 0.72
      and array.size(retracements_indexes) == 1
+     and histogram_changed_direction
+     and not most_of_volume_are_stuck_between_top_index_to_current
+     and not too_many_tops_with_rejections_in_range_of_current_bar
 
     if case_6
         log.info("case 6. starting_index: {0}. top_index: {1}.", starting_index, top_index)
         main_case := case_6
+
+    case_7 = true
+     and base_indication
+     and current_bar_is_top_and_after_own_retracement
+
+    if case_7
+        log.info("case 7. starting_index: {0}. top_index: {1}.", starting_index, top_index)
+        main_case := case_7
 
     ////////////       HALTED CASE       //////////// --- variables new initialization!
     _starting_index = _get_starting_index(index, false)
