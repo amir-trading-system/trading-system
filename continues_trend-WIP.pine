@@ -44,7 +44,6 @@ _get_starting_index(index, with_threshold) =>
         if with_threshold
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
              and volume[i] > 40000
-             and volume[i+1]/vol_avg[i+1] < 4
 
         if is_first_bar_to_pop_up
             for j = i+60 to i+1
@@ -73,7 +72,7 @@ _get_starting_index(index, with_threshold) =>
 _get_top_index(index, starting_index) =>
     highest_high = 0.0
     highest_high_index = 0
-    for i = index+1 to starting_index
+    for i = index+2 to starting_index
         if high[i] > highest_high
             highest_high := high[i]
             highest_high_index := i
@@ -88,7 +87,6 @@ _get_top_index(index, starting_index) =>
          and close[i] > ema_9[i]
          and volume[i] > vol_avg[i]
          and high[i] == highest_high
-         and open[i] >= open[i+1]
             top_index := i
             break
 
@@ -183,7 +181,7 @@ _most_of_current_body_is_above_9_ema(index) =>
         most_of_current_body_is_above_9_ema := (ema_9[index] - open[index])/(high[index] - open[index]) <= 0.2
 
     most_of_current_body_is_above_9_ema
-     and ema_9[index]/low[index] > 0.98
+     and ema_9[index]/low[index] > 0.95
 
 _current_volume_is_strong_with_high_volume(index, top_index) =>
     current_volume_is_strong_with_high_volume = true
@@ -277,8 +275,15 @@ _negative_bars_are_weak(top_index, index) =>
 
     negative_bars_are_weak
 
-_retracement_should_be_long_enough(top_index) =>
-    top_index >= 3
+_retracement_should_be_long_enough(index, top_index) =>
+    base_condition = top_index >= 3
+    retracement_should_be_long_enough = true
+    for i = top_index to index+1
+        if close[i] > open[i]
+            retracement_should_be_long_enough := false
+            break
+
+    retracement_should_be_long_enough or base_condition
 
 _starting_index_is_not_the_biggest_bar(index, starting_index) =>
     starting_index_is_not_the_biggest_bar = false
@@ -369,12 +374,23 @@ _current_bar_high_close_to_top_high(index, top_index, starting_index) =>
 _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
-     and high[index] - low[index] > (high[index+1] - low[index+1]) * 2
-     and high[index] - high[index+1] > 0.6
+     and close[index] - open[index] > (close[index+1] - open[index+1]) * 2
+     and high[index] - high[index+1] > 0.4
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
      and histogram[index] > 0
      and volume[index] > 5000
+
+_current_bar_is_highest_for_halted(index, starting_index, top_index) =>
+    current_bar_is_highest_for_halted = true
+    for i = starting_index to index+1
+        if high[i] > high[index]
+            current_bar_is_highest_for_halted := false
+            break
+
+    milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
+
+    current_bar_is_highest_for_halted and milestones_are_valid
 
 ///////////// Indications /////////////
 base_case_check(index) =>
@@ -393,7 +409,7 @@ base_case_check(index) =>
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
     [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
     [no_more_than_2_retracements_until_now, retracements_indexes] = _no_more_than_2_retracements_until_now(index, starting_index)
-    retracement_should_be_long_enough = _retracement_should_be_long_enough(top_index)
+    retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
 
     base_indication = true
      and made_more_than_usual_percentage_already
@@ -496,7 +512,7 @@ cases(index) =>
     ////////////       HALTED CASE       //////////// --- variables new initialization!
     _starting_index = _get_starting_index(index, false)
     _top_index = _get_top_index(index, _starting_index)
-    retracement_should_be_long_enough = _retracement_should_be_long_enough(_top_index)
+    retracement_should_be_long_enough = _retracement_should_be_long_enough(index, _top_index)
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, 0.1)
     movement_is_after_market_start = hour[index] >= 9 and hour[index] <= 20
     _lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
@@ -504,11 +520,12 @@ cases(index) =>
     negative_bars_are_weak := _negative_bars_are_weak(_top_index, index)
     most_of_current_body_is_above_9_ema := _most_of_current_body_is_above_9_ema(index)
     current_bar_is_halted = _current_bar_is_halted(index)
+    current_bar_is_highest_for_halted = _current_bar_is_highest_for_halted(index, starting_index, top_index)
 
     halted_case = true
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
-     and _move_is_still_strong_due_to_fibonacci_retracement
+     and (_move_is_still_strong_due_to_fibonacci_retracement or current_bar_is_highest_for_halted)
      and most_of_current_body_is_above_9_ema
      and retracement_should_be_long_enough
      and current_bar_is_halted
