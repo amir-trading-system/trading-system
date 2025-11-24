@@ -60,6 +60,10 @@ _get_starting_index(index, with_threshold) =>
                     is_first_bar_to_pop_up := false
                     break
 
+                if volume[j]/volume[i] >= 0.6 and (high[j] - low[j])/(high[i] - low[i]) > 0.9
+                    is_first_bar_to_pop_up := false
+                    break
+
             if is_first_bar_to_pop_up
                 starting_index := i
                 break
@@ -352,6 +356,16 @@ _no_more_than_2_retracements_until_now(index, starting_index) =>
 
     [retracements_count <= 2 and retracements_count >= 1, retracements_indexes]
 
+_current_bar_high_close_to_top_high(index, top_index, starting_index) =>
+    base_condition = high[index]/high[top_index] >= 0.99
+    current_bar_high_close_to_top_high = true
+    for i = starting_index to index+1
+        if close[i] > close[index]
+            current_bar_high_close_to_top_high := false
+            break
+
+    current_bar_high_close_to_top_high or base_condition
+
 _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
@@ -371,6 +385,7 @@ base_case_check(index) =>
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
     movement_is_after_market_start = hour[index] >= 9 and hour[index] <= 20
     current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
+    current_bar_high_close_to_top_high = _current_bar_high_close_to_top_high(index, top_index, starting_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
@@ -378,6 +393,7 @@ base_case_check(index) =>
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
     [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
     [no_more_than_2_retracements_until_now, retracements_indexes] = _no_more_than_2_retracements_until_now(index, starting_index)
+    retracement_should_be_long_enough = _retracement_should_be_long_enough(top_index)
 
     base_indication = true
      and made_more_than_usual_percentage_already
@@ -388,6 +404,8 @@ base_case_check(index) =>
      and most_of_bars_are_volatile
      and histogram_is_positive_until_now
      and no_more_than_2_retracements_until_now
+     and current_bar_high_close_to_top_high
+     and retracement_should_be_long_enough
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement, retracements_indexes]
 
@@ -397,7 +415,6 @@ cases(index) =>
     negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
     most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
-    retracement_should_be_long_enough = _retracement_should_be_long_enough(top_index)
     starting_index_is_not_the_biggest_bar = _starting_index_is_not_the_biggest_bar(index, starting_index)
     negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
     [current_bar_crossed_finally_highest_high, attempts_indexes] = _current_bar_crossed_finally_highest_high(index, top_index, starting_index)
@@ -429,7 +446,6 @@ cases(index) =>
     case_3 = true
      and base_indication
      and volume_sum_is_positive
-     and retracement_should_be_long_enough
      and starting_index_is_not_the_biggest_bar
      and negative_bars_volume_is_going_down
      and fibonacci_retracement > 0.4
@@ -442,7 +458,6 @@ cases(index) =>
     case_4 = true
      and base_indication
      and volume_sum_is_positive
-     and retracement_should_be_long_enough
      and starting_index_is_not_the_biggest_bar
      and current_bar_crossed_finally_highest_high
      and fibonacci_retracement > 0.4
@@ -456,7 +471,6 @@ cases(index) =>
     case_5 = true
      and base_indication
      and _volume_sum_is_positive
-     and retracement_should_be_long_enough
      and starting_index_is_not_the_biggest_bar
      and negative_bars_volume_is_going_down
      and fibonacci_retracement > 0.3
@@ -470,7 +484,6 @@ cases(index) =>
     case_6 = true
      and base_indication
      and _volume_sum_is_positive
-     and retracement_should_be_long_enough
      and starting_index_is_not_the_biggest_bar
      and fibonacci_retracement > 0.5
      and fibonacci_retracement < 0.72
@@ -483,13 +496,13 @@ cases(index) =>
     ////////////       HALTED CASE       //////////// --- variables new initialization!
     _starting_index = _get_starting_index(index, false)
     _top_index = _get_top_index(index, _starting_index)
+    retracement_should_be_long_enough = _retracement_should_be_long_enough(_top_index)
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, 0.1)
     movement_is_after_market_start = hour[index] >= 9 and hour[index] <= 20
     _lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
     [_move_is_still_strong_due_to_fibonacci_retracement, _fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, _starting_index, _top_index, _lowest_point_from_top_point_index)
     negative_bars_are_weak := _negative_bars_are_weak(_top_index, index)
     most_of_current_body_is_above_9_ema := _most_of_current_body_is_above_9_ema(index)
-    retracement_should_be_long_enough := _retracement_should_be_long_enough(_top_index)
     current_bar_is_halted = _current_bar_is_halted(index)
 
     halted_case = true
