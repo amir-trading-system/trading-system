@@ -1,0 +1,33 @@
+Stocks Indications:
+ - ABVE: 2025-10-08 - 1,2,3, 5
+ - AQMS: 2025-10-13 - 3, 6 (30 minutes)
+ - AQMS: 2025-10-14 - halted
+ - BQ: 2025-09-29 - halted
+ - BQ: 2025-10-30 - halted
+ - SGBX: 2025-11-19 - 2
+ - VCIG: 2025-10-29 - 1,2
+ - SONN: 2025-07-02 - 6 - 30 minutes.
+ - AIFF: 2025-02-11 - halted
+ - LFS: 2025-11-11 - halted
+ - LFS: 2025-11-18 - 7
+ - AREB: 2025-04-04 - halted
+ - WKHS: 2025-07-11 - 2
+ - THAR: 2025-08-20 - 1,2,3,5 - 30 minutes.
+ - THAR: 2025-08-25 - halted
+ - INHD: 2025-05-12 - halted
+ - INHD: 2025-08-25 - halted
+ - SOGP: 2025-08-28 - halted
+ - SOGP: 2025-09-02 - 1,2
+ - IPDN: 2025-09-03 - halted
+ - IPDN: 2025-08-29 - 5
+
+Need to identify:
+ - YHC: 2025-07-16
+ - APM: 2025-07-16
+ - CWD: 2025-08-05
+ - STSS: 2025-08-27
+ - IPDN: 2025-08-29 - Need to identify on 5 minutes chart.
+ - INHD: 2025-09-04
+ - AGMH: 2025-09-19
+
+Need to Fix - False positives:
