@@ -72,7 +72,7 @@ _get_starting_index(index, with_threshold) =>
 _get_top_index(index, starting_index) =>
     highest_high = 0.0
     highest_high_index = 0
-    for i = starting_index to index+1
+    for i = starting_index to index+2
         if high[i] > highest_high
             highest_high := high[i]
             highest_high_index := i
@@ -498,7 +498,7 @@ _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
      and close[index] - open[index] > (close[index+1] - open[index+1]) * 2
-     and high[index] - high[index+1] > high[index+1] - low[index+1]
+     and (high[index] - high[index+1])/(high[index+1] - low[index+1]) >= 0.5
      and high[index+1] - low[index+1] >= 0.1
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
@@ -549,7 +549,7 @@ _current_session_has_at_least_one_red_bar(index, starting_index) =>
     current_session_has_at_least_one_red_bar
 
 _current_bar_is_full(index) =>
-    current_bar_is_full = (close[index] - open[index])/(high[index] - low[index]) >= 0.45
+    current_bar_is_full = (close[index] - open[index])/(high[index] - low[index]) >= 0.4
     current_bar_is_full
 
 _current_bar_is_highest_and_full(index, starting_index) =>
@@ -590,6 +590,21 @@ _retracement_is_strong_but_graph_still_good(index, fibonacci_retracement, starti
 
     retracement_is_strong_but_graph_still_good
 
+_big_retracement_between_top_to_start(starting_index, top_index) =>
+    big_retracement_between_top_to_start = false
+    for i = starting_index-1 to top_index
+        if i < 0
+            continue
+        if low[i] < low[starting_index]
+            big_retracement_between_top_to_start := true
+            break
+
+        if low[starting_index]/low[i] >= 0.99
+            big_retracement_between_top_to_start := true
+            break
+
+    big_retracement_between_top_to_start
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -611,6 +626,7 @@ base_case_check(index) =>
     higher_than_before = _higher_than_before(index)
     current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
     current_bar_is_full = _current_bar_is_full(index)
+    big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
 
     base_indication = true
      and made_more_than_usual_percentage_already
@@ -626,6 +642,7 @@ base_case_check(index) =>
      and higher_than_before
      and current_session_has_at_least_one_red_bar
      and current_bar_is_full
+     and not big_retracement_between_top_to_start
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, retracement_indexes]
 
