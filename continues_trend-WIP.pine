@@ -90,7 +90,6 @@ _get_top_index(index, starting_index) =>
             top_index := i
             break
 
-
     top_index
 
 _get_lowest_point_from_top_point_index(index, top_index) =>
@@ -329,8 +328,11 @@ _current_bar_crossed_finally_highest_high(index, top_index, starting_index) =>
 
 _no_more_than_2_retracements_until_now(index, starting_index) =>
     retracements_indexes = array.new_int()
-    for i = starting_index to index
-        if i-1 < 0
+    for i = starting_index-1 to index
+        if i-1 < 0 or i < 0
+            continue
+
+        if low[i] > low[i+1] and low[i] < low[i-1]
             continue
 
         retracement_case_1 = true
@@ -346,18 +348,34 @@ _no_more_than_2_retracements_until_now(index, starting_index) =>
          and close[i-1] > open[i-1]
          and (low[i] <= ema_9[i] or ema_9[i]/low[i] >= 0.9)
 
-        result = retracement_case_1
-         or retracement_case_2
+        retracement_case_3 = true
+         and high[i] < high[i+1]
+         and high[i] < high[i-1]
+         and (close[i] - low[i])/(high[i] - low[i]) > 0.5
+         and (open[i] - low[i])/(high[i] - low[i]) > 0.5
+         and low[i] < low[i+1]
+         and low[i] < low[i-1]
 
-        if i > 2
-            result := (retracement_case_1 or retracement_case_2) and (high[i-1] < high[i-2] or low[i-1] < low[i-2])
+        retracement_case_4 = true
+         and high[i] < high[i+1]
+         and low[i] < low[i+1]
+         and low[i] < low[i-1]
+         and low[i] - ema_9[i] < low[i+1] - ema_9[i+1]
+         and low[i] - ema_9[i] < low[i-1] - ema_9[i-1]
+         and (close[i] - low[i])/(high[i] - low[i]) > 0.5
+         and (open[i] - low[i])/(high[i] - low[i]) > 0.5
+         and volume[i] < volume[i+1]
+
+        result = (retracement_case_1
+         or retracement_case_2
+         or retracement_case_3
+         or retracement_case_4)
 
         if result
             if not array.includes(retracements_indexes, i+1)
                 array.push(retracements_indexes, i)
 
     retracements_count = array.size(retracements_indexes)
-
     [retracements_count <= 2 and retracements_count >= 1, retracements_indexes]
 
 _current_bar_high_close_to_top_high(index, top_index, starting_index) =>
@@ -452,21 +470,18 @@ _current_bar_is_top_and_after_own_retracement(index, top_index, retracements_ind
     current_bar_after_retracement = true
      and (open[index] - low[index])/(high[index] - low[index]) >= 0.25
      and (high[index] - close[index])/(high[index] - low[index]) <= 0.2
+     and close[index] - open[index] > high[index] - close[index]
 
     current_bar_volume_is_higher_than_before = volume[index] > volume[index+1]
      and volume[index] > vol_avg[index]
 
-    coming_right_after_retracement = false
-    for retracement_index in retracements_indexes
-        if index+1 == retracement_index
-            coming_right_after_retracement := true
-            break
+    ema_9_close_to_low = ema_9[index]/low[index] >= 0.99
 
     result = true
      and current_bar_is_highest
      and current_bar_after_retracement
      and current_bar_volume_is_higher_than_before
-     and coming_right_after_retracement
+     and ema_9_close_to_low
 
     result
 
@@ -491,6 +506,22 @@ _current_bar_is_highest_for_halted(index, starting_index, top_index) =>
 
     current_bar_is_highest_for_halted and milestones_are_valid
 
+_higher_than_before(index) =>
+    high[index] > high[index+1]
+
+_current_bar_is_highest_and_full(index, starting_index) =>
+    current_bar_is_highest = true
+    for i = starting_index to index+1
+        if high[i] >= high[index]
+            current_bar_is_highest := false
+            break
+
+    current_bar_is_full = (close[index] - open[index])/(high[index] - low[index]) >= 0.8
+     and low[index]/open[index] >= 0.95
+
+    current_bar_is_highest
+     and current_bar_is_full
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -511,6 +542,7 @@ base_case_check(index) =>
     retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
     bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body = _bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body(index, starting_index, top_index)
     indecision_histogram_from_top = _indecision_histogram_from_top(index, top_index)
+    higher_than_before = _higher_than_before(index)
 
     base_indication = true
      and made_more_than_usual_percentage_already
@@ -525,6 +557,7 @@ base_case_check(index) =>
      and retracement_should_be_long_enough
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
      and not indecision_histogram_from_top
+     and higher_than_before
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index, fibonacci_retracement, retracements_indexes]
 
@@ -542,6 +575,7 @@ cases(index) =>
     histogram_changed_direction = _histogram_changed_direction(index)
     [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
     [too_many_tops_with_rejections_in_range_of_current_bar, tops_with_rejection_indexes] = _too_many_tops_with_rejections_in_range_of_current_bar(index, starting_index, top_index)
+    current_bar_is_highest_and_full = _current_bar_is_highest_and_full(index, starting_index)
 
     case_1 = true
      and base_indication
@@ -641,6 +675,18 @@ cases(index) =>
     if case_7
         log.info("case 7. starting_index: {0}. top_index: {1}.", starting_index, top_index)
         main_case := case_7
+
+    case_8 = true
+     and base_indication
+     and histogram_changed_direction
+     and current_bar_is_highest_and_full
+     and volume_sum_is_positive
+     and most_of_current_body_is_above_9_ema
+     and starting_index_is_not_the_biggest_bar
+
+    if case_8
+        log.info("case 8. starting_index: {0}. top_index: {1}.", starting_index, top_index)
+        main_case := case_8
 
     ////////////       HALTED CASE       //////////// --- variables new initialization!
     _starting_index = _get_starting_index(index, false)
