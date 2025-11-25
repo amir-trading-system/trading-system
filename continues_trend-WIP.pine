@@ -498,7 +498,8 @@ _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
      and close[index] - open[index] > (close[index+1] - open[index+1]) * 2
-     and high[index] - high[index+1] > 0.4
+     and high[index] - high[index+1] > high[index+1] - low[index+1]
+     and high[index+1] - low[index+1] >= 0.1
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
      and histogram[index] > 0
