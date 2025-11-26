@@ -3,6 +3,7 @@ Stocks Indications:
  - AQMS: 2025-10-13 - 3
  - AQMS: 2025-10-14 - (30 minutes) - halted
  - BQ: 2025-09-29 - halted
+ - BQ: 2025-10-30 - halted
  - BCG: 2025-11-18 - 1,2
  - SGBX: 2025-11-19 - 2,8
  - VCIG: 2025-10-29 - 1,2
@@ -32,6 +33,6 @@ Stocks Indications:
  - SMX: 2025-11-26 - 12
 
 Need to identify:
- - BQ: 2025-10-30 - halted
+ - ZYXI: 2025-11-26
 
 Need to Fix - False positives:
