@@ -43,7 +43,7 @@ _get_starting_index(index, with_threshold) =>
 
         if with_threshold
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
-             and volume[i] > 40000
+             and volume[i] > 10000
 
         if is_first_bar_to_pop_up
             for j = i+60 to i+1
@@ -650,7 +650,7 @@ base_case_check(index) =>
     current_bar_high_close_to_top_high = _current_bar_high_close_to_top_high(index, top_index, starting_index)
     lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
-    most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
+
     [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
 
     bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body = _bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body(index, starting_index, top_index)
@@ -662,7 +662,6 @@ base_case_check(index) =>
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
      and current_bar_close_close_to_high
-     and most_of_bars_are_volatile
      and histogram_is_positive_until_now
      and current_bar_high_close_to_top_high
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
@@ -698,6 +697,7 @@ cases(index) =>
     current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
     big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
     all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
+    most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
 
     winning_cases = array.new_string()
 
@@ -717,6 +717,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_1
         array.push(winning_cases, "case 1")
@@ -737,6 +738,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_2
         array.push(winning_cases, "case 2")
@@ -758,6 +760,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_3
         array.push(winning_cases, "case 3")
@@ -779,6 +782,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_4
         array.push(winning_cases, "case 4")
@@ -802,6 +806,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_5
         array.push(winning_cases, "case 5")
@@ -823,6 +828,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_6
         array.push(winning_cases, "case 6")
@@ -837,6 +843,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_7
         array.push(winning_cases, "case 7")
@@ -857,6 +864,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_8
         array.push(winning_cases, "case 8")
@@ -877,6 +885,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_9
         array.push(winning_cases, "case 9")
@@ -897,6 +906,7 @@ cases(index) =>
      and milestones_are_valid
      and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and most_of_bars_are_volatile
 
     if case_10
         array.push(winning_cases, "case 10")
@@ -911,10 +921,30 @@ cases(index) =>
      and starting_index_is_not_the_biggest_bar_in_term_of_price
      and current_bar_is_top_and_after_own_retracement
      and all_bars_are_positive_with_own_retracement
+     and most_of_bars_are_volatile
 
     if case_11
         array.push(winning_cases, "case 11")
         main_case := case_11
+
+    case_12 = true
+     and base_indication
+     and volume_sum_is_positive
+     and negative_bars_are_weak
+     and most_of_current_body_is_above_9_ema
+     and current_volume_is_strong_with_high_volume
+     and negative_bars_volume_is_going_down
+     and histogram_changed_direction
+     and not too_many_tops_with_rejections_in_range_of_current_bar
+     and move_is_still_strong_due_to_fibonacci_retracement
+     and retracement_should_be_long_enough
+     and milestones_are_valid
+     and current_session_has_at_least_one_red_bar
+     and not big_retracement_between_top_to_start
+
+    if case_12
+        array.push(winning_cases, "case 12")
+        main_case := case_12
 
     ////////////       HALTED CASE       //////////// --- variables new initialization!
     _starting_index = _get_starting_index(index, false)
