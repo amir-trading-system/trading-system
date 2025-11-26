@@ -10,11 +10,10 @@ Stocks Indications:
  - LFS: 2025-11-11 - halted
  - LFS: 2025-11-18 - 7
  - AREB: 2025-04-04 - halted
- - AREB: 2025-10-22 - 8
  - WKHS: 2025-07-11 - 2
  - THAR: 2025-08-20 - 1,2,3,5,8 - 30 minutes.
  - THAR: 2025-08-25 - halted
- - INHD: 2025-05-12 - halted
+ - INHD: 2025-05-12 - 9,halted
  - INHD: 2025-08-25 - 8,halted
  - INHD: 2025-09-04 - 9,halted
  - SOGP: 2025-08-28 - 3,5,8
@@ -24,10 +23,10 @@ Stocks Indications:
  - AGMH: 2025-09-19 - 8 (45)
  - AGMH: 2025-04-28 - 3 (45)
  - APM: 2025-07-16 - halted
+ - YHC: 2025-07-16 - 1,2,3,4,5
+ - CWD: 2025-08-05 - 10
 
 Need to identify:
- - YHC: 2025-07-16
- - CWD: 2025-08-05
  - STSS: 2025-08-27
 
 Need to Fix - False positives:
