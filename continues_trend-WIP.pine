@@ -46,7 +46,7 @@ _get_starting_index(index, with_threshold) =>
              and volume[i] > 10000
 
         if is_first_bar_to_pop_up
-            for j = i+60 to i+1
+            for j = i+20 to i+1
                 if dayofmonth[j] != dayofmonth[i]
                     continue
 
@@ -63,6 +63,14 @@ _get_starting_index(index, with_threshold) =>
                     is_first_bar_to_pop_up := false
                     break
 
+                if true
+                 and high[j] - low[j] > (high[j+1] - low[j+1]) * 5
+                 and close[j] > open[j]
+                 and volume[j] > volume[j+1]
+                 and volume[j] > vol_avg[j] * 3
+                    is_first_bar_to_pop_up := false
+                    break
+
             if is_first_bar_to_pop_up
                 starting_index := i
                 break
@@ -72,7 +80,7 @@ _get_starting_index(index, with_threshold) =>
 _get_top_index(index, starting_index) =>
     highest_high = 0.0
     highest_high_index = 0
-    for i = starting_index to index+2
+    for i = starting_index to index+1
         if high[i] > highest_high
             highest_high := high[i]
             highest_high_index := i
@@ -117,36 +125,6 @@ _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_in
 
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement]
 
-_current_bar_should_be_involved_with_9_ema(index, top_index) =>
-    distance_from_ema_9 = math.abs(ema_9[index] - open[index])/(high[index] - open[index])
-
-    open_under_ema_9_but_bar_is_strong = true
-     and open[index] <= ema_9[index]
-     and math.abs(ema_9[index] - low[index])/(high[index] - low[index]) <= 0.10
-
-    open_above_ema_9_but_close = true
-     and open[index] > ema_9[index]
-     and (low[index] - ema_9[index])/(high[index] - low[index]) <= 0.10
-
-    ema_9_change_is_higher_than_before = true
-     and ema_9[index] - ema_9[index+1] > ema_9[index+1] - ema_9[index+2]
-
-    ema_9_change_from_top_index_is_highest = true
-    current_change = ema_9[index] - ema_9[index+1]
-    for i = top_index-1 to index+1
-        if i < 0
-            continue
-        if ema_9[i] - ema_9[i+1] >= current_change
-            ema_9_change_from_top_index_is_highest := false
-
-    not_close_but_strong = ema_9_change_from_top_index_is_highest
-     and histogram[index] > histogram[index+1]
-     and histogram[index+2] > histogram[index+1]
-     and histogram[index+3] > histogram[index+2]
-
-    ema_9_change_is_higher_than_before
-     and (open_under_ema_9_but_bar_is_strong or open_above_ema_9_but_close or not_close_but_strong)
-
 _milestones_are_valid(index, starting_index, top_index) =>
     milestones_are_valid = true
      and starting_index != top_index
@@ -154,22 +132,6 @@ _milestones_are_valid(index, starting_index, top_index) =>
      and top_index > index
      and starting_index > 0
      and top_index > 0
-
-_histogram_looks_good(index, top_index) =>
-    histogram_changed_direction = histogram[index] > histogram[index+1]
-     and histogram[index+1] < histogram[index+2]
-
-    histogram_raised_significantly = true
-     and histogram[index+2] < histogram[index+1]
-     and histogram[index+1] < histogram[index]
-     and histogram[index+2]/histogram[index+1] >= 0.85
-     and histogram[index] - histogram[index+1] > (histogram[index+1] - histogram[index+2]) * 2
-
-    histogram_changed_significantly = histogram_changed_direction
-     or histogram_raised_significantly
-
-    histogram_changed_significantly
-     and histogram[index]/histogram[top_index] >= 0.5
 
 _current_bar_close_close_to_high(index) =>
     close[index]/high[index] >= 0.7
@@ -511,22 +473,10 @@ _current_bar_is_halted(index) =>
      and close[index] == high[index]
      and close[index] - open[index] > (close[index+1] - open[index+1]) * 2
      and (high[index] - high[index+1])/(high[index+1] - low[index+1]) >= 0.5
-     and high[index+1] - low[index+1] >= 0.1
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
      and histogram[index] > 0
      and volume[index] > 5000
-
-_current_bar_is_highest_for_halted(index, starting_index, top_index) =>
-    current_bar_is_highest_for_halted = true
-    for i = starting_index to index+1
-        if high[i] > high[index]
-            current_bar_is_highest_for_halted := false
-            break
-
-    milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
-
-    current_bar_is_highest_for_halted and milestones_are_valid
 
 _higher_than_before(index) =>
     high[index] > high[index+1]
@@ -674,50 +624,50 @@ base_case_check(index) =>
 cases(index) =>
     main_case = false
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index] = base_case_check(index)
-    negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
-    [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
-    retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
-    most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
+    all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
+    big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
-    starting_index_is_not_the_biggest_bar_in_term_of_volume = _starting_index_is_not_the_biggest_bar_in_term_of_volume(index, starting_index)
-    starting_index_is_not_the_biggest_bar_in_term_of_price = _starting_index_is_not_the_biggest_bar_in_term_of_price(index, starting_index)
-    negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
     [current_bar_crossed_finally_highest_high, attempts_indexes] = _current_bar_crossed_finally_highest_high(index, top_index, starting_index)
-    volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.0)
     current_bar_is_top_and_after_own_retracement = _current_bar_is_top_and_after_own_retracement(index, top_index)
-    histogram_changed_direction = _histogram_changed_direction(index)
-    [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
-    [too_many_tops_with_rejections_in_range_of_current_bar, tops_with_rejection_indexes] = _too_many_tops_with_rejections_in_range_of_current_bar(index, starting_index, top_index)
     current_bar_is_highest_and_full = _current_bar_is_highest_and_full(index, starting_index)
+    current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
     [no_more_than_2_retracements_until_now, retracement_indexes] = _no_more_than_2_retracements_until_now(index, starting_index, top_index)
     first_retracement_came_too_late = _first_retracement_came_too_late(starting_index, top_index, retracement_indexes)
-    most_session_is_before_top_index = _most_session_is_before_top_index(starting_index, top_index)
-    retracement_is_strong_but_graph_still_good = _retracement_is_strong_but_graph_still_good(index, fibonacci_retracement, starting_index)
+    histogram_changed_direction = _histogram_changed_direction(index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
-    current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
-    big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
-    all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
+    most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
+    [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
+    most_session_is_before_top_index = _most_session_is_before_top_index(starting_index, top_index)
+    [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
+    negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
+    negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
+    retracement_is_strong_but_graph_still_good = _retracement_is_strong_but_graph_still_good(index, fibonacci_retracement, starting_index)
+    retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
+    starting_index_is_not_the_biggest_bar_in_term_of_price = _starting_index_is_not_the_biggest_bar_in_term_of_price(index, starting_index)
+    starting_index_is_not_the_biggest_bar_in_term_of_volume = _starting_index_is_not_the_biggest_bar_in_term_of_volume(index, starting_index)
+    [too_many_tops_with_rejections_in_range_of_current_bar, tops_with_rejection_indexes] = _too_many_tops_with_rejections_in_range_of_current_bar(index, starting_index, top_index)
+    volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.0)
 
     winning_cases = array.new_string()
 
     case_1 = true
      and base_indication
-     and volume_sum_is_positive
-     and negative_bars_are_weak
-     and most_of_current_body_is_above_9_ema
-     and current_volume_is_strong_with_high_volume
-     and negative_bars_volume_is_going_down
-     and histogram_changed_direction
-     and not most_of_volume_are_stuck_between_top_index_to_current
-     and not too_many_tops_with_rejections_in_range_of_current_bar
-     and move_is_still_strong_due_to_fibonacci_retracement
-     and retracement_should_be_long_enough
-     and no_more_than_2_retracements_until_now
-     and milestones_are_valid
-     and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and current_volume_is_strong_with_high_volume
+     and current_session_has_at_least_one_red_bar
+     and histogram_changed_direction
+     and most_of_current_body_is_above_9_ema
+     and move_is_still_strong_due_to_fibonacci_retracement
      and most_of_bars_are_volatile
+     and milestones_are_valid
+     and not most_of_volume_are_stuck_between_top_index_to_current
+     and negative_bars_volume_is_going_down
+     and negative_bars_are_weak
+     and no_more_than_2_retracements_until_now
+     and retracement_should_be_long_enough
+     and not too_many_tops_with_rejections_in_range_of_current_bar
+     and volume_sum_is_positive
 
     if case_1
         array.push(winning_cases, "case 1")
@@ -725,20 +675,20 @@ cases(index) =>
 
     case_2 = true
      and base_indication
-     and volume_sum_is_positive
-     and most_of_current_body_is_above_9_ema
-     and current_volume_is_strong_with_high_volume
-     and negative_bars_volume_is_going_down
-     and histogram_changed_direction
-     and not most_of_volume_are_stuck_between_top_index_to_current
-     and not too_many_tops_with_rejections_in_range_of_current_bar
-     and move_is_still_strong_due_to_fibonacci_retracement
-     and retracement_should_be_long_enough
-     and no_more_than_2_retracements_until_now
-     and milestones_are_valid
-     and current_session_has_at_least_one_red_bar
      and not big_retracement_between_top_to_start
+     and current_session_has_at_least_one_red_bar
+     and current_volume_is_strong_with_high_volume
+     and histogram_changed_direction
+     and most_of_current_body_is_above_9_ema
+     and move_is_still_strong_due_to_fibonacci_retracement
+     and milestones_are_valid
      and most_of_bars_are_volatile
+     and not most_of_volume_are_stuck_between_top_index_to_current
+     and negative_bars_volume_is_going_down
+     and no_more_than_2_retracements_until_now
+     and retracement_should_be_long_enough
+     and not too_many_tops_with_rejections_in_range_of_current_bar
+     and volume_sum_is_positive
 
     if case_2
         array.push(winning_cases, "case 2")
@@ -946,45 +896,76 @@ cases(index) =>
         array.push(winning_cases, "case 12")
         main_case := case_12
 
-    ////////////       HALTED CASE       //////////// --- variables new initialization!
-    _starting_index = _get_starting_index(index, false)
-    _top_index = _get_top_index(index, _starting_index)
-    _retracement_should_be_long_enough = _retracement_should_be_long_enough(index, _top_index)
+    case_13 = true
+     and base_indication
+     and volume_sum_is_positive
+     and negative_bars_are_weak
+     and most_of_current_body_is_above_9_ema
+     and not too_many_tops_with_rejections_in_range_of_current_bar
+     and move_is_still_strong_due_to_fibonacci_retracement
+     and retracement_should_be_long_enough
+     and milestones_are_valid
+     and current_session_has_at_least_one_red_bar
+     and most_of_bars_are_volatile
+     and starting_index_is_not_the_biggest_bar_in_term_of_price
+     and starting_index_is_not_the_biggest_bar_in_term_of_volume
+     and no_more_than_2_retracements_until_now
+
+    if case_13
+        array.push(winning_cases, "case 13")
+        main_case := case_13
+
+// all_bars_are_positive_with_own_retracement
+// not big_retracement_between_top_to_start
+// current_volume_is_strong_with_high_volume
+// [current_bar_crossed_finally_highest_high
+// current_bar_is_top_and_after_own_retracement
+// current_bar_is_highest_and_full
+// current_session_has_at_least_one_red_bar
+// no_more_than_2_retracements_until_now
+// first_retracement_came_too_late
+// histogram_changed_direction
+// milestones_are_valid
+// most_of_current_body_is_above_9_ema
+// most_of_volume_are_stuck_between_top_index_to_current
+// most_of_bars_are_volatile
+// most_session_is_before_top_index
+// move_is_still_strong_due_to_fibonacci_retracement
+// negative_bars_are_weak
+// negative_bars_volume_is_going_down
+// retracement_is_strong_but_graph_still_good
+// retracement_should_be_long_enough
+// starting_index_is_not_the_biggest_bar_in_term_of_price
+// starting_index_is_not_the_biggest_bar_in_term_of_volume
+// not too_many_tops_with_rejections_in_range_of_current_bar
+// volume_sum_is_positive
+
+    ////////////       HALTED CASE       ////////////
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, 0.1)
     movement_is_after_market_start = hour[index] >= 9 and hour[index] <= 20
-    _lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
-    [_move_is_still_strong_due_to_fibonacci_retracement, _fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, _starting_index, _top_index, _lowest_point_from_top_point_index)
-    negative_bars_are_weak := _negative_bars_are_weak(_top_index, index)
     most_of_current_body_is_above_9_ema := _most_of_current_body_is_above_9_ema(index)
     current_bar_is_halted = _current_bar_is_halted(index)
-    current_bar_is_highest_for_halted = _current_bar_is_highest_for_halted(index, starting_index, top_index)
 
     halted_case = true
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
-     and (_move_is_still_strong_due_to_fibonacci_retracement or current_bar_is_highest_for_halted)
      and most_of_current_body_is_above_9_ema
-     and _retracement_should_be_long_enough
      and current_bar_is_halted
+     and top_index > 0
 
     if halted_case
-        starting_index := _starting_index
-        top_index := _top_index
-        fibonacci_retracement := _fibonacci_retracement
-        lowest_point_from_top_point_index := _lowest_point_from_top_point_index
-
-        array.push(winning_cases, "HALTED SYMBOL! halted case")
+        array.push(winning_cases, "HALTED!")
         main_case := halted_case
 
     for case in winning_cases
         log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
 
-    [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes]
+    [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases]
 
-[main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes] = cases(0)
+[main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases] = cases(0)
 if main_case
     confirmation_label = label.new(bar_index, high, text = "✅", size = size.tiny)
-    label.set_tooltip(confirmation_label, str.format("starting_index: {0}. top_index: {1}. fibonacci_retracement: {2}. lowest_point_from_top_point_index: {3}. top_histogram_index: {4}. attempts_indexes: {5}. retracement_indexes: {6}. volume_percentage_from_top: {7}. bars_percentage_from_top: {8}. tops_with_rejection_indexes: {9}", starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
+    label.set_tooltip(confirmation_label, str.format("starting_index: {0}. top_index: {1}. fibonacci_retracement: {2}. lowest_point_from_top_point_index: {3}. top_histogram_index: {4}. attempts_indexes: {5}. retracement_indexes: {6}. volume_percentage_from_top: {7}. bars_percentage_from_top: {8}. tops_with_rejection_indexes: {9}. winning_cases: {10}", starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases))
 
 plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
 
