@@ -967,7 +967,7 @@ cases(index) =>
 [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases] = cases(0)
 if main_case
     confirmation_label = label.new(bar_index, high, text = "✅", size = size.tiny)
-    label.set_tooltip(confirmation_label, str.format("starting_index: {0}. top_index: {1}. fibonacci_retracement: {2}. lowest_point_from_top_point_index: {3}. top_histogram_index: {4}. attempts_indexes: {5}. retracement_indexes: {6}. volume_percentage_from_top: {7}. bars_percentage_from_top: {8}. tops_with_rejection_indexes: {9}. winning_cases: {10}", starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases))
+    label.set_tooltip(confirmation_label, str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
 
 plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
 
