@@ -1,4 +1,5 @@
 import csv
+import datetime
 import tqdm
 import yfinance
 import requests
@@ -130,6 +131,25 @@ def get_stocks_by_price_change_and_volume():
                             }
                         )
                         csv_write_file.flush()
+
+def extract_symbols_names_from_csv():
+    symbols_names = []
+    with open("/Users/ayaffe/Downloads/full_year_trades_sumamry.csv", "r") as csv_file:
+        reader = csv.DictReader(
+            csv_file,
+        )
+        for row in reader:
+            if "." not in row["Symbol"]:
+                dt = str(row["DateTime"]).split(";")[0]
+                edited_datetime = datetime.datetime.strptime(dt, "%Y%m%d").date()
+                final_line = f"{row["Symbol"]}: {edited_datetime}"
+                if final_line not in symbols_names:
+                    symbols_names.append(f"{row["Symbol"]}: {edited_datetime}")
+
+    with open("full_year_traded_symbols.txt", "w") as f:
+        for symbol in symbols_names:
+            f.write(f"{symbol}\n")
+
 
 if __name__ == "__main__":
     get_stocks_by_price_change_and_volume()
