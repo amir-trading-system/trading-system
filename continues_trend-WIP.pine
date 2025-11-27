@@ -958,6 +958,8 @@ cases(index) =>
         main_case := halted_case
 
     for case in winning_cases
+        if case == "HALTED!"
+            continue
         log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
 
     [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases]
