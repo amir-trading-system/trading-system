@@ -818,24 +818,45 @@ cases(index) =>
 
     case_8 = true
      and base_indication
-     and histogram_changed_direction
+     and not big_retracement_between_top_to_start
      and current_bar_is_highest_and_full
-     and volume_sum_is_positive
-     and most_of_current_body_is_above_9_ema
-     and starting_index_is_not_the_biggest_bar_in_term_of_volume
+     and current_session_has_at_least_one_red_bar
      and not first_retracement_came_too_late
+     and histogram_changed_direction
+     and milestones_are_valid
+     and most_of_current_body_is_above_9_ema
+     and most_of_bars_are_volatile
      and most_session_is_before_top_index
      and move_is_still_strong_due_to_fibonacci_retracement
-     and retracement_should_be_long_enough
      and no_more_than_2_retracements_until_now
-     and milestones_are_valid
-     and current_session_has_at_least_one_red_bar
-     and not big_retracement_between_top_to_start
-     and most_of_bars_are_volatile
+     and retracement_should_be_long_enough
+     and starting_index_is_not_the_biggest_bar_in_term_of_volume
+     and volume_sum_is_positive
 
     if case_8
         array.push(winning_cases, "case 8")
         main_case := case_8
+
+    case_8_a = true
+     and base_indication
+     and not big_retracement_between_top_to_start
+     and current_session_has_at_least_one_red_bar
+     and current_bar_crossed_finally_highest_high
+     and not first_retracement_came_too_late
+     and histogram_changed_direction
+     and milestones_are_valid
+     and most_of_current_body_is_above_9_ema
+     and most_of_bars_are_volatile
+     and most_session_is_before_top_index
+     and move_is_still_strong_due_to_fibonacci_retracement
+     and no_more_than_2_retracements_until_now
+     and retracement_should_be_long_enough
+     and starting_index_is_not_the_biggest_bar_in_term_of_volume
+     and volume_sum_is_positive
+
+    if case_8_a
+        array.push(winning_cases, "case 8_a")
+        main_case := case_8_a
 
     case_9 = true
      and base_indication
