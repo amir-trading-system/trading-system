@@ -4,13 +4,9 @@ Stocks Indications:
  - AQMS: 2025-10-14 - (30 minutes) - halted
  - BQ: 2025-09-29 - halted
  - BQ: 2025-10-30 - halted
- - BCG: 2025-11-18 - 1,2
- - SGBX: 2025-11-19 - 2,8
  - VCIG: 2025-10-29 - 1,2
  - SONN: 2025-07-02 - 6 - 30 minutes.
  - AIFF: 2025-02-11 - halted
- - LFS: 2025-11-11 - halted
- - LFS: 2025-11-18 - 7
  - AREB: 2025-04-04 - halted
  - WKHS: 2025-07-11 - 2
  - THAR: 2025-08-20 - 1,2,3,5,8 - 30 minutes.
@@ -29,22 +25,26 @@ Stocks Indications:
  - CWD: 2025-08-05 - 10
  - STSS: 2025-08-27 - 11
  - EPSM: 2025-10-02 - halted
+ - GWH: 2025-10-13 - 14
+ - BGMS: 2025-07-15 - halted
+ - BGMS: 2025-07-18 - 1,2,6,12,halted
+ - BLBX: 2025-01-22 - 16 - 30 minutes
+ - BTBD: 2025-08-04 - 17
+ - LFS: 2025-11-11 - halted
+ - CYPH: 2025-11-12 - 8,13 - 30 minutes.
+ - CYCU: 2025-11-13 - 14 - 30 minutes
+ - BCG: 2025-11-18 - 1,2
+ - LFS: 2025-11-18 - 7
+ - SGBX: 2025-11-19 - 2,8
  - EPSM: 2025-11-20 - 8,halted
  - SMX: 2025-11-26 - 12
  - ZYXI: 2025-11-26 - 13
- - GWH: 2025-10-13 - 14
- - BGMS: 2025-07-18 - 1,2,6,12
- - CYCU: 2025-11-13 - 14 - 30 minutes
- - CYPH: 2025-11-12 - 8,13 - 30 minutes.
- - BLBX: 2025-01-22 - 16 - 30 minutes
- - BTBD: 2025-08-04 - 17
+ - SMX: 2025-11-28 - halted
 
 Need to identify:
- - BGMS: 2025-07-15 - 5 minutes chart
  - CYCU: 2025-11-14 - 30 minutes
  - CYN: 2025-06-26 - 5 minutes - couldnt find top.
  - CYPH: 2025-11-14 - 15 minutes.
- - SMX: 2025-11-28 - 5 minutes - halted - 10:00.
 
 Need to Fix - False positives:
 

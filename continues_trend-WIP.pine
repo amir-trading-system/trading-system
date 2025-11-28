@@ -473,8 +473,8 @@ _current_bar_is_top_and_after_own_retracement(index, top_index) =>
 _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
-     and close[index] - open[index] > (close[index+1] - open[index+1]) * 2
-     and (high[index] - high[index+1])/(high[index+1] - low[index+1]) >= 0.5
+     and (close[index] - open[index])/(close[index+1] - open[index+1]) > 0.8
+     and (high[index] - high[index+1])/(high[index+1] - low[index+1]) >= 0.3
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
      and histogram[index] > 0
@@ -1098,7 +1098,6 @@ cases(index) =>
      and movement_is_after_market_start
      and most_of_current_body_is_above_9_ema
      and current_bar_is_halted
-     and top_index > 0
 
     if halted_case
         array.push(winning_cases, "HALTED")
