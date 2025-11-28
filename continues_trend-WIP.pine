@@ -91,7 +91,7 @@ _get_top_index(index, starting_index) =>
         if i-1 < 0
             continue
 
-        if high[i] > high[i+1]
+        if high[i] >= high[i+1]
          and high[i] > high[i-1]
          and close[i] > ema_9[i]
          and volume[i] > vol_avg[i]
@@ -630,7 +630,6 @@ _current_bar_has_histogram_wave(index, starting_index, top_index) =>
     current_bar_has_histogram_wave = true
      and current_histogram_has_big_change_regarding_before
      and downtrend_histogram_count >= 2
-     and downtrend_histogram_count <= 4
 
 ///////////// Indications /////////////
 base_case_check(index) =>
@@ -1048,9 +1047,7 @@ cases(index) =>
      and current_volume_is_strong_with_high_volume
      and current_session_has_at_least_one_red_bar
      and most_of_current_body_is_above_9_ema
-     and most_of_bars_are_volatile
      and not most_session_is_before_top_index
-     and no_more_than_2_retracements_until_now
      and negative_bars_volume_is_going_down
      and retracement_should_be_long_enough
      and starting_index_is_not_the_biggest_bar_in_term_of_volume
