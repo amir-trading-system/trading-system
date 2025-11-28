@@ -140,8 +140,9 @@ def extract_symbols_names_from_csv():
         )
         for row in reader:
             if "." not in row["Symbol"]:
-                dt = str(row["DateTime"]).split(";")[0]
-                edited_datetime = datetime.datetime.strptime(dt, "%Y%m%d").date()
+                edited_datetime = datetime.datetime.strptime(row["DateTime"], "%Y%m%d;%H%M%S")
+                if edited_datetime.hour < 9:
+                    continue
                 final_line = f"{row["Symbol"]}: {edited_datetime}"
                 if final_line not in symbols_names:
                     symbols_names.append(f"{row["Symbol"]}: {edited_datetime}")

@@ -33,10 +33,17 @@ Stocks Indications:
  - SMX: 2025-11-26 - 12
  - ZYXI: 2025-11-26 - 13
  - GWH: 2025-10-13 - 14
+ - BGMS: 2025-07-18 - 1,2,6,12
+ - CYCU: 2025-11-13 - 14 - 30 minutes
+ - CYPH: 2025-11-12 - 8,13 - 30 minutes.
 
 Need to identify:
 - BLBX: 2025-01-22 - 30 minutes chart. 13:00
 - BTBD: 2025-08-04 - 5 minutes chart. 09:30
+- BGMS: 2025-07-15 - 5 minutes chart
+- CYCU: 2025-11-14 - 30 minutes
+- CYN: 2025-06-26 - 5 minutes - couldnt find top.
+- CYPH: 2025-11-14 - 15 minutes.
 
 Need to Fix - False positives:
 
