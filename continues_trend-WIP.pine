@@ -94,7 +94,6 @@ _get_top_index(index, starting_index) =>
         if high[i] >= high[i+1]
          and high[i] > high[i-1]
          and close[i] > ema_9[i]
-         and volume[i] > vol_avg[i]
          and high[i] == highest_high
             top_index := i
             break
@@ -148,8 +147,7 @@ _most_of_current_body_is_above_9_ema(index) =>
 _current_volume_is_strong_with_high_volume(index, top_index) =>
     current_volume_is_strong_with_high_volume = true
      and close[index] > open[index]
-     and low[index]/open[index] > 0.95
-     and (close[index] - open[index])/(high[index] - low[index]) >= 0.6
+     and (close[index] - open[index])/(high[index] - low[index]) >= 0.5
 
     for i = top_index-1 to index
         if i < 0
