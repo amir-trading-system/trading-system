@@ -2,7 +2,7 @@
 // © TheFirstPatienceTrader
 
 indicator(title="Continues Trend", overlay = true, max_bars_back = 5000)
-import TradingView/ta/10
+import TradingView/ta/11
 
 //@version=6
 
@@ -87,11 +87,12 @@ _get_top_index(index, starting_index) =>
             highest_high_index := i
 
     top_index = 0
-    for i = index to starting_index
+    for i = index+1 to starting_index
         if i-1 < 0
             continue
 
-        if high[i] >= high[i+1]
+        if true
+         and high[i] >= high[i+1]
          and high[i] > high[i-1]
          and close[i] > ema_9[i]
          and high[i] == highest_high
@@ -676,6 +677,54 @@ _current_bar_comes_after_healthy_retracement(index, top_index, lowest_point_from
      and negative_volume_goes_down
      and not has_fake_top_since_top_index
 
+_current_high_is_highest(index, starting_index) =>
+    current_high_is_highest = false
+    length_param = 1
+    if starting_index > 0
+        length_param := starting_index
+
+    highest_high = ta.highest(high, length_param)
+
+    if starting_index > 0
+        current_high_is_highest := highest_high == high[index]
+
+    current_high_is_highest
+
+_most_volatile_bar_from_top_is_not_weak(index, top_index) =>
+    most_volatile_bar_value = 0.0
+    most_volatile_bar_index = 0
+
+    for i = index+1 to top_index-1
+        if i < 0
+            continue
+
+        if volume[i] > most_volatile_bar_value
+            most_volatile_bar_value := volume[i]
+            most_volatile_bar_index := i
+
+    most_volatile_bar_from_top_is_not_weak = true
+     and close[most_volatile_bar_index] > open[most_volatile_bar_index]
+     or (close[most_volatile_bar_index] < open[most_volatile_bar_index]
+      and low[most_volatile_bar_index] < close[most_volatile_bar_index]
+      and high[most_volatile_bar_index] > open[most_volatile_bar_index]
+      and (open[most_volatile_bar_index] - close[most_volatile_bar_index])/(high[most_volatile_bar_index] - low[most_volatile_bar_index]) < 0.7)
+
+    if not most_volatile_bar_from_top_is_not_weak
+     and close[most_volatile_bar_index] < open[most_volatile_bar_index]
+     and (high[most_volatile_bar_index] - low[most_volatile_bar_index])/(high[top_index] - low[top_index]) < 0.7
+        most_volatile_bar_from_top_is_not_weak := true
+
+    if not most_volatile_bar_from_top_is_not_weak and top_index == 2
+        most_volatile_bar_from_top_is_not_weak := true
+
+    if not most_volatile_bar_from_top_is_not_weak
+     and volume[top_index] > most_volatile_bar_value * 1.2
+     and volume[index] > most_volatile_bar_value * 1.2
+     and high[index] > high[most_volatile_bar_index]
+        most_volatile_bar_from_top_is_not_weak := true
+
+    most_volatile_bar_from_top_is_not_weak
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -697,6 +746,7 @@ base_case_check(index) =>
     indecision_histogram_from_top = _indecision_histogram_from_top(index, top_index)
     higher_than_before = _higher_than_before(index)
     current_bar_is_full = _current_bar_is_full(index)
+    most_volatile_bar_from_top_is_not_weak = _most_volatile_bar_from_top_is_not_weak(index, top_index)
 
     base_indication = true
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
@@ -710,6 +760,7 @@ base_case_check(index) =>
      and histogram_is_positive_until_now
      and not indecision_histogram_from_top
      and made_more_than_usual_percentage_already
+     and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index]
@@ -724,6 +775,7 @@ cases(index) =>
     current_bar_is_top_and_after_own_retracement = _current_bar_is_top_and_after_own_retracement(index, top_index)
     current_bar_is_highest_and_full = _current_bar_is_highest_and_full(index, starting_index)
     current_bar_has_histogram_wave = _current_bar_has_histogram_wave(index, starting_index, top_index)
+    current_high_is_highest = _current_high_is_highest(index, starting_index)
     current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
     [no_more_than_2_retracements_until_now, retracement_indexes] = _no_more_than_2_retracements_until_now(index, starting_index, top_index)
     first_retracement_came_too_late = _first_retracement_came_too_late(starting_index, top_index, retracement_indexes)
@@ -1109,9 +1161,27 @@ cases(index) =>
         array.push(winning_cases, "case 17")
         main_case := case_17
 
+    case_18 = true
+     and base_indication
+     and current_high_is_highest
+     and current_volume_is_strong_with_high_volume
+     and current_session_has_at_least_one_red_bar
+     and histogram_changed_direction
+     and most_of_current_body_is_above_9_ema
+     and most_of_bars_are_volatile
+     and move_is_still_strong_due_to_fibonacci_retracement
+     and negative_bars_volume_is_going_down
+     and starting_index_is_not_the_biggest_bar_in_term_of_volume
+     and volume_sum_is_positive
+
+    if case_18
+        array.push(winning_cases, "case 18")
+        main_case := case_18
+
 // all_bars_are_positive_with_own_retracement
 // not big_retracement_between_top_to_start
 // current_bar_has_histogram_wave
+// current_high_is_highest
 // current_volume_is_strong_with_high_volume
 // current_bar_crossed_finally_highest_high
 // current_bar_is_top_and_after_own_retracement

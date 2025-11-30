@@ -11,6 +11,7 @@ Stocks Indications:
  - APM: 2025-07-16 - halted
  - YHC: 2025-07-16 - 1,2,3,4,5
  - BGMS: 2025-07-18 - 1,2,6,12,halted
+ - HWH: 2025-07-29 - 8,8_a,12,13,14,16,18,halted
  - BTBD: 2025-08-04 - 17
  - CWD: 2025-08-05 - 10
  - THAR: 2025-08-20 - 1,2,3,5,8 - 30 minutes.
@@ -33,19 +34,21 @@ Stocks Indications:
  - AQMS: 2025-10-14 - (30 minutes) - halted
  - VCIG: 2025-10-29 - 1,2
  - BQ: 2025-10-30 - halted
+ - HKD: 2025-10-31 - 18
  - LFS: 2025-11-11 - halted
  - CYPH: 2025-11-12 - 8,13 - 30 minutes.
  - CYCU: 2025-11-13 - 14 - 30 minutes
  - CYCU: 2025-11-14 - 17.
  - CYPH: 2025-11-14 - 17
  - BCG: 2025-11-18 - 1,2
- - LFS: 2025-11-18 - 7
- - SGBX: 2025-11-19 - 2,8
+ - LFS: 2025-11-18 - halted
  - EPSM: 2025-11-20 - 8,halted
  - SMX: 2025-11-26 - 12
  - SMX: 2025-11-28 - halted
 
 Need to identify:
+ - SGBX: 2025-11-19.
+ - HWH: 2025-09-02.
 
 Need to Fix - False positives:
 
