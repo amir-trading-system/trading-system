@@ -37,7 +37,6 @@ _get_starting_index(index, with_threshold) =>
          and close[i] > ema_9[i]
          and high[i] > vwap[i]
          and high[i] - low[i] > (high[i+1] - low[i+1]) * 2
-         and (close[i] - open[i])/(high[i] - low[i]) >= 0.3
          and dayofmonth[i] == dayofmonth[index]
          and high[i] > vwap[i]
 
@@ -173,7 +172,9 @@ _most_of_bars_are_volatile(starting_index, index) =>
 
 _histogram_is_positive_until_now(starting_index, index) =>
     histogram_is_positive_until_now = true
-    for i = starting_index to index
+    for i = starting_index-1 to index
+        if i < 0
+            continue
         if histogram[i] < 0
             histogram_is_positive_until_now := false
             break
@@ -459,7 +460,7 @@ _current_bar_is_top_and_after_own_retracement(index, top_index) =>
     current_bar_volume_is_higher_than_before = volume[index] > volume[index+1]
      and volume[index] > vol_avg[index]
 
-    ema_9_close_to_low = ema_9[index]/low[index] >= 0.99
+    ema_9_close_to_low = ema_9[index]/low[index] >= 0.98
 
     result = true
      and current_bar_is_highest
