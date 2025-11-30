@@ -45,7 +45,7 @@ _get_starting_index(index, with_threshold) =>
              and volume[i] > 10000
 
         if is_first_bar_to_pop_up
-            for j = i+20 to i+1
+            for j = i+30 to i+1
                 if dayofmonth[j] != dayofmonth[i]
                     continue
 
@@ -116,12 +116,12 @@ _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_in
     fibonacci_retracement = (high[top_index] - low[lowest_point_from_top_point_index])/(high[top_index] - open[starting_index])
     move_is_still_strong_due_to_fibonacci_retracement = starting_index > top_index
      and fibonacci_retracement <= 0.62
-     and fibonacci_retracement >= 0.3
+     and fibonacci_retracement >= 0.27
 
     if not move_is_still_strong_due_to_fibonacci_retracement and top_index-1 > 0
         move_is_still_strong_due_to_fibonacci_retracement := close[index] > high[top_index-1]
          and fibonacci_retracement <= 0.8
-         and fibonacci_retracement >= 0.3
+         and fibonacci_retracement >= 0.27
 
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement]
 
@@ -1174,10 +1174,6 @@ cases(index) =>
      and negative_bars_volume_is_going_down
      and starting_index_is_not_the_biggest_bar_in_term_of_volume
      and volume_sum_is_positive
-
-    if case_18
-        array.push(winning_cases, "case 18")
-        main_case := case_18
 
 // all_bars_are_positive_with_own_retracement
 // not big_retracement_between_top_to_start

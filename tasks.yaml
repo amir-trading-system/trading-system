@@ -3,6 +3,7 @@ Stocks Indications:
  - AIFF: 2025-02-11 - halted
  - AREB: 2025-04-04 - halted
  - AGMH: 2025-04-28 - 3 (45) - Not sure I want this case.
+ - KIDZ: 2025-05-01 - halted, 16 - 30 minutes.
  - INHD: 2025-05-12 - 9,halted
  - CYN: 2025-06-26 - halted
  - SONN: 2025-07-02 - 6 - 30 minutes.
@@ -21,6 +22,7 @@ Stocks Indications:
  - SOGP: 2025-08-28 - 3,5,8
  - IPDN: 2025-08-29 - 5,8
  - SOGP: 2025-09-02 - 1,2
+ - HWH: 2025-09-02 - 18
  - IPDN: 2025-09-03 - halted
  - INHD: 2025-09-04 - 9,halted
  - SONN: 2025-09-16 - 17
@@ -29,9 +31,11 @@ Stocks Indications:
  - EPSM: 2025-10-02 - halted
  - EPSM: 2025-10-03 - halted
  - ABVE: 2025-10-08 - 1,2,3,5
+ - NUAI: 2025-10-09 - 8,8_a,12,13,14,16
  - AQMS: 2025-10-13 - 3
  - GWH: 2025-10-13 - 14 (30 minutes)
  - AQMS: 2025-10-14 - (30 minutes) - halted
+ - MAMK: 2025-10-27 - halted
  - VCIG: 2025-10-29 - 1,2
  - BQ: 2025-10-30 - halted
  - HKD: 2025-10-31 - 18
@@ -42,13 +46,13 @@ Stocks Indications:
  - CYPH: 2025-11-14 - 17
  - BCG: 2025-11-18 - 1,2
  - LFS: 2025-11-18 - halted
+ - SGBX: 2025-11-19 - 7
  - EPSM: 2025-11-20 - 8,halted
  - SMX: 2025-11-26 - 12
  - SMX: 2025-11-28 - halted
 
 Need to identify:
- - SGBX: 2025-11-19.
- - HWH: 2025-09-02.
+ - PHIO: 2025-01-13 - 5 minutes.
 
 Need to Fix - False positives:
 
