@@ -110,7 +110,7 @@ _get_lowest_point_from_top_point_index(index, top_index) =>
             lowest_point_from_top_point_value := low[i]
             lowest_point_from_top_point_index := i
 
-    lowest_point_from_top_point_index
+    [lowest_point_from_top_point_index, lowest_point_from_top_point_value]
 
 _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index) =>
     fibonacci_retracement = (high[top_index] - low[lowest_point_from_top_point_index])/(high[top_index] - open[starting_index])
@@ -628,6 +628,54 @@ _current_bar_has_histogram_wave(index, starting_index, top_index) =>
      and current_histogram_has_big_change_regarding_before
      and downtrend_histogram_count >= 2
 
+_current_bar_is_highest_except_the_top_index(index, starting_index, top_index) =>
+    current_bar_is_highest_except_the_top_index = true
+
+    for i = starting_index to index
+        if true
+         and high[i] > high[index]
+         and i != top_index
+            current_bar_is_highest_except_the_top_index := false
+            break
+
+    current_bar_is_highest_except_the_top_index
+
+_current_bar_volume_is_volatile(index) =>
+    volume[index] > 100000
+
+_current_bar_comes_after_healthy_retracement(index, top_index, lowest_point_from_top_point_value) =>
+    current_bar_comes_after_healthy_retracement = true
+    negative_volume_goes_down = true
+    has_fake_top_since_top_index = false
+
+    for i = index+1 to top_index-1
+        if i < 0 or i-1 < 0
+            continue
+
+        if ema_9[i] < ema_9[i+1]
+            current_bar_comes_after_healthy_retracement := false
+
+        if close[i] < open[i]
+         and close[i+1] < open[i+1]
+         and volume[i] > volume[i+1]
+         and volume[i+1]/volume[i] < 0.9
+            negative_volume_goes_down := false
+
+        if high[i] > high[i+1]
+         and high[i] > high[i-1]
+         and volume[i] > volume[i+1]
+         and volume[i] > volume[i-1]
+            for j = index to i-1
+                if j < 0
+                    continue
+                if histogram[j] < histogram[j+1]
+                 and j+1 < i
+                    has_fake_top_since_top_index := true
+
+    current_bar_comes_after_healthy_retracement
+     and negative_volume_goes_down
+     and not has_fake_top_since_top_index
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -638,7 +686,10 @@ base_case_check(index) =>
     movement_is_after_market_start = hour[index] >= 9 and hour[index] <= 20
     current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
     current_bar_high_close_to_top_high = _current_bar_high_close_to_top_high(index, top_index, starting_index)
-    lowest_point_from_top_point_index = _get_lowest_point_from_top_point_index(index, top_index)
+    [lowest_point_from_top_point_index, lowest_point_from_top_point_value] = _get_lowest_point_from_top_point_index(index, top_index)
+    current_bar_is_highest_except_the_top_index = _current_bar_is_highest_except_the_top_index(index, starting_index, top_index)
+    current_bar_volume_is_volatile = _current_bar_volume_is_volatile(index)
+    current_bar_comes_after_healthy_retracement = _current_bar_comes_after_healthy_retracement(index, top_index, lowest_point_from_top_point_value)
 
     [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
 
@@ -648,15 +699,18 @@ base_case_check(index) =>
     current_bar_is_full = _current_bar_is_full(index)
 
     base_indication = true
+     and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
+     and current_bar_close_close_to_high
+     and current_bar_comes_after_healthy_retracement
+     and current_bar_high_close_to_top_high
+     and current_bar_is_full
+     and current_bar_is_highest_except_the_top_index
+     and current_bar_volume_is_volatile
+     and higher_than_before
+     and histogram_is_positive_until_now
+     and not indecision_histogram_from_top
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
-     and current_bar_close_close_to_high
-     and histogram_is_positive_until_now
-     and current_bar_high_close_to_top_high
-     and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
-     and not indecision_histogram_from_top
-     and higher_than_before
-     and current_bar_is_full
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, top_histogram_index]
 
