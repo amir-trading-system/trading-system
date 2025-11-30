@@ -471,8 +471,7 @@ _current_bar_is_top_and_after_own_retracement(index, top_index) =>
 _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
-     and (close[index] - open[index])/(close[index+1] - open[index+1]) > 0.8
-     and (high[index] - high[index+1])/(high[index+1] - low[index+1]) >= 0.3
+     and (close[index] - open[index])/math.abs(close[index+1] - open[index+1]) > 0.8
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
      and histogram[index] > 0
@@ -1107,7 +1106,11 @@ cases(index) =>
 
 [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases] = cases(0)
 if main_case
-    confirmation_label = label.new(bar_index, high, text = "✅", size = size.tiny)
+    joined_winning_cases_str = "✅"
+    for case in winning_cases
+        str_case = str.replace(case, "case ", "")
+        joined_winning_cases_str += str.format("\n{0}", str_case)
+    confirmation_label = label.new(bar_index, high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right)
     label.set_tooltip(confirmation_label, str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
 
 plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")

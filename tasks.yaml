@@ -25,9 +25,10 @@ Stocks Indications:
  - AGMH: 2025-09-19 - 8 (45)
  - BQ: 2025-09-29 - halted
  - EPSM: 2025-10-02 - halted
+ - EPSM: 2025-10-03 - halted
  - ABVE: 2025-10-08 - 1,2,3,5
  - AQMS: 2025-10-13 - 3
- - GWH: 2025-10-13 - 14
+ - GWH: 2025-10-13 - 14 (30 minutes)
  - AQMS: 2025-10-14 - (30 minutes) - halted
  - VCIG: 2025-10-29 - 1,2
  - BQ: 2025-10-30 - halted
@@ -64,5 +65,4 @@ Trades For 11-2025:
  - SMX: 2025-11-28 - halted
 
 To do list:
- - Need to check each of the current results and check for consistent.
  - Go over the other list of the current year trades.
