@@ -1,4 +1,5 @@
 Stocks Indications:
+ - PHIO: 2025-01-13 - 19
  - BLBX: 2025-01-22 - 16 - 30 minutes
  - AIFF: 2025-02-11 - halted
  - AREB: 2025-04-04 - halted
@@ -52,7 +53,6 @@ Stocks Indications:
  - SMX: 2025-11-28 - halted
 
 Need to identify:
- - PHIO: 2025-01-13 - 5 minutes.
 
 Need to Fix - False positives:
 
