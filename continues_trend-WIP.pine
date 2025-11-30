@@ -136,13 +136,17 @@ _milestones_are_valid(index, starting_index, top_index) =>
 _current_bar_close_close_to_high(index) =>
     close[index]/high[index] >= 0.7
 
-_most_of_current_body_is_above_9_ema(index) =>
+_most_of_current_body_is_above_9_ema(index, for_halt_purpose) =>
     most_of_current_body_is_above_9_ema = open[index] >= ema_9[index]
     if not most_of_current_body_is_above_9_ema
         most_of_current_body_is_above_9_ema := (ema_9[index] - open[index])/(high[index] - open[index]) <= 0.2
 
-    most_of_current_body_is_above_9_ema
+    result = most_of_current_body_is_above_9_ema
      and ema_9[index]/low[index] > 0.95
+
+    if for_halt_purpose
+        result := most_of_current_body_is_above_9_ema
+         and ema_9[index]/low[index] >= 0.9
 
 _current_volume_is_strong_with_high_volume(index, top_index) =>
     current_volume_is_strong_with_high_volume = true
@@ -829,7 +833,7 @@ cases(index) =>
     [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
     histogram_mostly_positive_except_small_retracement = _histogram_mostly_positive_except_small_retracement(index, starting_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
-    most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index)
+    most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, false)
     [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
     most_session_is_before_top_index = _most_session_is_before_top_index(starting_index, top_index)
@@ -1294,7 +1298,7 @@ cases(index) =>
     ////////////       HALTED CASE       ////////////
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, 0.1)
     movement_is_after_market_start = hour[index] >= 9 and hour[index] <= 20
-    most_of_current_body_is_above_9_ema := _most_of_current_body_is_above_9_ema(index)
+    most_of_current_body_is_above_9_ema := _most_of_current_body_is_above_9_ema(index, true)
     current_bar_is_halted = _current_bar_is_halted(index)
 
     halted_case = true
