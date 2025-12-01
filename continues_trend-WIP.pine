@@ -98,7 +98,7 @@ _get_top_index(index, starting_index) =>
             top_index := i
             break
 
-    top_index
+    [top_index, highest_high]
 
 _get_lowest_point_from_top_point_index(index, top_index) =>
     lowest_point_from_top_point_value = 1000.0
@@ -477,7 +477,6 @@ _current_bar_is_top_and_after_own_retracement(index, top_index) =>
 _current_bar_is_halted(index) =>
     current_bar_is_halted = true
      and close[index] == high[index]
-     and (close[index] - open[index])/math.abs(close[index+1] - open[index+1]) > 0.8
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
      and histogram[index] > 0
@@ -780,7 +779,7 @@ _histogram_mostly_positive_except_small_retracement(index, starting_index) =>
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
-    top_index = _get_top_index(index, starting_index)
+    [top_index, highest_high] = _get_top_index(index, starting_index)
 
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
@@ -812,11 +811,11 @@ base_case_check(index) =>
      and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
 
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index]
+    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
 
 cases(index) =>
     main_case = false
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index] = base_case_check(index)
+    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high] = base_case_check(index)
     all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
     big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
@@ -1316,15 +1315,18 @@ cases(index) =>
             continue
         log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
 
-    [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases]
+    [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high, winning_cases]
 
-[main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, winning_cases] = cases(0)
+[main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high, winning_cases] = cases(0)
+
 if main_case
+    if high[0] > highest_high
+        highest_high := high[0]
     joined_winning_cases_str = "✅"
     for case in winning_cases
         str_case = str.replace(case, "case ", "")
         joined_winning_cases_str += str.format("\n{0}", str_case)
-    confirmation_label = label.new(bar_index, high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right)
+    confirmation_label = label.new(bar_index, highest_high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right)
     label.set_tooltip(confirmation_label, str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
 
 plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
