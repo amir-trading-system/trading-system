@@ -9,6 +9,7 @@ import TradingView/ta/11
 relevant_timezone = "America/New_York"
 
 ema_9 = ta.ema(close, 9)
+ema_20 = ta.ema(close, 20)
 vwap = ta.vwap(hlc3)
 vol_avg = ta.sma(volume, 20)
 [macd, signal_line, histogram] = ta.macd(close, 12, 26, 9)
@@ -141,12 +142,16 @@ _most_of_current_body_is_above_9_ema(index, for_halt_purpose) =>
     if not most_of_current_body_is_above_9_ema
         most_of_current_body_is_above_9_ema := (ema_9[index] - open[index])/(high[index] - open[index]) <= 0.2
 
-    result = most_of_current_body_is_above_9_ema
-     and ema_9[index]/low[index] > 0.95
-
     if for_halt_purpose
-        result := most_of_current_body_is_above_9_ema
-         and ema_9[index]/low[index] >= 0.9
+        most_of_current_body_is_above_9_ema := (ema_9[index] - open[index])/(high[index] - open[index]) <= 0.5
+         and open[index] > ema_20[index]
+
+    low_close_to_ema_9 = ema_9[index]/low[index] >= 0.95
+
+    result = most_of_current_body_is_above_9_ema
+     and low_close_to_ema_9
+
+    result
 
 _current_volume_is_strong_with_high_volume(index, top_index) =>
     current_volume_is_strong_with_high_volume = true
@@ -475,7 +480,18 @@ _current_bar_is_top_and_after_own_retracement(index, top_index) =>
     result
 
 _current_bar_is_halted(index) =>
+    previous_bar_is_negative = close[index+1] < open[index+1]
+    previous_bar_is_indecision = math.abs(close[index+1] - open[index+1])/(high[index+1] - low[index+1]) < 0.5
+     and (high[index+1] - close[index+1])/(high[index+1] - low[index+1]) >= 0.2
+    previous_bar_has_little_movement = true
+     and close[index+1] > open[index+1]
+     and (close[index+1] - open[index+1])/(close[index] - open[index]) <= 0.3
+
+    current_bar_changed_direction = true
+     and (previous_bar_is_negative or previous_bar_is_indecision or previous_bar_has_little_movement)
+
     current_bar_is_halted = true
+     and current_bar_changed_direction
      and close[index] == high[index]
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
@@ -633,10 +649,10 @@ _current_bar_has_histogram_wave(index, starting_index, top_index) =>
      and current_histogram_has_big_change_regarding_before
      and downtrend_histogram_count >= 2
 
-_current_bar_is_highest_except_the_top_index(index, starting_index, top_index) =>
+_current_bar_is_highest_except_the_top_index(index, top_index) =>
     current_bar_is_highest_except_the_top_index = true
 
-    for i = starting_index to index
+    for i = top_index to index
         if true
          and high[i] > high[index]
          and i != top_index
@@ -787,7 +803,7 @@ base_case_check(index) =>
     current_bar_close_close_to_high = _current_bar_close_close_to_high(index)
     current_bar_high_close_to_top_high = _current_bar_high_close_to_top_high(index, top_index, starting_index)
     [lowest_point_from_top_point_index, lowest_point_from_top_point_value] = _get_lowest_point_from_top_point_index(index, top_index)
-    current_bar_is_highest_except_the_top_index = _current_bar_is_highest_except_the_top_index(index, starting_index, top_index)
+    current_bar_is_highest_except_the_top_index = _current_bar_is_highest_except_the_top_index(index, top_index)
     current_bar_volume_is_volatile = _current_bar_volume_is_volatile(index)
     current_bar_comes_after_healthy_retracement = _current_bar_comes_after_healthy_retracement(index, top_index, lowest_point_from_top_point_value)
 
@@ -1297,13 +1313,13 @@ cases(index) =>
     ////////////       HALTED CASE       ////////////
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, 0.1)
     movement_is_after_market_start = hour[index] >= 9 and hour[index] <= 20
-    most_of_current_body_is_above_9_ema := _most_of_current_body_is_above_9_ema(index, true)
+    _most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, true)
     current_bar_is_halted = _current_bar_is_halted(index)
 
     halted_case = true
      and made_more_than_usual_percentage_already
      and movement_is_after_market_start
-     and most_of_current_body_is_above_9_ema
+     and _most_of_current_body_is_above_9_ema
      and current_bar_is_halted
 
     if halted_case
