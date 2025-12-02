@@ -795,6 +795,15 @@ _histogram_mostly_positive_except_small_retracement(index, starting_index) =>
 
     histogram_mostly_positive_except_small_retracement
 
+_no_bars_closed_under_vwap(index, top_index) =>
+    no_bars_closed_under_vwap = true
+    for i = top_index to index
+        if close[i] < vwap[i]
+            no_bars_closed_under_vwap := false
+            break
+
+    no_bars_closed_under_vwap
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -858,6 +867,7 @@ cases(index) =>
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
     negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
     negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
+    no_bars_closed_under_vwap = _no_bars_closed_under_vwap(index, top_index)
     retracement_is_strong_but_graph_still_good = _retracement_is_strong_but_graph_still_good(index, fibonacci_retracement, starting_index)
     retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
     starting_index_is_not_the_biggest_bar_in_term_of_price = _starting_index_is_not_the_biggest_bar_in_term_of_price(index, starting_index)
@@ -1306,6 +1316,26 @@ cases(index) =>
         array.push(winning_cases, "case 20")
         main_case := case_20
 
+    case_21 = true
+     and base_indication
+     and current_high_is_highest
+     and current_volume_is_strong_with_high_volume
+     and current_bar_is_highest_and_full
+     and current_session_has_at_least_one_red_bar
+     and histogram_is_positive_until_now
+     and milestones_are_valid
+     and most_of_current_body_is_above_9_ema
+     and most_of_bars_are_volatile
+     and move_is_still_strong_due_to_fibonacci_retracement
+     and negative_bars_volume_is_going_down
+     and no_more_than_2_retracements_until_now
+     and no_bars_closed_under_vwap
+     and volume_sum_is_positive
+
+    if case_21
+        array.push(winning_cases, "case 21")
+        main_case := case_21
+
     // case_x = true
     //  and base_indication
 
@@ -1332,9 +1362,10 @@ cases(index) =>
 // most_of_bars_are_volatile
 // most_session_is_before_top_index
 // move_is_still_strong_due_to_fibonacci_retracement
-// no_more_than_2_retracements_until_now
 // negative_bars_are_weak
 // negative_bars_volume_is_going_down
+// no_more_than_2_retracements_until_now
+// no_bars_closed_under_vwap
 // retracement_is_strong_but_graph_still_good
 // retracement_should_be_long_enough
 // starting_index_is_not_the_biggest_bar_in_term_of_price
