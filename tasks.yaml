@@ -46,6 +46,7 @@ Stocks Indications:
  - VCIG: 2025-10-29 - 1,2
  - BQ: 2025-10-30 - halted
  - HKD: 2025-10-31 - 18
+ - LFS: 2025-11-11 - 20,halted
  - CYPH: 2025-11-12 - 8,13 - 30 minutes.
  - CYCU: 2025-11-13 - 14 - 30 minutes
  - CYCU: 2025-11-14 - 17.
@@ -55,12 +56,11 @@ Stocks Indications:
  - SGBX: 2025-11-19 - 7
  - EPSM: 2025-11-20 - 8,halted
  - SMX: 2025-11-26 - 12
+ - SMX: 2025-11-28 - halted
  - AHMA: 2025-12-01 - halted
  - FLYE: 2025-12-01 - halted
 
 Need to identify:
- - LFS: 2025-11-11 - halted
- - SMX: 2025-11-28 - halted
 
 
 Need to Fix - False positives:
