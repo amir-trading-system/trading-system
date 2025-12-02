@@ -1384,6 +1384,7 @@ cases(index) =>
      and movement_is_after_market_start
      and _most_of_current_body_is_above_9_ema
      and current_bar_is_halted
+     and histogram[index] > 0
 
     if halted_case
         array.push(winning_cases, "HALTED")
