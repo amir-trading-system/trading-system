@@ -63,6 +63,7 @@ Stocks Indications:
  - IRBT: 2025-12-03 - 8,12,13,14,16,18
 
 Need to identify:
+ - Consider to add check if its the highest until now.
 
 
 Need to Fix - False positives:
