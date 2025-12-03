@@ -63,24 +63,10 @@ Stocks Indications:
  - IRBT: 2025-12-03 - 8,12,13,14,16,18
 
 Need to identify:
- - Consider to add check if its the highest until now.
+ - KITT: 2025-12-03 - 15 minutes - 14:30.
 
 
 Need to Fix - False positives:
-
-
-Trades For 11-2025:
- - LFS: 2025-11-11 - halted
- - CYPH: 2025-11-12 - 8,13 - 30 minutes.
- - CYCU: 2025-11-13 - 14 - 30 minutes
- - CYCU: 2025-11-14 - 17.
- - CYPH: 2025-11-14 - 17
- - BCG: 2025-11-18 - 1,2
- - LFS: 2025-11-18 - 7
- - SGBX: 2025-11-19 - 2,8
- - EPSM: 2025-11-20 - 8,halted
- - SMX: 2025-11-26 - 12
- - SMX: 2025-11-28 - halted
 
 To do list:
  - Go over the other list of the current year trades.
