@@ -841,39 +841,184 @@ base_case_check(index) =>
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
 
+analyze_case(indications) =>
+    result = true
+    success_percentage = 0.0
+    winning_indications = 0
+    total_indications = array.size(indications)
+
+    for indication in indications
+        if indication
+            winning_indications += 1
+
+        result := true
+         and result
+         and indication
+
+    success_percentage = winning_indications/total_indications
+
+    [result, success_percentage]
+
 cases(index) =>
+    success_percentage = 0.0
+    winning_indications = 0
+    total_indications = 0
     main_case = false
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high] = base_case_check(index)
+    if base_indication
+        winning_indications += 1
+    total_indications += 1
+
     all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
+    if all_bars_are_positive_with_own_retracement
+        winning_indications += 1
+    total_indications += 1
+
     big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
+    if not big_retracement_between_top_to_start
+        winning_indications += 1
+    total_indications += 1
+
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
+    if current_volume_is_strong_with_high_volume
+        winning_indications += 1
+    total_indications += 1
+
     [current_bar_crossed_finally_highest_high, attempts_indexes] = _current_bar_crossed_finally_highest_high(index, top_index, starting_index)
+    if current_bar_crossed_finally_highest_high
+        winning_indications += 1
+    total_indications += 1
+
     current_bar_is_top_and_after_own_retracement = _current_bar_is_top_and_after_own_retracement(index, top_index)
+    if current_bar_is_top_and_after_own_retracement
+        winning_indications += 1
+    total_indications += 1
+
     current_bar_is_highest_and_full = _current_bar_is_highest_and_full(index, starting_index)
+    if current_bar_is_highest_and_full
+        winning_indications += 1
+    total_indications += 1
+
     current_bar_has_histogram_wave = _current_bar_has_histogram_wave(index, starting_index, top_index)
+    if current_bar_has_histogram_wave
+        winning_indications += 1
+    total_indications += 1
+
     current_high_is_highest = _current_high_is_highest(index, starting_index)
+    if current_high_is_highest
+        winning_indications += 1
+    total_indications += 1
+
     current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
+    if current_session_has_at_least_one_red_bar
+        winning_indications += 1
+    total_indications += 1
+
     [no_more_than_2_retracements_until_now, retracement_indexes] = _no_more_than_2_retracements_until_now(index, starting_index, top_index)
+    if no_more_than_2_retracements_until_now
+        winning_indications += 1
+    total_indications += 1
+
     first_retracement_came_too_late = _first_retracement_came_too_late(starting_index, top_index, retracement_indexes)
+    if not first_retracement_came_too_late
+        winning_indications += 1
+    total_indications += 1
+
     has_three_positive_two_negative_pattern = _has_three_positive_two_negative_pattern(index, starting_index)
+    if has_three_positive_two_negative_pattern
+        winning_indications += 1
+    total_indications += 1
+
     histogram_changed_direction = _histogram_changed_direction(index)
+    if histogram_changed_direction
+        winning_indications += 1
+    total_indications += 1
+
     [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
+    if histogram_is_positive_until_now
+        winning_indications += 1
+    total_indications += 1
+
     histogram_mostly_positive_except_small_retracement = _histogram_mostly_positive_except_small_retracement(index, starting_index)
+    if histogram_mostly_positive_except_small_retracement
+        winning_indications += 1
+    total_indications += 1
+
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
+    if milestones_are_valid
+        winning_indications += 1
+    total_indications += 1
+
     most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, false)
+    if most_of_current_body_is_above_9_ema
+        winning_indications += 1
+    total_indications += 1
+
     [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
+    if not most_of_volume_are_stuck_between_top_index_to_current
+        winning_indications += 1
+    total_indications += 1
+
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
+    if most_of_bars_are_volatile
+        winning_indications += 1
+    total_indications += 1
+
     most_session_is_before_top_index = _most_session_is_before_top_index(starting_index, top_index)
+    if most_session_is_before_top_index
+        winning_indications += 1
+    total_indications += 1
+
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
+    if move_is_still_strong_due_to_fibonacci_retracement
+        winning_indications += 1
+    total_indications += 1
+
     negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
+    if negative_bars_are_weak
+        winning_indications += 1
+    total_indications += 1
+
     negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
+    if negative_bars_volume_is_going_down
+        winning_indications += 1
+    total_indications += 1
+
     no_bars_closed_under_vwap = _no_bars_closed_under_vwap(index, top_index)
+    if no_bars_closed_under_vwap
+        winning_indications += 1
+    total_indications += 1
+
     retracement_is_strong_but_graph_still_good = _retracement_is_strong_but_graph_still_good(index, fibonacci_retracement, starting_index)
+    if retracement_is_strong_but_graph_still_good
+        winning_indications += 1
+    total_indications += 1
+
     retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
+    if retracement_should_be_long_enough
+        winning_indications += 1
+    total_indications += 1
+
     starting_index_is_not_the_biggest_bar_in_term_of_price = _starting_index_is_not_the_biggest_bar_in_term_of_price(index, starting_index)
+    if starting_index_is_not_the_biggest_bar_in_term_of_price
+        winning_indications += 1
+    total_indications += 1
+
     starting_index_is_not_the_biggest_bar_in_term_of_volume = _starting_index_is_not_the_biggest_bar_in_term_of_volume(index, starting_index)
+    if starting_index_is_not_the_biggest_bar_in_term_of_volume
+        winning_indications += 1
+    total_indications += 1
+
     [too_many_tops_with_rejections_in_range_of_current_bar, tops_with_rejection_indexes] = _too_many_tops_with_rejections_in_range_of_current_bar(index, starting_index, top_index)
+    if not too_many_tops_with_rejections_in_range_of_current_bar
+        winning_indications += 1
+    total_indications += 1
+
     volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.0)
+    if volume_sum_is_positive
+        winning_indications += 1
+    total_indications += 1
+
 
     winning_cases = array.new_string()
 
@@ -1258,20 +1403,20 @@ cases(index) =>
         array.push(winning_cases, "case 17")
         main_case := case_17
 
-    case_18 = true
-     and base_indication
-     and current_bar_is_highest_and_full
-     and current_high_is_highest
-     and current_session_has_at_least_one_red_bar
-     and current_volume_is_strong_with_high_volume
-     and histogram_changed_direction
-     and histogram_is_positive_until_now
-     and most_of_bars_are_volatile
-     and most_of_current_body_is_above_9_ema
-     and move_is_still_strong_due_to_fibonacci_retracement
-     and negative_bars_volume_is_going_down
-     and starting_index_is_not_the_biggest_bar_in_term_of_volume
-     and volume_sum_is_positive
+    [case_18, success_percentage_18] = analyze_case(
+     array.from(base_indication,
+      current_bar_is_highest_and_full,
+      current_high_is_highest,
+      current_session_has_at_least_one_red_bar,
+      current_volume_is_strong_with_high_volume,
+      histogram_changed_direction,
+      histogram_is_positive_until_now,
+      most_of_bars_are_volatile,
+      most_of_current_body_is_above_9_ema,
+      move_is_still_strong_due_to_fibonacci_retracement,
+      negative_bars_volume_is_going_down,
+      starting_index_is_not_the_biggest_bar_in_term_of_volume,
+      volume_sum_is_positive))
 
     if case_18
         array.push(winning_cases, "case 18")
