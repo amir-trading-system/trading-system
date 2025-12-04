@@ -20,7 +20,7 @@ if timeframe.period == "10S"
 bars_back = (((hour[0] - 4) * 60) + minute[0])/current_timeframe
 
 winning_cases = array.new_string()
-success_percentage_threshold = 0.85
+success_percentage_threshold = 0.9
 
 // if time == timestamp(relevant_timezone, 2025, 9, 18, 11, 50) and current_timeframe == 5
 //     log.info("some log")
@@ -927,7 +927,8 @@ cases(index) =>
       not most_of_volume_are_stuck_between_top_index_to_current,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
-      volume_sum_is_positive),1)
+      volume_sum_is_positive),
+      1)
 
     if case_1
         main_case := case_1
@@ -948,7 +949,8 @@ cases(index) =>
       not most_of_volume_are_stuck_between_top_index_to_current,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
-      volume_sum_is_positive),2)
+      volume_sum_is_positive),
+      2)
 
     if case_2
         main_case := case_2
@@ -970,7 +972,8 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),3)
+      volume_sum_is_positive),
+      3)
 
     if case_3
         main_case := case_3
@@ -992,7 +995,8 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),4)
+      volume_sum_is_positive),
+      4)
 
     if case_4
         main_case := case_4
@@ -1016,7 +1020,8 @@ cases(index) =>
       retracement_should_be_long_enough,
       starting_index >= 8,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      _volume_sum_is_positive),5)
+      _volume_sum_is_positive),
+      5)
 
     if case_5
         main_case := case_5
@@ -1038,7 +1043,8 @@ cases(index) =>
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
       _volume_sum_is_positive,
-      array.size(retracement_indexes) == 1),6)
+      array.size(retracement_indexes) == 1),
+      6)
 
     if case_6
         main_case := case_6
@@ -1053,7 +1059,8 @@ cases(index) =>
       move_is_still_strong_due_to_fibonacci_retracement,
       no_more_than_2_retracements_until_now,
       not big_retracement_between_top_to_start,
-      retracement_should_be_long_enough), 7)
+      retracement_should_be_long_enough),
+      7)
 
     if case_7
         main_case := case_7
@@ -1074,7 +1081,8 @@ cases(index) =>
       not first_retracement_came_too_late,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),8)
+      volume_sum_is_positive),
+      8)
 
     if case_8
         main_case := case_8
@@ -1095,7 +1103,8 @@ cases(index) =>
        not first_retracement_came_too_late,
        retracement_should_be_long_enough,
        starting_index_is_not_the_biggest_bar_in_term_of_volume,
-       volume_sum_is_positive), "8_a")
+       volume_sum_is_positive),
+       "8_a")
 
     if case_8_a
         main_case := case_8_a
@@ -1116,7 +1125,8 @@ cases(index) =>
        not big_retracement_between_top_to_start,
        retracement_is_strong_but_graph_still_good,
        starting_index_is_not_the_biggest_bar_in_term_of_volume,
-       volume_sum_is_positive),9)
+       volume_sum_is_positive),
+       9)
 
     if case_9
         main_case := case_9
@@ -1137,7 +1147,8 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive), 10)
+      volume_sum_is_positive),
+      10)
 
     if case_10
         main_case := case_10
@@ -1152,7 +1163,8 @@ cases(index) =>
       most_of_current_body_is_above_9_ema,
       not histogram_changed_direction,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
-      volume_sum_is_positive),11)
+      volume_sum_is_positive),
+      11)
 
     if case_11
         main_case := case_11
@@ -1171,7 +1183,8 @@ cases(index) =>
       not big_retracement_between_top_to_start,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
-      volume_sum_is_positive),12)
+      volume_sum_is_positive),
+      12)
 
     if case_12
         main_case := case_12
@@ -1190,7 +1203,8 @@ cases(index) =>
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),13)
+      volume_sum_is_positive),
+      13)
 
     if case_13
         main_case := case_13
@@ -1210,7 +1224,8 @@ cases(index) =>
       negative_bars_volume_is_going_down,
       not big_retracement_between_top_to_start,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
-      volume_sum_is_positive), 14)
+      volume_sum_is_positive),
+      14)
 
     if case_14
         main_case := case_14
@@ -1231,7 +1246,8 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
-      volume_sum_is_positive), 15)
+      volume_sum_is_positive),
+      15)
 
     if case_15
         main_case := case_15
@@ -1251,7 +1267,8 @@ cases(index) =>
       not big_retracement_between_top_to_start,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive), 16)
+      volume_sum_is_positive),
+      16)
 
     if case_16
         main_case := case_16
@@ -1268,7 +1285,8 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive), 17)
+      volume_sum_is_positive),
+      17)
 
     if case_17
         main_case := case_17
@@ -1286,7 +1304,8 @@ cases(index) =>
       move_is_still_strong_due_to_fibonacci_retracement,
       negative_bars_volume_is_going_down,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive), 18)
+      volume_sum_is_positive),
+      18)
 
     if case_18
         main_case := case_18
@@ -1303,7 +1322,8 @@ cases(index) =>
       move_is_still_strong_due_to_fibonacci_retracement,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive), 19)
+      volume_sum_is_positive),
+      19)
 
     if case_19
         main_case := case_19
@@ -1324,7 +1344,8 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive), 20)
+      volume_sum_is_positive),
+      20)
 
     if case_20
         main_case := case_20
@@ -1343,13 +1364,38 @@ cases(index) =>
       negative_bars_volume_is_going_down,
       no_bars_closed_under_vwap,
       no_more_than_2_retracements_until_now,
-      volume_sum_is_positive),21)
+      volume_sum_is_positive),
+      21)
 
     if case_21
         main_case := case_21
 
+    case_22 = _analyze_case(
+     array.from(
+     base_indication,
+     current_bar_crossed_finally_highest_high,
+     current_bar_is_highest_and_full,
+     current_session_has_at_least_one_red_bar,
+     current_volume_is_strong_with_high_volume,
+     histogram_changed_direction,
+     histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
+     most_of_bars_are_volatile,
+     most_of_current_body_is_above_9_ema,
+     move_is_still_strong_due_to_fibonacci_retracement,
+     negative_bars_volume_is_going_down,
+     no_bars_closed_under_vwap,
+     starting_index_is_not_the_biggest_bar_in_term_of_price,
+     starting_index_is_not_the_biggest_bar_in_term_of_volume,
+     volume_sum_is_positive),
+     22)
+
+    if case_22
+        main_case := case_22
+
+
     // case_x = _analyze_case(
-    //  array.from(base_indication), "x")
+    //  array.from(base_indication),
+    //  "x")
 
     // if case_x
     //     main_case := case_x
@@ -1401,11 +1447,6 @@ cases(index) =>
         array.push(winning_cases, "HALTED")
         main_case := halted_case
 
-    for case in winning_cases
-        if case == "HALTED"
-            continue
-        log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
-
     [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high]
 
 [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high] = cases(0)
@@ -1417,10 +1458,12 @@ if main_case
     for case in winning_cases
         str_case = str.replace(case, "case ", "")
         joined_winning_cases_str += str.format("\n{0}", str_case)
-    confirmation_label = label.new(bar_index, highest_high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right)
-    label.set_tooltip(confirmation_label, str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
 
-plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰")
+        if str.endswith(case, "1")
+            log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
+
+    tooltip_text = str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes)
+    label.new(bar_index, highest_high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right, tooltip = tooltip_text, yloc = yloc.price, xloc = xloc.bar_index)
 
 plot(fibonacci_retracement, "fibonacci_retracement", display = display.status_line)
 plot(starting_index, "starting_index", display = display.status_line)

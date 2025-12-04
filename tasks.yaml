@@ -6,6 +6,7 @@ Stocks Indications:
  - AGMH: 2025-04-28 - 3 (45) - Not sure I want this case.
  - KIDZ: 2025-05-01 - 16 - 30 minutes.
  - INHD: 2025-05-12 - 9,halted
+ - OMH: 2025-06-09 - halted
  - NAOV: 2025-06-11 - 7,8_a,18
  - RBNE: 2025-06-13 - halted
  - NWGL: 2025-06-18 - halted
@@ -61,10 +62,10 @@ Stocks Indications:
  - FLYE: 2025-12-01 - halted
  - SMX: 2025-12-02 - halted,21
  - IRBT: 2025-12-03 - 8,12,13,14,16,18
+ - KITT: 2025-12-03 - 22.
  - QCLS: 2025-12-04 - 12,14,18,20
 
 Need to identify:
- - KITT: 2025-12-03 - 15 minutes - 14:30.
 
 
 Need to Fix - False positives:
