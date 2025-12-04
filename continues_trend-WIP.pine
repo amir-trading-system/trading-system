@@ -807,6 +807,16 @@ _no_bars_closed_under_vwap(index, top_index) =>
 
     no_bars_closed_under_vwap
 
+_current_bar_has_lowest_volume_since_top_bar(index, top_index) =>
+    lowest_volume = 100000000.0
+
+    for i = top_index to index
+        if volume[i] < lowest_volume
+            lowest_volume := volume[i]
+
+    current_bar_has_lowest_volume_since_top_bar = volume[index] == lowest_volume
+    current_bar_has_lowest_volume_since_top_bar
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -827,6 +837,7 @@ base_case_check(index) =>
     higher_than_before = _higher_than_before(index)
     current_bar_is_full = _current_bar_is_full(index)
     most_volatile_bar_from_top_is_not_weak = _most_volatile_bar_from_top_is_not_weak(index, top_index)
+    current_bar_has_lowest_volume_since_top_bar = _current_bar_has_lowest_volume_since_top_bar(index, top_index)
 
     base_indication = true
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
@@ -841,6 +852,7 @@ base_case_check(index) =>
      and made_more_than_usual_percentage_already
      and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
+     and not current_bar_has_lowest_volume_since_top_bar
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
 
