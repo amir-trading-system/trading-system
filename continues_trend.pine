@@ -1451,7 +1451,7 @@ cases(index) =>
 
 [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high] = cases(0)
 
-if main_case
+if main_case or array.size(winning_cases) >= 5
     if high[0] > highest_high
         highest_high := high[0]
     joined_winning_cases_str = "✅"
