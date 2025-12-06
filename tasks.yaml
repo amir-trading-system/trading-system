@@ -21,6 +21,7 @@ Stocks Indications:
  - HWH: 2025-07-29 - 8,8_a,12,13,14,16,18,halted
  - BTBD: 2025-08-04 - 17
  - CWD: 2025-08-05 - 10
+ - RMSG: 2025-08-06 - halted
  - THAR: 2025-08-20 - 1,2,3,5,8 - 30 minutes.
  - THAR: 2025-08-25 - halted
  - INHD: 2025-08-25 - 8,halted
@@ -43,6 +44,8 @@ Stocks Indications:
  - AQMS: 2025-10-13 - 3
  - GWH: 2025-10-13 - 14 (30 minutes)
  - AQMS: 2025-10-14 - (30 minutes) - halted
+ - RANI: 2025-10-17 - halted
+ - SCNX: 2025-10-23 - 13,21
  - MAMK: 2025-10-27 - halted
  - VCIG: 2025-10-29 - 1,2
  - BQ: 2025-10-30 - halted
@@ -56,6 +59,7 @@ Stocks Indications:
  - LFS: 2025-11-18 - halted
  - SGBX: 2025-11-19 - 7
  - EPSM: 2025-11-20 - 8,halted
+ - INHD: 2025-11-24 - 14,18,21,halted
  - SMX: 2025-11-26 - 12
  - SMX: 2025-11-28 - halted
  - AHMA: 2025-12-01 - halted
@@ -64,10 +68,12 @@ Stocks Indications:
  - IRBT: 2025-12-03 - 8,12,13,14,16,18
  - KITT: 2025-12-03 - 22.
  - QCLS: 2025-12-04 - 12,14,18,20
+ - SMX: 2025-12-04 - halted
  - TWNP: 2025-12-05 - 17
  - IRBT: 2025-12-05 - 7,8_a,18,21,22
 
 Need to identify:
+ - SNGX: 2025-07-31 - 5 minutes.
 
 
 Need to Fix - False positives:
