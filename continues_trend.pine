@@ -35,6 +35,12 @@ _get_starting_index(index, with_threshold) =>
     for i = index+1 to index+min_bars_back
         if i < 0
             continue
+        if close[i] <= open[i]
+            continue
+        if volume[i] < vol_avg[i]
+            continue
+        if dayofmonth[i] != dayofmonth[index]
+            continue
         is_first_bar_to_pop_up = close[i] > open[i]
          and volume[i] > volume[i+1] * 1.5
          and volume[i] > vol_avg[i]
@@ -889,7 +895,6 @@ _vwap_ratio_is_good(index) =>
 
     ema_higher_than_vwap = true
      and ema_9[index] > vwap[index]
-     and ema_20[index] >= vwap[index]
 
     just_crossed_vwap or ema_higher_than_vwap
 
@@ -934,18 +939,20 @@ base_case_check(index) =>
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
 
-_analyze_case(indications, case_number) =>
+_analyze_case(base_indication, indications, case_number) =>
     result = true
     winning_indications = 0
     total_indications = array.size(indications)
 
-    for indication in indications
-        if indication
-            winning_indications += 1
-
-        result := true
-         and result
-         and indication
+    if base_indication
+        for i = 0 to total_indications - 1
+            indication = array.get(indications, i)
+            if indication
+                winning_indications += 1
+            else
+                result := false
+    else
+        result := false
 
     success_percentage = winning_indications/total_indications
 
@@ -990,8 +997,11 @@ cases(index) =>
     has_classic_bars_wave = _has_classic_bars_wave(index)
     has_bull_pattern = _has_bull_pattern(index, starting_index)
 
+    histogram_is_positive = histogram[index] > 0
+
     case_1 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
@@ -1014,7 +1024,8 @@ cases(index) =>
         main_case := case_1
 
     case_2 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
@@ -1036,7 +1047,8 @@ cases(index) =>
         main_case := case_2
 
     case_3 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       fibonacci_retracement < 0.5,
       fibonacci_retracement > 0.4,
@@ -1059,7 +1071,8 @@ cases(index) =>
         main_case := case_3
 
     case_4 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_crossed_finally_highest_high,
       current_session_has_at_least_one_red_bar,
       fibonacci_retracement < 0.5,
@@ -1083,7 +1096,8 @@ cases(index) =>
 
     _volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.5)
     case_5 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       fibonacci_retracement < 0.5,
       fibonacci_retracement > 0.3,
@@ -1107,7 +1121,8 @@ cases(index) =>
         main_case := case_5
 
     case_6 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       fibonacci_retracement < 0.72,
       fibonacci_retracement > 0.5,
@@ -1130,7 +1145,8 @@ cases(index) =>
         main_case := case_6
 
     case_7 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_is_top_and_after_own_retracement,
       current_session_has_at_least_one_red_bar,
       histogram_is_positive_until_now,
@@ -1146,7 +1162,8 @@ cases(index) =>
         main_case := case_7
 
     case_8 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_is_highest_and_full,
       current_session_has_at_least_one_red_bar,
       histogram_changed_direction,
@@ -1168,7 +1185,8 @@ cases(index) =>
         main_case := case_8
 
     case_8_a = _analyze_case(
-      array.from(base_indication,
+     base_indication,
+     array.from(
        current_bar_crossed_finally_highest_high,
        current_session_has_at_least_one_red_bar,
        histogram_changed_direction,
@@ -1190,7 +1208,8 @@ cases(index) =>
         main_case := case_8_a
 
     case_9 = _analyze_case(
-      array.from(base_indication,
+     base_indication,
+     array.from(
        current_bar_crossed_finally_highest_high,
        current_session_has_at_least_one_red_bar,
        current_volume_is_strong_with_high_volume,
@@ -1212,7 +1231,8 @@ cases(index) =>
         main_case := case_9
 
     case_10 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_crossed_finally_highest_high,
       current_bar_is_highest_and_full,
       current_session_has_at_least_one_red_bar,
@@ -1234,8 +1254,8 @@ cases(index) =>
         main_case := case_10
 
     case_11 = _analyze_case(
+     base_indication,
      array.from(all_bars_are_positive_with_own_retracement,
-      base_indication,
       current_bar_crossed_finally_highest_high,
       current_bar_is_top_and_after_own_retracement,
       histogram_is_positive_until_now,
@@ -1250,7 +1270,8 @@ cases(index) =>
         main_case := case_11
 
     case_12 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
@@ -1270,7 +1291,8 @@ cases(index) =>
         main_case := case_12
 
     case_13 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       histogram_is_positive_until_now,
       milestones_are_valid,
@@ -1290,7 +1312,8 @@ cases(index) =>
         main_case := case_13
 
     case_14 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_is_highest_and_full,
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
@@ -1311,7 +1334,8 @@ cases(index) =>
         main_case := case_14
 
     case_15 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       has_three_positive_two_negative_pattern,
       histogram_changed_direction,
@@ -1333,7 +1357,8 @@ cases(index) =>
         main_case := case_15
 
     case_16 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
@@ -1354,7 +1379,8 @@ cases(index) =>
         main_case := case_16
 
     case_17 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_has_histogram_wave,
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
@@ -1372,7 +1398,8 @@ cases(index) =>
         main_case := case_17
 
     case_18 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_is_highest_and_full,
       current_high_is_highest,
       current_session_has_at_least_one_red_bar,
@@ -1391,7 +1418,8 @@ cases(index) =>
         main_case := case_18
 
     case_19 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_is_highest_and_full,
       current_high_is_highest,
       current_session_has_at_least_one_red_bar,
@@ -1409,7 +1437,8 @@ cases(index) =>
         main_case := case_19
 
     case_20 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_has_histogram_wave,
       current_bar_is_highest_and_full,
       current_high_is_highest,
@@ -1431,7 +1460,8 @@ cases(index) =>
         main_case := case_20
 
     case_21 = _analyze_case(
-     array.from(base_indication,
+     base_indication,
+     array.from(
       current_bar_is_highest_and_full,
       current_high_is_highest,
       current_session_has_at_least_one_red_bar,
@@ -1451,50 +1481,50 @@ cases(index) =>
         main_case := case_21
 
     case_22 = _analyze_case(
-     array.from(
      base_indication,
-     current_bar_crossed_finally_highest_high,
-     current_bar_is_highest_and_full,
-     current_session_has_at_least_one_red_bar,
-     current_volume_is_strong_with_high_volume,
-     histogram_changed_direction,
-     histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
-     most_of_bars_are_volatile,
-     most_of_current_body_is_above_9_ema,
-     move_is_still_strong_due_to_fibonacci_retracement,
-     negative_bars_volume_is_going_down,
-     no_bars_closed_under_vwap,
-     starting_index_is_not_the_biggest_bar_in_term_of_price,
-     starting_index_is_not_the_biggest_bar_in_term_of_volume,
-     volume_sum_is_positive),
-     22)
+     array.from(
+      current_bar_crossed_finally_highest_high,
+      current_bar_is_highest_and_full,
+      current_session_has_at_least_one_red_bar,
+      current_volume_is_strong_with_high_volume,
+      histogram_changed_direction,
+      histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
+      most_of_bars_are_volatile,
+      most_of_current_body_is_above_9_ema,
+      move_is_still_strong_due_to_fibonacci_retracement,
+      negative_bars_volume_is_going_down,
+      no_bars_closed_under_vwap,
+      starting_index_is_not_the_biggest_bar_in_term_of_price,
+      starting_index_is_not_the_biggest_bar_in_term_of_volume,
+      volume_sum_is_positive),
+      22)
 
     if case_22
         main_case := case_22
 
     case_23 = _analyze_case(
-     array.from(
      base_indication,
-     has_classic_bars_wave,
-     most_of_current_body_is_above_9_ema,
-     volume_sum_is_positive),
-     "23")
+     array.from(
+      has_classic_bars_wave,
+      most_of_current_body_is_above_9_ema,
+      volume_sum_is_positive),
+      "23")
 
     if case_23
         main_case := case_23
 
     bull_case = _analyze_case(
-     array.from(
      base_indication,
-     has_bull_pattern),
-     "bull")
+     array.from(
+      has_bull_pattern),
+      "bull")
 
     if bull_case
         main_case := bull_case
 
     // case_x = _analyze_case(
-    //  array.from(
-    //  base_indication),
+    //  base_indication,
+    //  array.from(true),
     //  "x")
 
     // if case_x
