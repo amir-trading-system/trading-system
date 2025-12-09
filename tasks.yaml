@@ -1,10 +1,10 @@
 Stocks Indications:
  - PHIO: 2025-01-13 - 19,20
  - BLBX: 2025-01-22 - 16 - 30 minutes
- - AIFF: 2025-02-11 - halted
+ - AIFF: 2025-02-11 - 15,halted
  - AREB: 2025-04-04 - halted
- - AGMH: 2025-04-28 - 3 (45) - Not sure I want this case.
- - KIDZ: 2025-05-01 - 16 - 30 minutes.
+ - AGMH: 2025-04-28 - 3
+ - KIDZ: 2025-05-01 - halted.
  - INHD: 2025-05-12 - 9,halted
  - OMH: 2025-06-09 - halted
  - NAOV: 2025-06-11 - 7,8_a,18
@@ -34,7 +34,7 @@ Stocks Indications:
  - INHD: 2025-09-04 - 9,halted
  - ORBS: 2025-09-08 - halted
  - SONN: 2025-09-16 - 17
- - AGMH: 2025-09-19 - 8 (45)
+ - AGMH: 2025-09-19 - halted
  - BQ: 2025-09-29 - halted
  - EPSM: 2025-10-02 - halted
  - EPSM: 2025-10-03 - halted
@@ -72,6 +72,9 @@ Stocks Indications:
  - TWNP: 2025-12-05 - 17
  - TWG: 2025-12-08 - halted.
  - WBUY: 2025-12-08 - halted.
+ - NCPL: 2025-12-09 - halted.
+ - AFJK: 2025-12-09 - halted.
+ - OCG: 2025-12-09 - 8,8_a,13,16. - 23 on 30 minutes.
 
 Need to identify:
  - SNGX: 2025-07-31 - 5 minutes.

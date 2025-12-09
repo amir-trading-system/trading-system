@@ -156,7 +156,13 @@ _most_of_current_body_is_above_9_ema(index, for_halt_purpose) =>
         most_of_current_body_is_above_9_ema := (ema_9[index] - open[index])/(high[index] - open[index]) <= 0.5
          and open[index] > ema_20[index]
 
-    low_close_to_ema_9 = ema_9[index]/low[index] >= 0.95
+    first_cond = true
+     and ema_9[index]/low[index] >= 0.9
+     and low[index] - ema_9[index] < low[index+1] - ema_9[index+1]
+
+    second_cond = ema_9[index]/low[index] >= 0.95
+
+    low_close_to_ema_9 = first_cond or second_cond
 
     result = most_of_current_body_is_above_9_ema
      and low_close_to_ema_9
@@ -499,9 +505,11 @@ _current_bar_is_halted(index) =>
     volume_is_going_up = true
      and volume[index+2] < volume[index+1]
      and volume[index+1] < volume[index]
+    current_movement_is_much_bigger = true
+     and close[index] - open[index] > math.abs(close[index+1] - open[index+1]) * 1.5
 
     current_bar_changed_direction = true
-     and (previous_bar_is_negative or previous_bar_is_indecision or previous_bar_has_little_movement or volume_is_going_up)
+     and (previous_bar_is_negative or previous_bar_is_indecision or previous_bar_has_little_movement or volume_is_going_up or current_movement_is_much_bigger)
 
     current_bar_is_halted = true
      and current_bar_changed_direction
@@ -888,15 +896,23 @@ _has_bull_pattern(index, starting_index) =>
 
     has_bull_pattern
 
-_vwap_ratio_is_good(index) =>
-    just_crossed_vwap = true
-     and low[index] < vwap[index]
-     and close[index] > vwap[index]
+_has_retracement_from_top_index(index, top_index) =>
+    has_retracement_from_top_index = false
 
-    ema_higher_than_vwap = true
-     and ema_9[index] > vwap[index]
+    for i = index to top_index
+        if low[i] < low[i+1]
+            has_retracement_from_top_index := true
+            break
 
-    just_crossed_vwap or ema_higher_than_vwap
+    has_retracement_from_top_index
+
+_current_bar_closes_above_high_top_if_crossed_high_top(index, top_index) =>
+    current_bar_closes_above_high_top_if_crossed_high_top = true
+    if high[index] > high[top_index]
+     and close[index] < high[top_index]
+        current_bar_closes_above_high_top_if_crossed_high_top := false
+
+    current_bar_closes_above_high_top_if_crossed_high_top
 
 ///////////// Indications /////////////
 base_case_check(index) =>
@@ -919,23 +935,25 @@ base_case_check(index) =>
     current_bar_is_full = _current_bar_is_full(index)
     most_volatile_bar_from_top_is_not_weak = _most_volatile_bar_from_top_is_not_weak(index, top_index)
     current_bar_has_lowest_volume_since_top_bar = _current_bar_has_lowest_volume_since_top_bar(index, top_index)
-    vwap_ratio_is_good = _vwap_ratio_is_good(index)
+    has_retracement_from_top_index = _has_retracement_from_top_index(index, top_index)
+    current_bar_closes_above_high_top_if_crossed_high_top = _current_bar_closes_above_high_top_if_crossed_high_top(index, top_index)
 
     base_indication = true
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
      and current_bar_close_close_to_high
+     and current_bar_closes_above_high_top_if_crossed_high_top
      and current_bar_comes_after_healthy_retracement
+     and not current_bar_has_lowest_volume_since_top_bar
      and current_bar_high_close_to_top_high
      and current_bar_is_full
      and current_bar_is_highest_except_the_top_index
      and current_bar_volume_is_volatile
+     and has_retracement_from_top_index
      and higher_than_before
      and not indecision_histogram_from_top
      and made_more_than_usual_percentage_already
      and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
-     and not current_bar_has_lowest_volume_since_top_bar
-     and vwap_ratio_is_good
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
 
@@ -1521,14 +1539,6 @@ cases(index) =>
 
     if bull_case
         main_case := bull_case
-
-    // case_x = _analyze_case(
-    //  base_indication,
-    //  array.from(true),
-    //  "x")
-
-    // if case_x
-    //     main_case := case_x
 
 // all_bars_are_positive_with_own_retracement
 // current_bar_crossed_finally_highest_high
