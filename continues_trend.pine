@@ -20,7 +20,7 @@ if timeframe.period == "10S"
 bars_back = (((hour[0] - 4) * 60) + minute[0])/current_timeframe
 
 winning_cases = array.new_string()
-success_percentage_threshold = 0.9
+success_percentage_threshold = 0.85
 
 // if time == timestamp(relevant_timezone, 2025, 9, 18, 11, 50) and current_timeframe == 5
 //     log.info("some log")
@@ -99,6 +99,7 @@ _get_top_index(index, starting_index) =>
          and high[i] > high[i-1]
          and close[i] > ema_9[i]
          and high[i] == highest_high
+         and ((hour[i] == 9 and minute[i] >= 30) or hour[i] > 9)
             top_index := i
             break
 
@@ -817,6 +818,70 @@ _current_bar_has_lowest_volume_since_top_bar(index, top_index) =>
     current_bar_has_lowest_volume_since_top_bar = volume[index] == lowest_volume
     current_bar_has_lowest_volume_since_top_bar
 
+_has_classic_bars_wave(index) =>
+    forth_bar_is_positive = true
+     and close[index+3] > open[index+3]
+     and high[index+3] > high[index+4]
+     and volume[index+3] > vol_avg[index+3]
+     and volume[index+3] > volume[index+4]
+
+    both_middle_bars_are_negative_but_weak = true
+     and close[index+2] < open[index+2]
+     and close[index+1] < open[index+1]
+     and volume[index+2] > volume[index+1]
+     and volume[index+2] < volume[index+3]
+     and close[index+2] > ema_9[index+2]
+     and close[index+1] > ema_9[index+1]
+     and high[index+2] > high[index+1]
+     and high[index+2] - low[index+2] > high[index+1] - low[index+1]
+
+    current_bar_is_strong = true
+     and close[index] > open[index]
+     and volume[index] > vol_avg[index]
+     and volume[index] > volume[index+1]
+     and close[index] > high[index+1]
+
+    has_classic_bars_wave = true
+     and forth_bar_is_positive
+     and both_middle_bars_are_negative_but_weak
+     and current_bar_is_strong
+
+    has_classic_bars_wave
+
+_has_bull_pattern(index, starting_index) =>
+    third_bar_is_very_strong = true
+     and close[index+2] > open[index+2]
+     and volume[index+2] > vol_avg[index+2]
+     and volume[index+2] > volume[index+3] * 2
+     and close[index+2]/high[index+2] >= 0.9
+     and high[index+2] > high[index+1]
+
+    second_bar_is_negative_with_good_retacement = true
+     and close[index+1] < open[index+1]
+     and (close[index+1] - low[index+1])/(high[index+1] - low[index+1]) >= 0.5
+     and (open[index+1] - close[index+1])/(high[index+1] - low[index+1]) <= 0.3
+     and volume[index+1] > vol_avg[index+1]
+     and volume[index+1] < volume[index+2]
+     and volume[index+1]/volume[index+2] >= 0.5
+
+    third_bar_middle_point = high[index+2] - ((high[index+2] - low[index+2])/2)
+
+    second_bar_low_close_to_middle_point = third_bar_middle_point/low[index+1] >= 0.9
+
+
+    highest_high = 0.0
+    for i = starting_index to index
+        if high[i] > highest_high
+            highest_high := high[i]
+
+    has_bull_pattern = true
+     and third_bar_is_very_strong
+     and second_bar_is_negative_with_good_retacement
+     and second_bar_low_close_to_middle_point
+     and highest_high == high[index]
+
+    has_bull_pattern
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -909,6 +974,8 @@ cases(index) =>
     starting_index_is_not_the_biggest_bar_in_term_of_volume = _starting_index_is_not_the_biggest_bar_in_term_of_volume(index, starting_index)
     [too_many_tops_with_rejections_in_range_of_current_bar, tops_with_rejection_indexes] = _too_many_tops_with_rejections_in_range_of_current_bar(index, starting_index, top_index)
     volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.0)
+    has_classic_bars_wave = _has_classic_bars_wave(index)
+    has_bull_pattern = _has_bull_pattern(index, starting_index)
 
     case_1 = _analyze_case(
      array.from(base_indication,
@@ -1392,9 +1459,29 @@ cases(index) =>
     if case_22
         main_case := case_22
 
+    case_23 = _analyze_case(
+     array.from(
+     base_indication,
+     has_classic_bars_wave,
+     most_of_current_body_is_above_9_ema,
+     volume_sum_is_positive),
+     "23")
+
+    if case_23
+        main_case := case_23
+
+    bull_case = _analyze_case(
+     array.from(
+     base_indication,
+     has_bull_pattern),
+     "bull")
+
+    if bull_case
+        main_case := bull_case
 
     // case_x = _analyze_case(
-    //  array.from(base_indication),
+    //  array.from(
+    //  base_indication),
     //  "x")
 
     // if case_x
@@ -1409,6 +1496,7 @@ cases(index) =>
 // current_session_has_at_least_one_red_bar
 // current_volume_is_strong_with_high_volume
 // first_retracement_came_too_late
+// has_classic_bars_wave
 // histogram_changed_direction
 // histogram_is_positive_until_now
 // histogram_mostly_positive_except_small_retracement
@@ -1462,7 +1550,7 @@ if main_case or array.size(winning_cases) >= 5
         if str.endswith(case, "1")
             log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
 
-    confirmation_label = label.new(bar_index, high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right, force_overlay = true)
+    confirmation_label = label.new(bar_index, highest_high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right, force_overlay = true)
     label.set_tooltip(confirmation_label, str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
 
 plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰", force_overlay = true)
