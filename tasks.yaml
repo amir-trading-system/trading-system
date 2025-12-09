@@ -7,12 +7,11 @@ Stocks Indications:
  - KIDZ: 2025-05-01 - halted.
  - INHD: 2025-05-12 - 9,halted
  - OMH: 2025-06-09 - halted
- - NAOV: 2025-06-11 - 7,8_a,18
+ - NAOV: 2025-06-11 - halted
  - RBNE: 2025-06-13 - halted
  - NWGL: 2025-06-18 - halted
  - CYN: 2025-06-26 - halted
  - SONN: 2025-07-02 - 6 - 30 minutes.
- - WKHS: 2025-07-11 - 2
  - BGMS: 2025-07-15 - halted
  - APM: 2025-07-16 - halted
  - YHC: 2025-07-16 - 1,2,3,4,5
@@ -77,7 +76,7 @@ Stocks Indications:
  - OCG: 2025-12-09 - 8,8_a,13,16. - 23 on 30 minutes.
 
 Need to identify:
- - SNGX: 2025-07-31 - 5 minutes.
+ - KIDZ: 2025-05-01 - 45 minutes - 13:00.
 
 
 Need to Fix - False positives:

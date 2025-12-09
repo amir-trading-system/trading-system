@@ -899,7 +899,9 @@ _has_bull_pattern(index, starting_index) =>
 _has_retracement_from_top_index(index, top_index) =>
     has_retracement_from_top_index = false
 
-    for i = index to top_index
+    for i = index to top_index-1
+        if i < 0
+            continue
         if low[i] < low[i+1]
             has_retracement_from_top_index := true
             break
@@ -948,7 +950,7 @@ base_case_check(index) =>
      and current_bar_is_full
      and current_bar_is_highest_except_the_top_index
      and current_bar_volume_is_volatile
-     and has_retracement_from_top_index
+    //  and has_retracement_from_top_index - needs to be excluded from 10 case.
      and higher_than_before
      and not indecision_histogram_from_top
      and made_more_than_usual_percentage_already
@@ -1540,6 +1542,14 @@ cases(index) =>
     if bull_case
         main_case := bull_case
 
+    // case_x = _analyze_case(
+    //  base_indication,
+    //  array.from(true),
+    //  "x")
+
+    // if case_x
+    //     main_case := case_x
+
 // all_bars_are_positive_with_own_retracement
 // current_bar_crossed_finally_highest_high
 // current_bar_has_histogram_wave
@@ -1576,6 +1586,9 @@ cases(index) =>
     movement_is_after_market_start = hour[index] >= 9 and hour[index] < 16
     _most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, true)
     current_bar_is_halted = _current_bar_is_halted(index)
+    has_retracement_from_top_index = _has_retracement_from_top_index(index, top_index)
+    if top_index == 0
+        has_retracement_from_top_index := true
 
     halted_case = true
      and made_more_than_usual_percentage_already
@@ -1583,6 +1596,7 @@ cases(index) =>
      and _most_of_current_body_is_above_9_ema
      and current_bar_is_halted
      and histogram[index] > 0
+     and has_retracement_from_top_index
 
     if halted_case
         array.push(winning_cases, "HALTED")
