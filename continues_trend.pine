@@ -20,7 +20,7 @@ if timeframe.period == "10S"
 bars_back = (((hour[0] - 4) * 60) + minute[0])/current_timeframe
 
 winning_cases = array.new_string()
-success_percentage_threshold = 0.85
+success_percentage_threshold = 0.9
 
 // if time == timestamp(relevant_timezone, 2025, 9, 18, 11, 50) and current_timeframe == 5
 //     log.info("some log")
@@ -882,6 +882,17 @@ _has_bull_pattern(index, starting_index) =>
 
     has_bull_pattern
 
+_vwap_ratio_is_good(index) =>
+    just_crossed_vwap = true
+     and low[index] < vwap[index]
+     and close[index] > vwap[index]
+
+    ema_higher_than_vwap = true
+     and ema_9[index] > vwap[index]
+     and ema_20[index] >= vwap[index]
+
+    just_crossed_vwap or ema_higher_than_vwap
+
 ///////////// Indications /////////////
 base_case_check(index) =>
     starting_index = _get_starting_index(index, true)
@@ -903,6 +914,7 @@ base_case_check(index) =>
     current_bar_is_full = _current_bar_is_full(index)
     most_volatile_bar_from_top_is_not_weak = _most_volatile_bar_from_top_is_not_weak(index, top_index)
     current_bar_has_lowest_volume_since_top_bar = _current_bar_has_lowest_volume_since_top_bar(index, top_index)
+    vwap_ratio_is_good = _vwap_ratio_is_good(index)
 
     base_indication = true
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
@@ -918,6 +930,7 @@ base_case_check(index) =>
      and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
      and not current_bar_has_lowest_volume_since_top_bar
+     and vwap_ratio_is_good
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
 
