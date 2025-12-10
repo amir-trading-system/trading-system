@@ -917,7 +917,7 @@ _current_bar_closes_above_high_top_if_crossed_high_top(index, top_index) =>
     current_bar_closes_above_high_top_if_crossed_high_top
 
 ///////////// Indications /////////////
-base_case_check(index) =>
+base_case_check(index, check_for_retracement_before) =>
     starting_index = _get_starting_index(index, true)
     [top_index, highest_high] = _get_top_index(index, starting_index)
 
@@ -950,12 +950,14 @@ base_case_check(index) =>
      and current_bar_is_full
      and current_bar_is_highest_except_the_top_index
      and current_bar_volume_is_volatile
-    //  and has_retracement_from_top_index - needs to be excluded from 10 case.
      and higher_than_before
      and not indecision_histogram_from_top
      and made_more_than_usual_percentage_already
      and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
+
+    if check_for_retracement_before
+        base_indication := base_indication and has_retracement_from_top_index
 
     [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
 
@@ -983,7 +985,8 @@ _analyze_case(base_indication, indications, case_number) =>
 
 cases(index) =>
     main_case = false
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high] = base_case_check(index)
+    check_for_retracement_before = true
+    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high] = base_case_check(index, check_for_retracement_before)
     all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
     big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
@@ -1494,8 +1497,9 @@ cases(index) =>
       negative_bars_volume_is_going_down,
       no_bars_closed_under_vwap,
       no_more_than_2_retracements_until_now,
-      volume_sum_is_positive),
-      21)
+      volume_sum_is_positive
+     ),
+     21)
 
     if case_21
         main_case := case_21
@@ -1516,8 +1520,9 @@ cases(index) =>
       no_bars_closed_under_vwap,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      22)
+      volume_sum_is_positive
+     ),
+     22)
 
     if case_22
         main_case := case_22
@@ -1527,8 +1532,9 @@ cases(index) =>
      array.from(
       has_classic_bars_wave,
       most_of_current_body_is_above_9_ema,
-      volume_sum_is_positive),
-      "23")
+      volume_sum_is_positive
+     ),
+     "23")
 
     if case_23
         main_case := case_23
@@ -1541,6 +1547,31 @@ cases(index) =>
 
     if bull_case
         main_case := bull_case
+
+    check_for_retracement_before := false
+    [base_indication_no_retracement, _, _, _, _] = base_case_check(index, check_for_retracement_before)
+    case_24 = _analyze_case(
+     base_indication_no_retracement,
+     array.from(
+        current_bar_crossed_finally_highest_high,
+        current_bar_is_highest_and_full,
+        current_high_is_highest,
+        current_session_has_at_least_one_red_bar,
+        current_volume_is_strong_with_high_volume,
+        histogram_is_positive_until_now,
+        milestones_are_valid,
+        most_of_bars_are_volatile,
+        most_of_current_body_is_above_9_ema,
+        move_is_still_strong_due_to_fibonacci_retracement,
+        negative_bars_volume_is_going_down,
+        starting_index_is_not_the_biggest_bar_in_term_of_price,
+        starting_index_is_not_the_biggest_bar_in_term_of_volume,
+        volume_sum_is_positive
+     ),
+     "no_retracement")
+
+    if case_24
+        main_case := case_24
 
     // case_x = _analyze_case(
     //  base_indication,
