@@ -132,7 +132,7 @@ _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_in
     if not move_is_still_strong_due_to_fibonacci_retracement and top_index-1 > 0
         move_is_still_strong_due_to_fibonacci_retracement := close[index] > high[top_index-1]
          and fibonacci_retracement <= 0.8
-         and fibonacci_retracement >= 0.27
+         and fibonacci_retracement >= 0.22
 
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement]
 
@@ -1428,7 +1428,6 @@ cases(index) =>
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
-      histogram_is_positive_until_now,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
       move_is_still_strong_due_to_fibonacci_retracement,
