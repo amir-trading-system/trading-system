@@ -222,7 +222,7 @@ _histogram_is_positive_until_now(starting_index, index) =>
          and i < top_histogram_index
             histogram_top_appears_count += 1
 
-    [histogram_is_positive_until_now and histogram_top_appears_count < 2, top_histogram_index]
+    [histogram_is_positive_until_now, histogram_top_appears_count < 2, top_histogram_index]
 
 _histogram_changed_direction(index) =>
     histogram[index] > histogram[index+1]
@@ -1000,7 +1000,7 @@ cases(index) =>
     first_retracement_came_too_late = _first_retracement_came_too_late(starting_index, top_index, retracement_indexes)
     has_three_positive_two_negative_pattern = _has_three_positive_two_negative_pattern(index, starting_index)
     histogram_changed_direction = _histogram_changed_direction(index)
-    [histogram_is_positive_until_now, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
+    [histogram_is_positive_until_now, histogram_top_appears_less_than_twice, top_histogram_index] = _histogram_is_positive_until_now(starting_index, index)
     histogram_mostly_positive_except_small_retracement = _histogram_mostly_positive_except_small_retracement(index, starting_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, false)
@@ -1029,6 +1029,7 @@ cases(index) =>
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1053,6 +1054,7 @@ cases(index) =>
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1077,6 +1079,7 @@ cases(index) =>
       fibonacci_retracement > 0.4,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       move_is_still_strong_due_to_fibonacci_retracement,
@@ -1102,6 +1105,7 @@ cases(index) =>
       fibonacci_retracement > 0.4,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       move_is_still_strong_due_to_fibonacci_retracement,
@@ -1126,6 +1130,7 @@ cases(index) =>
       fibonacci_retracement > 0.3,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       move_is_still_strong_due_to_fibonacci_retracement,
@@ -1151,6 +1156,7 @@ cases(index) =>
       fibonacci_retracement > 0.5,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       move_is_still_strong_due_to_fibonacci_retracement,
@@ -1173,13 +1179,15 @@ cases(index) =>
       current_bar_is_top_and_after_own_retracement,
       current_session_has_at_least_one_red_bar,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       move_is_still_strong_due_to_fibonacci_retracement,
       no_more_than_2_retracements_until_now,
       not big_retracement_between_top_to_start,
-      retracement_should_be_long_enough),
-      7)
+      retracement_should_be_long_enough
+     ),
+     7)
 
     if case_7
         main_case := case_7
@@ -1191,6 +1199,7 @@ cases(index) =>
       current_session_has_at_least_one_red_bar,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1201,8 +1210,9 @@ cases(index) =>
       not first_retracement_came_too_late,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      8)
+      volume_sum_is_positive
+     ),
+     8)
 
     if case_8
         main_case := case_8
@@ -1214,6 +1224,7 @@ cases(index) =>
        current_session_has_at_least_one_red_bar,
        histogram_changed_direction,
        histogram_is_positive_until_now,
+       histogram_top_appears_less_than_twice,
        milestones_are_valid,
        most_of_bars_are_volatile,
        most_of_current_body_is_above_9_ema,
@@ -1224,8 +1235,9 @@ cases(index) =>
        not first_retracement_came_too_late,
        retracement_should_be_long_enough,
        starting_index_is_not_the_biggest_bar_in_term_of_volume,
-       volume_sum_is_positive),
-       "8_a")
+       volume_sum_is_positive
+      ),
+      "8_a")
 
     if case_8_a
         main_case := case_8_a
@@ -1238,6 +1250,7 @@ cases(index) =>
        current_volume_is_strong_with_high_volume,
        histogram_changed_direction,
        histogram_is_positive_until_now,
+       histogram_top_appears_less_than_twice,
        milestones_are_valid,
        most_of_bars_are_volatile,
        most_of_current_body_is_above_9_ema,
@@ -1247,8 +1260,9 @@ cases(index) =>
        not big_retracement_between_top_to_start,
        retracement_is_strong_but_graph_still_good,
        starting_index_is_not_the_biggest_bar_in_term_of_volume,
-       volume_sum_is_positive),
-       9)
+       volume_sum_is_positive
+      ),
+      9)
 
     if case_9
         main_case := case_9
@@ -1260,6 +1274,7 @@ cases(index) =>
       current_bar_is_highest_and_full,
       current_session_has_at_least_one_red_bar,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1270,8 +1285,9 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      10)
+      volume_sum_is_positive
+     ),
+     10)
 
     if case_10
         main_case := case_10
@@ -1282,12 +1298,14 @@ cases(index) =>
       current_bar_crossed_finally_highest_high,
       current_bar_is_top_and_after_own_retracement,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
       not histogram_changed_direction,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
-      volume_sum_is_positive),
-      11)
+      volume_sum_is_positive
+     ),
+     11)
 
     if case_11
         main_case := case_11
@@ -1299,6 +1317,7 @@ cases(index) =>
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_current_body_is_above_9_ema,
       move_is_still_strong_due_to_fibonacci_retracement,
@@ -1307,8 +1326,9 @@ cases(index) =>
       not big_retracement_between_top_to_start,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
-      volume_sum_is_positive),
-      12)
+      volume_sum_is_positive
+     ),
+     12)
 
     if case_12
         main_case := case_12
@@ -1318,6 +1338,7 @@ cases(index) =>
      array.from(
       current_session_has_at_least_one_red_bar,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1328,8 +1349,9 @@ cases(index) =>
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      13)
+      volume_sum_is_positive
+     ),
+     13)
 
     if case_13
         main_case := case_13
@@ -1342,6 +1364,7 @@ cases(index) =>
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1350,8 +1373,9 @@ cases(index) =>
       negative_bars_volume_is_going_down,
       not big_retracement_between_top_to_start,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
-      volume_sum_is_positive),
-      14)
+      volume_sum_is_positive
+     ),
+     14)
 
     if case_14
         main_case := case_14
@@ -1363,6 +1387,7 @@ cases(index) =>
       has_three_positive_two_negative_pattern,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1373,8 +1398,9 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
-      volume_sum_is_positive),
-      15)
+      volume_sum_is_positive
+     ),
+     15)
 
     if case_15
         main_case := case_15
@@ -1386,6 +1412,7 @@ cases(index) =>
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1395,8 +1422,9 @@ cases(index) =>
       not big_retracement_between_top_to_start,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      16)
+      volume_sum_is_positive
+     ),
+     16)
 
     if case_16
         main_case := case_16
@@ -1408,14 +1436,16 @@ cases(index) =>
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       most_of_current_body_is_above_9_ema,
       negative_bars_volume_is_going_down,
       not most_session_is_before_top_index,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      17)
+      volume_sum_is_positive
+     ),
+     17)
 
     if case_17
         main_case := case_17
@@ -1428,13 +1458,15 @@ cases(index) =>
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
+      histogram_is_positive_until_now,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
       move_is_still_strong_due_to_fibonacci_retracement,
       negative_bars_volume_is_going_down,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      18)
+      volume_sum_is_positive
+     ),
+     18)
 
     if case_18
         main_case := case_18
@@ -1452,8 +1484,9 @@ cases(index) =>
       move_is_still_strong_due_to_fibonacci_retracement,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      19)
+      volume_sum_is_positive
+     ),
+     19)
 
     if case_19
         main_case := case_19
@@ -1468,6 +1501,7 @@ cases(index) =>
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
       (histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement),
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1475,8 +1509,9 @@ cases(index) =>
       not too_many_tops_with_rejections_in_range_of_current_bar,
       starting_index_is_not_the_biggest_bar_in_term_of_price,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
-      volume_sum_is_positive),
-      20)
+      volume_sum_is_positive
+     ),
+     20)
 
     if case_20
         main_case := case_20
@@ -1489,6 +1524,7 @@ cases(index) =>
       current_session_has_at_least_one_red_bar,
       current_volume_is_strong_with_high_volume,
       histogram_is_positive_until_now,
+      histogram_top_appears_less_than_twice,
       milestones_are_valid,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
@@ -1512,6 +1548,7 @@ cases(index) =>
       current_volume_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
+      histogram_top_appears_less_than_twice,
       most_of_bars_are_volatile,
       most_of_current_body_is_above_9_ema,
       move_is_still_strong_due_to_fibonacci_retracement,
@@ -1558,6 +1595,7 @@ cases(index) =>
         current_session_has_at_least_one_red_bar,
         current_volume_is_strong_with_high_volume,
         histogram_is_positive_until_now,
+        histogram_top_appears_less_than_twice,
         milestones_are_valid,
         most_of_bars_are_volatile,
         most_of_current_body_is_above_9_ema,
@@ -1593,6 +1631,7 @@ cases(index) =>
 // histogram_changed_direction
 // histogram_is_positive_until_now
 // histogram_mostly_positive_except_small_retracement
+// histogram_top_appears_less_than_twice
 // milestones_are_valid
 // most_of_bars_are_volatile
 // most_of_current_body_is_above_9_ema
