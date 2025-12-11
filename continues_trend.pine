@@ -30,6 +30,7 @@ _made_more_than_usual_percentage_already(index, percentage) =>
     (close[index] - yesterday_close)/open[index] > percentage
 
 _get_starting_index(index, with_threshold) =>
+    first_one_to_be_starting_index = 0
     starting_index = 0
     min_bars_back = math.min(bars_back, 40)
     for i = index+1 to index+min_bars_back
@@ -55,8 +56,13 @@ _get_starting_index(index, with_threshold) =>
              and volume[i] > 10000
 
         if is_first_bar_to_pop_up
+            if first_one_to_be_starting_index == 0
+                first_one_to_be_starting_index := i
             for j = i+30 to i+1
                 if dayofmonth[j] != dayofmonth[i]
+                    continue
+
+                if (hour[j] == 9 and minute[j] < 30) or hour[j] < 9
                     continue
 
                 if volume[j] >= volume[i]
@@ -85,7 +91,7 @@ _get_starting_index(index, with_threshold) =>
                 starting_index := i
                 break
 
-    starting_index
+    [starting_index,first_one_to_be_starting_index]
 
 _get_top_index(index, starting_index) =>
     highest_high = 0.0
@@ -105,7 +111,7 @@ _get_top_index(index, starting_index) =>
          and high[i] > high[i-1]
          and close[i] > ema_9[i]
          and high[i] == highest_high
-         and ((hour[i] == 9 and minute[i] >= 30) or hour[i] > 9)
+        //  and ((hour[i] == 9 and minute[i] >= 30) or hour[i] > 9)
             top_index := i
             break
 
@@ -921,8 +927,9 @@ _current_bar_closes_above_high_top_if_crossed_high_top(index, top_index) =>
 
 ///////////// Indications /////////////
 base_case_check(index, check_for_retracement_before) =>
-    starting_index = _get_starting_index(index, true)
+    [starting_index,first_one_to_be_starting_index] = _get_starting_index(index, true)
     [top_index, highest_high] = _get_top_index(index, starting_index)
+    [top_index_if_no_started_index, _] = _get_top_index(index, first_one_to_be_starting_index)
 
     percentage = 0.1
     made_more_than_usual_percentage_already = _made_more_than_usual_percentage_already(index, percentage)
@@ -962,7 +969,7 @@ base_case_check(index, check_for_retracement_before) =>
     if check_for_retracement_before
         base_indication := base_indication and has_retracement_from_top_index
 
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high]
+    [base_indication, starting_index, top_index, top_index_if_no_started_index, lowest_point_from_top_point_index, highest_high]
 
 _analyze_case(base_indication, indications, case_number) =>
     result = true
@@ -989,7 +996,7 @@ _analyze_case(base_indication, indications, case_number) =>
 cases(index) =>
     main_case = false
     check_for_retracement_before = true
-    [base_indication, starting_index, top_index, lowest_point_from_top_point_index, highest_high] = base_case_check(index, check_for_retracement_before)
+    [base_indication, starting_index, top_index, top_index_if_no_started_index, lowest_point_from_top_point_index, highest_high] = base_case_check(index, check_for_retracement_before)
     all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
     big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
     current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
@@ -1588,7 +1595,7 @@ cases(index) =>
         main_case := bull_case
 
     check_for_retracement_before := false
-    [base_indication_no_retracement, _, _, _, _] = base_case_check(index, check_for_retracement_before)
+    [base_indication_no_retracement, _, _, _, _, _] = base_case_check(index, check_for_retracement_before)
     case_24 = _analyze_case(
      base_indication_no_retracement,
      array.from(
@@ -1658,9 +1665,10 @@ cases(index) =>
     movement_is_after_market_start = hour[index] >= 9 and hour[index] < 16
     _most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, true)
     current_bar_is_halted = _current_bar_is_halted(index)
+    if starting_index == 0
+        top_index := top_index_if_no_started_index
     has_retracement_from_top_index = _has_retracement_from_top_index(index, top_index)
-    if top_index == 0
-        has_retracement_from_top_index := true
+    just_crossed_top_index = low[index] < high[top_index] and high[index] >= high[top_index]
 
     halted_case = true
      and made_more_than_usual_percentage_already
@@ -1668,7 +1676,8 @@ cases(index) =>
      and _most_of_current_body_is_above_9_ema
      and current_bar_is_halted
      and histogram[index] > 0
-     and has_retracement_from_top_index
+     and top_index > 0
+     and just_crossed_top_index
 
     if halted_case
         array.push(winning_cases, "HALTED")
@@ -1679,9 +1688,10 @@ cases(index) =>
 [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high] = cases(0)
 
 if main_case or array.size(winning_cases) >= 5
+    main_case := true
     if high[0] > highest_high
         highest_high := high[0]
-    joined_winning_cases_str = "✅"
+    joined_winning_cases_str = str.format("✅ - Exit on {0}", high[0] * 1.15)
     for case in winning_cases
         str_case = str.replace(case, "case ", "")
         joined_winning_cases_str += str.format("\n{0}", str_case)
@@ -1693,6 +1703,8 @@ if main_case or array.size(winning_cases) >= 5
     label.set_tooltip(confirmation_label, str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
 
 plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰", force_overlay = true)
+exit_point_price = high[0] * 1.15
+plot(main_case ? exit_point_price : na, "Exit", color=color.green, style=plot.style_stepline, offset = 1, force_overlay = true)
 
 plot(fibonacci_retracement, "fibonacci_retracement", display = display.status_line)
 plot(starting_index, "starting_index", display = display.status_line)
