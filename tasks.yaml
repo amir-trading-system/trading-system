@@ -11,6 +11,7 @@ Stocks Indications:
  - RBNE: 2025-06-13 - 14,18,20,21,halted.
  - CYN: 2025-06-26 - 18,halted.
  - SONN: 2025-07-02 - 6 - 30 minutes.
+ - BGMS: 2025-07-15 - halted.
  - APM: 2025-07-16 - halted.
  - YHC: 2025-07-16 - 1,2,3,4,5.
  - BGMS: 2025-07-18 - 1,2,6,12.
@@ -28,6 +29,7 @@ Stocks Indications:
  - HWH: 2025-09-02 - 18.
  - IPDN: 2025-09-03 - halted.
  - INHD: 2025-09-04 - 9,halted.
+ - ORBS: 2025-09-08 - 12.
  - AGMH: 2025-09-18 - 2,8,8_a,18,21.
  - AGMH: 2025-09-19 - halted.
  - BQ: 2025-09-29 - 12.
@@ -67,8 +69,6 @@ Stocks Indications:
  - BBGI: 2025-12-10 - 12,13,16,halted.
 
 Need to identify:
- - BGMS: 2025-07-15 - halted.
- - ORBS: 2025-09-08 - halted.
  - LFS: 2025-11-18 - halted.
 
 
