@@ -1692,19 +1692,21 @@ if main_case or array.size(winning_cases) >= 5
     if high[0] > highest_high
         highest_high := high[0]
     joined_winning_cases_str = str.format("✅ - Exit on {0}", high[0] * 1.15)
+    cases_under_1_counter = 0
     for case in winning_cases
         str_case = str.replace(case, "case ", "")
-        joined_winning_cases_str += str.format("\n{0}", str_case)
+        if str.endswith(case, "- 1")
+            joined_winning_cases_str += str.format("\n{0}", str_case)
+            // log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
+        else
+            cases_under_1_counter += 1
 
-        if str.endswith(case, "1")
-            log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
+    joined_winning_cases_str += str.format("\nand another {0} high prob cases", cases_under_1_counter)
 
     confirmation_label = label.new(bar_index, highest_high, text = joined_winning_cases_str, size = size.tiny, style = label.style_label_lower_right, force_overlay = true)
     label.set_tooltip(confirmation_label, str.format("winning_cases: {0}. starting_index: {1}. top_index: {2}. fibonacci_retracement: {3}. lowest_point_from_top_point_index: {4}. top_histogram_index: {5}. attempts_indexes: {6}. retracement_indexes: {7}. volume_percentage_from_top: {8}. bars_percentage_from_top: {9}. tops_with_rejection_indexes: {10}.", winning_cases, starting_index, top_index, fibonacci_retracement, lowest_point_from_top_point_index, top_histogram_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes))
 
 plotshape(main_case, title="winning case", color=color.green, display = display.pane, style = shape.arrowup, size = size.small, location = location.belowbar, text = "💰", force_overlay = true)
-exit_point_price = high[0] * 1.15
-plot(main_case ? exit_point_price : na, "Exit", color=color.green, style=plot.style_stepline, offset = 1, force_overlay = true)
 
 plot(fibonacci_retracement, "fibonacci_retracement", display = display.status_line)
 plot(starting_index, "starting_index", display = display.status_line)
