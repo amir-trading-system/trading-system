@@ -37,17 +37,16 @@ Stocks Indications:
  - EPSM: 2025-10-02 - halted
  - EPSM: 2025-10-03 - halted
  - ABVE: 2025-10-08 - 1,2,3,5
-
-
+ - QNRX: 2025-10-10 - 15
  - AQMS: 2025-10-13 - 3
-
+ - GWH: 2025-10-13 - 14 (30 minutes)
  - AQMS: 2025-10-14 - (30 minutes) - halted
  - RANI: 2025-10-17 - halted
  - SCNX: 2025-10-23 - 13,21
  - MAMK: 2025-10-27 - halted
  - VCIG: 2025-10-29 - 1,2
  - BQ: 2025-10-30 - halted
-
+ - HKD: 2025-10-31 - 18
  - LFS: 2025-11-11 - 20,halted
  - CYPH: 2025-11-12 - 8,13 - 30 minutes.
  - CYCU: 2025-11-13 - 14 - 30 minutes
@@ -71,14 +70,10 @@ Stocks Indications:
  - WBUY: 2025-12-08 - halted.
  - AFJK: 2025-12-09 - halted.
  - OCG: 2025-12-09 - 8,8_a,13,16. - 23 on 30 minutes.
+ - OCG: 2025-12-10 - 1,2,6,7,12,13,16
+ - BBGI: 2025-12-10 - halted.
 
 Need to identify:
- - KIDZ: 2025-05-01 - 45 minutes - 13:00.
- - NUAI: 2025-10-09 - 8,8_a,12,13,14,16 - does not work - related to base for sure.
- - QNRX: 2025-10-10 - 15 - does not work - related to base for sure.
- - GWH: 2025-10-13 - 14 (30 minutes) - does not work - related to base for sure.
- - HKD: 2025-10-31 - 18 - does not work - related to base for sure.
- - TWNP: 2025-12-05 - 17 - does not work - related to base for sure.
 
 
 Need to Fix - False positives:

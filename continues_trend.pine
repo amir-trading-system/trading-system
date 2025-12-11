@@ -830,6 +830,7 @@ _current_bar_has_lowest_volume_since_top_bar(index, top_index) =>
             lowest_volume := volume[i]
 
     current_bar_has_lowest_volume_since_top_bar = volume[index] == lowest_volume
+     and volume[index]/volume[top_index] <= 0.6
     current_bar_has_lowest_volume_since_top_bar
 
 _has_classic_bars_wave(index) =>
@@ -898,6 +899,8 @@ _has_bull_pattern(index, starting_index) =>
 
 _has_retracement_from_top_index(index, top_index) =>
     has_retracement_from_top_index = false
+    if top_index <= 2
+        has_retracement_from_top_index := true
 
     for i = index to top_index-1
         if i < 0
