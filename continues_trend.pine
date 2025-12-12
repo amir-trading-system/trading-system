@@ -102,8 +102,8 @@ _get_top_index(index, starting_index) =>
     for i = starting_index to index+1
         if i-1 < 0
             continue
-        if high[i] > high[i+1]
-         and high[i] < high[i-1]
+        if high[i] >= high[i+1]
+         and high[i] <= high[i-1]
             continue
         if high[i] > highest_high
             highest_high := high[i]
@@ -1707,7 +1707,7 @@ if main_case or array.size(winning_cases) >= 5
     main_case := true
     if high[0] > highest_high
         highest_high := high[0]
-    joined_winning_cases_str = str.format("✅ - Exit on {0}", high[0] * 1.15)
+    joined_winning_cases_str = str.format("✅ - Exit on {0}", close[0] * 1.15)
     cases_under_1_counter = 0
     complete_cases = array.new_string()
     partial_cases = array.new_string()

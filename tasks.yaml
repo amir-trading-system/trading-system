@@ -8,7 +8,7 @@ Stocks Indications:
  - INHD: 2025-05-12 - 9,halted.
  - OMH: 2025-06-09 - halted.
  - NAOV: 2025-06-11 - 7,8_a,halted.
- - RBNE: 2025-06-13 - 14,18,20,21,halted.
+ - RBNE: 2025-06-13 - halted.
  - CYN: 2025-06-26 - 18,halted.
  - SONN: 2025-07-02 - 6 - 30 minutes.
  - BGMS: 2025-07-15 - halted.
@@ -16,7 +16,7 @@ Stocks Indications:
  - YHC: 2025-07-16 - 1,2,3,4,5.
  - BGMS: 2025-07-18 - 1,2,6,12.
  - PLRZ: 2025-07-22 - halted.
- - HWH: 2025-07-29 - 8,8_a,12,13,14,16,18,halted.
+ - HWH: 2025-07-29 - halted.
  - BTBD: 2025-08-04 - 17.
  - CWD: 2025-08-05 - 10, no_retracement.
  - THAR: 2025-08-20 - 1,2,3,5,8 - 30 minutes.
@@ -29,7 +29,7 @@ Stocks Indications:
  - HWH: 2025-09-02 - 18.
  - IPDN: 2025-09-03 - halted.
  - INHD: 2025-09-04 - 9,halted.
- - ORBS: 2025-09-08 - 12.
+ - ORBS: 2025-09-08 - 12 - 30 minutes.
  - AGMH: 2025-09-18 - 2,8,8_a,18,21.
  - AGMH: 2025-09-19 - halted.
  - BQ: 2025-09-29 - 12.
@@ -44,14 +44,14 @@ Stocks Indications:
  - VCIG: 2025-10-29 - 1,2.
  - BQ: 2025-10-30 - halted.
  - HKD: 2025-10-31 - 18.
- - LFS: 2025-11-11 - 20.
+ - LFS: 2025-11-11 - 20,halted.
  - CYPH: 2025-11-12 - 8,13 - 30 minutes.
  - CYCU: 2025-11-13 - 14 - 30 minutes.
  - CYCU: 2025-11-14 - 17.
  - CYPH: 2025-11-14 - 17.
  - BCG: 2025-11-18 - 1,2.
  - SGBX: 2025-11-19 - 7.
- - EPSM: 2025-11-20 - many cases with_high_results.
+ - EPSM: 2025-11-20 - halted, many cases with_high_results.
  - INHD: 2025-11-24 - 14,18,21,halted.
  - SMX: 2025-11-26 - 12,18,halted.
  - SMX: 2025-11-28 - halted.
@@ -69,7 +69,6 @@ Stocks Indications:
  - BBGI: 2025-12-10 - 12,13,16,halted.
 
 Need to identify:
- - LFS: 2025-11-18 - halted.
 
 
 Need to Fix - False positives:
