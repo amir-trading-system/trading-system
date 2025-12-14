@@ -1752,7 +1752,9 @@ cases(index) =>
     if starting_index == 0
         top_index := top_index_if_no_started_index
     has_retracement_from_top_index = _has_retracement_from_top_index(index, top_index)
-    just_crossed_top_index = low[index] < high[top_index] and high[index] >= high[top_index]
+    just_crossed_top_index = true
+     and low[index] < high[top_index]
+     and high[top_index]/high[index] < 0.95
 
     halted_case = true
      and made_more_than_usual_percentage_already
