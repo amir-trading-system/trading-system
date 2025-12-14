@@ -1019,7 +1019,29 @@ base_case_check(index, check_for_retracement_before) =>
         is_base_indication_full := false
         base_indication := true
 
+    biggest_bar_index = 0
+    biggest_bar_value = 0.0
+
+    most_volatile_index = 0
+    most_volatile_value = 0.0
+
+    for i = starting_index to index
+        if high[i] - low[i] > biggest_bar_value
+            biggest_bar_value := high[i] - low[i]
+            biggest_bar_index := i
+
+        if volume[i] > most_volatile_value
+            most_volatile_value := volume[i]
+            most_volatile_index := i
+
+    most_of_action_is_only_on_first_bar = biggest_bar_index == starting_index
+     and most_volatile_index == starting_index
+
     if not current_bar_is_after_market_starts
+     or not current_bar_closes_above_high_top_if_crossed_high_top
+     or not movement_is_after_market_start
+     or not made_more_than_usual_percentage_already
+     or most_of_action_is_only_on_first_bar
         base_indication := false
 
     [base_indication, starting_index, top_index, top_index_if_no_started_index, lowest_point_from_top_point_index, highest_high, is_base_indication_full]
