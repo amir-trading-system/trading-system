@@ -526,7 +526,7 @@ _current_bar_is_halted(index) =>
 
     current_bar_is_halted = true
      and current_bar_changed_direction
-     and close[index] == high[index]
+     and close[index]/high[index] >= 0.999
      and close[index] > vwap[index]
      and close[index] > ema_9[index]
      and histogram[index] > 0
@@ -985,7 +985,6 @@ base_case_check(index, check_for_retracement_before) =>
     current_bar_closes_above_high_top_if_crossed_high_top = _current_bar_closes_above_high_top_if_crossed_high_top(index, top_index)
     if current_bar_closes_above_high_top_if_crossed_high_top
         true_indications += 1
-
     current_bar_is_after_market_starts = _current_bar_is_after_market_starts(index)
     if current_bar_is_after_market_starts
         true_indications += 1
@@ -1784,11 +1783,18 @@ cases(index) =>
      and _most_of_current_body_is_above_9_ema
      and current_bar_is_halted
      and histogram[index] > 0
-     and top_index > 0
-     and just_crossed_top_index
+
+    case_name = "HALTED - **NO TOP**"
+
+    if top_index != 0
+        halted_case := halted_case
+         and top_index > 0
+         and just_crossed_top_index
+
+        case_name := "HALTED"
 
     if halted_case
-        array.push(winning_cases, "HALTED")
+        array.push(winning_cases, case_name)
         main_case := halted_case
 
     [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high, is_base_indication_full]
@@ -1804,7 +1810,7 @@ if main_case or array.size(winning_cases) >= 5
     partial_cases = array.new_string()
     for case in winning_cases
         str_case = str.replace(case, "case ", "")
-        if str.endswith(case, "- 1") or case == "HALTED"
+        if str.endswith(case, "- 1") or str.startswith(case, "HALTED")
             joined_winning_cases_str += str.format("\n{0}", str_case)
             array.push(complete_cases, case)
             log.info("{0}. starting_index: {1}. top_index: {2}.", case, starting_index, top_index)
