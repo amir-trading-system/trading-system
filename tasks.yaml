@@ -1,3 +1,8 @@
+3 main Components:
+ - Collector - Collects data from api.
+ - Enricher - enrich data with indications such ema_9, ema_20, macd, vol_avg and vwap (based on base data)
+ - Analyzer - runs indicators and return answer.
+
 Stocks Indications:
  - PHIO: 2025-01-13 - 19,20.
  - BLBX: 2025-01-22 - 16 - 30 minutes.
