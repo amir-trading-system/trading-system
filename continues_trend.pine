@@ -983,6 +983,19 @@ _current_bar_is_the_first_one_to_cross_top(index, top_index) =>
 
     current_bar_is_the_first_one_to_cross_top
 
+_top_index_is_not_the_lowest(index, top_index) =>
+    top_index_is_not_the_lowest = false
+
+    for i = top_index-1 to index+1
+        if i < 0
+            continue
+
+        if low[i] < low[top_index]
+            top_index_is_not_the_lowest := true
+            break
+
+    top_index_is_not_the_lowest
+
 ///////////// Indications /////////////
 base_case_check(index, check_for_retracement_before) =>
     [starting_index,first_one_to_be_starting_index] = _get_starting_index(index, true)
@@ -1041,6 +1054,9 @@ base_case_check(index, check_for_retracement_before) =>
     current_bar_is_after_market_starts = _current_bar_is_after_market_starts(index)
     if current_bar_is_after_market_starts
         true_indications += 1
+    top_index_is_not_the_lowest = _top_index_is_not_the_lowest(index, top_index)
+    if top_index_is_not_the_lowest
+        true_indications += 1
 
     base_indication = true
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
@@ -1058,14 +1074,15 @@ base_case_check(index, check_for_retracement_before) =>
      and made_more_than_usual_percentage_already
      and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
+     and top_index_is_not_the_lowest
 
     is_base_indication_full = true
     total_indications = 0
     if check_for_retracement_before
-        total_indications := 16
+        total_indications := 17
         base_indication := base_indication and has_retracement_from_top_index
     else
-        total_indications := 15
+        total_indications := 16
 
     if not base_indication and total_indications - true_indications == 1
         is_base_indication_full := false
@@ -1094,6 +1111,7 @@ base_case_check(index, check_for_retracement_before) =>
      or not movement_is_after_market_start
      or not made_more_than_usual_percentage_already
      or most_of_action_is_only_on_first_bar
+     or not top_index_is_not_the_lowest
         base_indication := false
 
     [base_indication, starting_index, top_index, top_index_if_no_started_index, lowest_point_from_top_point_index, highest_high, is_base_indication_full]
