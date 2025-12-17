@@ -8,14 +8,12 @@ from ibapi.ticktype import TickTypeEnum
 class TestApp(client.EClient, wrapper.EWrapper):
     def __init__(
         self,
-        bar_size: int,
     ):
         client.EClient.__init__(
             self,
             self,
         )
         self.last_price = None
-        self.bar_size = bar_size
 
     def nextValidId(
         self,
