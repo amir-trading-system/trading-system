@@ -29,6 +29,37 @@ _made_more_than_usual_percentage_already(index, percentage) =>
     yesterday_close = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
     (close[index] - yesterday_close)/open[index] > percentage
 
+_get_starting_index_if_no_one_exists(index, current_starting_index) =>
+    starting_index = 0
+    if current_starting_index > 0
+        starting_index := current_starting_index
+    else
+        current_index_is_after_market_starts = hour[index] > 9 or (hour[index] == 9 and minute[index] > 30)
+
+        if current_index_is_after_market_starts
+            to_index = (((hour[index] - 9) * 60) + minute[index] - 30)/current_timeframe
+
+            for i = index+1 to to_index
+                potential_starting_index = true
+                 and close[i] > open[i]
+                 and close[i] > vwap[i]
+                 and close[i] > ema_9[i]
+                 and open[i] < vwap[i]
+                 and open[i] < ema_9[i]
+                 and volume[i] > vol_avg[i]
+
+                if potential_starting_index
+                    for j = to_index to i+1
+                        if close[j] > open[j]
+                         and j > i
+                            potential_starting_index := false
+                            break
+
+                    if potential_starting_index
+                        starting_index := i
+
+    starting_index
+
 _get_starting_index(index, with_threshold) =>
     first_one_to_be_starting_index = 0
     starting_index = 0
@@ -93,6 +124,8 @@ _get_starting_index(index, with_threshold) =>
             if is_first_bar_to_pop_up
                 starting_index := i
                 break
+
+    starting_index := _get_starting_index_if_no_one_exists(index, starting_index)
 
     [starting_index,first_one_to_be_starting_index]
 
@@ -388,11 +421,20 @@ _no_more_than_2_retracements_until_now(index, starting_index, top_index) =>
          and ema_9[i]/low[i] >= 0.99
          and i-1 == index
 
+        retracement_case_6 = true
+         and low[i] < low[i+1]
+         and low[i] < low[i-1]
+         and low[i] < ema_9[i]
+         and close[i-1] > open[i-1]
+         and volume[i] < vol_avg[i]
+
         result = (retracement_case_1
          or retracement_case_2
          or retracement_case_3
          or retracement_case_4
-         or retracement_case_5)
+         or retracement_case_5
+         or retracement_case_6
+        )
 
         if result
             if not array.includes(retracement_indexes, i+1)
@@ -930,6 +972,17 @@ _current_bar_is_after_market_starts(index) =>
 
     current_bar_is_after_market_starts
 
+_current_bar_is_the_first_one_to_cross_top(index, top_index) =>
+    current_bar_is_the_first_one_to_cross_top = true
+    for i = top_index to index+1
+        if true
+         and high[i] > high[top_index]
+         and low[i] < high[top_index]
+            current_bar_is_the_first_one_to_cross_top := false
+            break
+
+    current_bar_is_the_first_one_to_cross_top
+
 ///////////// Indications /////////////
 base_case_check(index, check_for_retracement_before) =>
     [starting_index,first_one_to_be_starting_index] = _get_starting_index(index, true)
@@ -1103,6 +1156,7 @@ cases(index) =>
     volume_sum_is_positive = _volume_sum_is_positive(index, starting_index, 0.0)
     has_classic_bars_wave = _has_classic_bars_wave(index)
     has_bull_pattern = _has_bull_pattern(index, starting_index)
+    current_bar_is_the_first_one_to_cross_top = _current_bar_is_the_first_one_to_cross_top(index, top_index)
 
     histogram_is_positive = histogram[index] > 0
 
@@ -1717,6 +1771,27 @@ cases(index) =>
     if case_25
         main_case := case_25
 
+    case_26 = _analyze_case(
+     base_indication,
+     array.from(
+        current_bar_crossed_finally_highest_high,
+        current_bar_is_the_first_one_to_cross_top,
+        current_high_is_highest,
+        current_session_has_at_least_one_red_bar,
+        current_volume_is_strong_with_high_volume,
+        milestones_are_valid,
+        most_of_current_body_is_above_9_ema,
+        move_is_still_strong_due_to_fibonacci_retracement,
+        negative_bars_volume_is_going_down,
+        no_bars_closed_under_vwap,
+        no_more_than_2_retracements_until_now,
+        volume_sum_is_positive
+     ),
+     "26")
+
+    if case_26
+        main_case := case_26
+
     // case_x = _analyze_case(
     //  base_indication,
     //  array.from(true),
@@ -1737,6 +1812,7 @@ cases(index) =>
 // current_bar_crossed_finally_highest_high
 // current_bar_has_histogram_wave
 // current_bar_is_highest_and_full
+// current_bar_is_the_first_one_to_cross_top
 // current_bar_is_top_and_after_own_retracement
 // current_high_is_highest
 // current_session_has_at_least_one_red_bar
@@ -1801,7 +1877,7 @@ cases(index) =>
 
 [main_case, fibonacci_retracement, starting_index, top_index, top_histogram_index, lowest_point_from_top_point_index, attempts_indexes, retracement_indexes, volume_percentage_from_top, bars_percentage_from_top, tops_with_rejection_indexes, highest_high, is_base_indication_full] = cases(0)
 
-if main_case or array.size(winning_cases) >= 5
+if main_case
     if high[0] > highest_high
         highest_high := high[0]
     joined_winning_cases_str = str.format("✅ - Exit on {0}", close[0] * 1.15)
