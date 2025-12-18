@@ -13,6 +13,7 @@ class BarData:
         histogram: float,
         macd: float,
         signal_line: float,
+        timeframe: int,
     ):
         self.open = open_value
         self.close = close
@@ -26,3 +27,4 @@ class BarData:
         self.histogram = histogram
         self.macd = macd
         self.signal_line = signal_line
+        self.timeframe = timeframe
