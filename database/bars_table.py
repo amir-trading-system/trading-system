@@ -1,6 +1,6 @@
 from .. import common
 
-class Bars:
+class BarsTable:
     def __init__(
         self,
     ):
