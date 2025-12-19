@@ -1,3 +1,5 @@
+import datetime
+
 class BarData:
     def __init__(
         self,
@@ -6,14 +8,15 @@ class BarData:
         high: float,
         low: float,
         volume: float,
-        volume_average: float,
-        vwap: float,
-        ema_9: float,
-        ema_20: float,
-        histogram: float,
-        macd: float,
-        signal_line: float,
-        timeframe: int,
+        volume_average: float = None,
+        vwap: float = None,
+        ema_9: float = None,
+        ema_20: float = None,
+        histogram: float = None,
+        macd: float = None,
+        signal_line: float = None,
+        timeframe: int = None,
+        time: str = None,
     ):
         self.open = open_value
         self.close = close
@@ -28,3 +31,4 @@ class BarData:
         self.macd = macd
         self.signal_line = signal_line
         self.timeframe = timeframe
+        self.datetime = datetime.datetime.fromtimestamp(float(time))

@@ -1,4 +1,4 @@
-from .. import common
+from . import objects
 
 class BarsTable:
     def __init__(
@@ -8,6 +8,6 @@ class BarsTable:
 
     def insert_bars_data(
         self,
-        bars_data: list[common.bar_data.BarData],
+        bars_data: list[objects.BarData],
     ):
         pass
