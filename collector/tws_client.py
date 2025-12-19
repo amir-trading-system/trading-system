@@ -1,9 +1,9 @@
+import datetime
 import pandas as pd
 import talib
 
-from ibapi import client, wrapper
-
-import database
+from ibapi import client, wrapper, common
+from . import objects
 
 
 class TWSClient(client.EClient, wrapper.EWrapper):
@@ -11,19 +11,18 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         self,
         host: str,
         port: int,
-        database_client: database.client.Client,
+        request_id_to_stock: dict[int, objects.Stock],
     ):
         self.order_id = None
         client.EClient.__init__(
             self,
             self,
         )
-        self.database_client = database_client
         self.client = client
         self.host = host
         self.port = port
 
-        self.bars: list[dict] = []
+        self.request_id_to_stock = request_id_to_stock
 
     def connect_tws(
         self,
@@ -51,8 +50,9 @@ class TWSClient(client.EClient, wrapper.EWrapper):
 
     def enrich_bars(
         self,
-    ) -> pd.DataFrame:
-        bar_data_df = pd.DataFrame(self.bars)
+        bars: list[objects.BarData],
+    ) -> list[objects.BarData]:
+        bar_data_df = pd.DataFrame([vars(bar) for bar in bars])
 
         bar_data_df["ema_9"] = talib.EMA(
             real=bar_data_df["close"],
@@ -72,25 +72,65 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         bar_data_df["macd"] = macd
         bar_data_df["signal_line"] = signal_line
         bar_data_df["histogram"] = histogram
-        return bar_data_df
 
-    def historicalData(self, reqId, bar):
-        bar_data = {
-            "open_value": bar.open,
-            "close": bar.close,
-            "high": bar.high,
-            "low": bar.low,
-            "volume": bar.volume,
-            "vwap": bar.wap,
-            "time": bar.date,
-        }
-        self.bars.append(bar_data)
+        results_dict = bar_data_df.to_dict(orient="records")
+        bars = [objects.BarData(**kwargs) for kwargs in results_dict]
+        return bars
 
-    def historicalDataEnd(self, reqId, start, end):
-        bar_data = self.enrich_bars()
-        bars = bar_data.to_dict()
-        res = talib.get_functions()
-        print("h")
 
-    def historicalDataUpdate(self, reqId, bar):
-        print(f"reqId: {reqId}, bar: {str(bar)}. price: {bar.close}")
+    def historicalData(
+        self,
+        reqId: int,
+        bar: common.BarData,
+    ):
+        bar_time = datetime.datetime.fromtimestamp(float(bar.date))
+        self.request_id_to_stock[reqId].bars.append(
+            objects.BarData(
+                open_value=bar.open,
+                close=bar.close,
+                high=bar.high,
+                low=bar.low,
+                volume=bar.volume,
+                vwap=bar.wap,
+                bar_time=bar_time,
+            )
+        )
+
+    def historicalDataEnd(
+        self,
+        reqId: int,
+        start: str,
+        end: str,
+    ):
+        relevant_stock_bars = self.request_id_to_stock[reqId].bars
+        bars_data = self.enrich_bars(
+            bars=relevant_stock_bars,
+        )
+        self.request_id_to_stock[reqId].bars = bars_data
+
+    def historicalDataUpdate(
+        self,
+        reqId: int,
+        bar: common.BarData,
+    ):
+        relevant_stock_bars = self.request_id_to_stock[reqId].bars
+        current_bar_time = datetime.datetime.fromtimestamp(float(bar.date))
+        current_bar = objects.BarData(
+            open_value=bar.open,
+            close=bar.close,
+            high=bar.high,
+            low=bar.low,
+            volume=bar.volume,
+            vwap=bar.wap,
+            bar_time=current_bar_time,
+        )
+
+        if relevant_stock_bars[-1].bar_time == current_bar_time:
+            relevant_stock_bars[-1] = current_bar
+        else:
+            relevant_stock_bars.append(current_bar)
+
+        bars_data = self.enrich_bars(
+            bars=relevant_stock_bars,
+        )
+        self.request_id_to_stock[reqId].bars = bars_data

@@ -8,17 +8,16 @@ class BarData:
         high: float,
         low: float,
         volume: float,
+        vwap: float,
+        bar_time: datetime.datetime,
         volume_average: float = None,
-        vwap: float = None,
         ema_9: float = None,
         ema_20: float = None,
         histogram: float = None,
         macd: float = None,
         signal_line: float = None,
-        timeframe: int = None,
-        time: str = None,
     ):
-        self.open = open_value
+        self.open_value = open_value
         self.close = close
         self.high = high
         self.low = low
@@ -30,5 +29,15 @@ class BarData:
         self.histogram = histogram
         self.macd = macd
         self.signal_line = signal_line
+        self.bar_time = bar_time
+
+class Stock:
+    def __init__(
+        self,
+        symbol_name: str,
+        bars: list[BarData],
+        timeframe: int
+    ):
+        self.symbol_name = symbol_name
+        self.bars = bars
         self.timeframe = timeframe
-        self.datetime = datetime.datetime.fromtimestamp(float(time))

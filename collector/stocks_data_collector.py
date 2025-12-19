@@ -2,19 +2,19 @@ import threading
 import time
 
 from . import tws_client
+from . import objects
 
 class Collector:
     def __init__(
         self,
-        database_client,
         tws_host: str,
         tws_port: int,
     ):
-        self.database_client = database_client
+        self.request_id_to_stock: dict[int,objects.Stock] = {}
         self.tws_client = tws_client.TWSClient(
             host=tws_host,
             port=tws_port,
-            database_client=database_client,
+            request_id_to_stock=self.request_id_to_stock,
         )
         self.tws_client.connect_tws()
 
@@ -25,8 +25,9 @@ class Collector:
         threading.Thread(target=self.tws_client.run).start()
         time.sleep(1)
 
-        stocks = ["AFJK", "ISSC"]
+        stocks = ["AZI"]
         for stock in stocks:
+            timeframes = [5, 15]
             contract = self.tws_client.client.Contract()
             contract.symbol = stock
             contract.secType = "STK"
@@ -34,15 +35,22 @@ class Collector:
             contract.currency = "USD"
 
             ## For getting live data
-            self.tws_client.reqHistoricalData(
-                reqId=self.tws_client.nextId(),
-                contract=contract,
-                endDateTime="",
-                durationStr="1 D",
-                barSizeSetting=f"{timeframe} mins",
-                whatToShow="TRADES",
-                useRTH=0,
-                formatDate=2,
-                chartOptions=[],
-                keepUpToDate=True,
-            )
+            for timeframe in timeframes:
+                request_id = self.tws_client.nextId()
+                self.request_id_to_stock[request_id] = objects.Stock(
+                    symbol_name=stock,
+                    bars=[],
+                    timeframe=timeframe,
+                )
+                self.tws_client.reqHistoricalData(
+                    reqId=request_id,
+                    contract=contract,
+                    endDateTime="",
+                    durationStr="1 D",
+                    barSizeSetting=f"{timeframe} mins",
+                    whatToShow="TRADES",
+                    useRTH=0,
+                    formatDate=2,
+                    chartOptions=[],
+                    keepUpToDate=True,
+                )
