@@ -108,6 +108,8 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         )
         self.request_id_to_stock[reqId].bars = bars_data
 
+        ## Need to call here for analyzer.
+
     def historicalDataUpdate(
         self,
         reqId: int,
@@ -134,3 +136,5 @@ class TWSClient(client.EClient, wrapper.EWrapper):
             bars=relevant_stock_bars,
         )
         self.request_id_to_stock[reqId].bars = bars_data
+
+        ## Need to call here for analyzer.
