@@ -3,14 +3,28 @@ import datetime
 from ibapi import client, wrapper
 
 
-class TestApp(client.EClient, wrapper.EWrapper):
+class TWSClient(client.EClient, wrapper.EWrapper):
     def __init__(
         self,
+        host: str,
+        port: int,
     ):
         self.order_id = None
         client.EClient.__init__(
             self,
             self,
+        )
+        self.client = client
+        self.host = host
+        self.port = port
+
+    def connect_tws(
+        self,
+    ):
+        self.connect(
+            host=self.host,
+            port=self.port,
+            clientId=0,
         )
 
     def nextValidId(
