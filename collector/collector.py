@@ -22,11 +22,14 @@ class Collector:
 
     def collect_data(
         self,
+        manual_timeframe_for_tests: int = None,
     ):
         while True:
             if not self.tws_client.symbols_to_collect_queue.empty():
                 symbol = self.tws_client.symbols_to_collect_queue.get()
                 timeframes = [5, 15, 30]
+                if manual_timeframe_for_tests:
+                    timeframes = [manual_timeframe_for_tests]
 
                 for timeframe in timeframes:
                     self.tws_client.request_historical_data(

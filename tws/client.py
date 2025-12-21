@@ -81,17 +81,22 @@ class Client(client.EClient, wrapper.EWrapper):
 
     def start_scanner(
         self,
+        manual_results_for_test: list[str] = None,
     ):
-        scanner_subscription = self._get_scanner_subscription()
-        filters = self._get_scanner_filters()
-        request_id = self.next_id()
+        if manual_results_for_test:
+            for test_symbol in manual_results_for_test:
+                self.symbols_to_collect_queue.put(test_symbol)
+        else:
+            scanner_subscription = self._get_scanner_subscription()
+            filters = self._get_scanner_filters()
+            request_id = self.next_id()
 
-        self.reqScannerSubscription(
-            reqId=request_id,
-            subscription=scanner_subscription,
-            scannerSubscriptionOptions=[],
-            scannerSubscriptionFilterOptions=filters,
-        )
+            self.reqScannerSubscription(
+                reqId=request_id,
+                subscription=scanner_subscription,
+                scannerSubscriptionOptions=[],
+                scannerSubscriptionFilterOptions=filters,
+            )
 
     #pylint: disable=too-many-arguments,too-many-positional-arguments
     def scannerData(
@@ -191,8 +196,8 @@ class Client(client.EClient, wrapper.EWrapper):
                 close=bar.close,
                 high=bar.high,
                 low=bar.low,
-                volume=bar.volume,
-                vwap=bar.wap,
+                volume=float(bar.volume),
+                vwap=float(bar.wap),
                 bar_time=bar_time,
             )
         )
