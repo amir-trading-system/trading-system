@@ -1,8 +1,11 @@
 import datetime
+import time
+import queue
+
 import pandas as pd
 import talib
 
-from ibapi import client, wrapper, common
+from ibapi import client, wrapper, common, tag_value
 from . import objects
 
 
@@ -11,7 +14,7 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         self,
         host: str,
         port: int,
-        request_id_to_stock: dict[int, objects.Stock],
+        request_id_to_symbol: dict[int, objects.Stock],
     ):
         self.order_id = None
         client.EClient.__init__(
@@ -22,7 +25,9 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         self.host = host
         self.port = port
 
-        self.request_id_to_stock = request_id_to_stock
+        self.request_id_to_symbol = request_id_to_symbol
+        self.symbols_to_collect_queue = queue.Queue()
+        self.relevant_symbols: list[str] = []
 
     def connect_tws(
         self,
@@ -39,20 +44,94 @@ class TWSClient(client.EClient, wrapper.EWrapper):
     ):
         self.order_id = orderId
 
+    #pylint: disable=invalid-name
     def nextId(
         self,
     ):
         self.order_id += 1
         return self.order_id
 
-    def error(self, reqId, errorTime, errorCode, errorString, advancedOrderRejectJson=""):
+    #pylint: disable=too-many-arguments,too-many-positional-arguments
+    def error(
+        self,
+        reqId,
+        errorTime,
+        errorCode,
+        errorString,
+        advancedOrderRejectJson="",
+    ):
+        #pylint: disable=line-too-long
         print(f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}")
 
+    def _get_scanner_subscription(
+        self,
+    ) -> client.ScannerSubscription:
+        scanner_subscription = self.client.ScannerSubscription()
+        scanner_subscription.numberOfRows = 50
+        scanner_subscription.instrument = "STK"
+        scanner_subscription.locationCode = "STK.US.MAJOR"
+        scanner_subscription.scanCode = "TOP_PERC_GAIN"
+
+
+        return scanner_subscription
+
+    def _get_scanner_filters(
+        self,
+    ) -> list[tag_value.TagValue]:
+        return [
+            tag_value.TagValue("volumeAbove", "100000"),
+            tag_value.TagValue("priceAbove", "1"),
+            tag_value.TagValue("priceBelow", "100"),
+            tag_value.TagValue("marketCapBelow1e6", "500000000"),
+            tag_value.TagValue("changePercAbove", "30")
+        ]
+
+    def start_scanner(
+        self,
+        request_id: int,
+    ):
+        scanner_subscription = self._get_scanner_subscription()
+        filters = self._get_scanner_filters()
+
+        self.reqScannerSubscription(
+            reqId=request_id,
+            subscription=scanner_subscription,
+            scannerSubscriptionOptions=[],
+            scannerSubscriptionFilterOptions=filters,
+        )
+
+    #pylint: disable=too-many-arguments,too-many-positional-arguments
+    def scannerData(
+        self,
+        reqId,
+        rank,
+        contractDetails,
+        distance,
+        benchmark,
+        projection,
+        legsStr,
+    ):
+        self.reqContractDetails(
+            reqId=reqId,
+            contract=contractDetails.contract,
+        )
+
+    def contractDetails(self, reqId, contractDetails):
+        if contractDetails.stockType == "COMMON":
+            if contractDetails.contract.symbol not in self.relevant_symbols:
+                #pylint: disable=line-too-long
+                print(f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.")
+                self.relevant_symbols.append(contractDetails.contract.symbol)
+                self.symbols_to_collect_queue.put(contractDetails.contract.symbol)
+
+        return super().contractDetails(reqId, contractDetails)
+
+    #pylint: disable=no-member
     def enrich_bars(
         self,
         bars: list[objects.BarData],
     ) -> list[objects.BarData]:
-        bar_data_df = pd.DataFrame([vars(bar) for bar in bars])
+        bar_data_df = pd.DataFrame([vars(bar_candle) for bar_candle in bars])
 
         bar_data_df["ema_9"] = talib.EMA(
             real=bar_data_df["close"],
@@ -77,14 +156,13 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         bars = [objects.BarData(**kwargs) for kwargs in results_dict]
         return bars
 
-
     def historicalData(
         self,
         reqId: int,
         bar: common.BarData,
     ):
         bar_time = datetime.datetime.fromtimestamp(float(bar.date))
-        self.request_id_to_stock[reqId].bars.append(
+        self.request_id_to_symbol[reqId].bars.append(
             objects.BarData(
                 open_value=bar.open,
                 close=bar.close,
@@ -102,11 +180,13 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         start: str,
         end: str,
     ):
-        relevant_stock_bars = self.request_id_to_stock[reqId].bars
+        relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
+        symbol = self.request_id_to_symbol[reqId].symbol_name
         bars_data = self.enrich_bars(
-            bars=relevant_stock_bars,
+            bars=relevant_symbol_bars,
         )
-        self.request_id_to_stock[reqId].bars = bars_data
+        self.request_id_to_symbol[reqId].bars = bars_data
+        print(f"symbol: {symbol}. request_id: {reqId}. finished to get data.")
 
         ## Need to call here for analyzer.
 
@@ -115,7 +195,7 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         reqId: int,
         bar: common.BarData,
     ):
-        relevant_stock_bars = self.request_id_to_stock[reqId].bars
+        relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
         current_bar_time = datetime.datetime.fromtimestamp(float(bar.date))
         current_bar = objects.BarData(
             open_value=bar.open,
@@ -127,14 +207,14 @@ class TWSClient(client.EClient, wrapper.EWrapper):
             bar_time=current_bar_time,
         )
 
-        if relevant_stock_bars[-1].bar_time == current_bar_time:
-            relevant_stock_bars[-1] = current_bar
+        if relevant_symbol_bars[-1].bar_time == current_bar_time:
+            relevant_symbol_bars[-1] = current_bar
         else:
-            relevant_stock_bars.append(current_bar)
+            relevant_symbol_bars.append(current_bar)
 
         bars_data = self.enrich_bars(
-            bars=relevant_stock_bars,
+            bars=relevant_symbol_bars,
         )
-        self.request_id_to_stock[reqId].bars = bars_data
+        self.request_id_to_symbol[reqId].bars = bars_data
 
         ## Need to call here for analyzer.
