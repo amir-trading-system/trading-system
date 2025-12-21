@@ -11,8 +11,7 @@ def run_bot(
     c_obj: collector.collector.Collector,
     a_obj: analyzer.analyzer.Analyzer,
 ):
-    c_obj.tws_client.start_scanner(
-    )
+    c_obj.tws_client.start_scanner()
 
     threading.Thread(
         target=c_obj.collect_data,
@@ -32,18 +31,22 @@ def run_manual_test(
 
     threading.Thread(
         target=c_obj.collect_data,
-        args=[5],
+        kwargs={
+            "manual_timeframe_for_tests": 5,
+        },
     ).start()
 
     threading.Thread(
         target=a_obj.analyze_data,
-        args=[datetime.datetime(
-            year=2025,
-            month=12,
-            day=19,
-            hour=9,
-            minute=30,
-        )],
+        kwargs={
+            "specific_bar_time": datetime.datetime(
+                year=2025,
+                month=12,
+                day=19,
+                hour=9,
+                minute=30,
+            ),
+        }
     ).start()
 
 if __name__ == "__main__":
