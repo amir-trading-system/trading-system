@@ -1,8 +1,7 @@
 import time
 import queue
 
-from . import tws_client
-from . import objects
+from tws import objects, client
 
 class Collector:
     def __init__(
@@ -13,7 +12,7 @@ class Collector:
         bars_ready_to_analyze_queue: queue.Queue[objects.Stock],
     ):
         self.request_id_to_symbol: dict[int,objects.Stock] = {}
-        self.tws_client = tws_client.TWSClient(
+        self.tws_client = client.Client(
             host=tws_host,
             port=tws_port,
             request_id_to_symbol=self.request_id_to_symbol,
@@ -21,7 +20,6 @@ class Collector:
             bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         )
 
-    ## move it when ready to main.
     def collect_data(
         self,
     ):
@@ -35,16 +33,5 @@ class Collector:
                         symbol=symbol,
                         timeframe=timeframe,
                     )
-            else:
-                time.sleep(2)
-
-    ## move it when ready to main.
-    def analyze_data(
-        self,
-    ):
-        while True:
-            if not self.tws_client.bars_ready_to_analyze_queue.empty():
-                stock_object: objects.Stock = self.tws_client.bars_ready_to_analyze_queue.get()
-                print(f"got stock ready to analyze. stock: {stock_object.symbol_name}")
             else:
                 time.sleep(2)

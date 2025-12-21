@@ -8,7 +8,7 @@ from ibapi import client, wrapper, common, tag_value
 from . import objects
 
 
-class TWSClient(client.EClient, wrapper.EWrapper):
+class Client(client.EClient, wrapper.EWrapper):
     def __init__(
         self,
         host: str,
@@ -241,5 +241,3 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         )
         self.request_id_to_symbol[reqId].bars = bars_data
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
-
-        ## Need to call here for analyzer.
