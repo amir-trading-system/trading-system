@@ -1,5 +1,5 @@
-import threading
 import time
+import queue
 
 from . import tws_client
 from . import objects
@@ -9,54 +9,42 @@ class Collector:
         self,
         tws_host: str,
         tws_port: int,
+        symbols_to_collect_queue: queue.Queue[str],
+        bars_ready_to_analyze_queue: queue.Queue[objects.Stock],
     ):
         self.request_id_to_symbol: dict[int,objects.Stock] = {}
         self.tws_client = tws_client.TWSClient(
             host=tws_host,
             port=tws_port,
             request_id_to_symbol=self.request_id_to_symbol,
+            symbols_to_collect_queue=symbols_to_collect_queue,
+            bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         )
-        self.tws_client.connect_tws()
 
-    def collect(
+    ## move it when ready to main.
+    def collect_data(
         self,
-        timeframe: int,
     ):
-        threading.Thread(target=self.tws_client.run).start()
-        time.sleep(1)
-
-        request_id = self.tws_client.nextId()
-        self.tws_client.start_scanner(
-            request_id=request_id,
-        )
-
         while True:
             if not self.tws_client.symbols_to_collect_queue.empty():
                 symbol = self.tws_client.symbols_to_collect_queue.get()
                 timeframes = [5, 15, 30]
-                contract = self.tws_client.client.Contract()
-                contract.symbol = symbol
-                contract.secType = "STK"
-                contract.exchange = "SMART"
-                contract.currency = "USD"
 
-                ## For getting live data
                 for timeframe in timeframes:
-                    request_id = self.tws_client.nextId()
-                    self.request_id_to_symbol[request_id] = objects.Stock(
-                        symbol_name=symbol,
-                        bars=[],
+                    self.tws_client.request_historical_data(
+                        symbol=symbol,
                         timeframe=timeframe,
                     )
-                    self.tws_client.reqHistoricalData(
-                        reqId=request_id,
-                        contract=contract,
-                        endDateTime="",
-                        durationStr="1 D",
-                        barSizeSetting=f"{timeframe} mins",
-                        whatToShow="TRADES",
-                        useRTH=0,
-                        formatDate=2,
-                        chartOptions=[],
-                        keepUpToDate=True,
-                    )
+            else:
+                time.sleep(2)
+
+    ## move it when ready to main.
+    def analyze_data(
+        self,
+    ):
+        while True:
+            if not self.tws_client.bars_ready_to_analyze_queue.empty():
+                stock_object: objects.Stock = self.tws_client.bars_ready_to_analyze_queue.get()
+                print(f"got stock ready to analyze. stock: {stock_object.symbol_name}")
+            else:
+                time.sleep(2)

@@ -1,5 +1,4 @@
 import datetime
-import time
 import queue
 
 import pandas as pd
@@ -15,28 +14,23 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         host: str,
         port: int,
         request_id_to_symbol: dict[int, objects.Stock],
+        symbols_to_collect_queue: queue.Queue,
+        bars_ready_to_analyze_queue: queue.Queue,
     ):
         self.order_id = None
         client.EClient.__init__(
             self,
             self,
         )
-        self.client = client
-        self.host = host
-        self.port = port
-
-        self.request_id_to_symbol = request_id_to_symbol
-        self.symbols_to_collect_queue = queue.Queue()
-        self.relevant_symbols: list[str] = []
-
-    def connect_tws(
-        self,
-    ):
         self.connect(
-            host=self.host,
-            port=self.port,
+            host=host,
+            port=port,
             clientId=0,
         )
+        self.request_id_to_symbol = request_id_to_symbol
+        self.symbols_to_collect_queue = symbols_to_collect_queue
+        self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
+        self.relevant_symbols: list[str] = []
 
     def nextValidId(
         self,
@@ -44,8 +38,7 @@ class TWSClient(client.EClient, wrapper.EWrapper):
     ):
         self.order_id = orderId
 
-    #pylint: disable=invalid-name
-    def nextId(
+    def next_id(
         self,
     ):
         self.order_id += 1
@@ -66,7 +59,7 @@ class TWSClient(client.EClient, wrapper.EWrapper):
     def _get_scanner_subscription(
         self,
     ) -> client.ScannerSubscription:
-        scanner_subscription = self.client.ScannerSubscription()
+        scanner_subscription = client.ScannerSubscription()
         scanner_subscription.numberOfRows = 50
         scanner_subscription.instrument = "STK"
         scanner_subscription.locationCode = "STK.US.MAJOR"
@@ -88,10 +81,10 @@ class TWSClient(client.EClient, wrapper.EWrapper):
 
     def start_scanner(
         self,
-        request_id: int,
     ):
         scanner_subscription = self._get_scanner_subscription()
         filters = self._get_scanner_filters()
+        request_id = self.next_id()
 
         self.reqScannerSubscription(
             reqId=request_id,
@@ -156,6 +149,36 @@ class TWSClient(client.EClient, wrapper.EWrapper):
         bars = [objects.BarData(**kwargs) for kwargs in results_dict]
         return bars
 
+    def request_historical_data(
+        self,
+        symbol: str,
+        timeframe: int,
+    ):
+        contract = client.Contract()
+        contract.symbol = symbol
+        contract.secType = "STK"
+        contract.exchange = "SMART"
+        contract.currency = "USD"
+
+        request_id = self.next_id()
+        self.request_id_to_symbol[request_id] = objects.Stock(
+            symbol_name=symbol,
+            bars=[],
+            timeframe=timeframe,
+        )
+        self.reqHistoricalData(
+            reqId=request_id,
+            contract=contract,
+            endDateTime="",
+            durationStr="2 D",
+            barSizeSetting=f"{timeframe} mins",
+            whatToShow="TRADES",
+            useRTH=0,
+            formatDate=2,
+            chartOptions=[],
+            keepUpToDate=True,
+        )
+
     def historicalData(
         self,
         reqId: int,
@@ -186,6 +209,7 @@ class TWSClient(client.EClient, wrapper.EWrapper):
             bars=relevant_symbol_bars,
         )
         self.request_id_to_symbol[reqId].bars = bars_data
+        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
         print(f"symbol: {symbol}. request_id: {reqId}. finished to get data.")
 
         ## Need to call here for analyzer.
@@ -216,5 +240,6 @@ class TWSClient(client.EClient, wrapper.EWrapper):
             bars=relevant_symbol_bars,
         )
         self.request_id_to_symbol[reqId].bars = bars_data
+        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
 
         ## Need to call here for analyzer.
