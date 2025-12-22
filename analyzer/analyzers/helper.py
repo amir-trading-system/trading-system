@@ -44,7 +44,10 @@ class AnalyzerHelper:
         bars_length = len(stock.bars)
         for i in range(1, bars_length-1):
             potential_starting_bar: objects.BarData = stock.bars[i]
-            if potential_starting_bar.bar_time < starting_datetime:
+            if (
+                potential_starting_bar.bar_time < starting_datetime
+                or current_bar.bar_time < potential_starting_bar.bar_time
+            ):
                 continue
 
             previous_bar = stock.bars[i+1]
@@ -107,8 +110,6 @@ class AnalyzerHelper:
                         break
 
             if is_really_potential_starting_bar:
-                if stock.symbol_name == "FJET":
-                    print("h")
                 starting_bar = MilestoneBar(
                     index=i,
                     bar_object=potential_starting_bar,

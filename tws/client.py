@@ -129,8 +129,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self,
         bars: list[objects.BarData],
     ) -> list[objects.BarData]:
-        sorted_bars = sorted(bars, key=lambda bar: bar.bar_time, reverse=True)
-        bar_data_df = pd.DataFrame([vars(bar_candle) for bar_candle in sorted_bars])
+        bar_data_df = pd.DataFrame([vars(bar_candle) for bar_candle in bars])
 
         bar_data_df["ema_9"] = talib.EMA(
             real=bar_data_df["close"],
@@ -152,7 +151,11 @@ class Client(client.EClient, wrapper.EWrapper):
         bar_data_df["histogram"] = histogram
 
         results_dict = bar_data_df.to_dict(orient="records")
-        bars = [objects.BarData(**kwargs) for kwargs in results_dict]
+        bars = sorted(
+            [objects.BarData(**kwargs) for kwargs in results_dict],
+            key=lambda bar: bar.bar_time,
+            reverse=True,
+        )
         return bars
 
     def request_historical_data(
@@ -191,6 +194,10 @@ class Client(client.EClient, wrapper.EWrapper):
         bar: common.BarData,
     ):
         bar_time = datetime.datetime.fromtimestamp(float(bar.date))
+        now = datetime.datetime.now()
+        if now.day != bar_time.day and bar_time.hour < 16:
+            return
+
         self.request_id_to_symbol[reqId].bars.append(
             objects.BarData(
                 open_value=bar.open,

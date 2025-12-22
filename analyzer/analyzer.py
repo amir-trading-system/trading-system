@@ -39,9 +39,8 @@ class Analyzer:
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: objects.Stock = self.bars_ready_to_analyze_queue.get()
-                print(self.bars_ready_to_analyze_queue.qsize())
 
-                current_bar = stock_object.bars[-1]
+                current_bar = stock_object.bars[0]
                 if specific_bar_time is not None:
                     current_bar = [
                         bar_data
