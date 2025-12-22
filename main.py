@@ -32,7 +32,7 @@ def run_manual_test(
     threading.Thread(
         target=c_obj.collect_data,
         kwargs={
-            "manual_timeframe_for_tests": 5,
+            "manual_timeframe_for_tests": 15,
         },
     ).start()
 

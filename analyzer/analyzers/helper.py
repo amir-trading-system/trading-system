@@ -42,12 +42,12 @@ class AnalyzerHelper:
         )
 
         bars_length = len(stock.bars)
-        for i in range(bars_length-1, 0, -1):
-            potential_starting_bar: objects.BarData = stock.bars[i-1]
+        for i in range(1, bars_length):
+            potential_starting_bar: objects.BarData = stock.bars[i]
             if potential_starting_bar.bar_time < starting_datetime:
                 continue
 
-            previous_bar = stock.bars[i-2]
+            previous_bar = stock.bars[i+1]
             # pylint: disable=too-many-boolean-expressions,line-too-long
             is_really_potential_starting_bar = (
                 potential_starting_bar.close > potential_starting_bar.open_value
@@ -60,7 +60,7 @@ class AnalyzerHelper:
                 and potential_starting_bar.volume > 50000
             )
             if is_really_potential_starting_bar:
-                for j in range(i-2, i-32, -1):
+                for j in range(i+1, i+31):
                     previous_bar: objects.BarData = stock.bars[j]
                     if (previous_bar.bar_time.date() < potential_starting_bar.bar_time.date()
                     and previous_bar.bar_time.time() < datetime.time(hour=16)):
@@ -80,7 +80,7 @@ class AnalyzerHelper:
                         and (previous_bar.high - previous_bar.low)/(potential_starting_bar.high - potential_starting_bar.low) > 0.9
                     )
 
-                    bar_before_previous_bar = stock.bars[j-1]
+                    bar_before_previous_bar = stock.bars[j+1]
                     potential_starting_bar_before_starting_bar = (
                         (previous_bar.high - previous_bar.low) > (bar_before_previous_bar.high - bar_before_previous_bar.low) * 5
                         and previous_bar.close > previous_bar.open_value

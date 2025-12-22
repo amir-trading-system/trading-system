@@ -152,7 +152,8 @@ class Client(client.EClient, wrapper.EWrapper):
 
         results_dict = bar_data_df.to_dict(orient="records")
         bars = [objects.BarData(**kwargs) for kwargs in results_dict]
-        return bars
+        sorted_bars = sorted(bars, key=lambda bar: bar.bar_time, reverse=True)
+        return sorted_bars
 
     def request_historical_data(
         self,
