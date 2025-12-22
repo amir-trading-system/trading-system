@@ -115,7 +115,7 @@ class Client(client.EClient, wrapper.EWrapper):
         )
 
     def contractDetails(self, reqId, contractDetails):
-        if contractDetails.stockType == "COMMON":
+        if contractDetails.stockType != "ETF":
             if contractDetails.contract.symbol not in self.relevant_symbols:
                 #pylint: disable=line-too-long
                 print(f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.")
@@ -129,7 +129,8 @@ class Client(client.EClient, wrapper.EWrapper):
         self,
         bars: list[objects.BarData],
     ) -> list[objects.BarData]:
-        bar_data_df = pd.DataFrame([vars(bar_candle) for bar_candle in bars])
+        sorted_bars = sorted(bars, key=lambda bar: bar.bar_time, reverse=True)
+        bar_data_df = pd.DataFrame([vars(bar_candle) for bar_candle in sorted_bars])
 
         bar_data_df["ema_9"] = talib.EMA(
             real=bar_data_df["close"],
@@ -152,8 +153,7 @@ class Client(client.EClient, wrapper.EWrapper):
 
         results_dict = bar_data_df.to_dict(orient="records")
         bars = [objects.BarData(**kwargs) for kwargs in results_dict]
-        sorted_bars = sorted(bars, key=lambda bar: bar.bar_time, reverse=True)
-        return sorted_bars
+        return bars
 
     def request_historical_data(
         self,
@@ -237,13 +237,14 @@ class Client(client.EClient, wrapper.EWrapper):
             bar_time=current_bar_time,
         )
 
-        if relevant_symbol_bars[-1].bar_time == current_bar_time:
-            relevant_symbol_bars[-1] = current_bar
-        else:
-            relevant_symbol_bars.append(current_bar)
+        if (current_bar_time - relevant_symbol_bars[0].bar_time).seconds >= 30:
+            if relevant_symbol_bars[0].bar_time == current_bar_time:
+                relevant_symbol_bars[0] = current_bar
+            else:
+                relevant_symbol_bars.append(current_bar)
 
-        bars_data = self.enrich_bars(
-            bars=relevant_symbol_bars,
-        )
-        self.request_id_to_symbol[reqId].bars = bars_data
-        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
+            bars_data = self.enrich_bars(
+                bars=relevant_symbol_bars,
+            )
+            self.request_id_to_symbol[reqId].bars = bars_data
+            self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])

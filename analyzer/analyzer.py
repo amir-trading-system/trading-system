@@ -24,7 +24,7 @@ class Analyzer:
             current_bar=current_bar,
         )
         if starting_bar.index > 0:
-            print(f"starting index: {starting_bar.index}. bar_time: {starting_bar.bar_time}. timeframe: {starting_bar.timeframe}")
+            print(f"stock: {stock.symbol_name}. bar_time: {starting_bar.bar_time}. timeframe: {starting_bar.timeframe}. starting index: {starting_bar.index}.")
         # pass
 
     def _analyze(
@@ -39,6 +39,7 @@ class Analyzer:
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: objects.Stock = self.bars_ready_to_analyze_queue.get()
+                print(self.bars_ready_to_analyze_queue.qsize())
 
                 current_bar = stock_object.bars[-1]
                 if specific_bar_time is not None:
@@ -54,6 +55,6 @@ class Analyzer:
                     stock=stock_object,
                     current_bar=current_bar,
                 )
-                print(f"got stock ready to analyze. stock: {stock_object.symbol_name}")
+                # print(f"got stock ready to analyze. stock: {stock_object.symbol_name}")
             else:
                 time.sleep(2)

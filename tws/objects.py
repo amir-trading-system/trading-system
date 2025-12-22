@@ -21,9 +21,9 @@ class BarData:
         self.close = close
         self.high = high
         self.low = low
-        self.volume = volume
+        self.volume = float(volume)
         self.volume_average = volume_average
-        self.vwap = vwap
+        self.vwap = float(vwap)
         self.ema_9 = ema_9
         self.ema_20 = ema_20
         self.histogram = histogram

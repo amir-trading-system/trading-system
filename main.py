@@ -67,7 +67,12 @@ if __name__ == "__main__":
     ).start()
     time.sleep(1)
 
-    run_manual_test(
+    # run_manual_test(
+    #     c_obj=collector_obj,
+    #     a_obj=analyzer_obj,
+    # )
+
+    run_bot(
         c_obj=collector_obj,
         a_obj=analyzer_obj,
     )

@@ -80,7 +80,6 @@ _get_starting_index(index, with_threshold) =>
          and high[i] > vwap[i]
          and high[i] - low[i] > (high[i+1] - low[i+1]) * 2
          and dayofmonth[i] == dayofmonth[index]
-         and high[i] > vwap[i]
 
         if with_threshold
             is_first_bar_to_pop_up := is_first_bar_to_pop_up
@@ -1107,10 +1106,8 @@ base_case_check(index, check_for_retracement_before) =>
      and most_volatile_index == starting_index
 
     if not current_bar_is_after_market_starts
-     or not current_bar_closes_above_high_top_if_crossed_high_top
      or not movement_is_after_market_start
      or not made_more_than_usual_percentage_already
-     or most_of_action_is_only_on_first_bar
      or not top_index_is_not_the_lowest
         base_indication := false
 
