@@ -1,27 +1,8 @@
 import datetime
-import enum
 
 from tws import objects as tws_objects
 
-class MilestoneType(enum.Enum):
-    STARTING_BAR = 1
-    TOP_BAR = 2
-    LOWEST_BAR = 3
-
-class MilestoneBar:
-    def __init__(
-        self,
-        index: int,
-        bar_object: tws_objects.BarData = None,
-        bar_type: MilestoneType = None,
-        bar_time: datetime.datetime = None,
-        timeframe: int = None,
-    ):
-        self.index = index
-        self.bar_object = bar_object
-        self.type = bar_type
-        self.bar_time = bar_time
-        self.timeframe = timeframe
+from . import objects
 
 class AnalyzerHelper:
     #pylint:disable=too-many-locals
@@ -29,10 +10,10 @@ class AnalyzerHelper:
         self,
         stock: tws_objects.Stock,
         current_bar: tws_objects.BarData,
-    ) -> MilestoneBar:
-        starting_bar = MilestoneBar(
+    ) -> objects.MilestoneBar:
+        starting_bar = objects.MilestoneBar(
             index=0,
-            bar_type=MilestoneType.STARTING_BAR,
+            bar_type=objects.MilestoneType.STARTING_BAR,
             timeframe=stock.timeframe,
         )
 
@@ -125,10 +106,10 @@ class AnalyzerHelper:
                         break
 
             if is_really_potential_starting_bar:
-                starting_bar = MilestoneBar(
+                starting_bar = objects.MilestoneBar(
                     index=i,
                     bar_object=potential_starting_bar,
-                    bar_type=MilestoneType.STARTING_BAR,
+                    bar_type=objects.MilestoneType.STARTING_BAR,
                     bar_time=potential_starting_bar.bar_time,
                     timeframe=stock.timeframe,
                 )
@@ -139,11 +120,11 @@ class AnalyzerHelper:
     def get_top_bar(
         self,
         stock: tws_objects.Stock,
-        starting_bar: MilestoneBar,
-    ) -> MilestoneBar:
-        top_bar = MilestoneBar(
+        starting_bar: objects.MilestoneBar,
+    ) -> objects.MilestoneBar:
+        top_bar = objects.MilestoneBar(
             index=0,
-            bar_type=MilestoneType.TOP_BAR,
+            bar_type=objects.MilestoneType.TOP_BAR,
             timeframe=stock.timeframe,
         )
 
@@ -187,10 +168,10 @@ class AnalyzerHelper:
                     or potential_top_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
                 )
             ):
-                top_bar = MilestoneBar(
+                top_bar = objects.MilestoneBar(
                     index=i,
                     bar_object=potential_top_bar,
-                    bar_type=MilestoneType.TOP_BAR,
+                    bar_type=objects.MilestoneType.TOP_BAR,
                     bar_time=potential_top_bar.bar_time,
                     timeframe=stock.timeframe,
                 )
@@ -201,11 +182,11 @@ class AnalyzerHelper:
     def get_lowest_bar_from_top_bar(
         self,
         stock: tws_objects.Stock,
-        top_bar: MilestoneBar,
-    ) -> MilestoneBar:
-        lowest_milestone_bar = MilestoneBar(
+        top_bar: objects.MilestoneBar,
+    ) -> objects.MilestoneBar:
+        lowest_milestone_bar = objects.MilestoneBar(
             index=0,
-            bar_type=MilestoneType.LOWEST_BAR,
+            bar_type=objects.MilestoneType.LOWEST_BAR,
             timeframe=stock.timeframe,
         )
 
@@ -217,10 +198,10 @@ class AnalyzerHelper:
             key=lambda bar: bar.low
         )
 
-        return MilestoneBar(
+        return objects.MilestoneBar(
             index=lowest_low_bar.index,
             bar_object=lowest_low_bar,
-            bar_type=MilestoneType.LOWEST_BAR,
+            bar_type=objects.MilestoneType.LOWEST_BAR,
             bar_time=lowest_low_bar.bar_time,
             timeframe=stock.timeframe,
         )
