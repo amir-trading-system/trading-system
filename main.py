@@ -26,8 +26,8 @@ def run_bot(
                 year=2025,
                 month=12,
                 day=22,
-                hour=12,
-                minute=00,
+                hour=13,
+                minute=45,
             ),
         }
 

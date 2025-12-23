@@ -16,6 +16,7 @@ class BarData:
         histogram: float = None,
         macd: float = None,
         signal_line: float = None,
+        index: int = None,
     ):
         self.open_value = open_value
         self.close = close
@@ -30,6 +31,7 @@ class BarData:
         self.macd = macd
         self.signal_line = signal_line
         self.bar_time = bar_time
+        self.index = index
 
 class Stock:
     def __init__(

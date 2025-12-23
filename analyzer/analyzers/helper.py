@@ -1,7 +1,7 @@
 import datetime
 import enum
 
-from tws import objects
+from tws import objects as tws_objects
 
 class MilestoneType(enum.Enum):
     STARTING_BAR = 1
@@ -12,7 +12,7 @@ class MilestoneBar:
     def __init__(
         self,
         index: int,
-        bar_object: objects.BarData = None,
+        bar_object: tws_objects.BarData = None,
         bar_type: MilestoneType = None,
         bar_time: datetime.datetime = None,
         timeframe: int = None,
@@ -27,8 +27,8 @@ class AnalyzerHelper:
     #pylint:disable=too-many-locals
     def get_strating_bar(
         self,
-        stock: objects.Stock,
-        current_bar: objects.BarData,
+        stock: tws_objects.Stock,
+        current_bar: tws_objects.BarData,
     ) -> MilestoneBar:
         starting_bar = MilestoneBar(
             index=0,
@@ -42,8 +42,8 @@ class AnalyzerHelper:
         )
 
         bars_length = len(stock.bars)
-        for i in range(1, bars_length-1):
-            potential_starting_bar: objects.BarData = stock.bars[i]
+        for i in range(current_bar.index,bars_length-1):
+            potential_starting_bar: tws_objects.BarData = stock.bars[i]
             if (
                 potential_starting_bar.bar_time < starting_datetime
                 or current_bar.bar_time < potential_starting_bar.bar_time
@@ -66,7 +66,7 @@ class AnalyzerHelper:
                 for j in range(i+1, i+31):
                     if j > len(stock.bars) - 2:
                         break
-                    previous_bar: objects.BarData = stock.bars[j]
+                    previous_bar: tws_objects.BarData = stock.bars[j]
                     if (previous_bar.bar_time.date() < potential_starting_bar.bar_time.date()
                     and previous_bar.bar_time.time() < datetime.time(hour=16)):
                         continue
@@ -107,7 +107,6 @@ class AnalyzerHelper:
                         or previous_bar_is_bigger_than_starting_bar
                     ):
                         is_really_potential_starting_bar = False
-                        break
 
             if is_really_potential_starting_bar:
                 starting_bar = MilestoneBar(
@@ -120,3 +119,56 @@ class AnalyzerHelper:
                 break
 
         return starting_bar
+
+    def get_top_bar(
+        self,
+        stock: tws_objects.Stock,
+        starting_bar: MilestoneBar,
+    ) -> MilestoneBar:
+        top_bar = MilestoneBar(
+            index=0,
+        )
+
+        highest_high_bar = max(
+            stock.bars[2:starting_bar.index],
+            key=lambda bar: bar.high
+        )
+
+        for i in range(1,starting_bar.index-1):
+            potential_top_bar = stock.bars[i]
+            previous_bar = stock.bars[i+1]
+            right_after_bar = stock.bars[i-1]
+            if (
+                potential_top_bar.high == highest_high_bar.high
+                and potential_top_bar.high >= previous_bar.high
+                and potential_top_bar.high > right_after_bar.high
+                and potential_top_bar.close > potential_top_bar.ema_9
+            ):
+                top_bar = MilestoneBar(
+                    index=i,
+                    bar_object=potential_top_bar,
+                    bar_type=MilestoneType.TOP_BAR,
+                    bar_time=potential_top_bar.bar_time,
+                    timeframe=stock.timeframe,
+                )
+                break
+
+        return top_bar
+
+    def get_lowest_bar_from_top_bar(
+        self,
+        stock: tws_objects.Stock,
+        top_bar: MilestoneBar,
+    ) -> MilestoneBar:
+        lowest_low_bar = min(
+            stock.bars[1:top_bar.index],
+            key=lambda bar: bar.low
+        )
+
+        return MilestoneBar(
+            index=lowest_low_bar.index,
+            bar_object=lowest_low_bar,
+            bar_type=MilestoneType.LOWEST_BAR,
+            bar_time=lowest_low_bar.bar_time,
+            timeframe=stock.timeframe,
+        )

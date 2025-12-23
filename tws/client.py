@@ -156,6 +156,9 @@ class Client(client.EClient, wrapper.EWrapper):
             key=lambda bar: bar.bar_time,
             reverse=True,
         )
+        for i, bar_object in enumerate(bars):
+            bar_object.index = i
+
         return bars
 
     def request_historical_data(
