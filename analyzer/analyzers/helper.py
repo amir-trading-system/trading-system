@@ -90,6 +90,15 @@ class AnalyzerHelper:
                         and (previous_bar.high - previous_bar.low)/(potential_starting_bar.high - potential_starting_bar.low) > 0.9
                     )
 
+                    previous_bar_is_strong_almost_as_current = (
+                        previous_bar.close > previous_bar.open_value
+                        and previous_bar.close > previous_bar.ema_9
+                        and previous_bar.close > previous_bar.vwap
+                        and previous_bar.volume > previous_bar.volume_average * 3
+                        and previous_bar.volume > stock.bars[j+1].volume * 3
+                        and previous_bar.volume > 200000
+                    )
+
                     bar_before_previous_bar = stock.bars[j+1]
                     potential_starting_bar_before_starting_bar = (
                         (previous_bar.high - previous_bar.low) > (bar_before_previous_bar.high - bar_before_previous_bar.low) * 5
@@ -110,6 +119,7 @@ class AnalyzerHelper:
                         or previous_bar_body_identical_to_starting_bar
                         or potential_starting_bar_before_starting_bar
                         or previous_bar_is_bigger_than_starting_bar
+                        or previous_bar_is_strong_almost_as_current
                     ):
                         is_really_potential_starting_bar = False
                         break
@@ -140,10 +150,25 @@ class AnalyzerHelper:
         if starting_bar.index == 0 or len(stock.bars[2:starting_bar.index+1]) == 0:
             return top_bar
 
-        highest_high_bar = max(
-            stock.bars[2:starting_bar.index+1],
-            key=lambda bar: bar.high
+        high_picks_bars = [
+            {"index": i, "bar": stock.bars[i]}
+            for i in range(1, starting_bar.index+1)
+            if stock.bars[i].high > stock.bars[i-1].high
+            and stock.bars[i].high > stock.bars[i+1].high
+        ]
+
+        highest_high = max(
+            high_picks_bars,
+            key=lambda bar_dict: bar_dict["bar"].high
         )
+
+        last_highest_index = min(
+            high_picks_bars,
+            key=lambda bar_dict: bar_dict["index"]
+        )
+
+        if last_highest_index["bar"].high > highest_high["bar"].high:
+            return top_bar
 
         # pylint:disable=line-too-long,too-many-boolean-expressions
         for i in range(1,starting_bar.index+1):
@@ -152,7 +177,7 @@ class AnalyzerHelper:
             right_after_bar = stock.bars[i-1]
             if (
                 ## need to fix the highest high logic.
-                potential_top_bar.high == highest_high_bar.high
+                potential_top_bar.high == highest_high["bar"].high
                 and potential_top_bar.high >= previous_bar.high
                 and potential_top_bar.high > right_after_bar.high
                 and potential_top_bar.close > potential_top_bar.ema_9

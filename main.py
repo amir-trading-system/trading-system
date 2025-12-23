@@ -64,7 +64,7 @@ if __name__ == "__main__":
     time.sleep(1)
 
     run_bot(
-        is_manual=True,
+        # is_manual=True,
         c_obj=collector_obj,
         a_obj=analyzer_obj,
     )
