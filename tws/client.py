@@ -124,12 +124,39 @@ class Client(client.EClient, wrapper.EWrapper):
 
         return super().contractDetails(reqId, contractDetails)
 
+    def _filter_ignored_bars(
+        self,
+        bars: list[objects.BarData],
+    ):
+        relevant_bars: list[objects.BarData] = []
+        for i, bar_object in enumerate(bars):
+            if (
+                bar_object.bar_time.hour == 8
+                and bar_object.bar_time.minute == 0
+            ):
+                bar_before = bars[i-1]
+                bar_after = bars[i+1]
+                if (
+                    bar_object.volume > bar_before.volume * 10
+                    and bar_object.volume > bar_after.volume * 10
+                    and bar_object.high - bar_object.low > (bar_before.high - bar_before.low) * 10
+                    and bar_object.high - bar_object.low > (bar_after.high - bar_after.low) * 10
+                ):
+                    continue
+
+            relevant_bars.append(bar_object)
+
+        return relevant_bars
+
     #pylint: disable=no-member
     def enrich_bars(
         self,
         bars: list[objects.BarData],
     ) -> list[objects.BarData]:
-        bar_data_df = pd.DataFrame([vars(bar_candle) for bar_candle in bars])
+        fitered_bars = self._filter_ignored_bars(
+            bars=bars,
+        )
+        bar_data_df = pd.DataFrame([vars(bar_candle) for bar_candle in fitered_bars])
 
         bar_data_df["ema_9"] = talib.EMA(
             real=bar_data_df["close"],
@@ -198,7 +225,10 @@ class Client(client.EClient, wrapper.EWrapper):
     ):
         bar_time = datetime.datetime.fromtimestamp(float(bar.date))
         now = datetime.datetime.now()
-        if now.day != bar_time.day and bar_time.hour < 16:
+        if (
+            (now.day != bar_time.day and bar_time.hour < 16)
+            or bar.volume == 0.0
+        ):
             return
 
         self.request_id_to_symbol[reqId].bars.append(

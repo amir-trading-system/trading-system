@@ -23,24 +23,29 @@ class Analyzer:
             stock=stock,
             current_bar=current_bar,
         )
-        if starting_bar.index > 0:
-            print(f"stock: {stock.symbol_name}. bar_time: {starting_bar.bar_time}. timeframe: {starting_bar.timeframe}. starting index: {starting_bar.index}.")
 
         top_bar: analyzers.helper.MilestoneBar = self.helper.get_top_bar(
             stock=stock,
             starting_bar=starting_bar,
         )
-        if top_bar.index > 0:
-            print(f"stock: {stock.symbol_name}. bar_time: {top_bar.bar_time}. timeframe: {top_bar.timeframe}. starting index: {top_bar.index}.")
 
         lowest_low_bar: analyzers.helper.MilestoneBar = self.helper.get_lowest_bar_from_top_bar(
             stock=stock,
             top_bar=top_bar,
         )
 
-        if lowest_low_bar.index > 0:
-            print(f"stock: {stock.symbol_name}. bar_time: {lowest_low_bar.bar_time}. timeframe: {lowest_low_bar.timeframe}. starting index: {lowest_low_bar.index}.")
-
+        if (
+            starting_bar.index > 0
+            and top_bar.index > 0
+            and lowest_low_bar.index > 0
+        ):
+            print(
+                f"""stock: {stock.symbol_name}.
+                bar_time: {lowest_low_bar.bar_time}.
+                timeframe: {lowest_low_bar.timeframe}.
+                starting: index: {starting_bar.index}. time: {starting_bar.bar_time}\n
+                top: index: {top_bar.index}. time: {top_bar.bar_time}\n
+                lowest low: index: {lowest_low_bar.index}. time: {lowest_low_bar.bar_time}\n""")
 
         return {
             "starting_bar": starting_bar,

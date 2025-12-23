@@ -17,17 +17,17 @@ def run_bot(
     analyzer_kwargs = {}
 
     if is_manual:
-        manual_results_for_test = ["FJET"]
+        manual_results_for_test = ["ASTI"]
         collector_kwargs = {
-            "manual_timeframe_for_tests": 15,
+            "manual_timeframe_for_tests": 5,
         }
         analyzer_kwargs = {
             "specific_bar_time": datetime.datetime(
                 year=2025,
                 month=12,
-                day=22,
-                hour=13,
-                minute=45,
+                day=23,
+                hour=9,
+                minute=55,
             ),
         }
 
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     time.sleep(1)
 
     run_bot(
-        # is_manual=True,
+        is_manual=True,
         c_obj=collector_obj,
         a_obj=analyzer_obj,
     )

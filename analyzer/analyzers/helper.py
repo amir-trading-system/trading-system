@@ -32,6 +32,8 @@ class AnalyzerHelper:
     ) -> MilestoneBar:
         starting_bar = MilestoneBar(
             index=0,
+            bar_type=MilestoneType.STARTING_BAR,
+            timeframe=stock.timeframe,
         )
 
         starting_datetime = datetime.datetime(
@@ -60,7 +62,10 @@ class AnalyzerHelper:
                 and potential_starting_bar.high > potential_starting_bar.vwap
                 and potential_starting_bar.high - potential_starting_bar.low > (previous_bar.high - previous_bar.low) * 2
                 and potential_starting_bar.bar_time.day == current_bar.bar_time.day
-                and potential_starting_bar.volume > 50000
+                and (
+                    potential_starting_bar.volume > 50000
+                    or potential_starting_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
+                )
             )
             if is_really_potential_starting_bar:
                 for j in range(i+1, i+31):
@@ -77,7 +82,7 @@ class AnalyzerHelper:
                     )
                     previous_bar_close_to_starting_and_strong = (
                         previous_bar.volume/potential_starting_bar.volume >= 0.75
-                        and i-j < 10
+                        and j-i < 10
                         and previous_bar.volume > previous_bar.volume_average
                     )
                     previous_bar_body_identical_to_starting_bar = (
@@ -107,6 +112,7 @@ class AnalyzerHelper:
                         or previous_bar_is_bigger_than_starting_bar
                     ):
                         is_really_potential_starting_bar = False
+                        break
 
             if is_really_potential_starting_bar:
                 starting_bar = MilestoneBar(
@@ -127,22 +133,34 @@ class AnalyzerHelper:
     ) -> MilestoneBar:
         top_bar = MilestoneBar(
             index=0,
+            bar_type=MilestoneType.TOP_BAR,
+            timeframe=stock.timeframe,
         )
 
+        if starting_bar.index == 0 or len(stock.bars[2:starting_bar.index+1]) == 0:
+            return top_bar
+
         highest_high_bar = max(
-            stock.bars[2:starting_bar.index],
+            stock.bars[2:starting_bar.index+1],
             key=lambda bar: bar.high
         )
 
-        for i in range(1,starting_bar.index-1):
+        # pylint:disable=line-too-long,too-many-boolean-expressions
+        for i in range(1,starting_bar.index+1):
             potential_top_bar = stock.bars[i]
             previous_bar = stock.bars[i+1]
             right_after_bar = stock.bars[i-1]
             if (
+                ## need to fix the highest high logic.
                 potential_top_bar.high == highest_high_bar.high
                 and potential_top_bar.high >= previous_bar.high
                 and potential_top_bar.high > right_after_bar.high
                 and potential_top_bar.close > potential_top_bar.ema_9
+                and potential_top_bar.volume > potential_top_bar.volume_average * 2
+                and (
+                    potential_top_bar.volume > 50000
+                    or potential_top_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
+                )
             ):
                 top_bar = MilestoneBar(
                     index=i,
@@ -160,6 +178,15 @@ class AnalyzerHelper:
         stock: tws_objects.Stock,
         top_bar: MilestoneBar,
     ) -> MilestoneBar:
+        lowest_milestone_bar = MilestoneBar(
+            index=0,
+            bar_type=MilestoneType.LOWEST_BAR,
+            timeframe=stock.timeframe,
+        )
+
+        if top_bar.index == 0 or len(stock.bars[1:top_bar.index]) == 0:
+            return lowest_milestone_bar
+
         lowest_low_bar = min(
             stock.bars[1:top_bar.index],
             key=lambda bar: bar.low
