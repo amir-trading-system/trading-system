@@ -9,6 +9,8 @@ from . import objects
 
 
 class Client(client.EClient, wrapper.EWrapper):
+    is_manual: bool = False
+
     def __init__(
         self,
         host: str,
@@ -192,6 +194,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self,
         symbol: str,
         timeframe: int,
+        specific_bar_time: datetime.datetime,
     ):
         contract = client.Contract()
         contract.symbol = symbol
@@ -205,17 +208,24 @@ class Client(client.EClient, wrapper.EWrapper):
             bars=[],
             timeframe=timeframe,
         )
+        end_time_str = ""
+        keep_up_to_date = True
+        if specific_bar_time is not None:
+            end_time = (specific_bar_time + datetime.timedelta(days=1)).strftime("%Y%m%d %H:%M:%S")
+            end_time_str = f"{end_time} US/Eastern"
+            keep_up_to_date = False
+
         self.reqHistoricalData(
             reqId=request_id,
             contract=contract,
-            endDateTime="",
+            endDateTime=end_time_str,
             durationStr="2 D",
             barSizeSetting=f"{timeframe} mins",
             whatToShow="TRADES",
             useRTH=0,
             formatDate=2,
             chartOptions=[],
-            keepUpToDate=True,
+            keepUpToDate=keep_up_to_date,
         )
 
     def historicalData(
@@ -226,7 +236,7 @@ class Client(client.EClient, wrapper.EWrapper):
         bar_time = datetime.datetime.fromtimestamp(float(bar.date))
         now = datetime.datetime.now()
         if (
-            (now.day != bar_time.day and bar_time.hour < 16)
+            (now.day != bar_time.day and bar_time.hour < 16 and not self.is_manual)
             or bar.volume == 0.0
         ):
             return

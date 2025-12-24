@@ -2,7 +2,7 @@ import datetime
 import time
 import queue
 
-from analyzer.analyzers import objects, helper
+from analyzer import objects, helper
 from analyzer.indications import __indications__, objects as indication_objects
 from tws import objects as tws_objects
 
@@ -64,6 +64,7 @@ class Analyzer:
     def _analyze(
         self,
         stock: tws_objects.Stock,
+        current_bar: tws_objects.BarData,
         milestons: objects.Milestones,
     ) -> None:
         success_indicators_names: list[str] = []
@@ -80,11 +81,11 @@ class Analyzer:
 
         if len(success_indicators_names) > 0:
             print(f"""
-                Congrats!\n
-                Timeframe: {stock.timeframe}.\n
-                Time: {stock.bars[0].bar_time}.\n
-                Indications:{"\n".join(success_indicators_names)}.\n
-                Symbol: {stock.symbol_name}.\n
+            Congrats!
+            Timeframe: {stock.timeframe}.
+            Time: {current_bar.bar_time}.
+            Indications:{"\n".join(success_indicators_names)}.
+            Symbol: {stock.symbol_name}.
             """)
 
     def analyze_data(
@@ -119,6 +120,7 @@ class Analyzer:
 
                 self._analyze(
                     stock=stock_object,
+                    current_bar=current_bar,
                     milestons=milestons,
                 )
             else:

@@ -1,5 +1,5 @@
-from analyzer.analyzers.analyzer import Analyzer
-from analyzer.analyzers import objects as analyzer_objects
+from analyzer.analyzers._analyzer import Analyzer
+from analyzer import objects as analyzer_objects
 from tws import objects as tws_objects
 
 from . import objects

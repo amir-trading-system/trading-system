@@ -1,9 +1,12 @@
-from . import analyzer
-from . import objects
+from analyzer import objects
+
+from . import _analyzer
 
 class Analyzer(
-    analyzer.Analyzer,
+    _analyzer.Analyzer,
 ):
+    name = "fibonacci_retracement"
+
     def analyze(
         self,
         stock,

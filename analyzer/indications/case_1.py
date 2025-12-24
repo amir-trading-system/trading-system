@@ -1,4 +1,4 @@
-from analyzer.analyzers.analyzer import Analyzer
+from analyzer.analyzers._analyzer import Analyzer
 from analyzer.analyzers import fibonacci_retracement
 
 from . import indication

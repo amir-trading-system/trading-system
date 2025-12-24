@@ -1,3 +1,4 @@
+import datetime
 import time
 import queue
 
@@ -23,6 +24,7 @@ class Collector:
     def collect_data(
         self,
         manual_timeframe_for_tests: int = None,
+        specific_bar_time: datetime.datetime = None,
     ):
         while True:
             if not self.tws_client.symbols_to_collect_queue.empty():
@@ -35,6 +37,7 @@ class Collector:
                     self.tws_client.request_historical_data(
                         symbol=symbol,
                         timeframe=timeframe,
+                        specific_bar_time=specific_bar_time,
                     )
             else:
                 time.sleep(2)

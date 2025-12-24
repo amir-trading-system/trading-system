@@ -15,20 +15,23 @@ def run_bot(
     manual_results_for_test = []
     collector_kwargs = {}
     analyzer_kwargs = {}
+    c_obj.tws_client.is_manual = is_manual
 
     if is_manual:
-        manual_results_for_test = ["ASTI"]
+        specific_bar_time = datetime.datetime(
+            year=2025,
+            month=12,
+            day=22,
+            hour=12,
+            minute=30,
+        )
+        manual_results_for_test = ["FJET"]
         collector_kwargs = {
-            "manual_timeframe_for_tests": 5,
+            "manual_timeframe_for_tests": 15,
+            "specific_bar_time": specific_bar_time,
         }
         analyzer_kwargs = {
-            "specific_bar_time": datetime.datetime(
-                year=2025,
-                month=12,
-                day=23,
-                hour=9,
-                minute=55,
-            ),
+            "specific_bar_time": specific_bar_time,
         }
 
     c_obj.tws_client.start_scanner(
@@ -64,7 +67,7 @@ if __name__ == "__main__":
     time.sleep(1)
 
     run_bot(
-        # is_manual=True,
+        is_manual=True,
         c_obj=collector_obj,
         a_obj=analyzer_obj,
     )

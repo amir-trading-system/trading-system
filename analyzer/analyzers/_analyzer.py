@@ -1,8 +1,10 @@
 from tws import objects as tws_objects
 
-from . import objects
+from analyzer import objects
 
 class Analyzer:
+    name: str = ""
+
     def analyze(
         self,
         stock: tws_objects.Stock,
