@@ -2,7 +2,7 @@ from tws import objects as tws_objects
 
 from . import objects
 
-class BaseAnalyzer:
+class Analyzer:
     def analyze(
         self,
         stock: tws_objects.Stock,

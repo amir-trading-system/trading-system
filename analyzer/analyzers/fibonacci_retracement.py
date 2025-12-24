@@ -1,8 +1,8 @@
-from . import base_analyzer
+from . import analyzer
 from . import objects
 
 class Analyzer(
-    base_analyzer.BaseAnalyzer,
+    analyzer.Analyzer,
 ):
     def analyze(
         self,

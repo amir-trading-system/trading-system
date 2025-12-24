@@ -2,9 +2,11 @@ import datetime
 import time
 import queue
 
-from analyzer.analyzers import objects, helper, __analyzers__
-
+from analyzer.analyzers import objects, helper
+from analyzer.indications import __indications__, objects as indication_objects
 from tws import objects as tws_objects
+
+
 
 
 class Analyzer:
@@ -43,14 +45,14 @@ class Analyzer:
             and lowest_low_bar.index > 0
         ):
             are_valid = True
-            print(
-                f"""stock: {stock.symbol_name}.
-                bar_time: {lowest_low_bar.bar_time}.
-                timeframe: {lowest_low_bar.timeframe}.
-                starting: index: {starting_bar.index}. time: {starting_bar.bar_time}\n
-                top: index: {top_bar.index}. time: {top_bar.bar_time}\n
-                lowest low: index: {lowest_low_bar.index}. time: {lowest_low_bar.bar_time}\n""",
-            )
+            # print(
+            #     f"""stock: {stock.symbol_name}.
+            #     bar_time: {lowest_low_bar.bar_time}.
+            #     timeframe: {lowest_low_bar.timeframe}.
+            #     starting: index: {starting_bar.index}. time: {starting_bar.bar_time}\n
+            #     top: index: {top_bar.index}. time: {top_bar.bar_time}\n
+            #     lowest low: index: {lowest_low_bar.index}. time: {lowest_low_bar.bar_time}\n""",
+            # )
 
         return objects.Milestones(
             starting_bar=starting_bar,
@@ -63,17 +65,27 @@ class Analyzer:
         self,
         stock: tws_objects.Stock,
         milestons: objects.Milestones,
-    ) -> bool:
-        response = None
-        for analyzer in __analyzers__:
-            response: objects.AnalyzerResponse = analyzer().analyze(
+    ) -> None:
+        success_indicators_names: list[str] = []
+        for indication in __indications__:
+            indication_obj = indication()
+            indication_response: indication_objects.IndicationResponse = indication_obj.indicate(
                 stock=stock,
                 milestones=milestons,
             )
-            if response.reason != "":
-                print(response.reason)
+            if indication_response.result:
+                success_indicators_names.append(
+                    str.format(f"{indication.name}: {indication_response.success_rate}")
+                )
 
-        return response
+        if len(success_indicators_names) > 0:
+            print(f"""
+                Congrats!\n
+                Timeframe: {stock.timeframe}.\n
+                Time: {stock.bars[0].bar_time}.\n
+                Indications:{"\n".join(success_indicators_names)}.\n
+                Symbol: {stock.symbol_name}.\n
+            """)
 
     def analyze_data(
         self,
@@ -105,7 +117,7 @@ class Analyzer:
                 if not milestons.are_valid:
                     continue
 
-                response = self._analyze(
+                self._analyze(
                     stock=stock_object,
                     milestons=milestons,
                 )
