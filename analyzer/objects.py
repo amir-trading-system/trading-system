@@ -7,6 +7,7 @@ class MilestoneType(enum.Enum):
     STARTING_BAR = 1
     TOP_BAR = 2
     LOWEST_BAR = 3
+    PREVIOUS_BAR = 4
 
 class MilestoneBar:
     def __init__(
@@ -29,11 +30,13 @@ class Milestones:
         starting_bar: MilestoneBar,
         top_bar: MilestoneBar,
         lowest_low_bar: MilestoneBar,
+        previous_bar: MilestoneBar,
         are_valid: bool,
     ):
         self.starting_bar = starting_bar
         self.top_bar = top_bar
         self.lowest_low_bar = lowest_low_bar
+        self.previous_bar = previous_bar
         self.are_valid = are_valid
 
 class EvidenceResponse:

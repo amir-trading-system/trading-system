@@ -8,3 +8,4 @@ from . import current_bar_is_positive_and_volatile
 from . import current_bar_comes_after_healthy_retracement
 from . import most_volatile_bar_with_big_rejection_not_inside_current_bar_range
 from . import no_indecision_histogram_from_top
+from . import current_bar_higher_than_previous

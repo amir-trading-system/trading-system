@@ -17,6 +17,7 @@ class Indicator:
         analyzer.evidences.current_bar_comes_after_healthy_retracement.Evidence,
         analyzer.evidences.most_volatile_bar_with_big_rejection_not_inside_current_bar_range.Evidence,
         analyzer.evidences.no_indecision_histogram_from_top.Evidence,
+        analyzer.evidences.current_bar_higher_than_previous.Evidence,
     }
     name: str = ""
 

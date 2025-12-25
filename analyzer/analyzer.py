@@ -36,6 +36,14 @@ class Analyzer:
             stock=stock,
             top_bar=top_bar,
         )
+        previous_bar = stock.bars[current_bar.index+1]
+        previous_bar = objects.MilestoneBar(
+            index=previous_bar.index,
+            bar_object=previous_bar,
+            bar_type=objects.MilestoneType.PREVIOUS_BAR,
+            bar_time=previous_bar.bar_time,
+            timeframe=stock.timeframe,
+        )
 
         are_valid = False
 
@@ -58,6 +66,7 @@ class Analyzer:
             starting_bar=starting_bar,
             top_bar=top_bar,
             lowest_low_bar=lowest_low_bar,
+            previous_bar=previous_bar,
             are_valid=are_valid,
         )
 
