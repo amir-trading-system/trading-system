@@ -20,5 +20,5 @@ class Evidence(
             result=movement_is_after_market_starts,
             reason=""
             if movement_is_after_market_starts
-            else f"current bar is outside of market hours. bar time: {current_bar.bar_time}",
+            else f"Current bar is outside of market hours. bar time: {current_bar.bar_time}",
         )

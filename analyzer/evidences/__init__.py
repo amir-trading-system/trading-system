@@ -3,3 +3,8 @@ from . import fibonacci_retracement
 from . import movement_is_after_market_starts
 from . import current_close_similar_to_high
 from . import current_high_close_to_top_bar_high
+from . import current_bar_is_highest_except_top_bar
+from . import current_bar_is_positive_and_volatile
+from . import current_bar_comes_after_healthy_retracement
+from . import most_volatile_bar_with_big_rejection_not_inside_current_bar_range
+from . import no_indecision_histogram_from_top

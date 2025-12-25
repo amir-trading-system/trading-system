@@ -31,5 +31,5 @@ class Evidence(
             result=current_high_close_to_top_bar_high,
             reason=""
             if current_high_close_to_top_bar_high
-            else f"current high: {current_bar.high} is not close or not the only one who close to top bar high: {milestones.top_bar.bar_object.high}",
+            else f"Current high: {current_bar.high} is not close or not the only one who close to top bar high: {milestones.top_bar.bar_object.high}",
         )

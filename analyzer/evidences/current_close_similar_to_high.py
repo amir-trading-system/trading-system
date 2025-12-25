@@ -20,5 +20,5 @@ class Evidence(
             result=current_close_similar_to_high,
             reason=""
             if current_close_similar_to_high
-            else f"current close: {current_bar.close} is far from high: {current_bar.high}",
+            else f"Current close: {current_bar.close} is far from high: {current_bar.high}",
         )
