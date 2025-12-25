@@ -36,7 +36,7 @@ class Milestones:
         self.lowest_low_bar = lowest_low_bar
         self.are_valid = are_valid
 
-class AnalyzerResponse:
+class EvidenceResponse:
     def __init__(
         self,
         result: bool,

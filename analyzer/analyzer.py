@@ -2,11 +2,11 @@ import datetime
 import time
 import queue
 
+from colorama import Fore, Style
+
 from analyzer import objects, helper
 import analyzer.indicators
 from tws import objects as tws_objects
-
-
 
 
 class Analyzer:
@@ -69,22 +69,28 @@ class Analyzer:
     ) -> None:
         success_indicators_names: list[str] = []
         for indicator in analyzer.indicators.__indicators__:
-            indicator_obj = indicator()
+            indicator_obj: analyzer.indicators.indicator.Indicator = indicator()
             indicator_response: analyzer.indicators.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestons,
+                current_bar=current_bar,
             )
             if indicator_response.result:
-                success_indicators_names.append(
-                    str.format(f"{indicator.name}: {indicator_response.success_rate}")
-                )
+                indicator_title = ""
+                if indicator_response.success_rate == 1:
+                    indicator_title = str.format(f"{indicator.name}: {Fore.GREEN}{indicator_response.success_rate}{Style.RESET_ALL}")
+                else:
+                    indicator_title = str.format(f"{indicator.name}: {Fore.YELLOW}{indicator_response.success_rate}{Style.RESET_ALL}")
+
+                success_indicators_names.append(indicator_title)
 
         if len(success_indicators_names) > 0:
             print(f"""
-            Congrats!
+            {Fore.GREEN}Congrats!{Style.RESET_ALL}
             Timeframe: {stock.timeframe}.
             Time: {current_bar.bar_time}.
-            Indications:{"\n".join(success_indicators_names)}.
+            Indications:
+            {"\n".join(success_indicators_names)}.
             Symbol: {stock.symbol_name}.
             """)
 
