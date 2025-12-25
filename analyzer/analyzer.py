@@ -3,7 +3,7 @@ import time
 import queue
 
 from analyzer import objects, helper
-from analyzer.indications import __indications__, objects as indication_objects
+import analyzer.indicators
 from tws import objects as tws_objects
 
 
@@ -61,22 +61,22 @@ class Analyzer:
             are_valid=are_valid,
         )
 
-    def _analyze(
+    def run_indicators(
         self,
         stock: tws_objects.Stock,
         current_bar: tws_objects.BarData,
         milestons: objects.Milestones,
     ) -> None:
         success_indicators_names: list[str] = []
-        for indication in __indications__:
-            indication_obj = indication()
-            indication_response: indication_objects.IndicationResponse = indication_obj.indicate(
+        for indicator in analyzer.indicators.__indicators__:
+            indicator_obj = indicator()
+            indicator_response: analyzer.indicators.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestons,
             )
-            if indication_response.result:
+            if indicator_response.result:
                 success_indicators_names.append(
-                    str.format(f"{indication.name}: {indication_response.success_rate}")
+                    str.format(f"{indicator.name}: {indicator_response.success_rate}")
                 )
 
         if len(success_indicators_names) > 0:
@@ -118,7 +118,7 @@ class Analyzer:
                 if not milestons.are_valid:
                     continue
 
-                self._analyze(
+                self.run_indicators(
                     stock=stock_object,
                     current_bar=current_bar,
                     milestons=milestons,

@@ -1,10 +1,10 @@
 from analyzer.analyzers._analyzer import Analyzer
 from analyzer.analyzers import fibonacci_retracement
 
-from . import indication
+from . import indicator
 
 class Indicator(
-    indication.Indication,
+    indicator.Indicator,
 ):
     analyzers: list[Analyzer] = [
         fibonacci_retracement.Analyzer,

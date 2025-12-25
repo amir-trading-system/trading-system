@@ -4,7 +4,7 @@ from tws import objects as tws_objects
 
 from . import objects
 
-class Indication:
+class Indicator:
     analyzers: list[Analyzer] = []
     name: str = ""
 
@@ -12,7 +12,7 @@ class Indication:
         self,
         success_results: list[analyzer_objects.AnalyzerResponse],
         failure_results: list[analyzer_objects.AnalyzerResponse],
-    ) -> objects.IndicationResponse:
+    ) -> objects.IndicatorResponse:
         total = len(self.analyzers)
         success_rate = len(success_results)/total
         result = total == len(success_results) or success_rate >= 0.9
@@ -24,7 +24,7 @@ class Indication:
                     failed on {failure_result.reason}\n
                 """)
 
-        return objects.IndicationResponse(
+        return objects.IndicatorResponse(
             success_rate=success_rate,
             result=result,
         )
@@ -33,7 +33,7 @@ class Indication:
         self,
         stock: tws_objects.Stock,
         milestones: analyzer_objects.Milestones,
-    ) -> objects.IndicationResponse:
+    ) -> objects.IndicatorResponse:
         failure_results: list[analyzer_objects.AnalyzerResponse] = []
         success_results: list[analyzer_objects.AnalyzerResponse] = []
         for analyzer_obj in self.analyzers:

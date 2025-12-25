@@ -7,7 +7,6 @@ import requests
 FLOAT_THRESHOLD = 20000000
 
 def get_stocks_list_from_nasdaq():
-    #pylint:disable=line-too-long
     nasdaq_stocks_url = "https://api.nasdaq.com/api/screener/stocks?tableonly=false&limit=10000&download=true"
 
     headers = {
@@ -103,7 +102,6 @@ def get_stocks_by_price_change_and_volume():
                         else:
                             low_to_high[symbol][date]["low"] = stock_low_price
 
-                #pylint:disable=line-too-long
                 filtered_data_by_price = historical_data.High[symbol][historical_data.High[symbol] > 1]
                 for date, stock_high_price in filtered_data_by_price.items():
                     if not low_to_high.get(symbol, None):

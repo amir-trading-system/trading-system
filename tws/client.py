@@ -55,7 +55,6 @@ class Client(client.EClient, wrapper.EWrapper):
         errorString,
         advancedOrderRejectJson="",
     ):
-        #pylint: disable=line-too-long
         print(f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}")
 
     def _get_scanner_subscription(
@@ -119,7 +118,6 @@ class Client(client.EClient, wrapper.EWrapper):
     def contractDetails(self, reqId, contractDetails):
         if contractDetails.stockType != "ETF":
             if contractDetails.contract.symbol not in self.relevant_symbols:
-                #pylint: disable=line-too-long
                 print(f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.")
                 self.relevant_symbols.append(contractDetails.contract.symbol)
                 self.symbols_to_collect_queue.put(contractDetails.contract.symbol)

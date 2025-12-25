@@ -1,4 +1,4 @@
-class IndicationResponse:
+class IndicatorResponse:
     def __init__(
         self,
         success_rate: float,

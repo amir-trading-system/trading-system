@@ -34,7 +34,7 @@ class AnalyzerHelper:
                 continue
 
             previous_bar = stock.bars[i+1]
-            # pylint: disable=too-many-boolean-expressions,line-too-long
+            # pylint: disable=too-many-boolean-expressions
             is_really_potential_starting_bar = (
                 potential_starting_bar.close > potential_starting_bar.open_value
                 and potential_starting_bar.volume > previous_bar.volume * 1.5
@@ -151,7 +151,7 @@ class AnalyzerHelper:
         if last_highest_index["bar"].high > highest_high["bar"].high:
             return top_bar
 
-        # pylint:disable=line-too-long,too-many-boolean-expressions
+        # pylint:disable=too-many-boolean-expressions
         for i in range(1,starting_bar.index+1):
             potential_top_bar = stock.bars[i]
             previous_bar = stock.bars[i+1]
