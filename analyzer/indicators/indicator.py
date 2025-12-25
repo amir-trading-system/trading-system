@@ -11,6 +11,7 @@ class Indicator:
     evidences: set[analyzer.evidences._evidence.Evidence] = {
         analyzer.evidences.movement_is_after_market_starts.Evidence,
         analyzer.evidences.current_close_similar_to_high.Evidence,
+        analyzer.evidences.current_high_close_to_top_bar_high.Evidence,
     }
     name: str = ""
 
