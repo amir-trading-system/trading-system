@@ -30,6 +30,7 @@ class Indicator:
 
     def handle_response(
         self,
+        symbol_name: str,
         success_results: list[analyzer.objects.EvidenceResponse],
         failure_results: list[analyzer.objects.EvidenceResponse],
         printed_results: list[str]
@@ -38,7 +39,9 @@ class Indicator:
         success_rate = len(success_results)/total
         result = total == len(success_results) or success_rate >= 0.9 or total - len(success_results) == 1
 
-        print("\n".join(printed_results))
+        if success_rate >= 0.9:
+            print(f"SYMBOL: {symbol_name}")
+            print("\n".join(printed_results))
         if success_rate >= 0.9 and len(failure_results) > 0:
             for failure_result in failure_results:
                 print(f"""
@@ -83,6 +86,7 @@ class Indicator:
                 printed_results.append(f"{self.name}: Evidence {Fore.RED}{evidence_object.name}{Style.RESET_ALL} is negative")
 
         return self.handle_response(
+            symbol_name=stock.symbol_name,
             success_results=success_results,
             failure_results=failure_results,
             printed_results=printed_results,
