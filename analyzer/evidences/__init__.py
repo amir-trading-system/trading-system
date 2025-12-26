@@ -9,3 +9,10 @@ from . import current_bar_comes_after_healthy_retracement
 from . import most_volatile_bar_with_big_rejection_not_inside_current_bar_range
 from . import no_indecision_histogram_from_top
 from . import current_bar_higher_than_previous
+from . import current_bar_is_full
+from . import most_volatile_bar_from_top_strong
+from . import current_bar_is_not_the_volume_weakest_since_top_bar
+from . import retracement_occured_since_top_bar
+from . import current_bar_close_above_top_high_if_crossed_it
+from . import current_bar_after_market_starts
+from . import top_bar_is_not_the_lowest_bar

@@ -87,12 +87,11 @@ class Analyzer:
                 current_bar=current_bar,
             )
             if indicator_response.result:
-                indicator_title = ""
-                if indicator_response.success_rate == 1:
-                    indicator_title = str.format(f"{indicator.name}: {Fore.GREEN}{indicator_response.success_rate}{Style.RESET_ALL}")
-                else:
-                    indicator_title = str.format(f"{indicator.name}: {Fore.YELLOW}{indicator_response.success_rate}{Style.RESET_ALL}")
+                font_color = Fore.GREEN
+                if indicator_response.success_rate < 1:
+                    font_color = Fore.YELLOW
 
+                indicator_title = str.format(f"{indicator.name}: {font_color}{indicator_response.success_rate} - {indicator_response.success_count} success evidences{Style.RESET_ALL}")
                 success_indicators_names.append(indicator_title)
 
         if len(success_indicators_names) > 0:

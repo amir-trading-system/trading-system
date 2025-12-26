@@ -18,6 +18,13 @@ class Indicator:
         analyzer.evidences.most_volatile_bar_with_big_rejection_not_inside_current_bar_range.Evidence,
         analyzer.evidences.no_indecision_histogram_from_top.Evidence,
         analyzer.evidences.current_bar_higher_than_previous.Evidence,
+        analyzer.evidences.current_bar_is_full.Evidence,
+        analyzer.evidences.most_volatile_bar_from_top_strong.Evidence,
+        analyzer.evidences.current_bar_is_not_the_volume_weakest_since_top_bar.Evidence,
+        analyzer.evidences.retracement_occured_since_top_bar.Evidence,
+        analyzer.evidences.current_bar_close_above_top_high_if_crossed_it.Evidence,
+        analyzer.evidences.current_bar_after_market_starts.Evidence,
+        analyzer.evidences.top_bar_is_not_the_lowest_bar.Evidence,
     }
     name: str = ""
 
@@ -25,19 +32,22 @@ class Indicator:
         self,
         success_results: list[analyzer.objects.EvidenceResponse],
         failure_results: list[analyzer.objects.EvidenceResponse],
+        printed_results: list[str]
     ) -> objects.IndicatorResponse:
         total = len(self.evidences)
         success_rate = len(success_results)/total
         result = total == len(success_results) or success_rate >= 0.9 or total - len(success_results) == 1
 
+        print("\n".join(printed_results))
         if success_rate >= 0.9 and len(failure_results) > 0:
             for failure_result in failure_results:
                 print(f"""
                     success_rate: {success_rate}%.\n
-                    failed on {failure_result.reason}\n
+                    {failure_result.reason}\n
                 """)
 
         return objects.IndicatorResponse(
+            success_count=len(success_results),
             success_rate=success_rate,
             result=result,
         )
@@ -50,6 +60,7 @@ class Indicator:
     ) -> objects.IndicatorResponse:
         failure_results: list[analyzer.objects.EvidenceResponse] = []
         success_results: list[analyzer.objects.EvidenceResponse] = []
+        printed_results: list[str] = []
 
         for evidence_object in self.evidences:
             evidence_object: analyzer.evidences._evidence.Evidence = evidence_object()
@@ -59,14 +70,20 @@ class Indicator:
                 current_bar=current_bar,
             )
 
+            if not result.result and evidence_object.must_to_be_true:
+                success_results = []
+                printed_results = []
+                break
+
             if result.result:
-                print(f"{self.name}: Evidence {Fore.GREEN}{evidence_object.name}{Style.RESET_ALL} is positive")
                 success_results.append(result)
+                printed_results.append(f"{self.name}: Evidence {Fore.GREEN}{evidence_object.name}{Style.RESET_ALL} is positive")
             else:
-                print(f"{self.name}: Evidence {Fore.RED}{evidence_object.name}{Style.RESET_ALL} is negative")
                 failure_results.append(result)
+                printed_results.append(f"{self.name}: Evidence {Fore.RED}{evidence_object.name}{Style.RESET_ALL} is negative")
 
         return self.handle_response(
             success_results=success_results,
             failure_results=failure_results,
+            printed_results=printed_results,
         )
