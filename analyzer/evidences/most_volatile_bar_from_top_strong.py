@@ -14,8 +14,15 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
+        relevant_bars = stock.bars[1:milestones.top_bar.index-1]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
         most_volatile_bar = max(
-            stock.bars[1:milestones.top_bar.index-1],
+            relevant_bars,
             key=lambda bar_object: bar_object.volume
         )
 

@@ -48,7 +48,17 @@ class AnalyzerHelper:
                     or potential_starting_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
                 )
             )
-            if is_really_potential_starting_bar:
+            if (
+                True
+                and is_really_potential_starting_bar
+                and potential_starting_bar.bar_time != datetime.datetime(
+                    year=potential_starting_bar.bar_time.year,
+                    month=potential_starting_bar.bar_time.month,
+                    day=potential_starting_bar.bar_time.day,
+                    hour=9,
+                    minute=30,
+                )
+            ):
                 for j in range(i+1, i+31):
                     if j > len(stock.bars) - 2:
                         break

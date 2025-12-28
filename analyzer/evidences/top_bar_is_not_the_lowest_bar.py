@@ -14,11 +14,23 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
+        relevant_bars = stock.bars[1:milestones.top_bar.index-1]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
         lowest_bar_since_top_index = min(
-            stock.bars[1:milestones.top_bar.index-1],
+            relevant_bars,
             key=lambda bar_object: bar_object.low
         )
-        top_bar_is_not_the_lowest_bar = milestones.top_bar.bar_object.low > lowest_bar_since_top_index.low
+
+        top_bar_is_not_the_lowest_bar = (
+            True
+            and milestones.top_bar.bar_object.low > lowest_bar_since_top_index.low
+            or milestones.top_bar.bar_object.close > milestones.top_bar.bar_object.open_value
+        )
 
         return objects.EvidenceResponse(
             result=top_bar_is_not_the_lowest_bar,

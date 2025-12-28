@@ -14,9 +14,22 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
+        relevant_bars = stock.bars[1:milestones.top_bar.index-1]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
         indecision_histogram_bar_index = None
         no_indecision_histogram_from_top = True
-        for bar_object in stock.bars[1:milestones.top_bar.index-1]:
+
+        for bar_object in relevant_bars:
+            if not stock.has_previous_bar(
+                bar_object=bar_object,
+            ):
+                continue
+
             previous_bar = stock.bars[bar_object.index+1]
             next_bar = stock.bars[bar_object.index-1]
             if (

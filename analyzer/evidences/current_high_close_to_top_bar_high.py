@@ -14,10 +14,17 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
+        relevant_bars = stock.bars[1:milestones.starting_bar.index]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
         base_condition = current_bar.high/milestones.top_bar.bar_object.high >= 0.99
         any_other_bar_has_similar_condition = any(
             bar_object
-            for bar_object in stock.bars[1:milestones.starting_bar.index]
+            for bar_object in relevant_bars
             if bar_object.close > current_bar.close
         )
 

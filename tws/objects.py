@@ -51,3 +51,9 @@ class Stock:
         self.symbol_name = symbol_name
         self.bars = bars
         self.timeframe = timeframe
+
+    def has_previous_bar(
+        self,
+        bar_object: BarData,
+    ) -> bool:
+        return bar_object.index + 1 < len(self.bars)

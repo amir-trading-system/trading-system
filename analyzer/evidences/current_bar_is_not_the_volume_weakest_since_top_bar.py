@@ -14,8 +14,15 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
+        relevant_bars = stock.bars[1:milestones.top_bar.index]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
         lowest_volume_bar_since_top = min(
-            stock.bars[1:milestones.top_bar.index],
+            relevant_bars,
             key=lambda bar_object: bar_object.volume
         )
 

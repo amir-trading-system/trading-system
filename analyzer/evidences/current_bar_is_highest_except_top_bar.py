@@ -14,9 +14,16 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
+        relevant_bars = stock.bars[1:milestones.top_bar.index-1]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
         current_bar_is_highest_except_top_bar = not any(
             bar_object
-            for bar_object in stock.bars[1:milestones.top_bar.index-1]
+            for bar_object in relevant_bars
             if bar_object.high > current_bar.high
         )
 

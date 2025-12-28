@@ -45,10 +45,18 @@ class Analyzer:
             timeframe=stock.timeframe,
         )
 
+        current_bar_is_valid = (
+            True
+            and current_bar.close > current_bar.open_value
+            and current_bar.high > current_bar.ema_9
+            and current_bar.high > current_bar.vwap
+        )
+
         are_valid = False
 
         if (
-            starting_bar.index > 0
+            current_bar_is_valid
+            and starting_bar.index > 0
             and top_bar.index > 0
             and lowest_low_bar.index > 0
         ):

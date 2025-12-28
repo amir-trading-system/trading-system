@@ -14,10 +14,20 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
+        relevant_bars = stock.bars[:milestones.top_bar.index-1]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
         has_at_least_one_retracement_bar = any(
             bar_object
-            for bar_object in stock.bars[:milestones.top_bar.index-1]
-            if bar_object.low < stock.bars[bar_object.index+1].low
+            for bar_object in relevant_bars
+            if stock.has_previous_bar(
+                bar_object=bar_object,
+            )
+            and bar_object.low < stock.bars[bar_object.index+1].low
         )
         retracement_occured_since_top_bar = has_at_least_one_retracement_bar or milestones.top_bar.index <= 2
 

@@ -18,7 +18,19 @@ class Evidence(
         negative_volume_goes_down = True
         has_fake_top_since_top_index = False
 
-        for bar_object in stock.bars[1:milestones.top_bar.index-1]:
+        relevant_bars = stock.bars[1:milestones.top_bar.index-1]
+        if len(relevant_bars) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
+
+        for bar_object in relevant_bars:
+            if not stock.has_previous_bar(
+                bar_object=bar_object,
+            ):
+                continue
+
             previous_bar = stock.bars[bar_object.index+1]
             if bar_object.ema_9 < previous_bar.ema_9:
                 current_bar_comes_after_healthy_retracement = False

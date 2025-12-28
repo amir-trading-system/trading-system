@@ -83,10 +83,5 @@ Need to identify:
 Need to Fix - False positives:
 
 To do list:
- - Python:
-   - SIDU - check why we have list out of index on analyzer/evidences/current_bar_comes_after_healthy_retracement.py:22
  - Pinescript:
    - FJET - False positives both on 5 && 15 minute charts - relates to top similar to low - cant be.
-
- - Both:
-   - Add indication on ASPC - 15 minutes chart - 12:00.
