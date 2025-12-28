@@ -7,6 +7,7 @@ class Evidence(
     _evidence.Evidence,
 ):
     name = "top_bar_is_not_the_lowest_bar"
+    is_base_evidence = True
 
     def find_evidence(
         self,

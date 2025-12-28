@@ -5,6 +5,7 @@ from analyzer import objects
 class Evidence:
     name: str = ""
     must_to_be_true: bool = False
+    is_base_evidence: bool = False
 
     def find_evidence(
         self,

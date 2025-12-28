@@ -7,6 +7,7 @@ class Evidence(
     _evidence.Evidence,
 ):
     name = "movement_is_after_market_starts"
+    is_base_evidence = True
 
     def find_evidence(
         self,

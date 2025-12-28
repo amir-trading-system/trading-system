@@ -25,6 +25,7 @@ class Indicator:
         analyzer.evidences.current_bar_close_above_top_high_if_crossed_it.Evidence,
         analyzer.evidences.current_bar_after_market_starts.Evidence,
         analyzer.evidences.top_bar_is_not_the_lowest_bar.Evidence,
+        analyzer.evidences.at_least_one_bar_was_closed_to_9_ema_since_start.Evidence,
     }
     name: str = ""
 
@@ -43,11 +44,7 @@ class Indicator:
             print(f"SYMBOL: {symbol_name}")
             print("\n".join(printed_results))
         if success_rate >= 0.9 and len(failure_results) > 0:
-            for failure_result in failure_results:
-                print(f"""
-                    success_rate: {success_rate}%.\n
-                    {failure_result.reason}\n
-                """)
+            print(f"success_rate: {success_rate}%.")
 
         return objects.IndicatorResponse(
             success_count=len(success_results),
@@ -80,10 +77,9 @@ class Indicator:
 
             if result.result:
                 success_results.append(result)
-                printed_results.append(f"{self.name}: Evidence {Fore.GREEN}{evidence_object.name}{Style.RESET_ALL} is positive")
             else:
                 failure_results.append(result)
-                printed_results.append(f"{self.name}: Evidence {Fore.RED}{evidence_object.name}{Style.RESET_ALL} is negative")
+                printed_results.append(f"{self.name} -  Evidence: {evidence_object.name}. Reason: {Fore.RED}{result.reason}.{Style.RESET_ALL}")
 
         return self.handle_response(
             symbol_name=stock.symbol_name,

@@ -7,6 +7,7 @@ class Evidence(
     _evidence.Evidence,
 ):
     name = "current_bar_comes_after_healthy_retracement"
+    is_base_evidence = True
 
     def find_evidence(
         self,

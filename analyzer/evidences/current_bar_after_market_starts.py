@@ -8,6 +8,7 @@ class Evidence(
 ):
     name = "current_bar_after_market_starts"
     must_to_be_true = True
+    is_base_evidence = True
 
     def find_evidence(
         self,

@@ -18,13 +18,13 @@ def run_bot(
     c_obj.tws_client.is_manual = is_manual
 
     if is_manual:
-        manual_results_for_test = ["FJET"]
+        manual_results_for_test = ["ASPC"]
         specific_bar_time = datetime.datetime(
             year=2025,
             month=12,
             day=26,
-            hour=11,
-            minute=15,
+            hour=12,
+            minute=00,
         )
         collector_kwargs = {
             "manual_timeframe_for_tests": 15,

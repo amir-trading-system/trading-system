@@ -7,6 +7,7 @@ class Evidence(
     _evidence.Evidence,
 ):
     name = "no_indecision_histogram_from_top"
+    is_base_evidence = True
 
     def find_evidence(
         self,

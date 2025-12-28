@@ -7,6 +7,7 @@ class Evidence(
     _evidence.Evidence,
 ):
     name = "most_volatile_bar_with_big_rejection_not_inside_current_bar_range"
+    is_base_evidence = True
 
     def find_evidence(
         self,

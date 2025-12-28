@@ -7,6 +7,7 @@ class Evidence(
     _evidence.Evidence,
 ):
     name = "current_close_similar_to_high"
+    is_base_evidence = True
 
     def find_evidence(
         self,

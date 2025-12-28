@@ -7,6 +7,7 @@ class Evidence(
     _evidence.Evidence,
 ):
     name = "current_bar_is_highest_except_top_bar"
+    is_base_evidence = True
 
     def find_evidence(
         self,
