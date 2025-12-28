@@ -57,3 +57,9 @@ class Stock:
         bar_object: BarData,
     ) -> bool:
         return bar_object.index + 1 < len(self.bars)
+
+    def has_next_bar(
+        self,
+        bar_object: BarData,
+    ) -> bool:
+        return bar_object.index - 1 > 0

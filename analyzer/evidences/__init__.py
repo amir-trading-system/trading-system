@@ -27,3 +27,4 @@ from . import current_bar_is_top_and_after_own_retracement
 from . import current_bar_is_highest_and_full
 from . import current_bar_has_histogram_wave
 from . import current_high_is_highest
+from . import no_more_than_2_retracements_until_now
