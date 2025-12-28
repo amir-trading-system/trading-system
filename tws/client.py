@@ -3,6 +3,7 @@ import queue
 
 import pandas as pd
 import talib
+from talib import MA_Type
 
 from ibapi import client, wrapper, common, tag_value
 from . import objects
@@ -173,11 +174,11 @@ class Client(client.EClient, wrapper.EWrapper):
         [macd, signal_line, histogram] = talib.MACDEXT(
             real=bar_data_df["close"],
             fastperiod=12,
-            fastmatype=1,
+            fastmatype=MA_Type.EMA,
             slowperiod=26,
-            slowmatype=1,
+            slowmatype=MA_Type.EMA,
             signalperiod=9,
-            signalmatype=1,
+            signalmatype=MA_Type.EMA,
         )
         bar_data_df["macd"] = macd
         bar_data_df["signal_line"] = signal_line
