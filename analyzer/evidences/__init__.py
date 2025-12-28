@@ -21,4 +21,4 @@ from . import current_session_has_at_least_one_negative_bar
 from . import current_bar_is_strong_with_high_volume
 from . import histogram_changed_direction
 from . import all_bars_are_positive_with_own_retracement
-from . import has_big_retracement_between_top_to_start
+from . import does_not_have_big_retracement_between_top_to_start
