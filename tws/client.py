@@ -170,8 +170,14 @@ class Client(client.EClient, wrapper.EWrapper):
             real=bar_data_df["volume"],
             timeperiod=20,
         )
-        [macd, signal_line, histogram] = talib.MACD(
+        [macd, signal_line, histogram] = talib.MACDEXT(
             real=bar_data_df["close"],
+            fastperiod=12,
+            fastmatype=1,
+            slowperiod=26,
+            slowmatype=1,
+            signalperiod=9,
+            signalmatype=1,
         )
         bar_data_df["macd"] = macd
         bar_data_df["signal_line"] = signal_line

@@ -15,7 +15,7 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
-        relevant_bars = stock.bars[1:milestones.starting_bar.index]
+        relevant_bars = stock.bars[1:milestones.starting_bar.index+1]
         if len(relevant_bars) == 0:
             return objects.EvidenceResponse(
                 result=False,

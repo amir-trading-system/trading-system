@@ -5,7 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "main",
+            "name": "manual main",
+            "args": [
+                "--manual=true"
+            ],
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "main.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "prod main",
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,

@@ -85,7 +85,7 @@ class Analyzer:
         milestons: objects.Milestones,
     ) -> None:
         success_indicators_names: list[str] = []
-        stock.bars = stock.bars[1:milestons.starting_bar.index]
+        stock.bars = stock.bars[:milestons.starting_bar.index+1]
 
         for indicator in analyzer.indicators.__indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator()

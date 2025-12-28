@@ -19,7 +19,7 @@ class Evidence(
         negative_volume_goes_down = True
         has_fake_top_since_top_index = False
 
-        relevant_bars = stock.bars[1:milestones.top_bar.index-1]
+        relevant_bars = stock.bars[1:milestones.top_bar.index]
         if len(relevant_bars) == 0:
             return objects.EvidenceResponse(
                 result=False,

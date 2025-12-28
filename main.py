@@ -1,3 +1,4 @@
+from  argparse import ArgumentParser
 import datetime
 import threading
 import time
@@ -61,13 +62,22 @@ if __name__ == "__main__":
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
     )
 
+    argument_parser = ArgumentParser()
+    argument_parser.add_argument(
+        "--manual",
+        type=bool,
+        default=False,
+    )
+
+    args = argument_parser.parse_args()
+
     threading.Thread(
         target=collector_obj.tws_client.run
     ).start()
     time.sleep(1)
 
     run_bot(
-        is_manual=True,
+        is_manual=args.manual,
         c_obj=collector_obj,
         a_obj=analyzer_obj,
     )
