@@ -24,3 +24,4 @@ from . import all_bars_are_positive_with_own_retracement
 from . import does_not_have_big_retracement_between_top_to_start
 from . import current_bar_crossed_finally_highest_high
 from . import current_bar_is_top_and_after_own_retracement
+from . import current_bar_is_highest_and_full
