@@ -27,9 +27,10 @@ class Evidence(
             )
 
         for bar_object in relevant_bars:
-            if not stock.has_previous_bar(
+            previous_bar = stock.previous_bar(
                 bar_object=bar_object,
-            ):
+            )
+            if not previous_bar:
                 continue
 
             previous_bar = stock.bars[bar_object.index+1]
@@ -45,11 +46,11 @@ class Evidence(
                 negative_volume_goes_down = False
                 break
 
-            next_bar_index = bar_object.index-1
-            if next_bar_index <= 0:
-                break
-
-            next_bar = stock.bars[next_bar_index]
+            next_bar = stock.next_bar(
+                bar_object=bar_object,
+            )
+            if not next_bar:
+                continue
             if (
                 True
                 and bar_object.high > previous_bar.high
@@ -59,7 +60,7 @@ class Evidence(
             ):
                 has_fake_top_since_top_index = any(
                     b_object
-                    for b_object in stock.bars[current_bar.index:next_bar_index]
+                    for b_object in stock.bars[current_bar.index:next_bar.index]
                     if b_object.histogram < stock.bars[b_object.index+1].histogram
                     and b_object.index+1 < bar_object.index
                 )

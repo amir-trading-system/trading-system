@@ -28,3 +28,9 @@ from . import current_bar_is_highest_and_full
 from . import current_bar_has_histogram_wave
 from . import current_high_is_highest
 from . import no_more_than_2_retracements_until_now
+from . import has_three_positive_two_negative_pattern
+from . import histogram_is_positive_until_now
+from . import histogram_top_appears_less_than_twice
+from . import histogram_mostly_positive
+from . import milestones_are_valid
+from . import most_of_current_bar_is_above_9_ema

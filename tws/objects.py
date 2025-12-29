@@ -52,14 +52,22 @@ class Stock:
         self.bars = bars
         self.timeframe = timeframe
 
-    def has_previous_bar(
+    def previous_bar(
         self,
         bar_object: BarData,
-    ) -> bool:
-        return bar_object.index + 1 < len(self.bars)
+    ) -> BarData:
+        previous_bar_index = bar_object.index + 1
+        if previous_bar_index < len(self.bars):
+            return self.bars[previous_bar_index]
 
-    def has_next_bar(
+        return None
+
+    def next_bar(
         self,
         bar_object: BarData,
-    ) -> bool:
-        return bar_object.index - 1 > 0
+    ) -> BarData:
+        next_bar_index = bar_object.index - 1
+        if next_bar_index > 0:
+            return self.bars[next_bar_index]
+
+        return None

@@ -25,18 +25,14 @@ class Evidence(
         retracements = 0
         retracements_indexes: list[int] = []
         for bar_object in relevant_bars:
-            has_previous_bar = stock.has_previous_bar(
+            previous_bar = stock.previous_bar(
                 bar_object=bar_object,
             )
-            has_next_bar = stock.has_next_bar(
+            next_bar = stock.next_bar(
                 bar_object=bar_object,
             )
-
-            if not has_previous_bar or not has_next_bar:
+            if not previous_bar or not next_bar:
                 continue
-
-            next_bar = stock.bars[bar_object.index-1]
-            previous_bar = stock.bars[bar_object.index+1]
 
             if (
                 True

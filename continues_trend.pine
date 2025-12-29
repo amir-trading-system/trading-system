@@ -214,8 +214,8 @@ _most_of_current_body_is_above_9_ema(index, for_halt_purpose) =>
 
     result
 
-_current_volume_is_strong_with_high_volume(index, top_index) =>
-    current_volume_is_strong_with_high_volume = true
+_current_bar_is_strong_with_high_volume(index, top_index) =>
+    current_bar_is_strong_with_high_volume = true
      and close[index] > open[index]
      and (close[index] - open[index])/(high[index] - low[index]) >= 0.5
 
@@ -225,10 +225,10 @@ _current_volume_is_strong_with_high_volume(index, top_index) =>
 
         if volume[index]/volume[i] < 0.8
          and volume[index] < 500000
-            current_volume_is_strong_with_high_volume := false
+            current_bar_is_strong_with_high_volume := false
             break
 
-    current_volume_is_strong_with_high_volume
+    current_bar_is_strong_with_high_volume
 
 _most_of_bars_are_volatile(starting_index, index) =>
     volatile_bars = 0
@@ -959,6 +959,7 @@ _current_bar_closes_above_high_top_if_crossed_high_top(index, top_index) =>
     current_bar_closes_above_high_top_if_crossed_high_top = true
     if high[index] > high[top_index]
      and close[index] < high[top_index]
+     and close[index]/high[top_index] < 0.95
         current_bar_closes_above_high_top_if_crossed_high_top := false
 
     current_bar_closes_above_high_top_if_crossed_high_top
@@ -990,10 +991,34 @@ _top_index_is_not_the_lowest(index, top_index) =>
             continue
 
         if low[i] < low[top_index]
+         or close[i] > open[i]
             top_index_is_not_the_lowest := true
             break
 
     top_index_is_not_the_lowest
+
+_at_least_one_bar_touched_ema_9_since_start(index, starting_index) =>
+    at_least_one_bar_touched_ema_9_since_start = false
+    for i = index to starting_index-1
+        if i < 0
+            continue
+
+        if true
+         and low[i] < open[i]
+         and low[i] < ema_9[i]
+         and open[i] > ema_9[i]
+            at_least_one_bar_touched_ema_9_since_start := true
+            break
+
+        if true
+         and low[i] < open[i]
+         and low[i] >= ema_9[i]
+         and open[i] > ema_9[i]
+         and low[i] - ema_9[i] < 0.10
+            at_least_one_bar_touched_ema_9_since_start := true
+            break
+
+    at_least_one_bar_touched_ema_9_since_start
 
 ///////////// Indications /////////////
 base_case_check(index, check_for_retracement_before) =>
@@ -1056,6 +1081,9 @@ base_case_check(index, check_for_retracement_before) =>
     top_index_is_not_the_lowest = _top_index_is_not_the_lowest(index, top_index)
     if top_index_is_not_the_lowest
         true_indications += 1
+    at_least_one_bar_touched_ema_9_since_start = _at_least_one_bar_touched_ema_9_since_start(index, starting_index)
+    if at_least_one_bar_touched_ema_9_since_start
+        true_indications += 1
 
     base_indication = true
      and not bar_with_most_volume_is_with_big_rejection_inside_range_of_current_body
@@ -1074,14 +1102,15 @@ base_case_check(index, check_for_retracement_before) =>
      and most_volatile_bar_from_top_is_not_weak
      and movement_is_after_market_start
      and top_index_is_not_the_lowest
+     and at_least_one_bar_touched_ema_9_since_start
 
     is_base_indication_full = true
     total_indications = 0
     if check_for_retracement_before
-        total_indications := 17
+        total_indications := 18
         base_indication := base_indication and has_retracement_from_top_index
     else
-        total_indications := 16
+        total_indications := 17
 
     if not base_indication and total_indications - true_indications == 1
         is_base_indication_full := false
@@ -1109,6 +1138,7 @@ base_case_check(index, check_for_retracement_before) =>
      or not movement_is_after_market_start
      or not made_more_than_usual_percentage_already
      or not top_index_is_not_the_lowest
+     or not at_least_one_bar_touched_ema_9_since_start
         base_indication := false
 
     [base_indication, starting_index, top_index, top_index_if_no_started_index, lowest_point_from_top_point_index, highest_high, is_base_indication_full]
@@ -1141,7 +1171,7 @@ cases(index) =>
     [base_indication, starting_index, top_index, top_index_if_no_started_index, lowest_point_from_top_point_index, highest_high, is_base_indication_full] = base_case_check(index, check_for_retracement_before)
     all_bars_are_positive_with_own_retracement = _all_bars_are_positive_with_own_retracement(index, starting_index)
     big_retracement_between_top_to_start = _big_retracement_between_top_to_start(starting_index, top_index)
-    current_volume_is_strong_with_high_volume = _current_volume_is_strong_with_high_volume(index, top_index)
+    current_bar_is_strong_with_high_volume = _current_bar_is_strong_with_high_volume(index, top_index)
     [current_bar_crossed_finally_highest_high, attempts_indexes] = _current_bar_crossed_finally_highest_high(index, top_index, starting_index)
     current_bar_is_top_and_after_own_retracement = _current_bar_is_top_and_after_own_retracement(index, top_index)
     current_bar_is_highest_and_full = _current_bar_is_highest_and_full(index, starting_index)
@@ -1149,6 +1179,7 @@ cases(index) =>
     current_high_is_highest = _current_high_is_highest(index, starting_index)
     current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
     [no_more_than_2_retracements_until_now, retracement_indexes] = _no_more_than_2_retracements_until_now(index, starting_index, top_index)
+    // right now not applicable in python.
     first_retracement_came_too_late = _first_retracement_came_too_late(starting_index, top_index, retracement_indexes)
     has_three_positive_two_negative_pattern = _has_three_positive_two_negative_pattern(index, starting_index)
     histogram_changed_direction = _histogram_changed_direction(index)
@@ -1156,6 +1187,7 @@ cases(index) =>
     histogram_mostly_positive_except_small_retracement = _histogram_mostly_positive_except_small_retracement(index, starting_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, false)
+    // python convertion has been made until here.
     [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
     most_session_is_before_top_index = _most_session_is_before_top_index(starting_index, top_index)
@@ -1179,7 +1211,7 @@ cases(index) =>
      base_indication,
      array.from(
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
@@ -1204,7 +1236,7 @@ cases(index) =>
      base_indication,
      array.from(
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
@@ -1401,7 +1433,7 @@ cases(index) =>
      array.from(
        current_bar_crossed_finally_highest_high,
        current_session_has_at_least_one_red_bar,
-       current_volume_is_strong_with_high_volume,
+       current_bar_is_strong_with_high_volume,
        histogram_changed_direction,
        histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
        histogram_top_appears_less_than_twice,
@@ -1468,7 +1500,7 @@ cases(index) =>
      base_indication,
      array.from(
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
@@ -1515,7 +1547,7 @@ cases(index) =>
      array.from(
       current_bar_is_highest_and_full,
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
@@ -1563,7 +1595,7 @@ cases(index) =>
      base_indication,
      array.from(
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
@@ -1588,7 +1620,7 @@ cases(index) =>
      array.from(
       current_bar_has_histogram_wave,
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
       most_of_current_body_is_above_9_ema,
@@ -1610,7 +1642,7 @@ cases(index) =>
       current_bar_is_highest_and_full,
       current_high_is_highest,
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       most_of_bars_are_volatile,
@@ -1631,7 +1663,7 @@ cases(index) =>
       current_bar_is_highest_and_full,
       current_high_is_highest,
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_mostly_positive_except_small_retracement,
       milestones_are_valid,
       most_of_current_body_is_above_9_ema,
@@ -1652,7 +1684,7 @@ cases(index) =>
       current_bar_is_highest_and_full,
       current_high_is_highest,
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       (histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement),
       histogram_top_appears_less_than_twice,
@@ -1676,7 +1708,7 @@ cases(index) =>
       current_bar_is_highest_and_full,
       current_high_is_highest,
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
       milestones_are_valid,
@@ -1699,7 +1731,7 @@ cases(index) =>
       current_bar_crossed_finally_highest_high,
       current_bar_is_highest_and_full,
       current_session_has_at_least_one_red_bar,
-      current_volume_is_strong_with_high_volume,
+      current_bar_is_strong_with_high_volume,
       histogram_changed_direction,
       histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
       histogram_top_appears_less_than_twice,
@@ -1747,7 +1779,7 @@ cases(index) =>
         current_bar_is_highest_and_full,
         current_high_is_highest,
         current_session_has_at_least_one_red_bar,
-        current_volume_is_strong_with_high_volume,
+        current_bar_is_strong_with_high_volume,
         histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
         histogram_top_appears_less_than_twice,
         milestones_are_valid,
@@ -1769,7 +1801,7 @@ cases(index) =>
      array.from(
         current_high_is_highest,
         current_session_has_at_least_one_red_bar,
-        current_volume_is_strong_with_high_volume,
+        current_bar_is_strong_with_high_volume,
         histogram_changed_direction,
         histogram_is_positive_until_now or histogram_mostly_positive_except_small_retracement,
         milestones_are_valid,
@@ -1793,7 +1825,7 @@ cases(index) =>
         current_bar_is_the_first_one_to_cross_top,
         current_high_is_highest,
         current_session_has_at_least_one_red_bar,
-        current_volume_is_strong_with_high_volume,
+        current_bar_is_strong_with_high_volume,
         milestones_are_valid,
         most_of_current_body_is_above_9_ema,
         move_is_still_strong_due_to_fibonacci_retracement,
@@ -1831,7 +1863,7 @@ cases(index) =>
 // current_bar_is_top_and_after_own_retracement
 // current_high_is_highest
 // current_session_has_at_least_one_red_bar
-// current_volume_is_strong_with_high_volume
+// current_bar_is_strong_with_high_volume
 // first_retracement_came_too_late
 // has_classic_bars_wave
 // histogram_changed_direction

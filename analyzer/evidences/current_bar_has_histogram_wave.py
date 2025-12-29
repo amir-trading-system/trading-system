@@ -26,12 +26,12 @@ class Evidence(
         downtrend_histogram_count = 0
 
         for bar_object in relevant_bars:
-            if not stock.has_previous_bar(
+            previous_bar = stock.previous_bar(
                 bar_object=bar_object,
-            ):
+            )
+            if not previous_bar:
                 continue
 
-            previous_bar = stock.bars[bar_object.index+1]
             histogram_distance = abs(bar_object.histogram - previous_bar.histogram)
             if (
                 True

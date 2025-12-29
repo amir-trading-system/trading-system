@@ -26,13 +26,15 @@ class Evidence(
         no_indecision_histogram_from_top = True
 
         for bar_object in relevant_bars:
-            if not stock.has_previous_bar(
+            previous_bar = stock.previous_bar(
                 bar_object=bar_object,
-            ):
+            )
+            next_bar = stock.next_bar(
+                bar_object=bar_object,
+            )
+            if not previous_bar or not next_bar:
                 continue
 
-            previous_bar = stock.bars[bar_object.index+1]
-            next_bar = stock.bars[bar_object.index-1]
             if (
                 True
                 and bar_object.histogram > previous_bar.histogram

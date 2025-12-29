@@ -25,9 +25,9 @@ class Evidence(
         has_at_least_one_retracement_bar = any(
             bar_object
             for bar_object in relevant_bars
-            if stock.has_previous_bar(
+            if stock.previous_bar(
                 bar_object=bar_object,
-            )
+            ) is not None
             and bar_object.low < stock.bars[bar_object.index+1].low
         )
 
@@ -37,9 +37,9 @@ class Evidence(
                 bar_object
                 for bar_object in relevant_bars
                 if bar_object.index > current_bar.index
-                and stock.has_previous_bar(
+                and stock.previous_bar(
                     bar_object=bar_object,
-                )
+                ) is not None
                 and (
                     bar_object.high < stock.bars[bar_object.index+1].high
                     or abs(bar_object.close - bar_object.open_value) < abs(stock.bars[bar_object.index+1].close - stock.bars[bar_object.index+1].open_value)
