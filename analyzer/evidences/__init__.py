@@ -41,3 +41,5 @@ from . import most_of_the_session_is_before_top_index
 from . import negative_bars_are_weak
 from . import negative_bars_volume_is_going_down
 from . import no_bars_closed_under_vwap
+from . import retracement_is_strong_but_graph_still_looks_good
+from . import first_retracement_is_not_too_late

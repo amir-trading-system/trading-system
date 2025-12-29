@@ -44,6 +44,8 @@ class EvidenceResponse:
         self,
         result: bool,
         reason: str = None,
+        value: any = None,
     ):
         self.result = result
         self.reason = reason
+        self.value = value

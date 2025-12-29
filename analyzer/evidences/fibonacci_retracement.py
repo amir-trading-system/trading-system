@@ -38,4 +38,5 @@ class Evidence(
             reason=""
             if move_is_still_strong_due_to_fibonacci_retracement
             else f"Retracement is: {retracement}, too high and risky",
+            value=retracement,
         )

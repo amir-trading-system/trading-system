@@ -136,4 +136,5 @@ class Evidence(
             reason=""
             if no_more_than_2_retracements_until_now
             else "More than 2 retracements or no retracements at all",
+            value=retracements_indexes,
         )
