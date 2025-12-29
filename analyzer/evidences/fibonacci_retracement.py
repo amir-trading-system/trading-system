@@ -22,6 +22,17 @@ class Evidence(
 
         move_is_still_strong_due_to_fibonacci_retracement = 0.27 <= retracement <= 0.62
 
+        if (
+            True
+            and not move_is_still_strong_due_to_fibonacci_retracement
+            and milestones.top_bar.index - 1 > 0
+        ):
+            move_is_still_strong_due_to_fibonacci_retracement = (
+                True
+                and current_bar.close > stock.bars[milestones.top_bar.index-1].high
+                and 0.22 <= retracement <= 0.8
+            )
+
         return objects.EvidenceResponse(
             result=move_is_still_strong_due_to_fibonacci_retracement,
             reason=""

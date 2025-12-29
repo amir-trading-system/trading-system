@@ -35,3 +35,7 @@ from . import histogram_mostly_positive
 from . import milestones_are_valid
 from . import most_of_current_bar_is_above_9_ema
 from . import most_of_volume_does_not_stuck_between_top_index_to_current
+from . import most_of_bars_are_volatile
+from . import most_of_the_session_is_after_top_index
+from . import most_of_the_session_is_before_top_index
+from . import negative_bars_are_weak
