@@ -34,3 +34,4 @@ from . import histogram_top_appears_less_than_twice
 from . import histogram_mostly_positive
 from . import milestones_are_valid
 from . import most_of_current_bar_is_above_9_ema
+from . import most_of_volume_does_not_stuck_between_top_index_to_current
