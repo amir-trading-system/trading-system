@@ -39,3 +39,5 @@ from . import most_of_bars_are_volatile
 from . import most_of_the_session_is_after_top_index
 from . import most_of_the_session_is_before_top_index
 from . import negative_bars_are_weak
+from . import negative_bars_volume_is_going_down
+from . import no_bars_closed_under_vwap
