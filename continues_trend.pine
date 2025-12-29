@@ -625,6 +625,9 @@ _current_bar_is_highest_and_full(index, starting_index) =>
 _most_session_is_before_top_index(starting_index, top_index) =>
     top_index/starting_index <= 0.7
 
+_most_session_is_after_top_index(starting_index, top_index) =>
+    top_index/starting_index > 0.7
+
 _retracement_is_strong_but_graph_still_good(index, fibonacci_retracement, starting_index) =>
     positive_histogram = 0
     negative_histogram = 0
@@ -1179,7 +1182,6 @@ cases(index) =>
     current_high_is_highest = _current_high_is_highest(index, starting_index)
     current_session_has_at_least_one_red_bar = _current_session_has_at_least_one_red_bar(index, starting_index)
     [no_more_than_2_retracements_until_now, retracement_indexes] = _no_more_than_2_retracements_until_now(index, starting_index, top_index)
-    // right now not applicable in python.
     first_retracement_came_too_late = _first_retracement_came_too_late(starting_index, top_index, retracement_indexes)
     has_three_positive_two_negative_pattern = _has_three_positive_two_negative_pattern(index, starting_index)
     histogram_changed_direction = _histogram_changed_direction(index)
@@ -1187,15 +1189,16 @@ cases(index) =>
     histogram_mostly_positive_except_small_retracement = _histogram_mostly_positive_except_small_retracement(index, starting_index)
     milestones_are_valid = _milestones_are_valid(index, starting_index, top_index)
     most_of_current_body_is_above_9_ema = _most_of_current_body_is_above_9_ema(index, false)
-    // python convertion has been made until here.
     [most_of_volume_are_stuck_between_top_index_to_current, volume_percentage_from_top, bars_percentage_from_top] = _most_of_volume_are_stuck_between_top_index_to_current(index, top_index, starting_index)
     most_of_bars_are_volatile = _most_of_bars_are_volatile(starting_index, index)
     most_session_is_before_top_index = _most_session_is_before_top_index(starting_index, top_index)
+    most_session_is_after_top_index = _most_session_is_after_top_index(starting_index, top_index)
     [move_is_still_strong_due_to_fibonacci_retracement, fibonacci_retracement] = _move_is_still_strong_due_to_fibonacci_retracement(index, starting_index, top_index, lowest_point_from_top_point_index)
     negative_bars_are_weak = _negative_bars_are_weak(top_index, index)
     negative_bars_volume_is_going_down = _negative_bars_volume_is_going_down(starting_index, index)
     no_bars_closed_under_vwap = _no_bars_closed_under_vwap(index, top_index)
     retracement_is_strong_but_graph_still_good = _retracement_is_strong_but_graph_still_good(index, fibonacci_retracement, starting_index)
+    // python convertion has been made until here.
     retracement_should_be_long_enough = _retracement_should_be_long_enough(index, top_index)
     starting_index_is_not_the_biggest_bar_in_term_of_price = _starting_index_is_not_the_biggest_bar_in_term_of_price(index, starting_index)
     starting_index_is_not_the_biggest_bar_in_term_of_volume = _starting_index_is_not_the_biggest_bar_in_term_of_volume(index, starting_index)
@@ -1625,7 +1628,7 @@ cases(index) =>
       histogram_top_appears_less_than_twice,
       most_of_current_body_is_above_9_ema,
       negative_bars_volume_is_going_down,
-      not most_session_is_before_top_index,
+      most_session_is_after_top_index,
       not too_many_tops_with_rejections_in_range_of_current_bar,
       retracement_should_be_long_enough,
       starting_index_is_not_the_biggest_bar_in_term_of_volume,
@@ -1875,6 +1878,7 @@ cases(index) =>
 // most_of_current_body_is_above_9_ema
 // most_of_volume_are_stuck_between_top_index_to_current
 // most_session_is_before_top_index
+// most_session_is_after_top_index
 // move_is_still_strong_due_to_fibonacci_retracement
 // negative_bars_are_weak
 // negative_bars_volume_is_going_down
