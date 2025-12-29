@@ -39,7 +39,7 @@ class Evidence(
                 True
                 and bar_object.histogram > previous_bar.histogram
                 and bar_object.histogram > next_bar.histogram
-                and stock.bars[previous_bar.index+1] > previous_bar.histogram
+                and stock.bars[previous_bar.index+1].histogram > previous_bar.histogram
             ):
                 indecision_histogram_bar_index = bar_object.index
                 no_indecision_histogram_from_top = False

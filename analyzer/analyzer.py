@@ -22,6 +22,7 @@ class Analyzer:
         stock: tws_objects.Stock,
         current_bar: tws_objects.BarData,
     ) -> objects.Milestones:
+        are_valid = False
         starting_bar: objects.MilestoneBar = self.helper.get_strating_bar(
             stock=stock,
             current_bar=current_bar,
@@ -36,7 +37,18 @@ class Analyzer:
             stock=stock,
             top_bar=top_bar,
         )
-        previous_bar = stock.bars[current_bar.index+1]
+        previous_bar = stock.previous_bar(
+            bar_object=current_bar,
+        )
+        if not previous_bar:
+            return objects.Milestones(
+                starting_bar=starting_bar,
+                top_bar=top_bar,
+                lowest_low_bar=lowest_low_bar,
+                previous_bar=previous_bar,
+                are_valid=are_valid,
+            )
+
         previous_bar = objects.MilestoneBar(
             index=previous_bar.index,
             bar_object=previous_bar,
@@ -51,8 +63,6 @@ class Analyzer:
             and current_bar.high > current_bar.ema_9
             and current_bar.high > current_bar.vwap
         )
-
-        are_valid = False
 
         if (
             current_bar_is_valid

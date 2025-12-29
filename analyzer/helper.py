@@ -33,7 +33,10 @@ class AnalyzerHelper:
             ):
                 continue
 
-            previous_bar = stock.bars[i+1]
+            previous_bar = stock.previous_bar(
+                bar_object=potential_starting_bar,
+            )
+
             # pylint: disable=too-many-boolean-expressions
             is_really_potential_starting_bar = (
                 potential_starting_bar.close > potential_starting_bar.open_value

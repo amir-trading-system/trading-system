@@ -77,6 +77,8 @@ Stocks Indications:
  - ARBKL: 2025-12-12 - halted.
  - AMCI: 2025-12-15 - halted.
  - RILY: 2025-12-16 - 26.
+ - ASPC: 2025-12-26 - 16,25.
+ - GVH: 2025-12-29 - 14,18,20,25.
 
 Need to identify:
 
@@ -84,4 +86,7 @@ Need to Fix - False positives:
 
 To do list:
  - Pinescript:
-   - FJET - False positives both on 5 && 15 minute charts - relates to top similar to low - cant be.
+   - Create blacklist for stock who made hard down move - can be for many reasons:
+     - top bar has vanished be itself or by one after with a lot of volume (minimum 100000).
+   - Make sure current bar has more than 100000 volume.
+   - ORBS - Do not recommend on stock with more than 100,000,000 shares or huge market cap.
