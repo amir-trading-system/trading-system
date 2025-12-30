@@ -96,6 +96,7 @@ class AnalyzerHelper:
                     )
                     previous_bar_body_identical_to_starting_bar = (
                         previous_bar.volume/potential_starting_bar.volume >= 0.6
+                        and potential_starting_bar.high - potential_starting_bar.low > 0
                         and (previous_bar.high - previous_bar.low)/(potential_starting_bar.high - potential_starting_bar.low) > 0.9
                     )
 

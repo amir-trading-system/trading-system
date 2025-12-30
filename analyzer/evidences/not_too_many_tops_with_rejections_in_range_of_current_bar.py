@@ -31,6 +31,7 @@ class Evidence(
                 and bar_object.high > current_bar.open_value
                 and bar_object.high < current_bar.high
                 and bar_object.close < bar_object.open_value
+                and bar_object.high - bar_object.low > 0
                 and (bar_object.high - bar_object.open_value)/(bar_object.high - bar_object.low) >= 0.25
             ):
                 rejections_count += 1
@@ -42,6 +43,7 @@ class Evidence(
                 and bar_object.high < current_bar.high
                 and bar_object.close < bar_object.high
                 and bar_object.volume > bar_object.volume_average
+                and bar_object.high - bar_object.low > 0
                 and (
                         (
                             (bar_object.high - bar_object.close)/(bar_object.high - bar_object.low) >= 0.25

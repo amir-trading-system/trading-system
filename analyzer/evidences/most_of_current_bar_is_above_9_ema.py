@@ -19,7 +19,10 @@ class Evidence(
             True
             and (
                 current_bar.index > current_bar.ema_9
-                or (current_bar.ema_9 - current_bar.open_value)/(current_bar.high - current_bar.open_value) <= 0.2
+                or (
+                    current_bar.high - current_bar.open_value > 0
+                    and (current_bar.ema_9 - current_bar.open_value)/(current_bar.high - current_bar.open_value) <= 0.2
+                )
             )
         )
 

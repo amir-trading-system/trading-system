@@ -29,6 +29,7 @@ class Evidence(
         )
         current_bar_is_full = (
             True
+            and current_bar.high - current_bar.low > 0
             and (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low) >= 0.7
             and current_bar.low/current_bar.open_value >= 0.95
         )

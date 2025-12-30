@@ -33,6 +33,7 @@ class Evidence(
             and most_volatile_bar.volume > current_bar.volume
             and most_volatile_bar.high < current_bar.high
             and most_volatile_bar.high > current_bar.open_value
+            and most_volatile_bar.high - most_volatile_bar.open_value > 0
             and (most_volatile_bar.high - most_volatile_bar.close)/(most_volatile_bar.high - most_volatile_bar.open_value) > 0.5
             and milestones.starting_bar.index - most_volatile_bar.index > most_volatile_bar.index
         )

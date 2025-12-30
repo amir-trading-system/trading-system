@@ -30,7 +30,11 @@ class Evidence(
         )
 
         previous_bar = milestones.previous_bar.bar_object
-        previous_bar_is_positive_with_own_retracement = (previous_bar.open_value - previous_bar.low)/(previous_bar.high - previous_bar.low) > 0.5
+        previous_bar_is_positive_with_own_retracement = (
+            True
+            and previous_bar.high - previous_bar.low > 0
+            and (previous_bar.open_value - previous_bar.low)/(previous_bar.high - previous_bar.low) > 0.5
+        )
         current_bar_volume_is_higher_than_before = current_bar.volume > previous_bar.volume
         ema_9_close_to_low = current_bar.ema_9/current_bar.low >= 0.99
 

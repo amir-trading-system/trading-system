@@ -15,7 +15,11 @@ class Evidence(
         milestones: objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
-        current_bar_is_full = (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low) >= 0.4
+        current_bar_is_full = (
+            True
+            and current_bar.high - current_bar.low > 0
+            and (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low) >= 0.4
+        )
 
         return objects.EvidenceResponse(
             result=current_bar_is_full,

@@ -18,6 +18,7 @@ class Evidence(
         current_bar_is_highest = current_bar.high >= milestones.top_bar.bar_object.high
         current_bar_after_own_retracement = (
             True
+            and current_bar.high - current_bar.low > 0
             and (current_bar.open_value - current_bar.low)/(current_bar.high - current_bar.low) >= 0.18
             and (current_bar.high - current_bar.close)/(current_bar.high - current_bar.low) <= 0.2
             and current_bar.close - current_bar.open_value > current_bar.high - current_bar.close

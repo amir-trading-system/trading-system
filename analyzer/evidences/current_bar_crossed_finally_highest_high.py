@@ -34,6 +34,7 @@ class Evidence(
                     bar_object.index
                     for bar_object in relevant_bars
                     if bar_object.high/milestones.top_bar.bar_object.high >= 0.96
+                    and bar_object.high - bar_object.low > 0
                     and (bar_object.close - bar_object.low)/(bar_object.high - bar_object.low) <= 0.7
                 ]
             )

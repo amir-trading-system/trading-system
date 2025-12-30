@@ -31,6 +31,11 @@ class Evidence(
         )
 
         retracement_indexes: list[int] = evidence.value
+        if len(retracement_indexes) == 0:
+            return objects.EvidenceResponse(
+                result=False,
+                reason="no retracement indexes",
+            )
 
         first_retracement_index = max(retracement_indexes)
         retracement_attempts = len(
@@ -39,6 +44,7 @@ class Evidence(
                 for bar_object in relevant_bars
                 if (
                     True
+                    and bar_object.high - bar_object.low > 0
                     and (bar_object.open_value - bar_object.low)/(bar_object.high - bar_object.low) >= 0.25
                     and bar_object.volume > bar_object.volume_average
                     and bar_object.open_value - bar_object.low > bar_object.high - bar_object.close

@@ -18,7 +18,9 @@ class Evidence(
         lowest_low_after = milestones.lowest_low_bar.bar_object.low
         starting_open = milestones.starting_bar.bar_object.open_value
 
-        retracement = (top_high - lowest_low_after)/(top_high - starting_open)
+        retracement = 0
+        if top_high - starting_open > 0:
+            retracement = (top_high - lowest_low_after)/(top_high - starting_open)
 
         move_is_still_strong_due_to_fibonacci_retracement = 0.27 <= retracement <= 0.62
 

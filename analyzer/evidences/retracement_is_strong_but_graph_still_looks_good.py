@@ -54,6 +54,7 @@ class Evidence(
         previous_bar = milestones.previous_bar.bar_object
         price_jumps_on_current_bar = (
             True
+            and current_bar.high - current_bar.low > 0
             and (previous_bar.high - previous_bar.low)/(current_bar.high - current_bar.low) < 0.5
             and current_bar.close > current_bar.open_value
             and previous_bar.low/current_bar.low >= 0.9

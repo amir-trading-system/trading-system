@@ -32,6 +32,7 @@ class Evidence(
             and most_volatile_bar.close > most_volatile_bar.open_value
             or (
                 True
+                and most_volatile_bar.high - most_volatile_bar.low > 0
                 and most_volatile_bar.close < most_volatile_bar.open_value
                 and most_volatile_bar.low < most_volatile_bar.close
                 and most_volatile_bar.high > most_volatile_bar.open_value
@@ -43,6 +44,7 @@ class Evidence(
             True
             and not most_volatile_bar_from_top_is_strong
             and most_volatile_bar.close < most_volatile_bar.open_value
+            and milestones.top_bar.bar_object.high - milestones.top_bar.bar_object.low > 0
             and (most_volatile_bar.high - most_volatile_bar.low)/(milestones.top_bar.bar_object.high - milestones.top_bar.bar_object.low) < 0.7
         ):
             most_volatile_bar_from_top_is_strong = True

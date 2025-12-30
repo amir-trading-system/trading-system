@@ -76,6 +76,7 @@ class Evidence(
                 True
                 and bar_object.high < previous_bar.high
                 and bar_object.high < next_bar.high
+                and bar_object.high - bar_object.low > 0
                 and (bar_object.close - bar_object.low)/(bar_object.high - bar_object.low) > 0.5
                 and (bar_object.open_value - bar_object.low)/(bar_object.high - bar_object.low) > 0.5
                 and bar_object.low < previous_bar.low
@@ -93,6 +94,7 @@ class Evidence(
                 and bar_object.low < next_bar.low
                 and bar_object.low - bar_object.ema_9 < previous_bar.low - previous_bar.ema_9
                 and bar_object.low - bar_object.ema_9 < next_bar.low - next_bar.ema_9
+                and bar_object.high - bar_object.low > 0
                 and (bar_object.close - bar_object.low)/(bar_object.high - bar_object.low) > 0.5
                 and (bar_object.open_value - bar_object.low)/(bar_object.high - bar_object.low) > 0.5
                 and bar_object.volume < previous_bar.volume

@@ -18,6 +18,7 @@ class Evidence(
         current_bar_has_buyers = (
             True
             and current_bar.close > current_bar.open_value
+            and current_bar.high > current_bar.low > 0
             and (current_bar.close > current_bar.open_value)/(current_bar.high > current_bar.low) >= 0.5
         )
 
@@ -31,7 +32,8 @@ class Evidence(
         any_bar_is_stronger = any(
             bar_object
             for bar_object in relevant_bars
-            if current_bar.volume/bar_object.volume < 0.8
+            if bar_object.volume > 0
+            and current_bar.volume/bar_object.volume < 0.8
             and current_bar.volume < 500000
         )
 

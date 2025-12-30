@@ -34,6 +34,7 @@ class Evidence(
         second_bar_is_negative_with_good_retacement = (
             True
             and relevant_bars[1].close < relevant_bars[1].open_value
+            and relevant_bars[1].high - relevant_bars[1].low > 0
             and (relevant_bars[1].close - relevant_bars[1].low)/(relevant_bars[1].high - relevant_bars[1].low) >= 0.5
             and (relevant_bars[1].open - relevant_bars[1].close)/(relevant_bars[1].high - relevant_bars[1].low) <= 0.3
             and relevant_bars[1].volume > relevant_bars[1].volume_average
