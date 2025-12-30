@@ -46,3 +46,8 @@ from . import first_retracement_is_not_too_late
 from . import retracement_should_be_long_enough
 from . import starting_bar_is_not_the_biggest_in_terms_of_price
 from . import starting_bar_is_not_the_biggest_in_terms_of_volume
+from . import not_too_many_tops_with_rejections_in_range_of_current_bar
+from . import volume_sum_is_positive
+from . import has_classic_bars_wave
+from . import has_bull_pattern
+from . import current_bar_is_the_first_one_to_cross_top_bar

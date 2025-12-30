@@ -31,20 +31,15 @@ class Indicator:
 
     def handle_response(
         self,
-        symbol_name: str,
         success_results: list[analyzer.objects.EvidenceResponse],
-        failure_results: list[analyzer.objects.EvidenceResponse],
         printed_results: list[str]
     ) -> objects.IndicatorResponse:
         total = len(self.evidences)
         success_rate = len(success_results)/total
         result = total == len(success_results) or success_rate >= 0.9 or total - len(success_results) == 1
 
-        # if success_rate >= 0.9:
-        #     print(f"SYMBOL: {symbol_name}")
-        #     print("\n".join(printed_results))
-        # if success_rate >= 0.9 and len(failure_results) > 0:
-        #     print(f"success_rate: {success_rate}%.")
+        if success_rate >= 0.9:
+            print("\n".join(printed_results))
 
         return objects.IndicatorResponse(
             success_count=len(success_results),
@@ -58,7 +53,6 @@ class Indicator:
         milestones: analyzer.objects.Milestones,
         current_bar: tws_objects.BarData,
     ) -> objects.IndicatorResponse:
-        failure_results: list[analyzer.objects.EvidenceResponse] = []
         success_results: list[analyzer.objects.EvidenceResponse] = []
         printed_results: list[str] = []
 
@@ -78,12 +72,9 @@ class Indicator:
             if result.result:
                 success_results.append(result)
             else:
-                failure_results.append(result)
                 printed_results.append(f"{self.name} -  Evidence: {evidence_object.name}. Reason: {Fore.RED}{result.reason}.{Style.RESET_ALL}")
 
         return self.handle_response(
-            symbol_name=stock.symbol_name,
             success_results=success_results,
-            failure_results=failure_results,
             printed_results=printed_results,
         )
