@@ -107,12 +107,12 @@ class Analyzer:
         if len(success_indicators_names) > 0:
             ## should send alert over here - phone/whatsapp/telegram.
             print(f"""
-            {Fore.GREEN}Congrats!{Style.RESET_ALL}
-            Timeframe: {stock.timeframe}.
-            Time: {current_bar.bar_time}.
-            Indications:
-            {"\n".join(success_indicators_names)}.
-            Symbol: {stock.symbol_name}.
+{Fore.GREEN}Congrats!{Style.RESET_ALL}
+Timeframe: {stock.timeframe}.
+Time: {current_bar.bar_time}.
+Indications:
+{"\n".join(success_indicators_names)}.
+Symbol: {stock.symbol_name}.
             """)
 
     def analyze_data(

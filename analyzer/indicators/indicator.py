@@ -40,11 +40,11 @@ class Indicator:
         success_rate = len(success_results)/total
         result = total == len(success_results) or success_rate >= 0.9 or total - len(success_results) == 1
 
-        if success_rate >= 0.9:
-            print(f"SYMBOL: {symbol_name}")
-            print("\n".join(printed_results))
-        if success_rate >= 0.9 and len(failure_results) > 0:
-            print(f"success_rate: {success_rate}%.")
+        # if success_rate >= 0.9:
+        #     print(f"SYMBOL: {symbol_name}")
+        #     print("\n".join(printed_results))
+        # if success_rate >= 0.9 and len(failure_results) > 0:
+        #     print(f"success_rate: {success_rate}%.")
 
         return objects.IndicatorResponse(
             success_count=len(success_results),

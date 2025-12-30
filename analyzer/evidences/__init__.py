@@ -44,3 +44,5 @@ from . import no_bars_closed_under_vwap
 from . import retracement_is_strong_but_graph_still_looks_good
 from . import first_retracement_is_not_too_late
 from . import retracement_should_be_long_enough
+from . import starting_bar_is_not_the_biggest_in_terms_of_price
+from . import starting_bar_is_not_the_biggest_in_terms_of_volume
