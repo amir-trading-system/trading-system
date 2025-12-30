@@ -2,6 +2,7 @@ from analyzer import objects
 from tws import objects as tws_objects
 
 from . import _evidence
+from . import histogram_mostly_positive
 
 
 class Evidence(
@@ -27,6 +28,16 @@ class Evidence(
             for bar_object in relevant_bars
             if bar_object.histogram < 0
         )
+        if not histogram_is_positive_until_now:
+            histogram_mostly_positive_object = histogram_mostly_positive.Evidence()
+            histogram_mostly_positive_result = histogram_mostly_positive_object.find_evidence(
+                stock=stock,
+                milestones=milestones,
+                current_bar=current_bar,
+            )
+
+            if histogram_mostly_positive_result.result:
+                return histogram_mostly_positive_result
 
         return objects.EvidenceResponse(
             result=histogram_is_positive_until_now,
