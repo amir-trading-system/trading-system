@@ -10,6 +10,7 @@ class Indicator(
     def __init__(
         self,
     ):
+        super().__init__()
         self.evidences.update(
             {
                 analyzer.evidences.current_session_has_at_least_one_negative_bar.Evidence,

@@ -70,6 +70,21 @@ class AnalyzerHelper:
                     and previous_bar.bar_time.time() < datetime.time(hour=16)):
                         continue
 
+                    market_open_time = datetime.datetime(
+                        year=potential_starting_bar.bar_time.year,
+                        month=potential_starting_bar.bar_time.month,
+                        day=potential_starting_bar.bar_time.day,
+                        hour=9,
+                        minute=30,
+                    )
+
+                    if (
+                        True
+                        and potential_starting_bar.bar_time > market_open_time
+                        and previous_bar.bar_time == market_open_time
+                    ):
+                        continue
+
                     more_volatile_than_starting_bar = (
                         previous_bar.volume > potential_starting_bar.volume
                         and previous_bar.high >= potential_starting_bar.high
@@ -91,6 +106,7 @@ class AnalyzerHelper:
                         and previous_bar.volume > previous_bar.volume_average * 3
                         and previous_bar.volume > stock.bars[j+1].volume * 3
                         and previous_bar.volume > 200000
+                        and previous_bar.volume/potential_starting_bar.volume >= 0.9
                     )
 
                     bar_before_previous_bar = stock.bars[j+1]
@@ -150,6 +166,8 @@ class AnalyzerHelper:
             if stock.bars[i].high > stock.bars[i-1].high
             and stock.bars[i].high > stock.bars[i+1].high
         ]
+        if len(high_picks_bars) == 0:
+            return top_bar
 
         highest_high = max(
             high_picks_bars,
