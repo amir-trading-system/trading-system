@@ -121,7 +121,7 @@ class Analyzer:
                 if indicator_response.success_rate < 1:
                     emoji = "👀"
 
-                indicator_title = str.format(f"success rate:{indicator_response.success_rate}. There was {indicator_response.success_count} success evidences")
+                indicator_title = str.format(f"Indicator Name: {indicator_obj.name}.\nSuccess Rate:{indicator_response.success_rate}.\nThere was {indicator_response.success_count} success evidences.")
                 success_indicators_names.append(indicator_title)
 
         if len(success_indicators_names) > 0:
