@@ -2,7 +2,7 @@ import datetime
 import time
 import queue
 
-from colorama import Fore, Style
+import requests
 
 from analyzer import objects, helper
 import analyzer.indicators
@@ -80,6 +80,25 @@ class Analyzer:
             are_valid=are_valid,
         )
 
+    def alert(
+        self,
+        message: str,
+    ):
+        bot_token = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
+        chat_id = "-5177099672"
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        response = requests.post(
+            url=url,
+            json=payload,
+            timeout=10,
+        )
+        response.raise_for_status()
+
     def run_indicators(
         self,
         stock: tws_objects.Stock,
@@ -88,6 +107,7 @@ class Analyzer:
     ) -> None:
         success_indicators_names: list[str] = []
         stock.bars = stock.bars[:milestons.starting_bar.index+10]
+        emoji = ""
 
         for indicator in analyzer.indicators.__indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator()
@@ -97,23 +117,30 @@ class Analyzer:
                 current_bar=current_bar,
             )
             if indicator_response.result:
-                font_color = Fore.GREEN
+                emoji = "✅ - 💰"
                 if indicator_response.success_rate < 1:
-                    font_color = Fore.YELLOW
+                    emoji = "👀"
 
-                indicator_title = str.format(f"{indicator.name}: {font_color}{indicator_response.success_rate} - {indicator_response.success_count} success evidences{Style.RESET_ALL}")
+                indicator_title = str.format(f"success rate:{indicator_response.success_rate}. There was {indicator_response.success_count} success evidences")
                 success_indicators_names.append(indicator_title)
 
         if len(success_indicators_names) > 0:
-            ## should send alert over here - phone/whatsapp/telegram.
-            print(f"""
-{Fore.GREEN}Congrats!{Style.RESET_ALL}
-Timeframe: {stock.timeframe}.
-Time: {current_bar.bar_time}.
-Indications:
-{"\n".join(success_indicators_names)}.
-Symbol: {stock.symbol_name}.
-            """)
+            message = f"""
+<b>{emoji} Congrats!</b>
+
+<b>Symbol:</b> <u>{stock.symbol_name}</u>
+<b>Timeframe:</b> <code>{stock.timeframe}</code>
+<b>Time:</b> <code>{current_bar.bar_time}</code>
+
+<b>Indications:</b>
+{chr(10).join(f"• <i>{name}</i>" for name in success_indicators_names)}
+
+
+"""
+
+            self.alert(
+                message=message,
+            )
 
     def analyze_data(
         self,

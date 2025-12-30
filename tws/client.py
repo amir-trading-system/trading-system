@@ -274,8 +274,6 @@ class Client(client.EClient, wrapper.EWrapper):
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
         print(f"symbol: {symbol}. request_id: {reqId}. finished to get data.")
 
-        ## Need to call here for analyzer.
-
     def historicalDataUpdate(
         self,
         reqId: int,

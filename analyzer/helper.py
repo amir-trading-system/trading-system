@@ -188,7 +188,6 @@ class AnalyzerHelper:
             previous_bar = stock.bars[i+1]
             right_after_bar = stock.bars[i-1]
             if (
-                ## need to fix the highest high logic.
                 potential_top_bar.high == highest_high["bar"].high
                 and potential_top_bar.high >= previous_bar.high
                 and potential_top_bar.high > right_after_bar.high
