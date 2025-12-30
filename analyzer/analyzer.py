@@ -71,14 +71,6 @@ class Analyzer:
             and lowest_low_bar.index > 0
         ):
             are_valid = True
-            # print(
-            #     f"""stock: {stock.symbol_name}.
-            #     bar_time: {lowest_low_bar.bar_time}.
-            #     timeframe: {lowest_low_bar.timeframe}.
-            #     starting: index: {starting_bar.index}. time: {starting_bar.bar_time}\n
-            #     top: index: {top_bar.index}. time: {top_bar.bar_time}\n
-            #     lowest low: index: {lowest_low_bar.index}. time: {lowest_low_bar.bar_time}\n""",
-            # )
 
         return objects.Milestones(
             starting_bar=starting_bar,
@@ -113,6 +105,7 @@ class Analyzer:
                 success_indicators_names.append(indicator_title)
 
         if len(success_indicators_names) > 0:
+            ## should send alert over here - phone/whatsapp/telegram.
             print(f"""
             {Fore.GREEN}Congrats!{Style.RESET_ALL}
             Timeframe: {stock.timeframe}.
