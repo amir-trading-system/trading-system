@@ -24,8 +24,8 @@ def run_bot(
             year=2025,
             month=12,
             day=30,
-            hour=10,
-            minute=15,
+            hour=11,
+            minute=5,
         )
         collector_kwargs = {
             "manual_timeframe_for_tests": 5,

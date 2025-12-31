@@ -193,7 +193,7 @@ class AnalyzerHelper:
                 and potential_top_bar.high >= previous_bar.high
                 and potential_top_bar.high > right_after_bar.high
                 and potential_top_bar.close > potential_top_bar.ema_9
-                and potential_top_bar.volume > potential_top_bar.volume_average * 2
+                and potential_top_bar.volume > potential_top_bar.volume_average
                 and (
                     potential_top_bar.volume > 50000
                     or potential_top_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe

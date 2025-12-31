@@ -13,6 +13,7 @@ class Indicator:
     def __init__(
         self,
     ):
+        self.unique_evidences: set[analyzer.evidences._evidence.Evidence] = {}
         self.evidences: set[analyzer.evidences._evidence.Evidence] = {
             analyzer.evidences.movement_is_after_market_starts.Evidence,
             analyzer.evidences.current_close_similar_to_high.Evidence,
@@ -36,9 +37,10 @@ class Indicator:
     def handle_response(
         self,
         success_results: list[analyzer.objects.EvidenceResponse],
-        printed_results: list[str]
+        printed_results: list[str],
+        failed_base_evidences_count: int,
     ) -> objects.IndicatorResponse:
-        total = len(self.evidences)
+        total = len(self.unique_evidences)
         success_rate = len(success_results)/total
         result = total == len(success_results) or success_rate >= 0.9 or total - len(success_results) == 1
 
@@ -49,6 +51,7 @@ class Indicator:
             success_count=len(success_results),
             success_rate=success_rate,
             result=result,
+            failed_base_evidences_count=failed_base_evidences_count,
         )
 
     def indicate(
@@ -59,6 +62,7 @@ class Indicator:
     ) -> objects.IndicatorResponse:
         success_results: list[analyzer.objects.EvidenceResponse] = []
         printed_results: list[str] = []
+        failed_base_evidences_count = 0
 
         for evidence_object in self.evidences:
             evidence_object: analyzer.evidences._evidence.Evidence = evidence_object()
@@ -67,6 +71,8 @@ class Indicator:
                 milestones=milestones,
                 current_bar=current_bar,
             )
+            if not result.result and evidence_object.is_base_evidence:
+                failed_base_evidences_count += 1
 
             if not result.result and evidence_object.must_to_be_true:
                 success_results = []
@@ -74,11 +80,13 @@ class Indicator:
                 break
 
             if result.result:
-                success_results.append(result)
+                if not evidence_object.is_base_evidence:
+                    success_results.append(result)
             else:
                 printed_results.append(f"{self.name} -  Evidence: {evidence_object.name}. Reason: {Fore.RED}{result.reason}.{Style.RESET_ALL}")
 
         return self.handle_response(
             success_results=success_results,
             printed_results=printed_results,
+            failed_base_evidences_count=failed_base_evidences_count,
         )

@@ -108,6 +108,7 @@ class Analyzer:
         success_indicators_names: list[str] = []
         stock.bars = stock.bars[:milestons.starting_bar.index+10]
         emoji = ""
+        base_except_one = False
 
         for indicator in analyzer.indicators.__indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator()
@@ -116,17 +117,22 @@ class Analyzer:
                 milestones=milestons,
                 current_bar=current_bar,
             )
+            if indicator_response.failed_base_evidences_count > 1:
+                continue
             if indicator_response.result:
-                emoji = "✅ - 💰"
+                emoji = "✅"
                 if indicator_response.success_rate < 1:
                     emoji = "👀"
 
                 indicator_title = str.format(f"Indicator Name: {indicator_obj.name}.\nSuccess Rate:{indicator_response.success_rate}.\nThere was {indicator_response.success_count} success evidences.")
+                if indicator_response.failed_base_evidences_count == 1:
+                    base_except_one = True
                 success_indicators_names.append(indicator_title)
 
         if len(success_indicators_names) > 0:
             message = f"""
-<b>{emoji} Congrats!</b>
+<b>{emoji} Congrats! {emoji}</b>
+{"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
 
 <b>Symbol:</b> <u>{stock.symbol_name}</u>
 <b>Timeframe:</b> <code>{stock.timeframe}</code>
