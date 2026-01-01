@@ -87,9 +87,7 @@ Need to Fix - False positives:
 
 To do list:
   - Run on specific Day on all times when given timeframe (09:30-20:00).
-  - Filter alerts on at least 1 with 1.0 rate and total of 6 indicators.
   - Create blacklist for stock who made hard down move - can be for many reasons:
-    - top bar has vanished be itself or by one after with a lot of volume (minimum 100000).
+    - top bar has vanished by itself or by one after with a lot of volume (minimum 100000).
   - Make sure current bar has more than 100000 volume.
-  - ORBS - Do not recommend on stock with more than 100,000,000 shares or huge market cap.
   - Need to check for more open closer to ema_9.

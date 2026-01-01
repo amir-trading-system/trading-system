@@ -10,7 +10,7 @@ from . import objects
 
 
 class Client(client.EClient, wrapper.EWrapper):
-    is_manual: bool = False
+    on_specific_bar_time: bool = False
 
     def __init__(
         self,
@@ -194,6 +194,11 @@ class Client(client.EClient, wrapper.EWrapper):
         for i, bar_object in enumerate(bars):
             bar_object.index = i
 
+        bars = sorted(
+            [bar_object for bar_object in bars],
+            key=lambda bar: bar.bar_time,
+        )
+
         return bars
 
     def request_historical_data(
@@ -242,7 +247,7 @@ class Client(client.EClient, wrapper.EWrapper):
         bar_time = datetime.datetime.fromtimestamp(float(bar.date))
         now = datetime.datetime.now()
         if (
-            (now.day != bar_time.day and bar_time.hour < 16 and not self.is_manual)
+            (now.day != bar_time.day and bar_time.hour < 16 and not self.on_specific_bar_time)
             or bar.volume == 0.0
         ):
             return
@@ -291,9 +296,9 @@ class Client(client.EClient, wrapper.EWrapper):
             bar_time=current_bar_time,
         )
 
-        if (current_bar_time - relevant_symbol_bars[0].bar_time).seconds >= 30:
-            if relevant_symbol_bars[0].bar_time == current_bar_time:
-                relevant_symbol_bars[0] = current_bar
+        if (current_bar_time - relevant_symbol_bars[-1].bar_time).seconds >= 30:
+            if relevant_symbol_bars[-1].bar_time == current_bar_time:
+                relevant_symbol_bars[-1] = current_bar
             else:
                 relevant_symbol_bars.append(current_bar)
 

@@ -207,6 +207,11 @@ class Analyzer:
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: tws_objects.Stock = self.bars_ready_to_analyze_queue.get()
+                stock_object.bars = sorted(
+                    [bar_object for bar_object in stock_object.bars],
+                    key=lambda bar: bar.bar_time,
+                    reverse=True,
+                )
 
                 current_bar = stock_object.bars[0]
                 if specific_bar_time is not None:

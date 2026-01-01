@@ -11,14 +11,14 @@ import tws
 def run_bot(
     c_obj: collector.collector.Collector,
     a_obj: analyzer.analyzer.Analyzer,
-    is_manual: bool = False,
+    on_specific_bar_time: bool = False,
 ):
     manual_results_for_test = []
     collector_kwargs = {}
     analyzer_kwargs = {}
-    c_obj.tws_client.is_manual = is_manual
+    c_obj.tws_client.on_specific_bar_time = on_specific_bar_time
 
-    if is_manual:
+    if on_specific_bar_time:
         manual_results_for_test = ["EKSO"]
         specific_bar_time = datetime.datetime(
             year=2025,
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     argument_parser = ArgumentParser()
     argument_parser.add_argument(
-        "--manual",
+        "--on_specific_bar_time",
         type=bool,
         default=False,
     )
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     time.sleep(1)
 
     run_bot(
-        is_manual=args.manual,
+        on_specific_bar_time=args.on_specific_bar_time,
         c_obj=collector_obj,
         a_obj=analyzer_obj,
     )

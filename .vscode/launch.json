@@ -7,7 +7,7 @@
         {
             "name": "manual main",
             "args": [
-                "--manual=true"
+                "--on_specific_bar_time=true"
             ],
             "type": "debugpy",
             "request": "launch",
