@@ -35,6 +35,7 @@ class Indicator:
             analyzer.evidences.at_least_one_bar_was_closed_to_9_ema_since_start.Evidence,
         }
         self.must_to_have: list[bool] = []
+        self.check_for_retracement_before: bool = True
         self.milestons = milestons
 
     def handle_response(
@@ -81,6 +82,9 @@ class Indicator:
             )
 
         for evidence_object in self.evidences:
+            if not self.check_for_retracement_before and evidence_object.name == analyzer.evidences.retracement_occured_since_top_bar:
+                continue
+
             evidence_object: analyzer.evidences._evidence.Evidence = evidence_object()
             result = evidence_object.find_evidence(
                 stock=stock,

@@ -29,4 +29,3 @@ class Indicator(
         self.evidences.update(
             self.unique_evidences,
         )
-        self.must_to_have = []
