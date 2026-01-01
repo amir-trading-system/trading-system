@@ -124,7 +124,7 @@ class Analyzer:
         current_bar: tws_objects.BarData,
         milestons: objects.Milestones,
     ) -> None:
-        success_indicators_names: list[str] = []
+        success_indicators: dict[str,float] = {}
         stock.bars = stock.bars[:milestons.starting_bar.index+10]
         emoji = ""
         base_except_one = False
@@ -145,12 +145,18 @@ class Analyzer:
                 if indicator_response.success_rate < 1:
                     emoji = "👀"
 
-                indicator_title = str.format(f"Indicator Name: {indicator_obj.name}.\nSuccess Rate:{indicator_response.success_rate}.\nThere was {indicator_response.success_count} success evidences.")
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
-                success_indicators_names.append(indicator_title)
+                success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
 
-        if len(success_indicators_names) > 0:
+        if len(success_indicators) > 0:
+            sorted_indicators = dict(
+                sorted(
+                    success_indicators.items(),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )
+            )
             message = f"""
 <b>{emoji} Congrats! {emoji}</b>
 {"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
@@ -159,10 +165,8 @@ class Analyzer:
 <b>Timeframe:</b> <code>{stock.timeframe}</code>
 <b>Time:</b> <code>{current_bar.bar_time}</code>
 
-<b>Indications:</b>
-{chr(10).join(f"• <i>{name}</i>" for name in success_indicators_names)}
-
-
+<b>{len(sorted_indicators)} Indications:</b>
+{chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
 """
 
             self.alert(
