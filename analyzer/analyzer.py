@@ -6,6 +6,7 @@ import requests
 
 from analyzer import objects, helper
 import analyzer.indicators
+import analyzer.evidences
 from tws import objects as tws_objects
 
 
@@ -72,7 +73,7 @@ class Analyzer:
         ):
             are_valid = True
 
-        return objects.Milestones(
+        milestones = objects.Milestones(
             starting_bar=starting_bar,
             top_bar=top_bar,
             lowest_low_bar=lowest_low_bar,
@@ -80,12 +81,30 @@ class Analyzer:
             are_valid=are_valid,
         )
 
+        if milestones.are_valid:
+            fibonacci_retracement_evidence_object = analyzer.evidences.fibonacci_retracement.Evidence()
+            retracements_evidence_object = analyzer.evidences.no_more_than_2_retracements_until_now.Evidence()
+            fibonacci_retracement_result = fibonacci_retracement_evidence_object.find_evidence(
+                stock=stock,
+                current_bar=current_bar,
+                milestones=milestones,
+            )
+            retracements_result = retracements_evidence_object.find_evidence(
+                stock=stock,
+                current_bar=current_bar,
+                milestones=milestones,
+            )
+            milestones.fibonacci_retracement = float(fibonacci_retracement_result.value)
+            milestones.retracement_indexes = retracements_result.value
+
+        return milestones
+
     def alert(
         self,
         message: str,
     ):
         bot_token = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
-        chat_id = "-5177099672"
+        chat_id = "-1003604401866"
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {
             "chat_id": chat_id,
@@ -111,7 +130,9 @@ class Analyzer:
         base_except_one = False
 
         for indicator in analyzer.indicators.__indicators__:
-            indicator_obj: analyzer.indicators.indicator.Indicator = indicator()
+            indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
+                milestons=milestons,
+            )
             indicator_response: analyzer.indicators.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestons,

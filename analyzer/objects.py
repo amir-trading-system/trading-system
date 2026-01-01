@@ -32,12 +32,16 @@ class Milestones:
         lowest_low_bar: MilestoneBar,
         previous_bar: MilestoneBar,
         are_valid: bool,
+        fibonacci_retracement: float = None,
+        retracement_indexes: list[int] = None,
     ):
         self.starting_bar = starting_bar
         self.top_bar = top_bar
         self.lowest_low_bar = lowest_low_bar
         self.previous_bar = previous_bar
         self.are_valid = are_valid
+        self.fibonacci_retracement = fibonacci_retracement
+        self.retracement_indexes = retracement_indexes
 
 class EvidenceResponse:
     def __init__(

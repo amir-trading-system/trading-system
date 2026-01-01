@@ -9,11 +9,13 @@ class Indicator(
 
     def __init__(
         self,
+        milestons: analyzer.objects.Milestones,
     ):
-        super().__init__()
+        super().__init__(
+            milestons=milestons,
+        )
         self.unique_evidences = {
             analyzer.evidences.current_session_has_at_least_one_negative_bar.Evidence,
-            analyzer.evidences.fibonacci_retracement_between_values.Evidence,
             analyzer.evidences.histogram_changed_direction.Evidence,
             analyzer.evidences.histogram_is_positive_until_now.Evidence,
             analyzer.evidences.histogram_top_appears_less_than_twice.Evidence,
@@ -32,3 +34,6 @@ class Indicator(
         self.evidences.update(
             self.unique_evidences,
         )
+        self.must_to_have = [
+            0.4 < milestons.fibonacci_retracement < 0.5,
+        ]

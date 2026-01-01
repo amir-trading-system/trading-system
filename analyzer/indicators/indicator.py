@@ -12,6 +12,7 @@ class Indicator:
 
     def __init__(
         self,
+        milestons: analyzer.objects.Milestones,
     ):
         self.unique_evidences: set[analyzer.evidences._evidence.Evidence] = {}
         self.evidences: set[analyzer.evidences._evidence.Evidence] = {
@@ -33,6 +34,8 @@ class Indicator:
             analyzer.evidences.top_bar_is_not_the_lowest_bar.Evidence,
             analyzer.evidences.at_least_one_bar_was_closed_to_9_ema_since_start.Evidence,
         }
+        self.must_to_have: list[bool] = []
+        self.milestons = milestons
 
     def handle_response(
         self,
@@ -44,7 +47,7 @@ class Indicator:
         success_rate = len(success_results)/total
         result = total == len(success_results) or success_rate >= 0.9 or total - len(success_results) == 1
 
-        if success_rate >= 0.9:
+        if success_rate >= 0.9 and failed_base_evidences_count <= 1:
             print("\n".join(printed_results))
 
         return objects.IndicatorResponse(
@@ -63,6 +66,19 @@ class Indicator:
         success_results: list[analyzer.objects.EvidenceResponse] = []
         printed_results: list[str] = []
         failed_base_evidences_count = 0
+
+        if not all(
+            boolean
+            for boolean in self.must_to_have
+            if boolean is True
+        ):
+            print(f"Not all must_to_have terms are true for {self.name} indicator")
+            return objects.IndicatorResponse(
+                success_count=0,
+                success_rate=0.0,
+                result=False,
+                failed_base_evidences_count=0,
+            )
 
         for evidence_object in self.evidences:
             evidence_object: analyzer.evidences._evidence.Evidence = evidence_object()
@@ -83,7 +99,7 @@ class Indicator:
                 if not evidence_object.is_base_evidence:
                     success_results.append(result)
             else:
-                printed_results.append(f"{self.name} -  Evidence: {evidence_object.name}. Reason: {Fore.RED}{result.reason}.{Style.RESET_ALL}")
+                printed_results.append(f"{stock.symbol_name}: {self.name} -  Evidence: {evidence_object.name}. Reason: {Fore.RED}{result.reason}.{Style.RESET_ALL}")
 
         return self.handle_response(
             success_results=success_results,
