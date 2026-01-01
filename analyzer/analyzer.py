@@ -34,6 +34,20 @@ class Analyzer:
             starting_bar=starting_bar,
         )
 
+        if top_bar.index > 0:
+            already_passed_top_bar = [
+                bar_object.index
+                for bar_object in stock.bars[current_bar.index+1:top_bar.index-1]
+                if bar_object.high > top_bar.bar_object.high
+                and bar_object.index < top_bar.index
+            ]
+            if len(already_passed_top_bar) > 0:
+                top_bar = objects.MilestoneBar(
+                    index=0,
+                    bar_type=objects.MilestoneType.TOP_BAR,
+                    timeframe=stock.timeframe,
+                )
+
         lowest_low_bar: objects.MilestoneBar = self.helper.get_lowest_bar_from_top_bar(
             stock=stock,
             top_bar=top_bar,
@@ -141,13 +155,10 @@ class Analyzer:
             if indicator_response.failed_base_evidences_count > 1:
                 continue
             if indicator_response.result:
-                emoji = "✅"
-                if indicator_response.success_rate < 1:
-                    emoji = "👀"
+                success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
-                success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
 
         if len(success_indicators) > 0:
             sorted_indicators = dict(
@@ -157,21 +168,37 @@ class Analyzer:
                     reverse=True,
                 )
             )
-            message = f"""
-<b>{emoji} Congrats! {emoji}</b>
-{"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
 
-<b>Symbol:</b> <u>{stock.symbol_name}</u>
-<b>Timeframe:</b> <code>{stock.timeframe}</code>
-<b>Time:</b> <code>{current_bar.bar_time}</code>
+            at_least_one_indication_result_is_certain = len(
+                [
+                    result
+                    for result in sorted_indicators.values()
+                    if result == 1.0
+                ]
+            ) >= 1
+            certain_result = len(sorted_indicators) >= 5
 
-<b>{len(sorted_indicators)} Indications:</b>
-{chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
-"""
+            if at_least_one_indication_result_is_certain:
+                if certain_result:
+                    emoji = "✅"
+                else:
+                    emoji = "👀"
 
-            self.alert(
-                message=message,
-            )
+                message = f"""
+    <b>{emoji} Congrats! {emoji}</b>
+    {"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
+
+    <b>Symbol:</b> <u>{stock.symbol_name}</u>
+    <b>Timeframe:</b> <code>{stock.timeframe}</code>
+    <b>Time:</b> <code>{current_bar.bar_time}</code>
+
+    <b>{len(sorted_indicators)} Indications:</b>
+    {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
+    """
+
+                self.alert(
+                    message=message,
+                )
 
     def analyze_data(
         self,

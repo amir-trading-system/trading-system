@@ -46,7 +46,7 @@ class Indicator:
     ) -> objects.IndicatorResponse:
         total = len(self.unique_evidences)
         success_rate = len(success_results)/total
-        result = total == len(success_results) or success_rate >= 0.9 or total - len(success_results) == 1
+        result = success_rate >= 0.9
 
         if success_rate >= 0.9 and failed_base_evidences_count <= 1:
             print("\n".join(printed_results))
