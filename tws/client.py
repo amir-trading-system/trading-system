@@ -275,14 +275,15 @@ class Client(client.EClient, wrapper.EWrapper):
         start: str,
         end: str,
     ):
-        relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
-        symbol = self.request_id_to_symbol[reqId].symbol_name
-        bars_data = self.enrich_bars(
-            bars=relevant_symbol_bars,
-        )
-        self.request_id_to_symbol[reqId].bars = bars_data
-        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
-        print(f"symbol: {symbol}. request_id: {reqId}. finished to get data.")
+        if self.on_specific_bar_time:
+            relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
+            symbol = self.request_id_to_symbol[reqId].symbol_name
+            bars_data = self.enrich_bars(
+                bars=relevant_symbol_bars,
+            )
+            self.request_id_to_symbol[reqId].bars = bars_data
+            self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
+            print(f"symbol: {symbol}. request_id: {reqId}. finished to get data.")
 
     def historicalDataUpdate(
         self,
@@ -301,14 +302,18 @@ class Client(client.EClient, wrapper.EWrapper):
             bar_time=current_bar_time,
         )
 
-        if (current_bar_time - relevant_symbol_bars[-1].bar_time).seconds >= 30:
-            if relevant_symbol_bars[-1].bar_time == current_bar_time:
-                relevant_symbol_bars[-1] = current_bar
-            else:
-                relevant_symbol_bars.append(current_bar)
-
+        if relevant_symbol_bars[-1].bar_time == current_bar_time:
+            relevant_symbol_bars[-1] = current_bar
+        else:
+            #TODO: Fix this logic - only when bar is finished to collect data on, send it to analyzer.
             bars_data = self.enrich_bars(
                 bars=relevant_symbol_bars,
             )
             self.request_id_to_symbol[reqId].bars = bars_data
             self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
+
+            relevant_symbol_bars.append(current_bar)
+            bars_data = self.enrich_bars(
+                bars=relevant_symbol_bars,
+            )
+            self.request_id_to_symbol[reqId].bars = bars_data

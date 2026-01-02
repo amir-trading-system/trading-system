@@ -74,15 +74,8 @@ class Analyzer:
             timeframe=stock.timeframe,
         )
 
-        current_bar_is_valid = (
-            True
-            and current_bar.close > current_bar.open_value
-            and current_bar.high > current_bar.ema_9
-            and current_bar.high > current_bar.vwap
-        )
-
         if (
-            current_bar_is_valid
+            True
             and starting_bar.index > 0
             and top_bar.index > 0
             and lowest_low_bar.index > 0
@@ -117,6 +110,9 @@ class Analyzer:
 
     def alert(
         self,
+        symbol: str,
+        timeframe: int,
+        bar_date: datetime.datetime,
         message: str,
     ):
         bot_token = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
@@ -133,6 +129,7 @@ class Analyzer:
             timeout=10,
         )
         response.raise_for_status()
+        print(f"Alert has been sent successfully for {symbol} on {timeframe} minutes timeframe for {bar_date} bar")
 
     def run_indicators(
         self,
@@ -140,6 +137,7 @@ class Analyzer:
         current_bar: tws_objects.BarData,
         milestons: objects.Milestones,
     ) -> None:
+        print(f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Bar Time: {current_bar.bar_time}. Message: Running analyzers")
         success_indicators: dict[str,float] = {}
         stock.bars = stock.bars[:milestons.starting_bar.index+10]
         emoji = ""
@@ -154,10 +152,15 @@ class Analyzer:
                 milestones=milestons,
                 current_bar=current_bar,
             )
+            ## remove those 2 lines when finish investigation.
+            indicator_response.result = True
+            indicator_response.failed_base_evidences_count = 0
             if indicator_response.failed_base_evidences_count > 1:
                 continue
             if indicator_response.result:
-                success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
+                ## remove this line when finish investigation.
+                success_indicators[indicator_obj.name] = 1.0
+                # success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
@@ -199,6 +202,9 @@ class Analyzer:
     """
 
                 self.alert(
+                    symbol=stock.symbol_name,
+                    timeframe=stock.timeframe,
+                    bar_date=current_bar.bar_time,
                     message=message,
                 )
 
@@ -207,12 +213,23 @@ class Analyzer:
         stock: tws_objects.Stock,
         current_bar: tws_objects.BarData,
     ):
+        current_bar_is_valid = (
+            True
+            and current_bar.close > current_bar.open_value
+            and current_bar.high > current_bar.ema_9
+            and current_bar.high > current_bar.vwap
+        )
+        if not current_bar_is_valid:
+            print(f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Bar Time: {current_bar.bar_time}. Message: Bar is not valid")
+            return
+
         milestons: objects.Milestones = self._prepare_milestones(
             stock=stock,
             current_bar=current_bar,
         )
 
         if not milestons.are_valid:
+            print(f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Bar Time: {current_bar.bar_time}. Message: Milestones are not valid")
             return
 
         self.run_indicators(
@@ -234,6 +251,7 @@ class Analyzer:
                     timeframe=stock_object.timeframe,
                     bars=copy.deepcopy(stock_object.bars),
                 )
+                print(f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Message: Starting analyze bar")
 
                 stock.bars = sorted(
                     stock.bars,
