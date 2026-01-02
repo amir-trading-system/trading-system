@@ -229,15 +229,21 @@ class Analyzer:
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: tws_objects.Stock = self.bars_ready_to_analyze_queue.get()
-                stock_object.bars = sorted(
-                    stock_object.bars,
+                stock = tws_objects.Stock(
+                    symbol_name=stock_object.symbol_name,
+                    timeframe=stock_object.timeframe,
+                    bars=copy.deepcopy(stock_object.bars),
+                )
+
+                stock.bars = sorted(
+                    stock.bars,
                     key=lambda bar: bar.bar_time,
                     reverse=True,
                 )
 
                 if retroactive_from:
-                    all_bars = copy.deepcopy(stock_object.bars)
-                    for bar_object in stock_object.bars:
+                    all_bars = copy.deepcopy(stock.bars)
+                    for bar_object in stock.bars:
                         if bar_object.bar_time.day != retroactive_from.day:
                             continue
 
@@ -265,22 +271,22 @@ class Analyzer:
                             current_bar=current_bar,
                         )
                 else:
-                    current_bar = stock_object.bars[0]
+                    current_bar = stock.bars[0]
                     if specific_bar_time is not None:
                         current_bar = [
                             bar_data
-                            for bar_data in stock_object.bars
+                            for bar_data in stock.bars
                             if bar_data.bar_time == specific_bar_time
                         ]
 
                         if len(current_bar) == 1:
                             current_bar = current_bar[0]
-                            stock_object.bars = stock_object.bars[current_bar.index:]
-                            for i, bar_object in enumerate(stock_object.bars):
+                            stock.bars = stock.bars[current_bar.index:]
+                            for i, bar_object in enumerate(stock.bars):
                                 bar_object.index = i
 
                     self.analyze_bar(
-                        stock=stock_object,
+                        stock=stock,
                         current_bar=current_bar,
                     )
             else:

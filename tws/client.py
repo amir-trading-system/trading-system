@@ -118,11 +118,20 @@ class Client(client.EClient, wrapper.EWrapper):
         )
 
     def contractDetails(self, reqId, contractDetails):
-        if contractDetails.stockType != "ETF":
-            if contractDetails.contract.symbol not in self.relevant_symbols:
-                print(f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.")
-                self.relevant_symbols.append(contractDetails.contract.symbol)
-                self.symbols_to_collect_queue.put(contractDetails.contract.symbol)
+        no_opening_trades = False
+        symbol_name = contractDetails.contract.symbol
+        if symbol_name not in self.relevant_symbols:
+            if contractDetails.ineligibilityReasonList is not None:
+                for reason in contractDetails.ineligibilityReasonList:
+                    if str(reason.description).startswith("No Opening Trades"):
+                        no_opening_trades = True
+                        self.relevant_symbols.append(contractDetails.contract.symbol)
+                        break
+            if not no_opening_trades:
+                if contractDetails.contract.symbol not in self.relevant_symbols:
+                    print(f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.")
+                    self.relevant_symbols.append(contractDetails.contract.symbol)
+                    self.symbols_to_collect_queue.put(contractDetails.contract.symbol)
 
         return super().contractDetails(reqId, contractDetails)
 
@@ -135,6 +144,7 @@ class Client(client.EClient, wrapper.EWrapper):
             if (
                 bar_object.bar_time.hour == 8
                 and bar_object.bar_time.minute == 0
+                and i+1 < len(bars)-1
             ):
                 bar_before = bars[i-1]
                 bar_after = bars[i+1]
@@ -190,15 +200,9 @@ class Client(client.EClient, wrapper.EWrapper):
         bars = sorted(
             [objects.BarData(**kwargs) for kwargs in results_dict],
             key=lambda bar: bar.bar_time,
-            reverse=True,
         )
         for i, bar_object in enumerate(bars):
-            bar_object.index = i
-
-        bars = sorted(
-            [bar_object for bar_object in bars],
-            key=lambda bar: bar.bar_time,
-        )
+            bar_object.index = len(bars) - i-1
 
         return bars
 
