@@ -2,6 +2,7 @@ import datetime
 import time
 import queue
 
+import copy
 import requests
 
 from analyzer import objects, helper
@@ -40,6 +41,7 @@ class Analyzer:
                 for bar_object in stock.bars[current_bar.index+1:top_bar.index-1]
                 if bar_object.high > top_bar.bar_object.high
                 and bar_object.index < top_bar.index
+                and bar_object.volume > top_bar.bar_object.volume
             ]
             if len(already_passed_top_bar) > 0:
                 top_bar = objects.MilestoneBar(
@@ -200,45 +202,86 @@ class Analyzer:
                     message=message,
                 )
 
+    def analyze_bar(
+        self,
+        stock: tws_objects.Stock,
+        current_bar: tws_objects.BarData,
+    ):
+        milestons: objects.Milestones = self._prepare_milestones(
+            stock=stock,
+            current_bar=current_bar,
+        )
+
+        if not milestons.are_valid:
+            return
+
+        self.run_indicators(
+            stock=stock,
+            current_bar=current_bar,
+            milestons=milestons,
+        )
+
     def analyze_data(
         self,
         specific_bar_time: datetime.datetime = None,
+        retroactive_from: datetime.datetime = False,
     ):
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: tws_objects.Stock = self.bars_ready_to_analyze_queue.get()
                 stock_object.bars = sorted(
-                    [bar_object for bar_object in stock_object.bars],
+                    stock_object.bars,
                     key=lambda bar: bar.bar_time,
                     reverse=True,
                 )
 
-                current_bar = stock_object.bars[0]
-                if specific_bar_time is not None:
-                    current_bar = [
-                        bar_data
-                        for bar_data in stock_object.bars
-                        if bar_data.bar_time == specific_bar_time
-                    ]
+                if retroactive_from:
+                    all_bars = copy.deepcopy(stock_object.bars)
+                    for bar_object in stock_object.bars:
+                        if bar_object.bar_time.day != retroactive_from.day:
+                            continue
 
-                    if len(current_bar) == 1:
+                        relevant_bars = all_bars[bar_object.index:]
+                        for i, bar_obj in enumerate(relevant_bars):
+                            bar_obj.index = i
+
+                        current_bar = [
+                            bar_obj
+                            for bar_obj in relevant_bars
+                            if bar_obj.bar_time == bar_object.bar_time
+                        ]
+                        if len(current_bar) == 0:
+                            continue
+
                         current_bar = current_bar[0]
-                        stock_object.bars = stock_object.bars[current_bar.index:]
-                        for i, bar_object in enumerate(stock_object.bars):
-                            bar_object.index = i
+                        new_stock_object = tws_objects.Stock(
+                            symbol_name=stock_object.symbol_name,
+                            bars=relevant_bars,
+                            timeframe=stock_object.timeframe,
+                        )
 
-                milestons: objects.Milestones = self._prepare_milestones(
-                    stock=stock_object,
-                    current_bar=current_bar,
-                )
+                        self.analyze_bar(
+                            stock=new_stock_object,
+                            current_bar=current_bar,
+                        )
+                else:
+                    current_bar = stock_object.bars[0]
+                    if specific_bar_time is not None:
+                        current_bar = [
+                            bar_data
+                            for bar_data in stock_object.bars
+                            if bar_data.bar_time == specific_bar_time
+                        ]
 
-                if not milestons.are_valid:
-                    continue
+                        if len(current_bar) == 1:
+                            current_bar = current_bar[0]
+                            stock_object.bars = stock_object.bars[current_bar.index:]
+                            for i, bar_object in enumerate(stock_object.bars):
+                                bar_object.index = i
 
-                self.run_indicators(
-                    stock=stock_object,
-                    current_bar=current_bar,
-                    milestons=milestons,
-                )
+                    self.analyze_bar(
+                        stock=stock_object,
+                        current_bar=current_bar,
+                    )
             else:
                 time.sleep(2)

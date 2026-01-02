@@ -16,7 +16,7 @@ class Evidence(
         current_bar: tws_objects.BarData,
     ) -> objects.EvidenceResponse:
         relevant_bars = stock.bars[:milestones.starting_bar.index+1]
-        if len(relevant_bars) < 3:
+        if len(relevant_bars) < 4:
             return objects.EvidenceResponse(
                 result=False,
                 reason="no bars to indicate",
@@ -36,7 +36,7 @@ class Evidence(
             and relevant_bars[1].close < relevant_bars[1].open_value
             and relevant_bars[1].high - relevant_bars[1].low > 0
             and (relevant_bars[1].close - relevant_bars[1].low)/(relevant_bars[1].high - relevant_bars[1].low) >= 0.5
-            and (relevant_bars[1].open - relevant_bars[1].close)/(relevant_bars[1].high - relevant_bars[1].low) <= 0.3
+            and (relevant_bars[1].open_value - relevant_bars[1].close)/(relevant_bars[1].high - relevant_bars[1].low) <= 0.3
             and relevant_bars[1].volume > relevant_bars[1].volume_average
             and relevant_bars[1].volume < relevant_bars[2].volume
             and relevant_bars[1].volume/relevant_bars[2].volume >= 0.5

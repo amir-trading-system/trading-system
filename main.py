@@ -12,27 +12,38 @@ def run_bot(
     c_obj: collector.collector.Collector,
     a_obj: analyzer.analyzer.Analyzer,
     on_specific_bar_time: bool = False,
+    retroactive_from: datetime.datetime = None,
 ):
     manual_results_for_test = []
     collector_kwargs = {}
     analyzer_kwargs = {}
     c_obj.tws_client.on_specific_bar_time = on_specific_bar_time
+    c_obj.tws_client.is_retro = retroactive_from is not None
 
     if on_specific_bar_time:
-        manual_results_for_test = ["EKSO"]
+        manual_results_for_test = ["INBS"]
         specific_bar_time = datetime.datetime(
             year=2025,
             month=12,
-            day=30,
-            hour=11,
-            minute=5,
+            day=31,
+            hour=12,
+            minute=30,
         )
         collector_kwargs = {
-            "manual_timeframe_for_tests": 5,
+            "manual_timeframe_for_tests": 15,
             "specific_bar_time": specific_bar_time,
         }
         analyzer_kwargs = {
             "specific_bar_time": specific_bar_time,
+        }
+    if retroactive_from:
+        manual_results_for_test = ["INBS"]
+        collector_kwargs = {
+            "manual_timeframe_for_tests": 15,
+            "specific_bar_time": retroactive_from,
+        }
+        analyzer_kwargs = {
+            "retroactive_from": retroactive_from,
         }
 
     c_obj.tws_client.start_scanner(
@@ -68,6 +79,11 @@ if __name__ == "__main__":
         type=bool,
         default=False,
     )
+    argument_parser.add_argument(
+        "--retroactive_from",
+        type=datetime.date.fromisoformat,
+        default=False,
+    )
 
     args = argument_parser.parse_args()
 
@@ -77,6 +93,7 @@ if __name__ == "__main__":
     time.sleep(1)
 
     run_bot(
+        retroactive_from=args.retroactive_from,
         on_specific_bar_time=args.on_specific_bar_time,
         c_obj=collector_obj,
         a_obj=analyzer_obj,

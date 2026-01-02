@@ -11,6 +11,7 @@ from . import objects
 
 class Client(client.EClient, wrapper.EWrapper):
     on_specific_bar_time: bool = False
+    is_retro: bool = False
 
     def __init__(
         self,
@@ -247,7 +248,7 @@ class Client(client.EClient, wrapper.EWrapper):
         bar_time = datetime.datetime.fromtimestamp(float(bar.date))
         now = datetime.datetime.now()
         if (
-            (now.day != bar_time.day and bar_time.hour < 16 and not self.on_specific_bar_time)
+            (now.day != bar_time.day and bar_time.hour < 16 and not self.on_specific_bar_time and not self.is_retro)
             or bar.volume == 0.0
         ):
             return
