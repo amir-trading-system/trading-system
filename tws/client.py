@@ -266,6 +266,7 @@ class Client(client.EClient, wrapper.EWrapper):
                 volume=float(bar.volume),
                 vwap=float(bar.wap),
                 bar_time=bar_time,
+                ready_to_analyze=True,
             )
         )
 
@@ -303,17 +304,13 @@ class Client(client.EClient, wrapper.EWrapper):
         )
 
         if relevant_symbol_bars[-1].bar_time == current_bar_time:
-            relevant_symbol_bars[-1] = current_bar
-        else:
-            #TODO: Fix this logic - only when bar is finished to collect data on, send it to analyzer.
-            bars_data = self.enrich_bars(
-                bars=relevant_symbol_bars,
-            )
-            self.request_id_to_symbol[reqId].bars = bars_data
-            self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
+            return
 
-            relevant_symbol_bars.append(current_bar)
-            bars_data = self.enrich_bars(
-                bars=relevant_symbol_bars,
-            )
-            self.request_id_to_symbol[reqId].bars = bars_data
+        relevant_symbol_bars[-1].ready_to_analyze = True
+        relevant_symbol_bars.append(current_bar)
+        bars_data = self.enrich_bars(
+            bars=relevant_symbol_bars,
+        )
+
+        self.request_id_to_symbol[reqId].bars = bars_data
+        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])

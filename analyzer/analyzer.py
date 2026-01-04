@@ -262,7 +262,7 @@ class Analyzer:
                 if retroactive_from:
                     all_bars = copy.deepcopy(stock.bars)
                     for bar_object in stock.bars:
-                        if bar_object.bar_time.day != retroactive_from.day:
+                        if bar_object.bar_time.day != retroactive_from.day or not bar_object.ready_to_analyze:
                             continue
 
                         relevant_bars = all_bars[bar_object.index:]
@@ -290,6 +290,9 @@ class Analyzer:
                         )
                 else:
                     current_bar = stock.bars[0]
+                    if not stock.bars[0].ready_to_analyze and stock.bars[1].ready_to_analyze:
+                        current_bar = stock.bars[1]
+
                     if specific_bar_time is not None:
                         current_bar = [
                             bar_data

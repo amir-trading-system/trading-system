@@ -18,6 +18,7 @@ class BarData:
         signal_line: float = None,
         index: int = None,
         is_after_market_open: bool = None,
+        ready_to_analyze: bool = False,
     ):
         self.open_value = open_value
         self.close = close
@@ -40,6 +41,7 @@ class BarData:
             hour=9,
             minute=30,
         )
+        self.ready_to_analyze = ready_to_analyze
 
 class Stock:
     def __init__(
