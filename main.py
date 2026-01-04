@@ -13,26 +13,19 @@ def run_bot(
     a_obj: analyzer.analyzer.Analyzer,
     symbol: str = None,
     timeframe: int = None,
-    on_specific_bar_time: bool = False,
+    specific_bar_time: datetime.datetime = None,
     retroactive_from: datetime.datetime = None,
 ):
     manual_results_for_test = []
     collector_kwargs = {}
     analyzer_kwargs = {}
-    c_obj.tws_client.on_specific_bar_time = on_specific_bar_time
+    c_obj.tws_client.on_specific_bar_time = specific_bar_time is not None
     c_obj.tws_client.is_retro = retroactive_from is not None
 
     if symbol is not None:
         manual_results_for_test = [str.upper(symbol)]
 
-        if on_specific_bar_time:
-            specific_bar_time = datetime.datetime(
-                year=2025,
-                month=12,
-                day=31,
-                hour=12,
-                minute=30,
-            )
+        if specific_bar_time:
             collector_kwargs = {
                 "manual_timeframe_for_tests": timeframe,
                 "specific_bar_time": specific_bar_time,
@@ -91,14 +84,14 @@ if __name__ == "__main__":
         type=str,
     )
     test_parser.add_argument(
-        "--on_specific_bar_time",
-        type=bool,
-        default=False,
+        "specific_bar_time",
+        type=datetime.date.fromisoformat,
+        default=None,
     )
     test_parser.add_argument(
         "--retroactive_from",
         type=datetime.date.fromisoformat,
-        default=False,
+        default=None,
     )
     test_parser.add_argument(
         "--timeframe",
@@ -122,6 +115,6 @@ if __name__ == "__main__":
             c_obj=collector_obj,
             a_obj=analyzer_obj,
             symbol=args.symbol,
-            on_specific_bar_time=args.on_specific_bar_time,
+            specific_bar_time=args.specific_bar_time,
             retroactive_from=args.retroactive_from,
         )

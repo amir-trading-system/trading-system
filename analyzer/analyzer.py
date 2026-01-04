@@ -153,14 +153,14 @@ class Analyzer:
                 current_bar=current_bar,
             )
             ## remove those 2 lines when finish investigation.
-            indicator_response.result = True
-            indicator_response.failed_base_evidences_count = 0
+            # indicator_response.result = True
+            # indicator_response.failed_base_evidences_count = 0
             if indicator_response.failed_base_evidences_count > 1:
                 continue
             if indicator_response.result:
                 ## remove this line when finish investigation.
-                success_indicators[indicator_obj.name] = 1.0
-                # success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
+                # success_indicators[indicator_obj.name] = 1.0
+                success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
