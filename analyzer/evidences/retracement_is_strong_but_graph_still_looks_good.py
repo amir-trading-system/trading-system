@@ -50,7 +50,7 @@ class Evidence(
             else:
                 negative_histograms_count += 1
 
-        most_histograms_are_positive = negative_histograms_count/positive_histograms_count <= 0.5
+        most_histograms_are_positive = positive_histograms_count > 0 and negative_histograms_count/positive_histograms_count <= 0.5
         previous_bar = milestones.previous_bar.bar_object
         price_jumps_on_current_bar = (
             True

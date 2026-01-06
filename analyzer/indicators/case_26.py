@@ -9,10 +9,10 @@ class Indicator(
 
     def __init__(
         self,
-        milestons: analyzer.objects.Milestones,
+        milestones: analyzer.objects.Milestones,
     ):
         super().__init__(
-            milestons=milestons,
+            milestones=milestones,
         )
         self.unique_evidences = {
             analyzer.evidences.current_high_is_highest.Evidence,

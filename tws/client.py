@@ -1,4 +1,5 @@
 import datetime
+import logging
 import queue
 
 import pandas as pd
@@ -20,6 +21,7 @@ class Client(client.EClient, wrapper.EWrapper):
         request_id_to_symbol: dict[int, objects.Stock],
         symbols_to_collect_queue: queue.Queue,
         bars_ready_to_analyze_queue: queue.Queue,
+        logger: logging.Logger,
     ):
         self.order_id = None
         client.EClient.__init__(
@@ -35,6 +37,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.relevant_symbols: list[str] = []
+        self.logger = logger
 
     def nextValidId(
         self,
@@ -57,7 +60,12 @@ class Client(client.EClient, wrapper.EWrapper):
         errorString,
         advancedOrderRejectJson="",
     ):
-        print(f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}")
+        self.logger.error(
+            msg=f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}",
+            extra={
+                "my_name": "amiros",
+            }
+        )
 
     def _get_scanner_subscription(
         self,
@@ -123,13 +131,18 @@ class Client(client.EClient, wrapper.EWrapper):
         if symbol_name not in self.relevant_symbols:
             if contractDetails.ineligibilityReasonList is not None:
                 for reason in contractDetails.ineligibilityReasonList:
-                    if str(reason.description).startswith("No Opening Trades"):
+                    if (
+                        str(reason.description).startswith("No Opening Trades")
+                        or "this product is in closing-only status" in str(reason.description)
+                    ):
                         no_opening_trades = True
                         self.relevant_symbols.append(contractDetails.contract.symbol)
                         break
             if not no_opening_trades:
                 if contractDetails.contract.symbol not in self.relevant_symbols:
-                    print(f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.")
+                    self.logger.info(
+                        msg=f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.",
+                    )
                     self.relevant_symbols.append(contractDetails.contract.symbol)
                     self.symbols_to_collect_queue.put(contractDetails.contract.symbol)
 
@@ -304,6 +317,16 @@ class Client(client.EClient, wrapper.EWrapper):
         )
 
         if relevant_symbol_bars[-1].bar_time == current_bar_time:
+            relevant_symbol_bars[-1].close = bar.close
+            relevant_symbol_bars[-1].open_value = bar.open
+            relevant_symbol_bars[-1].high = bar.high
+            relevant_symbol_bars[-1].low = bar.low
+            relevant_symbol_bars[-1].volume = bar.volume
+            relevant_symbol_bars[-1].vwap = bar.wap
+
+            bars_data = self.enrich_bars(
+                bars=relevant_symbol_bars,
+            )
             return
 
         relevant_symbol_bars[-1].ready_to_analyze = True
@@ -314,3 +337,4 @@ class Client(client.EClient, wrapper.EWrapper):
 
         self.request_id_to_symbol[reqId].bars = bars_data
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
+        # print(f"TWS Client: Symbol: {self.request_id_to_symbol[reqId].symbol_name}. Timeframe: {self.request_id_to_symbol[reqId].timeframe}. Bar Time: {relevant_symbol_bars[-2].bar_time}. Message: bar is ready to analyze")

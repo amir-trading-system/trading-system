@@ -12,7 +12,7 @@ class Indicator:
 
     def __init__(
         self,
-        milestons: analyzer.objects.Milestones,
+        milestones: analyzer.objects.Milestones,
     ):
         self.unique_evidences: set[analyzer.evidences._evidence.Evidence] = {}
         self.evidences: set[analyzer.evidences._evidence.Evidence] = {
@@ -36,7 +36,7 @@ class Indicator:
         }
         self.must_to_have: list[bool] = []
         self.check_for_retracement_before: bool = True
-        self.milestons = milestons
+        self.milestones = milestones
 
     def handle_response(
         self,

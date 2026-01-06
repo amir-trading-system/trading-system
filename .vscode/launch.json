@@ -28,11 +28,12 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "manual main",
+            "name": "test specific bar",
             "args": [
-                "--symbol=BNAI",
-                "--specific_bar_time=2026-01-02:09:45:000",
-                "--timeframe=15",
+                "test",
+                "--symbol=IBIO",
+                "--specific_bar_time=2026-01-06 09:55:00",
+                "--timeframe=5",
             ],
             "type": "debugpy",
             "request": "launch",
@@ -43,9 +44,10 @@
         {
             "name": "retroactive main",
             "args": [
+                "test",
                 "--symbol=BNAI",
                 "--retroactive_from=2026-01-02",
-                "--timeframe=15",
+                "--timeframe=5",
             ],
             "type": "debugpy",
             "request": "launch",

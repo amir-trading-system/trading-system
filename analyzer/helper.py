@@ -1,10 +1,17 @@
 import datetime
+import logging
 
 from tws import objects as tws_objects
 
 from . import objects
 
 class AnalyzerHelper:
+    def __init__(
+        self,
+        logger: logging.Logger,
+    ):
+        self.logger = logger
+
     #pylint:disable=too-many-locals
     def get_strating_bar(
         self,
@@ -25,7 +32,7 @@ class AnalyzerHelper:
         )
 
         bars_length = len(stock.bars)
-        for i in range(current_bar.index,bars_length-1):
+        for i in range(current_bar.index+1,bars_length-1):
             potential_starting_bar: tws_objects.BarData = stock.bars[i]
             if (
                 potential_starting_bar.bar_time < starting_datetime
@@ -68,21 +75,6 @@ class AnalyzerHelper:
                     previous_bar: tws_objects.BarData = stock.bars[j]
                     if (previous_bar.bar_time.date() < potential_starting_bar.bar_time.date()
                     and previous_bar.bar_time.time() < datetime.time(hour=16)):
-                        continue
-
-                    market_open_time = datetime.datetime(
-                        year=potential_starting_bar.bar_time.year,
-                        month=potential_starting_bar.bar_time.month,
-                        day=potential_starting_bar.bar_time.day,
-                        hour=9,
-                        minute=30,
-                    )
-
-                    if (
-                        True
-                        and potential_starting_bar.bar_time > market_open_time
-                        and previous_bar.bar_time == market_open_time
-                    ):
                         continue
 
                     more_volatile_than_starting_bar = (

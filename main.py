@@ -4,6 +4,7 @@ import threading
 import time
 import queue
 
+import logger
 import analyzer
 import collector
 import tws
@@ -59,14 +60,19 @@ def run_bot(
 if __name__ == "__main__":
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[tws.objects.Stock] = queue.Queue()
+    logger_object = logger.logger.Logger()
+    logger_object = logger_object.get_logger()
+
     collector_obj = collector.collector.Collector(
         tws_host="localhost",
         tws_port=8081,
         symbols_to_collect_queue=symbols_to_collect_queue,
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+        logger=logger_object,
     )
     analyzer_obj = analyzer.analyzer.Analyzer(
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+        logger=logger_object,
     )
 
     argument_parser = ArgumentParser()
@@ -84,8 +90,8 @@ if __name__ == "__main__":
         type=str,
     )
     test_parser.add_argument(
-        "specific_bar_time",
-        type=datetime.date.fromisoformat,
+        "--specific_bar_time",
+        type=lambda s: datetime.datetime.strptime(s, "%Y-%m-%d %H:%M:%S"),
         default=None,
     )
     test_parser.add_argument(
@@ -115,6 +121,7 @@ if __name__ == "__main__":
             c_obj=collector_obj,
             a_obj=analyzer_obj,
             symbol=args.symbol,
+            timeframe=args.timeframe,
             specific_bar_time=args.specific_bar_time,
             retroactive_from=args.retroactive_from,
         )

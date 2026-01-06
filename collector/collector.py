@@ -1,4 +1,5 @@
 import datetime
+import logging
 import time
 import queue
 
@@ -11,7 +12,9 @@ class Collector:
         tws_port: int,
         symbols_to_collect_queue: queue.Queue[str],
         bars_ready_to_analyze_queue: queue.Queue[objects.Stock],
+        logger: logging.Logger,
     ):
+        self.logger = logger
         self.request_id_to_symbol: dict[int,objects.Stock] = {}
         self.tws_client = client.Client(
             host=tws_host,
@@ -19,6 +22,7 @@ class Collector:
             request_id_to_symbol=self.request_id_to_symbol,
             symbols_to_collect_queue=symbols_to_collect_queue,
             bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+            logger=logger,
         )
 
     def collect_data(

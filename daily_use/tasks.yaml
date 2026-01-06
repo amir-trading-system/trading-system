@@ -86,8 +86,16 @@ Need to identify:
 Need to Fix - False positives:
 
 To do list:
+  - Inspect BNAI on 09:55 at 2026-01-02 5 minutes - no retracements at all.
+  - Milestones issue:
+    - NXTT - 10:15 - 5 minutes - 2026-01-06
   - Run on specific Day on all times when given timeframe (09:30-20:00).
   - Create blacklist for stock who made hard down move - can be for many reasons:
     - top bar has vanished by itself or by one after with a lot of volume (minimum 100000).
   - Make sure current bar has more than 100000 volume.
   - Need to check for more open closer to ema_9.
+
+
+Elastic:
+ - username: elastic
+ - password: 4obla=pJpXkiaeAglNQH

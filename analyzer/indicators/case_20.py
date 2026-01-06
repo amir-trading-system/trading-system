@@ -9,10 +9,10 @@ class Indicator(
 
     def __init__(
         self,
-        milestons: analyzer.objects.Milestones,
+        milestones: analyzer.objects.Milestones,
     ):
         super().__init__(
-            milestons=milestons,
+            milestones=milestones,
         )
         self.unique_evidences = {
             analyzer.evidences.current_bar_has_histogram_wave.Evidence,
