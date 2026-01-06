@@ -20,18 +20,37 @@ class Handler(
         self,
         record,
     ):
+        record_as_dict = record.__dict__
         document = {
-            "level": record.levelname,
-            "message": record.getMessage(),
-            "logger": record.name,
             "@timestamp": datetime.datetime.now(datetime.timezone.utc),
+            "worker": record_as_dict.get("worker"),
+            "message": record.getMessage(),
+            "level": record.levelname,
+            "function_name": record.funcName,
+            "logger_name": record.name,
+            "symbol": record_as_dict.get("symbol"),
+            "symbol_type": record_as_dict.get("symbol_type"),
+            "timeframe": record_as_dict.get("timeframe"),
+            "success_indicators": record_as_dict.get("success_indicators"),
+            "success_indicators_count": record_as_dict.get("success_indicators_count"),
+            "total_indicators": record_as_dict.get("total_indicators"),
+            "failed_indicators": record_as_dict.get("failed_indicators"),
+            "current_index": record_as_dict.get("current_index"),
+            "current_bar": record_as_dict.get("current_bar"),
+            "milestones": {
+                "starting_index": record_as_dict.get("starting_index"),
+                "top_index": record_as_dict.get("top_index"),
+                "lowest_low_index": record_as_dict.get("lowest_low_index"),
+            },
+            "indicator_name": record_as_dict.get("indicator_name"),
         }
 
-        for key, value in record.__dict__.items():
-            if key not in logging.LogRecord.__dict__:
-                document[key] = value
+        if record_as_dict.get("bar_time"):
+            document["bar_time"] = record_as_dict.get("bar_time") + datetime.timedelta(
+                hours=5,
+            )
 
         self.elastic_client.index(
             index=self.index,
-            document=record.__dict__,
+            document=document,
         )

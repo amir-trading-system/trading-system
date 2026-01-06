@@ -10,9 +10,11 @@ class Indicator(
     def __init__(
         self,
         milestones: analyzer.objects.Milestones,
+        logger,
     ):
         super().__init__(
             milestones=milestones,
+            logger=logger,
         )
         self.unique_evidences = {
             analyzer.evidences.current_bar_is_top_and_after_own_retracement.Evidence,

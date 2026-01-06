@@ -96,29 +96,35 @@ class Analyzer:
         )
         if not milestones.are_valid:
             self.logger.info(
-                msg=f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Bar Time: {current_bar.bar_time}. starting index: {milestones.starting_bar.index}. top index: {milestones.top_bar.index}. lowest_low_index: {milestones.lowest_low_bar.index}",
+                msg="One of the Milestones are not valid",
                 extra={
+                    "worker": f"{__name__}.{__class__.__name__}",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "bar_time": current_bar.bar_time,
+                    "current_index": current_bar.index,
                     "starting_index": milestones.starting_bar.index,
                     "top_index": milestones.top_bar.index,
                     "lowest_low_index": milestones.lowest_low_bar.index,
+                    "current_bar": current_bar.__dict__,
                 },
             )
+            return milestones
 
-        if milestones.are_valid:
-            fibonacci_retracement_evidence_object = analyzer.evidences.fibonacci_retracement.Evidence()
-            retracements_evidence_object = analyzer.evidences.no_more_than_2_retracements_until_now.Evidence()
-            fibonacci_retracement_result = fibonacci_retracement_evidence_object.find_evidence(
-                stock=stock,
-                current_bar=current_bar,
-                milestones=milestones,
-            )
-            retracements_result = retracements_evidence_object.find_evidence(
-                stock=stock,
-                current_bar=current_bar,
-                milestones=milestones,
-            )
-            milestones.fibonacci_retracement = float(fibonacci_retracement_result.value)
-            milestones.retracement_indexes = retracements_result.value
+        fibonacci_retracement_evidence_object = analyzer.evidences.fibonacci_retracement.Evidence()
+        retracements_evidence_object = analyzer.evidences.no_more_than_2_retracements_until_now.Evidence()
+        fibonacci_retracement_result = fibonacci_retracement_evidence_object.find_evidence(
+            stock=stock,
+            current_bar=current_bar,
+            milestones=milestones,
+        )
+        retracements_result = retracements_evidence_object.find_evidence(
+            stock=stock,
+            current_bar=current_bar,
+            milestones=milestones,
+        )
+        milestones.fibonacci_retracement = float(fibonacci_retracement_result.value)
+        milestones.retracement_indexes = retracements_result.value
 
         return milestones
 
@@ -127,6 +133,7 @@ class Analyzer:
         symbol: str,
         timeframe: int,
         bar_date: datetime.datetime,
+        bar_index: int,
         message: str,
     ):
         bot_token = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
@@ -144,7 +151,14 @@ class Analyzer:
         )
         response.raise_for_status()
         self.logger.info(
-            msg=f"Alert has been sent successfully for {symbol} on {timeframe} minutes timeframe for {bar_date} bar",
+            msg="Alert has been sent successfully",
+            extra={
+                "worker": f"{__name__}.{__class__.__name__}",
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "bar_time": bar_date,
+                "current_index": bar_index,
+            },
         )
 
     def run_indicators(
@@ -154,12 +168,18 @@ class Analyzer:
         milestones: objects.Milestones,
     ) -> None:
         self.logger.info(
-            msg=f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Bar Time: {current_bar.bar_time}. Message: Running analyzers",
+            msg="Running analyzers",
             extra={
+                "worker": f"{__name__}.{__class__.__name__}",
+                "symbol": stock.symbol_name,
+                "timeframe": stock.timeframe,
+                "bar_time": current_bar.bar_time,
+                "current_index": current_bar.index,
                 "starting_index": milestones.starting_bar.index,
                 "top_index": milestones.top_bar.index,
                 "lowest_low_index": milestones.lowest_low_bar.index,
-            }
+                "current_bar": current_bar.__dict__,
+            },
         )
         success_indicators: dict[str,float] = {}
         stock.bars = stock.bars[:milestones.starting_bar.index+10]
@@ -169,6 +189,7 @@ class Analyzer:
         for indicator in analyzer.indicators.__indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
                 milestones=milestones,
+                logger=self.logger,
             )
             indicator_response: analyzer.indicators.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
@@ -183,15 +204,22 @@ class Analyzer:
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
 
-        if len(success_indicators) > 0:
-            self.logger.info(
-                msg=f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Bar Time: {current_bar.bar_time}. Success indicators: {len(success_indicators)}. Message: Finished Running analyzers",
-                extra={
-                    "starting_index": milestones.starting_bar.index,
-                    "top_index": milestones.top_bar.index,
-                    "lowest_low_index": milestones.lowest_low_bar.index,
-                },
-            )
+        self.logger.info(
+            msg="Finished Running analyzers",
+            extra={
+                "worker": f"{__name__}.{__class__.__name__}",
+                "symbol": stock.symbol_name,
+                "timeframe": stock.timeframe,
+                "bar_time": current_bar.bar_time,
+                "current_index": current_bar.index,
+                "starting_index": milestones.starting_bar.index,
+                "top_index": milestones.top_bar.index,
+                "lowest_low_index": milestones.lowest_low_bar.index,
+                "current_bar": current_bar.__dict__,
+                "success_indicators_count": len(success_indicators),
+                "success_indicators": success_indicators,
+            },
+        )
 
         if len(success_indicators) > 0:
             sorted_indicators = dict(
@@ -211,8 +239,8 @@ class Analyzer:
             ) >= 1
             certain_result = len(sorted_indicators) >= 5
 
-            if at_least_one_indication_result_is_certain:
-                if certain_result:
+            if certain_result:
+                if at_least_one_indication_result_is_certain:
                     emoji = "✅"
                 else:
                     emoji = "👀"
@@ -233,6 +261,7 @@ class Analyzer:
                     symbol=stock.symbol_name,
                     timeframe=stock.timeframe,
                     bar_date=current_bar.bar_time,
+                    bar_index=current_bar.index,
                     message=message,
                 )
 
@@ -256,14 +285,6 @@ class Analyzer:
         )
 
         if not milestones.are_valid:
-            self.logger.info(
-                msg=f"ANALYZER: Symbol: {stock.symbol_name}. Timeframe: {stock.timeframe}. Bar Time: {current_bar.bar_time}. Message: Milestones are not valid",
-                extra={
-                    "starting_index": milestones.starting_bar.index,
-                    "top_index": milestones.top_bar.index,
-                    "lowest_low_index": milestones.lowest_low_bar.index,
-                },
-            )
             return
 
         self.run_indicators(

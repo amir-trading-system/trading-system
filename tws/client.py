@@ -60,11 +60,14 @@ class Client(client.EClient, wrapper.EWrapper):
         errorString,
         advancedOrderRejectJson="",
     ):
+        if reqId == -1:
+            return
+
         self.logger.error(
             msg=f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}",
             extra={
-                "my_name": "amiros",
-            }
+                "worker": f"{__name__}.{__class__.__name__}",
+            },
         )
 
     def _get_scanner_subscription(
@@ -141,7 +144,11 @@ class Client(client.EClient, wrapper.EWrapper):
             if not no_opening_trades:
                 if contractDetails.contract.symbol not in self.relevant_symbols:
                     self.logger.info(
-                        msg=f"New symbol!! name: {contractDetails.contract.symbol}. type: {contractDetails.stockType}. request_id: {reqId}.",
+                        msg="New symbol founded by scanner",
+                        extra={
+                            "symbol": contractDetails.contract.symbol,
+                            "symbol_type": contractDetails.stockType,
+                        },
                     )
                     self.relevant_symbols.append(contractDetails.contract.symbol)
                     self.symbols_to_collect_queue.put(contractDetails.contract.symbol)
@@ -289,7 +296,7 @@ class Client(client.EClient, wrapper.EWrapper):
         start: str,
         end: str,
     ):
-        if self.on_specific_bar_time:
+        if self.on_specific_bar_time or self.is_retro:
             relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
             symbol = self.request_id_to_symbol[reqId].symbol_name
             bars_data = self.enrich_bars(
@@ -297,7 +304,13 @@ class Client(client.EClient, wrapper.EWrapper):
             )
             self.request_id_to_symbol[reqId].bars = bars_data
             self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
-            print(f"symbol: {symbol}. request_id: {reqId}. finished to get data.")
+            self.logger.info(
+                msg="Finished to collect data for symbol",
+                extra={
+                    "worker": f"{__name__}.{__class__.__name__}",
+                    "symbol": symbol,
+                }
+            )
 
     def historicalDataUpdate(
         self,
@@ -337,4 +350,3 @@ class Client(client.EClient, wrapper.EWrapper):
 
         self.request_id_to_symbol[reqId].bars = bars_data
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
-        # print(f"TWS Client: Symbol: {self.request_id_to_symbol[reqId].symbol_name}. Timeframe: {self.request_id_to_symbol[reqId].timeframe}. Bar Time: {relevant_symbol_bars[-2].bar_time}. Message: bar is ready to analyze")

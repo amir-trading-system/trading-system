@@ -1,3 +1,5 @@
+import logging
+
 from colorama import Fore, Style
 
 import analyzer.evidences
@@ -13,7 +15,9 @@ class Indicator:
     def __init__(
         self,
         milestones: analyzer.objects.Milestones,
+        logger: logging.Logger,
     ):
+        self.logger = logger
         self.unique_evidences: set[analyzer.evidences._evidence.Evidence] = {}
         self.evidences: set[analyzer.evidences._evidence.Evidence] = {
             analyzer.evidences.movement_is_after_market_starts.Evidence,
@@ -73,6 +77,21 @@ class Indicator:
             for boolean in self.must_to_have
             if boolean is True
         ):
+            self.logger.error(
+                msg="Not all must_to_have terms are true for indicator",
+                extra={
+                    "worker": f"{__name__}.{__class__.__name__}",
+                    "indicator_name": self.name,
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "bar_time": current_bar.bar_time,
+                    "bar_index": current_bar.index,
+                    "current_bar": current_bar,
+                    "starting_index": milestones.starting_bar.index,
+                    "top_index": milestones.top_bar.index,
+                    "lowest_low_index": milestones.lowest_low_bar.index,
+                }
+            )
             print(f"Not all must_to_have terms are true for {self.name} indicator")
             return objects.IndicatorResponse(
                 success_count=0,
