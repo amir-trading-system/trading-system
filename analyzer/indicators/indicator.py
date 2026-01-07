@@ -122,7 +122,7 @@ class Indicator:
                 break
 
             if result.result:
-                if not evidence_object.is_base_evidence:
+                if not evidence_object.is_base_evidence or self.name == "already_has_indication":
                     success_results.append(result)
             else:
                 printed_results.append(f"{stock.symbol_name}: {self.name} -  Evidence: {evidence_object.name}. Reason: {Fore.RED}{result.reason}.{Style.RESET_ALL}")

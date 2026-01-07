@@ -8,8 +8,8 @@ class BarData:
         high: float,
         low: float,
         volume: float,
-        vwap: float,
         bar_time: datetime.datetime,
+        vwap: float = None,
         volume_average: float = None,
         ema_9: float = None,
         ema_20: float = None,
@@ -19,6 +19,7 @@ class BarData:
         index: int = None,
         is_after_market_open: bool = None,
         ready_to_analyze: bool = False,
+        has_indication: bool = False,
     ):
         self.open_value = open_value
         self.close = close
@@ -26,7 +27,7 @@ class BarData:
         self.low = low
         self.volume = float(volume)
         self.volume_average = volume_average
-        self.vwap = float(vwap)
+        self.vwap = vwap
         self.ema_9 = ema_9
         self.ema_20 = ema_20
         self.histogram = histogram
@@ -42,6 +43,7 @@ class BarData:
             minute=30,
         )
         self.ready_to_analyze = ready_to_analyze
+        self.has_indication = has_indication
 
 class Stock:
     def __init__(

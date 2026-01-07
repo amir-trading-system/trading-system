@@ -52,3 +52,4 @@ from . import volume_sum_is_positive
 from . import has_classic_bars_wave
 from . import has_bull_pattern
 from . import current_bar_is_the_first_one_to_cross_top_bar
+from . import has_previous_bar_with_indication

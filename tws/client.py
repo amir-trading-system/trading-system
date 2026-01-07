@@ -202,6 +202,25 @@ class Client(client.EClient, wrapper.EWrapper):
             real=bar_data_df["volume"],
             timeperiod=20,
         )
+        now = datetime.datetime.now()
+        since_open_bar_df = bar_data_df.where(
+            bar_data_df["bar_time"] >= datetime.datetime(
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                hour=9,
+                minute=30,
+            )
+        )
+
+        since_open_bar_df["volume"] = since_open_bar_df["volume"].astype(float)
+
+        ## calculate vwap
+        since_open_bar_df["hlc3"] = (since_open_bar_df["high"] + since_open_bar_df["low"] + since_open_bar_df["close"]) / 3
+        since_open_bar_df["pv"] = since_open_bar_df["hlc3"] * since_open_bar_df["volume"]
+        since_open_bar_df["cum_pv"] = since_open_bar_df["pv"].cumsum()
+        since_open_bar_df["cum_vol"] = since_open_bar_df["volume"].cumsum()
+        bar_data_df["vwap"] = since_open_bar_df["cum_pv"] / since_open_bar_df["cum_vol"]
 
         [macd, signal_line, histogram] = talib.MACDEXT(
             real=bar_data_df["close"],
@@ -284,7 +303,6 @@ class Client(client.EClient, wrapper.EWrapper):
                 high=bar.high,
                 low=bar.low,
                 volume=float(bar.volume),
-                vwap=float(bar.wap),
                 bar_time=bar_time,
                 ready_to_analyze=True,
             )
@@ -325,7 +343,6 @@ class Client(client.EClient, wrapper.EWrapper):
             high=bar.high,
             low=bar.low,
             volume=bar.volume,
-            vwap=bar.wap,
             bar_time=current_bar_time,
         )
 
@@ -335,7 +352,6 @@ class Client(client.EClient, wrapper.EWrapper):
             relevant_symbol_bars[-1].high = bar.high
             relevant_symbol_bars[-1].low = bar.low
             relevant_symbol_bars[-1].volume = bar.volume
-            relevant_symbol_bars[-1].vwap = bar.wap
 
             bars_data = self.enrich_bars(
                 bars=relevant_symbol_bars,

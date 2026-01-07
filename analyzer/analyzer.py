@@ -243,13 +243,31 @@ class Analyzer:
                     if result == 1.0
                 ]
             ) >= 1
-            certain_result = len(sorted_indicators) >= 2
+            certain_result = len(sorted_indicators) >= 2 or at_least_one_indication_result_is_certain
 
             if certain_result:
                 if at_least_one_indication_result_is_certain:
                     emoji = "✅"
                 else:
                     emoji = "👀"
+
+                stock.bars[current_bar.index].has_indication = True
+                self.logger.info(
+                    msg="Bar has Indication",
+                    extra={
+                        "worker": f"{__name__}.{__class__.__name__}",
+                        "symbol": stock.symbol_name,
+                        "timeframe": stock.timeframe,
+                        "bar_time": current_bar.bar_time,
+                        "current_index": current_bar.index,
+                        "starting_index": milestones.starting_bar.index,
+                        "starting_index_time": milestones.starting_bar.bar_time,
+                        "top_index": milestones.top_bar.index,
+                        "top_index_time": milestones.top_bar.bar_time,
+                        "lowest_low_index": milestones.lowest_low_bar.index,
+                        "lowest_low_time": milestones.lowest_low_bar.bar_time,
+                    }
+                )
 
                 message = f"""
     <b>{emoji} Congrats! {emoji}</b>
