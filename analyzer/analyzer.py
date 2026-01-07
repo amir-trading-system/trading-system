@@ -104,9 +104,11 @@ class Analyzer:
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
                     "starting_index": milestones.starting_bar.index,
+                    "starting_index_time": milestones.starting_bar.bar_time,
                     "top_index": milestones.top_bar.index,
+                    "top_index_time": milestones.top_bar.bar_time,
                     "lowest_low_index": milestones.lowest_low_bar.index,
-                    "current_bar": current_bar.__dict__,
+                    "lowest_low_time": milestones.lowest_low_bar.bar_time,
                 },
             )
             return milestones
@@ -176,9 +178,11 @@ class Analyzer:
                 "bar_time": current_bar.bar_time,
                 "current_index": current_bar.index,
                 "starting_index": milestones.starting_bar.index,
+                "starting_index_time": milestones.starting_bar.bar_time,
                 "top_index": milestones.top_bar.index,
+                "top_index_time": milestones.top_bar.bar_time,
                 "lowest_low_index": milestones.lowest_low_bar.index,
-                "current_bar": current_bar.__dict__,
+                "lowest_low_time": milestones.lowest_low_bar.bar_time,
             },
         )
         success_indicators: dict[str,float] = {}
@@ -213,9 +217,11 @@ class Analyzer:
                 "bar_time": current_bar.bar_time,
                 "current_index": current_bar.index,
                 "starting_index": milestones.starting_bar.index,
+                "starting_index_time": milestones.starting_bar.bar_time,
                 "top_index": milestones.top_bar.index,
+                "top_index_time": milestones.top_bar.bar_time,
                 "lowest_low_index": milestones.lowest_low_bar.index,
-                "current_bar": current_bar.__dict__,
+                "lowest_low_time": milestones.lowest_low_bar.bar_time,
                 "success_indicators_count": len(success_indicators),
                 "success_indicators": success_indicators,
             },
@@ -237,7 +243,7 @@ class Analyzer:
                     if result == 1.0
                 ]
             ) >= 1
-            certain_result = len(sorted_indicators) >= 5
+            certain_result = len(sorted_indicators) >= 2
 
             if certain_result:
                 if at_least_one_indication_result_is_certain:
@@ -272,6 +278,7 @@ class Analyzer:
     ):
         current_bar_is_valid = (
             True
+            and current_bar.high - current_bar.low > 0.2
             and current_bar.close > current_bar.open_value
             and current_bar.high > current_bar.ema_9
             and current_bar.high > current_bar.vwap
@@ -360,6 +367,12 @@ class Analyzer:
                             stock.bars = stock.bars[current_bar.index:]
                             for i, bar_object in enumerate(stock.bars):
                                 bar_object.index = i
+                            current_bar.index = 0
+                    else:
+                        current_bar.index = 0
+                        stock.bars = stock.bars[current_bar.index:]
+                        for i, bar_object in enumerate(stock.bars):
+                            bar_object.index = i
 
                     self.analyze_bar(
                         stock=stock,

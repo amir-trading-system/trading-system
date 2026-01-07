@@ -31,8 +31,8 @@
             "name": "test specific bar",
             "args": [
                 "test",
-                "--symbol=BNAI",
-                "--specific_bar_time=2026-01-02 09:55:00",
+                "--symbol=SMX",
+                "--specific_bar_time=2026-01-07 11:05:00",
                 "--timeframe=5",
             ],
             "type": "debugpy",
@@ -42,11 +42,11 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "retroactive main",
+            "name": "test retroactive",
             "args": [
                 "test",
-                "--symbol=BNAI",
-                "--retroactive_from=2026-01-02",
+                "--symbol=SMX",
+                "--retroactive_from=2026-01-07",
                 "--timeframe=5",
             ],
             "type": "debugpy",

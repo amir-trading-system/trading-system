@@ -90,7 +90,7 @@ class Client(client.EClient, wrapper.EWrapper):
             tag_value.TagValue("priceAbove", "1"),
             tag_value.TagValue("priceBelow", "100"),
             tag_value.TagValue("marketCapBelow1e6", "500000000"),
-            tag_value.TagValue("changePercAbove", "30")
+            tag_value.TagValue("changePercAbove", "20")
         ]
 
     def start_scanner(

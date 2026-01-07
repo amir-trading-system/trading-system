@@ -88,8 +88,11 @@ class Indicator:
                     "bar_index": current_bar.index,
                     "current_bar": current_bar,
                     "starting_index": milestones.starting_bar.index,
+                    "starting_index_time": milestones.starting_bar.bar_time,
                     "top_index": milestones.top_bar.index,
+                    "top_index_time": milestones.top_bar.bar_time,
                     "lowest_low_index": milestones.lowest_low_bar.index,
+                    "lowest_low_time": milestones.lowest_low_bar.bar_time,
                 }
             )
             print(f"Not all must_to_have terms are true for {self.name} indicator")
