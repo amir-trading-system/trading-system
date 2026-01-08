@@ -23,7 +23,7 @@
             "program": "main.py",
             "args": [
                 "test",
-                "--symbol=BNAI",
+                "--symbol=FLYX",
             ],
             "console": "integratedTerminal"
         },
@@ -31,9 +31,9 @@
             "name": "test specific bar",
             "args": [
                 "test",
-                "--symbol=SMX",
-                "--specific_bar_time=2026-01-07 12:05:00",
-                "--timeframe=5",
+                "--symbol=FLYX",
+                "--specific_bar_time=2026-01-08 11:45:00",
+                "--timeframe=15",
             ],
             "type": "debugpy",
             "request": "launch",

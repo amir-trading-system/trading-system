@@ -31,6 +31,14 @@ class AnalyzerHelper:
             hour=4,
         )
 
+        market_open_time = datetime.datetime(
+            year=current_bar.bar_time.year,
+            month=current_bar.bar_time.month,
+            day=current_bar.bar_time.day,
+            hour=9,
+            minute=30,
+        )
+
         bars_length = len(stock.bars)
         for i in range(current_bar.index+1,bars_length-1):
             potential_starting_bar: tws_objects.BarData = stock.bars[i]
@@ -50,14 +58,20 @@ class AnalyzerHelper:
                 and potential_starting_bar.volume > previous_bar.volume * 1.5
                 and potential_starting_bar.volume > potential_starting_bar.volume_average
                 and potential_starting_bar.close > potential_starting_bar.ema_9
-                and potential_starting_bar.high > potential_starting_bar.vwap
                 and potential_starting_bar.high - potential_starting_bar.low > (previous_bar.high - previous_bar.low) * 2
                 and potential_starting_bar.bar_time.day == current_bar.bar_time.day
+                and potential_starting_bar.bar_time != market_open_time
                 and (
                     potential_starting_bar.volume > 50000
                     or potential_starting_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
                 )
             )
+            if potential_starting_bar.bar_time > market_open_time:
+                is_really_potential_starting_bar = (
+                    True
+                    and is_really_potential_starting_bar
+                    and potential_starting_bar.high > potential_starting_bar.vwap
+                )
             if (
                 True
                 and is_really_potential_starting_bar
