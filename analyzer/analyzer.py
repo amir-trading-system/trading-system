@@ -216,6 +216,7 @@ class Analyzer:
                 "timeframe": stock.timeframe,
                 "bar_time": current_bar.bar_time,
                 "current_index": current_bar.index,
+                "current_volume": current_bar.volume,
                 "starting_index": milestones.starting_bar.index,
                 "starting_index_time": milestones.starting_bar.bar_time,
                 "top_index": milestones.top_bar.index,
@@ -391,6 +392,9 @@ class Analyzer:
                         stock.bars = stock.bars[current_bar.index:]
                         for i, bar_object in enumerate(stock.bars):
                             bar_object.index = i
+
+                    if not current_bar.is_after_market_open:
+                        continue
 
                     self.analyze_bar(
                         stock=stock,

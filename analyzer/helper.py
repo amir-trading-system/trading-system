@@ -13,6 +13,7 @@ class AnalyzerHelper:
         self.logger = logger
 
     #pylint:disable=too-many-locals
+    ## TODO: Add here search like ELVN- 15 minutes - 01.09.26 - search for 2 positive bars in a row that its volume bigger much more the start.
     def get_strating_bar(
         self,
         stock: tws_objects.Stock,
@@ -58,9 +59,9 @@ class AnalyzerHelper:
                 and potential_starting_bar.volume > previous_bar.volume * 1.5
                 and potential_starting_bar.volume > potential_starting_bar.volume_average
                 and potential_starting_bar.close > potential_starting_bar.ema_9
+                and potential_starting_bar.low <= potential_starting_bar.ema_9
                 and potential_starting_bar.high - potential_starting_bar.low > (previous_bar.high - previous_bar.low) * 2
                 and potential_starting_bar.bar_time.day == current_bar.bar_time.day
-                and potential_starting_bar.bar_time != market_open_time
                 and (
                     potential_starting_bar.volume > 50000
                     or potential_starting_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
