@@ -37,9 +37,9 @@ class Confirmator:
             one_minute_stock_data: tws_objects.Stock = self.request_id_to_symbol[one_minute_timeframe_request_id]
             if len(one_minute_stock_data.bars) == 0:
                 continue
+
             last_datetime = one_minute_stock_data.bars[-1].bar_time
             if not one_minute_stock_data.ready_to_confirm or most_updated_datetime == last_datetime:
-                time.sleep(1)
                 continue
 
             most_updated_datetime = one_minute_stock_data.bars[-1].bar_time
@@ -48,11 +48,10 @@ class Confirmator:
                 bar_object
                 for bar_object in one_minute_stock_data.bars
                 if bar_object.bar_time == original_bar_to_confirm.bar_time + datetime.timedelta(
-                    minutes=original_bar_to_confirm.timeframe+1,
+                    minutes=original_bar_to_confirm.timeframe,
                 )
             ]
             if len(one_minute_timeframe_starting_bar_to_look_from) == 0:
-                time.sleep(1)
                 continue
 
             one_minute_timeframe_starting_bar_to_look_from = one_minute_timeframe_starting_bar_to_look_from[0]
@@ -65,7 +64,13 @@ class Confirmator:
 
             highest_volume_until_now = 0
             for bar_object in relevant_bars:
-                highest_timeframe_contains_bar = [
+                bars_to_check = [
+                    bar_obj
+                    for bar_obj in relevant_bars
+                    if bar_obj.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
+                    and bar_obj.bar_time <= bar_object.bar_time
+                ]
+                higher_timeframe_contains_bar = [
                     higher_timeframe_bar
                     for higher_timeframe_bar in original_stock_data.bars
                     if (
@@ -76,7 +81,7 @@ class Confirmator:
                 ][0]
                 previous_bar = [
                     bar_obj
-                    for bar_obj in relevant_bars
+                    for bar_obj in bars_to_check
                     if bar_obj.index == bar_object.index+1
                 ]
                 if len(previous_bar) == 0:
@@ -84,47 +89,49 @@ class Confirmator:
                 previous_bar = previous_bar[0]
 
                 highest_volume_until_now = max(highest_volume_until_now, bar_object.volume)
-
-                if (
+                bar_is_most_volatile_since_now = (
                     True
-                    and one_minute_timeframe_starting_bar_to_look_from.index - bar_object.index <= 3
-                    and one_minute_timeframe_starting_bar_to_look_from.volume > one_minute_timeframe_starting_bar_to_look_from.volume_average
-                ):
-                    continue
+                    and not any(
+                        bar_obj
+                        for bar_obj in bars_to_check
+                        if bar_obj.volume > bar_obj.volume_average
+                        and bar_obj.volume > bar_object.volume
+                    )
+                    and bar_object.volume > bar_object.volume_average
+                )
 
                 if (
                     True
                     and bar_object.ready_to_analyze
+                    and bar_is_most_volatile_since_now
                     and bar_object.volume > bar_object.volume_average
                     and bar_object.close > bar_object.open_value
                     and bar_object.volume == highest_volume_until_now
                     and previous_bar.volume < previous_bar.volume_average
                     and bar_object.close > bar_object.ema_9
-                    and (highest_timeframe_contains_bar.low - highest_timeframe_contains_bar.ema_9)/(highest_timeframe_contains_bar.high - highest_timeframe_contains_bar.low) <= 0.3
+                    and higher_timeframe_contains_bar.high - higher_timeframe_contains_bar.low > 0
+                    and (
+                        ((higher_timeframe_contains_bar.low - higher_timeframe_contains_bar.ema_9)/(higher_timeframe_contains_bar.high - higher_timeframe_contains_bar.low) <= 0.3 and higher_timeframe_contains_bar.volume > 200000) or
+                        (higher_timeframe_contains_bar.low - higher_timeframe_contains_bar.ema_9 < higher_timeframe_contains_bar.high - higher_timeframe_contains_bar.low and higher_timeframe_contains_bar.volume < 100000)
+                    )
                 ):
-                    relevant_bars = [
-                        bar_obj
-                        for bar_obj in relevant_bars
-                        if bar_obj.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
-                        and bar_obj.bar_time <= bar_object.bar_time
-                    ]
                     above_volume_average_count = len(
                         [
                             bar_obj
-                            for bar_obj in relevant_bars
+                            for bar_obj in bars_to_check
                             if bar_obj.volume > bar_obj.volume_average
                         ]
                     )
                     under_volume_average_count = len(
                         [
                             bar_obj
-                            for bar_obj in relevant_bars
+                            for bar_obj in bars_to_check
                             if bar_obj.volume <= bar_obj.volume_average
                         ]
                     )
                     bars_not_showing_real_retracement = (
                         True
-                        and len(relevant_bars) > 10
+                        and len(bars_to_check) > 10
                         and above_volume_average_count/under_volume_average_count >= 0.75
                     )
 

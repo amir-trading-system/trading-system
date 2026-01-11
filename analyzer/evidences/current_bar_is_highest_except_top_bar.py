@@ -26,6 +26,7 @@ class Evidence(
             bar_object
             for bar_object in relevant_bars
             if bar_object.high > current_bar.high
+            and bar_object.high - bar_object.low > 0
             and abs(bar_object.close - bar_object.open_value)/(bar_object.high - bar_object.low) >= 0.5
         )
 

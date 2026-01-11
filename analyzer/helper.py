@@ -82,6 +82,9 @@ class AnalyzerHelper:
                     and previous_bar.bar_time.time() < datetime.time(hour=16)):
                         continue
 
+                    if previous_bar.bar_time.hour == 8 and previous_bar.bar_time.minute == 0:
+                        continue
+
                     more_volatile_than_starting_bar = (
                         previous_bar.volume > potential_starting_bar.volume
                         and previous_bar.high >= potential_starting_bar.high

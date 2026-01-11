@@ -31,8 +31,8 @@
             "name": "test specific bar",
             "args": [
                 "test",
-                "--symbol=INBS",
-                "--specific_bar_time=2025-12-31 12:30:00",
+                "--symbol=ASPC",
+                "--specific_bar_time=2025-12-26 12:00:00",
                 "--timeframe=15",
             ],
             "type": "debugpy",
@@ -45,9 +45,9 @@
             "name": "test retroactive",
             "args": [
                 "test",
-                "--symbol=INBS",
-                "--retroactive_from=2025-12-31",
-                "--timeframe=15",
+                "--symbol=AGMH",
+                "--retroactive_from=2025-09-19",
+                "--timeframe=5",
             ],
             "type": "debugpy",
             "request": "launch",
