@@ -4,6 +4,7 @@ import time
 import threading
 import queue
 
+import alerter
 from tws import objects as tws_objects
 
 class Confirmator:
@@ -12,11 +13,13 @@ class Confirmator:
         waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
         request_id_to_symbol: dict[int,tws_objects.Stock],
         ibapi_requests: list[tws_objects.IbAPIRequest],
+        alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
     ):
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.request_id_to_symbol = request_id_to_symbol
         self.ibapi_requests = ibapi_requests
+        self.alerter_object = alerter_object
         self.logger = logger
 
     def confirm_entry_position(
@@ -56,6 +59,9 @@ class Confirmator:
             for bar_object in relevant_bars:
                 highest_volume_until_now = max(highest_volume_until_now, bar_object.volume)
 
+                if one_minute_timeframe_starting_bar_to_look_from.index - bar_object.index < 3:
+                    continue
+
                 if (
                     True
                     and bar_object.ready_to_analyze
@@ -72,7 +78,17 @@ class Confirmator:
                 break
 
         if entry_position_confirmed:
-            print(f"Entry position confirmed for {entry_position_bar.symbol}. bar_time: {entry_position_bar.bar_time}")
+            self.alerter_object.alert(
+                symbol=entry_position_bar.symbol,
+                timeframe=1,
+                bar_date=entry_position_bar.bar_time,
+                bar_index=entry_position_bar.index,
+                message=f"""
+                    <b>Entry position confirmed for:</b>
+<b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
+<b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
+<b>Time:</b> <code>{entry_position_bar.bar_time}</code>"""
+            )
 
     def confirm_data(
         self,

@@ -4,10 +4,11 @@ import threading
 import time
 import queue
 
-import logger
+import alerter
 import analyzer
-import collector
 import buying_confirmator
+import collector
+import logger
 import tws
 
 def run_bot(
@@ -72,6 +73,9 @@ if __name__ == "__main__":
     logger_object = logger.logger.Logger()
     logger_object = logger_object.get_logger()
 
+    alerter_object = alerter.alerter.Alerter(
+        logger=logger_object,
+    )
     collector_obj = collector.collector.Collector(
         tws_host="localhost",
         tws_port=8081,
@@ -84,12 +88,14 @@ if __name__ == "__main__":
     analyzer_obj = analyzer.analyzer.Analyzer(
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+        alerter_object=alerter_object,
         logger=logger_object,
     )
     confirmator_obj = buying_confirmator.confirmator.Confirmator(
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
         request_id_to_symbol=request_id_to_symbol,
         ibapi_requests=ibapi_requests,
+        alerter_object=alerter_object,
         logger=logger_object,
     )
 

@@ -4,8 +4,9 @@ import queue
 
 import copy
 import logging
-import requests
 
+
+import alerter
 from analyzer import objects, helper
 import analyzer.indicators
 import analyzer.evidences
@@ -17,6 +18,7 @@ class Analyzer:
         self,
         bars_ready_to_analyze_queue: queue.Queue[tws_objects.BarData],
         waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
+        alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
     ):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
@@ -25,6 +27,7 @@ class Analyzer:
             logger=logger,
         )
         self.logger = logger
+        self.alerter_object = alerter_object
 
     def _prepare_milestones(
         self,
@@ -131,39 +134,6 @@ class Analyzer:
         milestones.retracement_indexes = retracements_result.value
 
         return milestones
-
-    def _alert(
-        self,
-        symbol: str,
-        timeframe: int,
-        bar_date: datetime.datetime,
-        bar_index: int,
-        message: str,
-    ):
-        bot_token = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
-        chat_id = "-1003604401866"
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": message,
-            "parse_mode": "HTML"
-        }
-        response = requests.post(
-            url=url,
-            json=payload,
-            timeout=10,
-        )
-        response.raise_for_status()
-        self.logger.info(
-            msg="Alert has been sent successfully",
-            extra={
-                "worker": f"{__name__}.{__class__.__name__}",
-                "symbol": symbol,
-                "timeframe": timeframe,
-                "bar_time": bar_date,
-                "current_index": bar_index,
-            },
-        )
 
     def _run_indicators(
         self,
@@ -284,7 +254,7 @@ class Analyzer:
     {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
     """
 
-                self._alert(
+                self.alerter_object.alert(
                     symbol=stock.symbol_name,
                     timeframe=stock.timeframe,
                     bar_date=current_bar.bar_time,
