@@ -12,6 +12,7 @@ class Alerter:
 
     def alert(
         self,
+        sender: str,
         symbol: str,
         timeframe: int,
         bar_date: datetime.datetime,
@@ -35,7 +36,7 @@ class Alerter:
         self.logger.info(
             msg="Alert has been sent successfully",
             extra={
-                "worker": f"{__name__}.{__class__.__name__}",
+                "worker": sender,
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "bar_time": bar_date,

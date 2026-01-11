@@ -79,6 +79,7 @@ class Confirmator:
 
         if entry_position_confirmed:
             self.alerter_object.alert(
+                sender=f"{__name__}.{__class__.__name__}",
                 symbol=entry_position_bar.symbol,
                 timeframe=1,
                 bar_date=entry_position_bar.bar_time,
