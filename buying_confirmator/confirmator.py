@@ -57,9 +57,18 @@ class Confirmator:
 
             highest_volume_until_now = 0
             for bar_object in relevant_bars:
+                previous_bar = [
+                    bar_obj
+                    for bar_obj in relevant_bars
+                    if bar_obj.index == bar_object.index+1
+                ]
+                if len(previous_bar) == 0:
+                    continue
+                previous_bar = previous_bar[0]
+
                 highest_volume_until_now = max(highest_volume_until_now, bar_object.volume)
 
-                if one_minute_timeframe_starting_bar_to_look_from.index - bar_object.index < 3:
+                if one_minute_timeframe_starting_bar_to_look_from.index - bar_object.index < 2:
                     continue
 
                 if (
@@ -68,6 +77,7 @@ class Confirmator:
                     and bar_object.volume > bar_object.volume_average
                     and bar_object.close > bar_object.open_value
                     and bar_object.volume == highest_volume_until_now
+                    and previous_bar.volume < previous_bar.volume_average
                     and bar_object.close > bar_object.ema_9
                 ):
                     entry_position_confirmed = True
