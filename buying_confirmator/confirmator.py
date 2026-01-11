@@ -1,5 +1,7 @@
+import datetime
 import logging
 import time
+import threading
 import queue
 
 from tws import objects as tws_objects
@@ -17,11 +19,86 @@ class Confirmator:
         self.ibapi_requests = ibapi_requests
         self.logger = logger
 
+    def confirm_entry_position(
+        self,
+        one_minute_timeframe_request_id: int,
+        original_bar_to_confirm: tws_objects.BarData,
+    ):
+        entry_position_confirmed: bool = False
+        entry_position_bar: tws_objects.BarData = None
+
+        while True:
+            one_minute_stock_data: tws_objects.Stock = self.request_id_to_symbol[one_minute_timeframe_request_id]
+            if not one_minute_stock_data.ready_to_confirm:
+                time.sleep(1)
+                continue
+
+            one_minute_timeframe_starting_bar_to_look_from = [
+                bar_object
+                for bar_object in one_minute_stock_data.bars
+                if bar_object.bar_time == original_bar_to_confirm.bar_time + datetime.timedelta(
+                    minutes=original_bar_to_confirm.timeframe+1,
+                )
+            ]
+            if len(one_minute_timeframe_starting_bar_to_look_from) == 0:
+                time.sleep(1)
+                continue
+
+            one_minute_timeframe_starting_bar_to_look_from = one_minute_timeframe_starting_bar_to_look_from[0]
+
+            relevant_bars = [
+                bar_object
+                for bar_object in one_minute_stock_data.bars
+                if bar_object.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
+            ]
+
+            highest_volume_until_now = 0
+            for bar_object in relevant_bars:
+                highest_volume_until_now = max(highest_volume_until_now, bar_object.volume)
+
+                if (
+                    True
+                    and bar_object.ready_to_analyze
+                    and bar_object.volume > bar_object.volume_average
+                    and bar_object.close > bar_object.open_value
+                    and bar_object.volume == highest_volume_until_now
+                    and bar_object.close > bar_object.ema_9
+                ):
+                    entry_position_confirmed = True
+                    entry_position_bar = bar_object
+                    break
+
+            if entry_position_confirmed:
+                break
+
+        if entry_position_confirmed:
+            print(f"Entry position confirmed for {entry_position_bar.symbol}. bar_time: {entry_position_bar.bar_time}")
+
     def confirm_data(
         self,
     ):
         while True:
             if not self.waiting_for_confirmation_queue.empty():
                 bar_to_confirm: tws_objects.BarData = self.waiting_for_confirmation_queue.get()
-                ## TODO: continue from here
+                one_minute_timeframe_request_id = [
+                    request_id
+                    for request_id, symbol_data in self.request_id_to_symbol.items()
+                    if (
+                        True
+                        and symbol_data.symbol_name == bar_to_confirm.symbol
+                        and symbol_data.timeframe == 1
+                    )
+                ]
+                if len(one_minute_timeframe_request_id) == 0:
+                    continue
+                one_minute_timeframe_request_id = one_minute_timeframe_request_id[0]
+
+                threading.Thread(
+                    target=self.confirm_entry_position,
+                    kwargs={
+                        "one_minute_timeframe_request_id": one_minute_timeframe_request_id,
+                        "original_bar_to_confirm": bar_to_confirm,
+                    },
+                ).start()
+
             time.sleep(1)

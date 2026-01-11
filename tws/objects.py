@@ -54,11 +54,13 @@ class Stock:
         self,
         symbol_name: str,
         bars: list[BarData],
-        timeframe: int
+        timeframe: int,
+        ready_to_confirm: bool = False,
     ):
         self.symbol_name = symbol_name
         self.bars = bars
         self.timeframe = timeframe
+        self.ready_to_confirm = ready_to_confirm
 
     def previous_bar(
         self,
