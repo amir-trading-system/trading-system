@@ -3,6 +3,8 @@ import datetime
 class BarData:
     def __init__(
         self,
+        symbol: str,
+        timeframe: int,
         open_value: float,
         close: float,
         high: float,
@@ -21,6 +23,8 @@ class BarData:
         ready_to_analyze: bool = False,
         has_indication: bool = False,
     ):
+        self.symbol = symbol
+        self.timeframe = timeframe
         self.open_value = open_value
         self.close = close
         self.high = high
@@ -75,3 +79,15 @@ class Stock:
             return self.bars[next_bar_index]
 
         return None
+
+
+class IbAPIRequest:
+    def __init__(
+        self,
+        request_id: int,
+        symbol: str,
+        timeframe: int,
+    ):
+        self.request_id = request_id
+        self.symbol = symbol
+        self.timeframe = timeframe

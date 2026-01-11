@@ -18,6 +18,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self,
         host: str,
         port: int,
+        ibapi_requests: list[objects.IbAPIRequest],
         request_id_to_symbol: dict[int, objects.Stock],
         symbols_to_collect_queue: queue.Queue,
         bars_ready_to_analyze_queue: queue.Queue,
@@ -33,6 +34,7 @@ class Client(client.EClient, wrapper.EWrapper):
             port=port,
             clientId=0,
         )
+        self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
@@ -202,25 +204,22 @@ class Client(client.EClient, wrapper.EWrapper):
             real=bar_data_df["volume"],
             timeperiod=20,
         )
-        now = datetime.datetime.now()
-        since_open_bar_df = bar_data_df.where(
-            bar_data_df["bar_time"] >= datetime.datetime(
-                year=now.year,
-                month=now.month,
-                day=now.day,
-                hour=9,
-                minute=30,
-            )
-        )
-
-        since_open_bar_df["volume"] = since_open_bar_df["volume"].astype(float)
 
         ## calculate vwap
+        bar_data_df["bar_time"] = (
+            pd.to_datetime(bar_data_df["bar_time"])
+        )
+        since_open_bar_df = bar_data_df.where(
+            (bar_data_df["bar_time"].dt.time >= pd.to_datetime("09:30").time()) &
+            (bar_data_df["bar_time"].dt.time <= pd.to_datetime("16:00").time())
+        )
+        since_open_bar_df["session"] = since_open_bar_df["bar_time"].dt.date
+
+        since_open_bar_df["volume"] = since_open_bar_df["volume"].astype(float)
         since_open_bar_df["hlc3"] = (since_open_bar_df["high"] + since_open_bar_df["low"] + since_open_bar_df["close"]) / 3
         since_open_bar_df["pv"] = since_open_bar_df["hlc3"] * since_open_bar_df["volume"]
-        since_open_bar_df["cum_pv"] = since_open_bar_df["pv"].cumsum()
-        since_open_bar_df["cum_vol"] = since_open_bar_df["volume"].cumsum()
-        bar_data_df["vwap"] = since_open_bar_df["cum_pv"] / since_open_bar_df["cum_vol"]
+
+        bar_data_df["vwap"] = since_open_bar_df.groupby("session")["pv"].cumsum() / since_open_bar_df.groupby("session")["volume"].cumsum()
 
         [macd, signal_line, histogram] = talib.MACDEXT(
             real=bar_data_df["close"],
@@ -263,6 +262,14 @@ class Client(client.EClient, wrapper.EWrapper):
             bars=[],
             timeframe=timeframe,
         )
+        ibapi_request = objects.IbAPIRequest(
+            request_id=request_id,
+            symbol=symbol,
+            timeframe=timeframe,
+        )
+        if ibapi_request not in self.ibapi_requests:
+            self.ibapi_requests.append(ibapi_request)
+
         end_time_str = ""
         keep_up_to_date = True
         if specific_bar_time is not None:
@@ -270,12 +277,16 @@ class Client(client.EClient, wrapper.EWrapper):
             end_time_str = f"{end_time} US/Eastern"
             keep_up_to_date = False
 
+        bar_size = f"{timeframe} mins"
+        if timeframe == 1:
+            bar_size = f"{timeframe} min"
+
         self.reqHistoricalData(
             reqId=request_id,
             contract=contract,
             endDateTime=end_time_str,
             durationStr="1 W",
-            barSizeSetting=f"{timeframe} mins",
+            barSizeSetting=bar_size,
             whatToShow="TRADES",
             useRTH=0,
             formatDate=2,
@@ -296,8 +307,19 @@ class Client(client.EClient, wrapper.EWrapper):
         ):
             return
 
+        ibapi_request = [
+            request
+            for request in self.ibapi_requests
+            if request.request_id == reqId
+        ]
+        if len(ibapi_request) == 0:
+            return
+
+        ibapi_request = ibapi_request[0]
         self.request_id_to_symbol[reqId].bars.append(
             objects.BarData(
+                symbol=ibapi_request.symbol,
+                timeframe=ibapi_request.timeframe,
                 open_value=bar.open,
                 close=bar.close,
                 high=bar.high,
@@ -337,7 +359,20 @@ class Client(client.EClient, wrapper.EWrapper):
     ):
         relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
         current_bar_time = datetime.datetime.fromtimestamp(float(bar.date))
+
+        ibapi_request = [
+            request
+            for request in self.ibapi_requests
+            if request.request_id == reqId
+        ]
+        if len(ibapi_request) == 0:
+            return
+
+        ibapi_request = ibapi_request[0]
+
         current_bar = objects.BarData(
+            symbol=ibapi_request.symbol,
+            timeframe=ibapi_request.timeframe,
             open_value=bar.open,
             close=bar.close,
             high=bar.high,

@@ -13,7 +13,6 @@ class AnalyzerHelper:
         self.logger = logger
 
     #pylint:disable=too-many-locals
-    ## TODO: Add here search like ELVN- 15 minutes - 01.09.26 - search for 2 positive bars in a row that its volume bigger much more the start.
     def get_strating_bar(
         self,
         stock: tws_objects.Stock,

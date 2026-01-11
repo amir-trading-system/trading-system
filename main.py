@@ -7,11 +7,13 @@ import queue
 import logger
 import analyzer
 import collector
+import buying_confirmator
 import tws
 
 def run_bot(
     c_obj: collector.collector.Collector,
     a_obj: analyzer.analyzer.Analyzer,
+    co_obj: buying_confirmator.confirmator.Confirmator,
     symbol: str = None,
     timeframe: int = None,
     specific_bar_time: datetime.datetime = None,
@@ -57,9 +59,16 @@ def run_bot(
         kwargs=analyzer_kwargs,
     ).start()
 
+    threading.Thread(
+        target=co_obj.confirm_data,
+    ).start()
+
 if __name__ == "__main__":
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[tws.objects.Stock] = queue.Queue()
+    waiting_for_confirmation_queue: queue.Queue[tws.objects.BarData] = queue.Queue()
+    request_id_to_symbol: dict[int,tws.objects.Stock] = {}
+    ibapi_requests: list[tws.objects.IbAPIRequest] = []
     logger_object = logger.logger.Logger()
     logger_object = logger_object.get_logger()
 
@@ -68,10 +77,19 @@ if __name__ == "__main__":
         tws_port=8081,
         symbols_to_collect_queue=symbols_to_collect_queue,
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+        ibapi_requests=ibapi_requests,
+        request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
     )
     analyzer_obj = analyzer.analyzer.Analyzer(
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+        logger=logger_object,
+    )
+    confirmator_obj = buying_confirmator.confirmator.Confirmator(
+        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+        request_id_to_symbol=request_id_to_symbol,
+        ibapi_requests=ibapi_requests,
         logger=logger_object,
     )
 
@@ -115,11 +133,13 @@ if __name__ == "__main__":
         run_bot(
             c_obj=collector_obj,
             a_obj=analyzer_obj,
+            co_obj=confirmator_obj,
         )
     else:
         run_bot(
             c_obj=collector_obj,
             a_obj=analyzer_obj,
+            co_obj=confirmator_obj,
             symbol=args.symbol,
             timeframe=args.timeframe,
             specific_bar_time=args.specific_bar_time,

@@ -15,10 +15,12 @@ from tws import objects as tws_objects
 class Analyzer:
     def __init__(
         self,
-        bars_ready_to_analyze_queue: queue.Queue,
+        bars_ready_to_analyze_queue: queue.Queue[tws_objects.BarData],
+        waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
         logger: logging.Logger,
     ):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
+        self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.helper = helper.AnalyzerHelper(
             logger=logger,
         )
@@ -130,7 +132,7 @@ class Analyzer:
 
         return milestones
 
-    def alert(
+    def _alert(
         self,
         symbol: str,
         timeframe: int,
@@ -163,7 +165,7 @@ class Analyzer:
             },
         )
 
-    def run_indicators(
+    def _run_indicators(
         self,
         stock: tws_objects.Stock,
         current_bar: tws_objects.BarData,
@@ -282,15 +284,16 @@ class Analyzer:
     {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
     """
 
-                self.alert(
+                self._alert(
                     symbol=stock.symbol_name,
                     timeframe=stock.timeframe,
                     bar_date=current_bar.bar_time,
                     bar_index=current_bar.index,
                     message=message,
                 )
+                self.waiting_for_confirmation_queue.put(current_bar)
 
-    def analyze_bar(
+    def _analyze_bar(
         self,
         stock: tws_objects.Stock,
         current_bar: tws_objects.BarData,
@@ -313,7 +316,7 @@ class Analyzer:
         if not milestones.are_valid:
             return
 
-        self.run_indicators(
+        self._run_indicators(
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
@@ -364,7 +367,7 @@ class Analyzer:
                             timeframe=stock_object.timeframe,
                         )
 
-                        self.analyze_bar(
+                        self._analyze_bar(
                             stock=new_stock_object,
                             current_bar=current_bar,
                         )
@@ -396,9 +399,9 @@ class Analyzer:
                     if not current_bar.is_after_market_open:
                         continue
 
-                    self.analyze_bar(
+                    self._analyze_bar(
                         stock=stock,
                         current_bar=current_bar,
                     )
             else:
-                time.sleep(2)
+                time.sleep(1)
