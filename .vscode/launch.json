@@ -31,8 +31,8 @@
             "name": "test specific bar",
             "args": [
                 "test",
-                "--symbol=GVH",
-                "--specific_bar_time=2025-12-29 11:00:00",
+                "--symbol=ASPC",
+                "--specific_bar_time=2025-12-26 12:00:00",
                 "--timeframe=15",
             ],
             "type": "debugpy",

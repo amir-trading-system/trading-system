@@ -344,6 +344,9 @@ class Client(client.EClient, wrapper.EWrapper):
             )
             self.request_id_to_symbol[reqId].bars = bars_data
             self.request_id_to_symbol[reqId].ready_to_confirm = True
+            if self.request_id_to_symbol[reqId].timeframe == 1:
+                return
+
             self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
             self.logger.info(
                 msg="Finished to collect data for symbol",
@@ -402,4 +405,7 @@ class Client(client.EClient, wrapper.EWrapper):
 
         self.request_id_to_symbol[reqId].bars = bars_data
         self.request_id_to_symbol[reqId].ready_to_confirm = True
+        if self.request_id_to_symbol[reqId].timeframe == 1:
+            return
+
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
