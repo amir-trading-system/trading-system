@@ -25,16 +25,24 @@ class Confirmator:
     def confirm_entry_position(
         self,
         one_minute_timeframe_request_id: int,
+        original_timeframe_request_id: int,
         original_bar_to_confirm: tws_objects.BarData,
     ):
         entry_position_confirmed: bool = False
         entry_position_bar: tws_objects.BarData = None
+        most_updated_datetime = None
 
         while True:
+            original_stock_data: tws_objects.Stock = self.request_id_to_symbol[original_timeframe_request_id]
             one_minute_stock_data: tws_objects.Stock = self.request_id_to_symbol[one_minute_timeframe_request_id]
-            if not one_minute_stock_data.ready_to_confirm:
+            if len(one_minute_stock_data.bars) == 0:
+                continue
+            last_datetime = one_minute_stock_data.bars[-1].bar_time
+            if not one_minute_stock_data.ready_to_confirm or most_updated_datetime == last_datetime:
                 time.sleep(1)
                 continue
+
+            most_updated_datetime = one_minute_stock_data.bars[-1].bar_time
 
             one_minute_timeframe_starting_bar_to_look_from = [
                 bar_object
@@ -57,6 +65,15 @@ class Confirmator:
 
             highest_volume_until_now = 0
             for bar_object in relevant_bars:
+                highest_timeframe_contains_bar = [
+                    higher_timeframe_bar
+                    for higher_timeframe_bar in original_stock_data.bars
+                    if (
+                        True
+                        and bar_object.bar_time.day == higher_timeframe_bar.bar_time.day
+                        and (bar_object.bar_time - higher_timeframe_bar.bar_time).seconds/60 < higher_timeframe_bar.timeframe
+                    )
+                ][0]
                 previous_bar = [
                     bar_obj
                     for bar_obj in relevant_bars
@@ -68,7 +85,11 @@ class Confirmator:
 
                 highest_volume_until_now = max(highest_volume_until_now, bar_object.volume)
 
-                if one_minute_timeframe_starting_bar_to_look_from.index - bar_object.index < 2:
+                if (
+                    True
+                    and one_minute_timeframe_starting_bar_to_look_from.index - bar_object.index <= 3
+                    and one_minute_timeframe_starting_bar_to_look_from.volume > one_minute_timeframe_starting_bar_to_look_from.volume_average
+                ):
                     continue
 
                 if (
@@ -79,10 +100,38 @@ class Confirmator:
                     and bar_object.volume == highest_volume_until_now
                     and previous_bar.volume < previous_bar.volume_average
                     and bar_object.close > bar_object.ema_9
+                    and (highest_timeframe_contains_bar.low - highest_timeframe_contains_bar.ema_9)/(highest_timeframe_contains_bar.high - highest_timeframe_contains_bar.low) <= 0.3
                 ):
-                    entry_position_confirmed = True
-                    entry_position_bar = bar_object
-                    break
+                    relevant_bars = [
+                        bar_obj
+                        for bar_obj in relevant_bars
+                        if bar_obj.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
+                        and bar_obj.bar_time <= bar_object.bar_time
+                    ]
+                    above_volume_average_count = len(
+                        [
+                            bar_obj
+                            for bar_obj in relevant_bars
+                            if bar_obj.volume > bar_obj.volume_average
+                        ]
+                    )
+                    under_volume_average_count = len(
+                        [
+                            bar_obj
+                            for bar_obj in relevant_bars
+                            if bar_obj.volume <= bar_obj.volume_average
+                        ]
+                    )
+                    bars_not_showing_real_retracement = (
+                        True
+                        and len(relevant_bars) > 10
+                        and above_volume_average_count/under_volume_average_count >= 0.75
+                    )
+
+                    if not bars_not_showing_real_retracement:
+                        entry_position_confirmed = True
+                        entry_position_bar = bar_object
+                        break
 
             if entry_position_confirmed:
                 break
@@ -98,7 +147,8 @@ class Confirmator:
                     <b>Entry position confirmed for:</b>
 <b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
 <b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
-<b>Time:</b> <code>{entry_position_bar.bar_time}</code>"""
+<b>Time:</b> <code>{entry_position_bar.bar_time}</code>
+<b>Original bar to confirm Time:</b> <code>{original_bar_to_confirm.bar_time}</code>"""
             )
 
     def confirm_data(
@@ -116,6 +166,16 @@ class Confirmator:
                         and symbol_data.timeframe == 1
                     )
                 ]
+                original_timeframe_request_id = [
+                    request_id
+                    for request_id, symbol_data in self.request_id_to_symbol.items()
+                    if (
+                        True
+                        and symbol_data.symbol_name == bar_to_confirm.symbol
+                        and symbol_data.timeframe == bar_to_confirm.timeframe
+                    )
+                ]
+
                 if len(one_minute_timeframe_request_id) == 0:
                     continue
                 one_minute_timeframe_request_id = one_minute_timeframe_request_id[0]
@@ -124,6 +184,7 @@ class Confirmator:
                     target=self.confirm_entry_position,
                     kwargs={
                         "one_minute_timeframe_request_id": one_minute_timeframe_request_id,
+                        "original_timeframe_request_id": original_timeframe_request_id[0],
                         "original_bar_to_confirm": bar_to_confirm,
                     },
                 ).start()

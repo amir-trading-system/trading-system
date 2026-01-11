@@ -72,17 +72,8 @@ class AnalyzerHelper:
                     and is_really_potential_starting_bar
                     and potential_starting_bar.high > potential_starting_bar.vwap
                 )
-            if (
-                True
-                and is_really_potential_starting_bar
-                and potential_starting_bar.bar_time != datetime.datetime(
-                    year=potential_starting_bar.bar_time.year,
-                    month=potential_starting_bar.bar_time.month,
-                    day=potential_starting_bar.bar_time.day,
-                    hour=9,
-                    minute=30,
-                )
-            ):
+
+            if is_really_potential_starting_bar:
                 for j in range(i+1, i+31):
                     if j > len(stock.bars) - 2:
                         break
@@ -164,12 +155,12 @@ class AnalyzerHelper:
             timeframe=stock.timeframe,
         )
 
-        if starting_bar.index == 0 or len(stock.bars[2:starting_bar.index+1]) == 0:
+        if starting_bar.index == 0 or len(stock.bars[2:starting_bar.index-1]) == 0:
             return top_bar
 
         high_picks_bars = [
             {"index": i, "bar": stock.bars[i]}
-            for i in range(1, starting_bar.index+1)
+            for i in range(2, starting_bar.index-1)
             if stock.bars[i].high > stock.bars[i-1].high
             and stock.bars[i].high > stock.bars[i+1].high
         ]
@@ -190,7 +181,7 @@ class AnalyzerHelper:
             return top_bar
 
         # pylint:disable=too-many-boolean-expressions
-        for i in range(1,starting_bar.index+1):
+        for i in range(2,starting_bar.index-1):
             potential_top_bar = stock.bars[i]
             previous_bar = stock.bars[i+1]
             right_after_bar = stock.bars[i-1]

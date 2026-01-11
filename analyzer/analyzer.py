@@ -48,7 +48,7 @@ class Analyzer:
         if top_bar.index > 0:
             already_passed_top_bar = [
                 bar_object.index
-                for bar_object in stock.bars[current_bar.index+1:top_bar.index-1]
+                for bar_object in stock.bars[current_bar.index+2:top_bar.index-1]
                 if bar_object.high > top_bar.bar_object.high
                 and bar_object.index < top_bar.index
                 and bar_object.volume > top_bar.bar_object.volume
