@@ -23,7 +23,7 @@
             "program": "main.py",
             "args": [
                 "test",
-                "--symbol=FLYX",
+                "--symbol=INBS",
             ],
             "console": "integratedTerminal"
         },

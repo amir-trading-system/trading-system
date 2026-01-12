@@ -14,6 +14,8 @@ from tws import objects as tws_objects
 
 
 class Analyzer:
+    # To check with confirmator on real time.
+    # to_push = True
     def __init__(
         self,
         bars_ready_to_analyze_queue: queue.Queue[tws_objects.BarData],
@@ -366,6 +368,12 @@ class Analyzer:
                         stock.bars = stock.bars[current_bar.index:]
                         for i, bar_object in enumerate(stock.bars):
                             bar_object.index = i
+
+                    # To check with confirmator on real time.
+                    # if self.to_push:
+                    #     if current_bar.timeframe == 5 and current_bar.symbol == "INBS":
+                    #         self.waiting_for_confirmation_queue.put(current_bar)
+                    #         self.to_push = False
 
                     if not current_bar.is_after_market_open:
                         continue
