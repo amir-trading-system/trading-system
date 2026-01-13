@@ -5,9 +5,9 @@ import queue
 import pandas as pd
 import talib
 from talib import MA_Type
+from ibapi import client, wrapper, common, tag_value
 
 import alerter
-from ibapi import client, wrapper, common, tag_value
 from . import objects
 
 
