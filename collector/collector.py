@@ -3,6 +3,7 @@ import logging
 import time
 import queue
 
+import alerter
 from tws import objects, client
 
 class Collector:
@@ -15,6 +16,7 @@ class Collector:
         ibapi_requests: list[objects.IbAPIRequest],
         request_id_to_symbol: dict[int,objects.Stock],
         logger: logging.Logger,
+        alerter_object: alerter.alerter.Alerter,
     ):
         self.logger = logger
         self.ibapi_requests = ibapi_requests
@@ -27,6 +29,7 @@ class Collector:
             symbols_to_collect_queue=symbols_to_collect_queue,
             bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
             logger=logger,
+            alerter_object=alerter_object,
         )
 
     def collect_data(

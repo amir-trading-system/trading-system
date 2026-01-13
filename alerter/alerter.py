@@ -4,11 +4,31 @@ import requests
 
 
 class Alerter:
+    BOT_TOEKN = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
+    CHAT_ID = "-1003604401866"
+    URL = f"https://api.telegram.org/bot{BOT_TOEKN}/sendMessage"
+
     def __init__(
         self,
         logger: logging.Logger,
     ):
         self.logger = logger
+
+    def _send_message(
+        self,
+        message: str,
+    ):
+        payload = {
+            "chat_id": self.CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        response = requests.post(
+            url=self.URL,
+            json=payload,
+            timeout=10,
+        )
+        response.raise_for_status()
 
     def alert(
         self,
@@ -19,20 +39,9 @@ class Alerter:
         bar_index: int,
         message: str,
     ):
-        bot_token = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
-        chat_id = "-1003604401866"
-        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": message,
-            "parse_mode": "HTML"
-        }
-        response = requests.post(
-            url=url,
-            json=payload,
-            timeout=10,
+        self._send_message(
+            message=message,
         )
-        response.raise_for_status()
         self.logger.info(
             msg="Alert has been sent successfully",
             extra={
@@ -41,5 +50,20 @@ class Alerter:
                 "timeframe": timeframe,
                 "bar_time": bar_date,
                 "current_index": bar_index,
+            },
+        )
+
+    def alert_on_error(
+        self,
+        message: str,
+    ):
+        error_message = f"<b>Error: {message}<b/>"
+        self._send_message(
+            message=error_message,
+        )
+        self.logger.info(
+            msg="Error has occurred - sending message by bot",
+            extra={
+                "error_message": error_message,
             },
         )

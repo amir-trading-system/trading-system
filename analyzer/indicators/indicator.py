@@ -40,6 +40,7 @@ class Indicator:
         }
         self.must_to_have: list[bool] = []
         self.check_for_retracement_before: bool = True
+        self.can_be_confirm_by_itself = False
         self.milestones = milestones
 
     def handle_response(

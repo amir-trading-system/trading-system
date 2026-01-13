@@ -84,6 +84,7 @@ if __name__ == "__main__":
         ibapi_requests=ibapi_requests,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
+        alerter_object=alerter_object,
     )
     analyzer_obj = analyzer.analyzer.Analyzer(
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,

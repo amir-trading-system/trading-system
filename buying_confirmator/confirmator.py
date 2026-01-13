@@ -76,10 +76,10 @@ class Confirmator:
             ]
 
             highest_volume_until_now = 0
-            for bar_object in relevant_bars:
+            for i, bar_object in enumerate(relevant_bars):
                 bars_to_check = [
                     bar_obj
-                    for bar_obj in relevant_bars
+                    for bar_obj in relevant_bars[:i]
                     if bar_obj.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
                     and bar_obj.bar_time <= one_minute_timeframe_starting_bar_to_look_from.bar_time + datetime.timedelta(
                         hours=8,

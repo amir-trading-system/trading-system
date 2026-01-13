@@ -28,6 +28,7 @@ from . import case_25
 from . import case_26
 from . import case_27
 from . import case_28
+from . import case_29
 
 __indicators__: list[indicator.Indicator] = [
     case_1.Indicator,
@@ -59,4 +60,5 @@ __indicators__: list[indicator.Indicator] = [
     case_26.Indicator,
     case_27.Indicator,
     case_28.Indicator,
+    case_29.Indicator,
 ]

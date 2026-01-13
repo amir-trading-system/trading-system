@@ -177,6 +177,8 @@ class Analyzer:
                 continue
             if indicator_response.result:
                 success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
+                if indicator_obj.can_be_confirm_by_itself:
+                    self.waiting_for_confirmation_queue.put(current_bar)
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True

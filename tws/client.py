@@ -6,6 +6,7 @@ import pandas as pd
 import talib
 from talib import MA_Type
 
+import alerter
 from ibapi import client, wrapper, common, tag_value
 from . import objects
 
@@ -23,6 +24,7 @@ class Client(client.EClient, wrapper.EWrapper):
         symbols_to_collect_queue: queue.Queue,
         bars_ready_to_analyze_queue: queue.Queue,
         logger: logging.Logger,
+        alerter_object: alerter.alerter.Alerter,
     ):
         self.order_id = None
         client.EClient.__init__(
@@ -40,6 +42,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.relevant_symbols: list[str] = []
         self.logger = logger
+        self.alerter_object = alerter_object
 
     def nextValidId(
         self,
@@ -65,11 +68,9 @@ class Client(client.EClient, wrapper.EWrapper):
         if reqId == -1:
             return
 
-        self.logger.error(
-            msg=f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}",
-            extra={
-                "worker": f"{__name__}.{__class__.__name__}",
-            },
+        error_message = f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}"
+        self.alerter_object.alert_on_error(
+            message=error_message,
         )
 
     def _get_scanner_subscription(
@@ -342,6 +343,8 @@ class Client(client.EClient, wrapper.EWrapper):
             bars_data = self.enrich_bars(
                 bars=relevant_symbol_bars,
             )
+            for bar_object in bars_data:
+                bar_object.ready_to_analyze = True
             self.request_id_to_symbol[reqId].bars = bars_data
             self.request_id_to_symbol[reqId].ready_to_confirm = True
             if self.request_id_to_symbol[reqId].timeframe == 1:
