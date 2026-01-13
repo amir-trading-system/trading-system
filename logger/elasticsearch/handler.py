@@ -58,6 +58,10 @@ class Handler(
             document["bar_time"] = record_as_dict.get("bar_time") + datetime.timedelta(
                 hours=5,
             )
+        if record_as_dict.get("last_one_minute_bar_time"):
+            document["last_one_minute_bar_time"] = record_as_dict.get("last_one_minute_bar_time") + datetime.timedelta(
+                hours=5,
+            )
 
         self.elastic_client.index(
             index=self.index,

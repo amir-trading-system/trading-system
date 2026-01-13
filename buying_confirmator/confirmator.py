@@ -25,7 +25,6 @@ class Confirmator:
     def confirm_entry_position(
         self,
         one_minute_timeframe_request_id: int,
-        original_timeframe_request_id: int,
         original_bar_to_confirm: tws_objects.BarData,
     ):
         entry_position_confirmed: bool = False
@@ -33,16 +32,29 @@ class Confirmator:
         most_updated_datetime = None
 
         while True:
-            original_stock_data: tws_objects.Stock = self.request_id_to_symbol[original_timeframe_request_id]
             one_minute_stock_data: tws_objects.Stock = self.request_id_to_symbol[one_minute_timeframe_request_id]
             if len(one_minute_stock_data.bars) == 0:
                 continue
 
-            last_datetime = one_minute_stock_data.bars[-1].bar_time
-            if not one_minute_stock_data.ready_to_confirm or most_updated_datetime == last_datetime:
+            last_datetime = one_minute_stock_data.bars[-2].bar_time
+            if (
+                not one_minute_stock_data.ready_to_confirm
+                or most_updated_datetime == last_datetime
+            ):
                 continue
 
-            most_updated_datetime = one_minute_stock_data.bars[-1].bar_time
+            most_updated_datetime = one_minute_stock_data.bars[-2].bar_time
+
+            self.logger.info(
+                msg="Trying to confirm bar",
+                extra={
+                    "worker": f"{__name__}.{__class__.__name__}",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "last_one_minute_bar_time": most_updated_datetime,
+                },
+            )
 
             one_minute_timeframe_starting_bar_to_look_from = [
                 bar_object
@@ -60,6 +72,7 @@ class Confirmator:
                 bar_object
                 for bar_object in one_minute_stock_data.bars
                 if bar_object.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
+                and bar_object.ready_to_analyze
             ]
 
             highest_volume_until_now = 0
@@ -68,17 +81,10 @@ class Confirmator:
                     bar_obj
                     for bar_obj in relevant_bars
                     if bar_obj.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
-                    and bar_obj.bar_time <= bar_object.bar_time
-                ]
-                higher_timeframe_contains_bar = [
-                    higher_timeframe_bar
-                    for higher_timeframe_bar in original_stock_data.bars
-                    if (
-                        True
-                        and bar_object.bar_time.day == higher_timeframe_bar.bar_time.day
-                        and (bar_object.bar_time - higher_timeframe_bar.bar_time).seconds/60 < higher_timeframe_bar.timeframe
+                    and bar_obj.bar_time <= one_minute_timeframe_starting_bar_to_look_from.bar_time + datetime.timedelta(
+                        hours=8,
                     )
-                ][0]
+                ]
                 previous_bar = [
                     bar_obj
                     for bar_obj in bars_to_check
@@ -109,11 +115,6 @@ class Confirmator:
                     and bar_object.volume == highest_volume_until_now
                     and previous_bar.volume < previous_bar.volume_average
                     and bar_object.close > bar_object.ema_9
-                    and higher_timeframe_contains_bar.high - higher_timeframe_contains_bar.low > 0
-                    and (
-                        ((higher_timeframe_contains_bar.low - higher_timeframe_contains_bar.ema_9)/(higher_timeframe_contains_bar.high - higher_timeframe_contains_bar.low) <= 0.3 and higher_timeframe_contains_bar.volume > 200000) or
-                        (higher_timeframe_contains_bar.low - higher_timeframe_contains_bar.ema_9 < higher_timeframe_contains_bar.high - higher_timeframe_contains_bar.low and higher_timeframe_contains_bar.volume < 100000)
-                    )
                 ):
                     above_volume_average_count = len(
                         [
@@ -144,6 +145,16 @@ class Confirmator:
                 break
 
         if entry_position_confirmed:
+            self.logger.info(
+                "Bar has confirmed",
+                extra={
+                    "worker": f"{__name__}.{__class__.__name__}",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "entry_position_bar_time": entry_position_bar.bar_time,
+                },
+            )
+
             self.alerter_object.alert(
                 sender=f"{__name__}.{__class__.__name__}",
                 symbol=entry_position_bar.symbol,
@@ -173,15 +184,6 @@ class Confirmator:
                         and symbol_data.timeframe == 1
                     )
                 ]
-                original_timeframe_request_id = [
-                    request_id
-                    for request_id, symbol_data in self.request_id_to_symbol.items()
-                    if (
-                        True
-                        and symbol_data.symbol_name == bar_to_confirm.symbol
-                        and symbol_data.timeframe == bar_to_confirm.timeframe
-                    )
-                ]
 
                 if len(one_minute_timeframe_request_id) == 0:
                     continue
@@ -191,7 +193,6 @@ class Confirmator:
                     target=self.confirm_entry_position,
                     kwargs={
                         "one_minute_timeframe_request_id": one_minute_timeframe_request_id,
-                        "original_timeframe_request_id": original_timeframe_request_id[0],
                         "original_bar_to_confirm": bar_to_confirm,
                     },
                 ).start()

@@ -58,12 +58,13 @@ class AnalyzerHelper:
                 and potential_starting_bar.volume > previous_bar.volume * 1.5
                 and potential_starting_bar.volume > potential_starting_bar.volume_average
                 and potential_starting_bar.close > potential_starting_bar.ema_9
-                and (potential_starting_bar.low <= potential_starting_bar.ema_9 or potential_starting_bar.ema_9/potential_starting_bar.low >= 0.95)
+                and (potential_starting_bar.low <= potential_starting_bar.ema_9 or potential_starting_bar.ema_9/potential_starting_bar.low >= 0.95 or potential_starting_bar.bar_time.date() > previous_bar.bar_time.date())
                 and potential_starting_bar.high - potential_starting_bar.low > (previous_bar.high - previous_bar.low) * 2
                 and potential_starting_bar.bar_time.day == current_bar.bar_time.day
                 and (
                     potential_starting_bar.volume > 50000
                     or potential_starting_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
+                    or potential_starting_bar.close - potential_starting_bar.open_value > 1
                 )
             )
             if potential_starting_bar.bar_time >= market_open_time:

@@ -1,5 +1,4 @@
 import datetime
-import time
 import queue
 
 import copy
@@ -371,7 +370,7 @@ class Analyzer:
 
                     # To check with confirmator on real time.
                     # if self.to_push:
-                    #     if current_bar.timeframe == 5 and current_bar.symbol == "INBS":
+                    #     if current_bar.timeframe == 5 and current_bar.symbol == "EVTV":
                     #         self.waiting_for_confirmation_queue.put(current_bar)
                     #         self.to_push = False
 
@@ -382,5 +381,3 @@ class Analyzer:
                         stock=stock,
                         current_bar=current_bar,
                     )
-            else:
-                time.sleep(1)

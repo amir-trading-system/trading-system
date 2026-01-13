@@ -148,6 +148,7 @@ class Client(client.EClient, wrapper.EWrapper):
                     self.logger.info(
                         msg="New symbol founded by scanner",
                         extra={
+                            "worker": f"{__name__}.{__class__.__name__}",
                             "symbol": contractDetails.contract.symbol,
                             "symbol_type": contractDetails.stockType,
                         },
@@ -326,7 +327,6 @@ class Client(client.EClient, wrapper.EWrapper):
                 low=bar.low,
                 volume=float(bar.volume),
                 bar_time=bar_time,
-                ready_to_analyze=True,
             )
         )
 
@@ -361,6 +361,8 @@ class Client(client.EClient, wrapper.EWrapper):
         reqId: int,
         bar: common.BarData,
     ):
+        if bar.volume == 0.0:
+            return
         relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
         current_bar_time = datetime.datetime.fromtimestamp(float(bar.date))
 
@@ -402,10 +404,19 @@ class Client(client.EClient, wrapper.EWrapper):
         bars_data = self.enrich_bars(
             bars=relevant_symbol_bars,
         )
-
         self.request_id_to_symbol[reqId].bars = bars_data
         self.request_id_to_symbol[reqId].ready_to_confirm = True
+
         if self.request_id_to_symbol[reqId].timeframe == 1:
             return
 
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[reqId])
+        relevant_symbol = self.request_id_to_symbol[reqId]
+        self.logger.info(
+            msg="Bar is ready to analyze and confirm",
+            extra={
+                "worker": f"{__name__}.{__class__.__name__}",
+                "symbol": relevant_symbol.symbol_name,
+                "timeframe": relevant_symbol.timeframe,
+            }
+        )

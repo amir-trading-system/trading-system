@@ -1,6 +1,6 @@
-from . import elasticsearch
-
 import logging
+
+from . import elasticsearch
 
 
 class Logger:
