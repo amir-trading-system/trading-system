@@ -57,7 +57,7 @@ class Alerter:
         self,
         message: str,
     ):
-        error_message = f"<b>Error: {message}<b/>"
+        error_message = f"<b>Error: {message}</b>"
         self._send_message(
             message=error_message,
         )

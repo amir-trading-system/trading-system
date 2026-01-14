@@ -37,6 +37,19 @@ class Confirmator:
                 continue
 
             last_datetime = one_minute_stock_data.bars[-2].bar_time
+            if one_minute_stock_data.bars[-2].low < original_bar_to_confirm.low:
+                self.logger.info(
+                    msg="Bar no logger need to be confirmed. crossed its low down",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "last_one_minute_bar_time": one_minute_stock_data.bars[-2].bar_time,
+                    }
+                )
+                break
+
             if (
                 not one_minute_stock_data.ready_to_confirm
                 or most_updated_datetime == last_datetime
@@ -48,7 +61,7 @@ class Confirmator:
             self.logger.info(
                 msg="Trying to confirm bar",
                 extra={
-                    "worker": f"{__name__}.{__class__.__name__}",
+                    "worker": "Confirmator",
                     "symbol": original_bar_to_confirm.symbol,
                     "timeframe": original_bar_to_confirm.timeframe,
                     "bar_time": original_bar_to_confirm.bar_time,
@@ -148,7 +161,7 @@ class Confirmator:
             self.logger.info(
                 "Bar has confirmed",
                 extra={
-                    "worker": f"{__name__}.{__class__.__name__}",
+                    "worker": "Confirmator",
                     "symbol": original_bar_to_confirm.symbol,
                     "timeframe": original_bar_to_confirm.timeframe,
                     "entry_position_bar_time": entry_position_bar.bar_time,

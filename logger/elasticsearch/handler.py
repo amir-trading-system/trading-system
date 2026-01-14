@@ -26,7 +26,6 @@ class Handler(
             "worker": record_as_dict.get("worker", ""),
             "message": record.getMessage(),
             "level": record.levelname,
-            "function_name": record.funcName,
             "logger_name": record.name,
             "symbol": record_as_dict.get("symbol", ""),
             "symbol_type": record_as_dict.get("symbol_type", ""),

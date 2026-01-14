@@ -65,13 +65,16 @@ class Client(client.EClient, wrapper.EWrapper):
         errorString,
         advancedOrderRejectJson="",
     ):
-        if reqId == -1:
+        if reqId == -1 or errorCode == 162:
             return
 
         error_message = f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}"
-        self.alerter_object.alert_on_error(
-            message=error_message,
-        )
+        if errorCode == 366:
+            print(error_message)
+        else:
+            self.alerter_object.alert_on_error(
+                message=error_message,
+            )
 
     def _get_scanner_subscription(
         self,
@@ -268,6 +271,7 @@ class Client(client.EClient, wrapper.EWrapper):
             request_id=request_id,
             symbol=symbol,
             timeframe=timeframe,
+            last_time_analyzed=datetime.datetime.fromtimestamp(0),
         )
         if ibapi_request not in self.ibapi_requests:
             self.ibapi_requests.append(ibapi_request)
@@ -318,6 +322,9 @@ class Client(client.EClient, wrapper.EWrapper):
             return
 
         ibapi_request = ibapi_request[0]
+        if self.request_id_to_symbol.get(reqId) is None:
+            return
+
         self.request_id_to_symbol[reqId].bars.append(
             objects.BarData(
                 symbol=ibapi_request.symbol,
@@ -338,6 +345,9 @@ class Client(client.EClient, wrapper.EWrapper):
         end: str,
     ):
         if self.on_specific_bar_time or self.is_retro:
+            if self.request_id_to_symbol.get(reqId) is None:
+                return
+
             relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
             symbol = self.request_id_to_symbol[reqId].symbol_name
             bars_data = self.enrich_bars(
@@ -359,15 +369,60 @@ class Client(client.EClient, wrapper.EWrapper):
                 }
             )
 
+    def had_to_cancel_historical_data_if_symbol_goes_down(
+        self,
+        request_id: int,
+        bar_data: common.BarData,
+    ):
+        if self.request_id_to_symbol.get(request_id) is None:
+            return
+
+        has_to_cancel = False
+        relevant_symbol_bars = self.request_id_to_symbol[request_id].bars
+        current_bar_time = datetime.datetime.fromtimestamp(float(bar_data.date))
+
+        today_bars = sorted(
+            [
+                bar_object
+                for bar_object in relevant_symbol_bars
+                if bar_object.bar_time.day == current_bar_time.day
+            ],
+            key=lambda bar_object: bar_object.bar_time
+        )
+
+        today_gains = (bar_data.close - today_bars[0].open_value)/today_bars[0].open_value
+        if today_gains < 0.1:
+            has_to_cancel = True
+            self.cancelHistoricalData(request_id)
+            cancelled_stock = self.request_id_to_symbol.pop(request_id)
+            print(f"cancelled: {request_id}")
+            self.logger.info(
+                msg="Stopped getting historical data for symbol due to lower gains",
+                extra={
+                    "symbol": cancelled_stock.symbol_name,
+                    "timeframe": cancelled_stock.timeframe,
+                },
+            )
+
+        return has_to_cancel
+
     def historicalDataUpdate(
         self,
         reqId: int,
         bar: common.BarData,
     ):
-        if bar.volume == 0.0:
+        had_to_cancel_historical_data = self.had_to_cancel_historical_data_if_symbol_goes_down(
+            request_id=reqId,
+            bar_data=bar,
+        )
+        if had_to_cancel_historical_data:
             return
+
         relevant_symbol_bars = self.request_id_to_symbol[reqId].bars
         current_bar_time = datetime.datetime.fromtimestamp(float(bar.date))
+
+        if bar.volume == 0.0:
+            return
 
         ibapi_request = [
             request
