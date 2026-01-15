@@ -300,11 +300,17 @@ class IbAPIDataStreamer(client.EClient, wrapper.EWrapper):
             relevant_symbol_bars[-1].open_value = bar.open
             relevant_symbol_bars[-1].high = bar.high
             relevant_symbol_bars[-1].low = bar.low
-            relevant_symbol_bars[-1].volume = bar.volume
+            relevant_symbol_bars[-1].volume = float(bar.volume)
 
             bars_data = self.enrich_bars(
                 bars=relevant_symbol_bars,
             )
+
+            if ibapi_request.timeframe == 1:
+                bars_data[-1].ready_to_analyze = True
+                self.request_id_to_symbol[reqId].bars = bars_data
+                self.request_id_to_symbol[reqId].ready_to_confirm = True
+
             return
 
         relevant_symbol_bars[-1].ready_to_analyze = True

@@ -34,11 +34,7 @@ class Confirmator:
             if len(one_minute_stock_data.bars) == 0:
                 continue
 
-            last_datetime = one_minute_stock_data.bars[-2].bar_time
-            if (
-                not one_minute_stock_data.ready_to_confirm
-                or most_updated_datetime == last_datetime
-            ):
+            if not one_minute_stock_data.ready_to_confirm:
                 continue
 
             most_updated_datetime = one_minute_stock_data.bars[-2].bar_time
