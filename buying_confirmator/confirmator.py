@@ -12,13 +12,11 @@ class Confirmator:
         self,
         waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
         request_id_to_symbol: dict[int,tws_objects.Stock],
-        ibapi_requests: list[tws_objects.IbAPIRequest],
         alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
     ):
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.request_id_to_symbol = request_id_to_symbol
-        self.ibapi_requests = ibapi_requests
         self.alerter_object = alerter_object
         self.logger = logger
 
@@ -37,19 +35,6 @@ class Confirmator:
                 continue
 
             last_datetime = one_minute_stock_data.bars[-2].bar_time
-            if one_minute_stock_data.bars[-2].low < original_bar_to_confirm.low:
-                self.logger.info(
-                    msg="Bar no logger need to be confirmed. crossed its low down",
-                    extra={
-                        "worker": "Confirmator",
-                        "symbol": original_bar_to_confirm.symbol,
-                        "bar_time": original_bar_to_confirm.bar_time,
-                        "timeframe": original_bar_to_confirm.timeframe,
-                        "last_one_minute_bar_time": one_minute_stock_data.bars[-2].bar_time,
-                    }
-                )
-                break
-
             if (
                 not one_minute_stock_data.ready_to_confirm
                 or most_updated_datetime == last_datetime
@@ -69,35 +54,19 @@ class Confirmator:
                 },
             )
 
-            one_minute_timeframe_starting_bar_to_look_from = [
-                bar_object
-                for bar_object in one_minute_stock_data.bars
-                if bar_object.bar_time == original_bar_to_confirm.bar_time + datetime.timedelta(
-                    minutes=original_bar_to_confirm.timeframe,
-                )
-            ]
-            if len(one_minute_timeframe_starting_bar_to_look_from) == 0:
-                continue
-
-            one_minute_timeframe_starting_bar_to_look_from = one_minute_timeframe_starting_bar_to_look_from[0]
-
             relevant_bars = [
                 bar_object
                 for bar_object in one_minute_stock_data.bars
-                if bar_object.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
+                if bar_object.bar_time >= original_bar_to_confirm.bar_time + datetime.timedelta(
+                    minutes=original_bar_to_confirm.timeframe-2,
+                )
+                and bar_object.bar_time.day == original_bar_to_confirm.bar_time.day
+                and (bar_object.bar_time - original_bar_to_confirm.bar_time).seconds <= 3600
                 and bar_object.ready_to_analyze
             ]
 
-            highest_volume_until_now = 0
             for i, bar_object in enumerate(relevant_bars):
-                bars_to_check = [
-                    bar_obj
-                    for bar_obj in relevant_bars[:i]
-                    if bar_obj.bar_time >= one_minute_timeframe_starting_bar_to_look_from.bar_time
-                    and bar_obj.bar_time <= one_minute_timeframe_starting_bar_to_look_from.bar_time + datetime.timedelta(
-                        hours=8,
-                    )
-                ]
+                bars_to_check = relevant_bars[:i]
                 previous_bar = [
                     bar_obj
                     for bar_obj in bars_to_check
@@ -107,27 +76,15 @@ class Confirmator:
                     continue
                 previous_bar = previous_bar[0]
 
-                highest_volume_until_now = max(highest_volume_until_now, bar_object.volume)
-                bar_is_most_volatile_since_now = (
-                    True
-                    and not any(
-                        bar_obj
-                        for bar_obj in bars_to_check
-                        if bar_obj.volume > bar_obj.volume_average
-                        and bar_obj.volume > bar_object.volume
-                    )
-                    and bar_object.volume > bar_object.volume_average
-                )
-
                 if (
                     True
                     and bar_object.ready_to_analyze
-                    and bar_is_most_volatile_since_now
+                    and bar_object.high >= original_bar_to_confirm.high
                     and bar_object.volume > bar_object.volume_average
                     and bar_object.close > bar_object.open_value
-                    and bar_object.volume == highest_volume_until_now
-                    and previous_bar.volume < previous_bar.volume_average
+                    and previous_bar.volume/bar_object.volume <= 0.8
                     and bar_object.close > bar_object.ema_9
+                    and (bar_object.close-bar_object.open_value)/(bar_object.high-bar_object.low) >= 0.7
                 ):
                     above_volume_average_count = len(
                         [

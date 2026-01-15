@@ -23,8 +23,8 @@ def run_bot(
     manual_results_for_test = []
     collector_kwargs = {}
     analyzer_kwargs = {}
-    c_obj.tws_client.on_specific_bar_time = specific_bar_time is not None
-    c_obj.tws_client.is_retro = retroactive_from is not None
+    c_obj.tws_data_streamer.on_specific_bar_time = specific_bar_time is not None
+    c_obj.tws_data_streamer.is_retro = retroactive_from is not None
 
     if symbol is not None:
         manual_results_for_test = [str.upper(symbol)]
@@ -46,7 +46,7 @@ def run_bot(
                 "retroactive_from": retroactive_from,
             }
 
-    c_obj.tws_client.start_scanner(
+    c_obj.tws_scanner.start_scanner(
         manual_results_for_test=manual_results_for_test,
     )
 
@@ -69,7 +69,6 @@ if __name__ == "__main__":
     bars_ready_to_analyze_queue: queue.Queue[tws.objects.Stock] = queue.Queue()
     waiting_for_confirmation_queue: queue.Queue[tws.objects.BarData] = queue.Queue()
     request_id_to_symbol: dict[int,tws.objects.Stock] = {}
-    ibapi_requests: list[tws.objects.IbAPIRequest] = []
     logger_object = logger.logger.Logger()
     logger_object = logger_object.get_logger()
 
@@ -81,7 +80,6 @@ if __name__ == "__main__":
         tws_port=8081,
         symbols_to_collect_queue=symbols_to_collect_queue,
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
-        ibapi_requests=ibapi_requests,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
         alerter_object=alerter_object,
@@ -95,7 +93,6 @@ if __name__ == "__main__":
     confirmator_obj = buying_confirmator.confirmator.Confirmator(
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
         request_id_to_symbol=request_id_to_symbol,
-        ibapi_requests=ibapi_requests,
         alerter_object=alerter_object,
         logger=logger_object,
     )
@@ -132,7 +129,11 @@ if __name__ == "__main__":
     args = argument_parser.parse_args()
 
     threading.Thread(
-        target=collector_obj.tws_client.run
+        target=collector_obj.tws_scanner.run
+    ).start()
+    time.sleep(1)
+    threading.Thread(
+        target=collector_obj.tws_data_streamer.run
     ).start()
     time.sleep(1)
 

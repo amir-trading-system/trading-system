@@ -4,7 +4,7 @@ import time
 import queue
 
 import alerter
-from tws import objects, client
+from tws import objects, scanner, data_streamer
 
 class Collector:
     def __init__(
@@ -13,20 +13,23 @@ class Collector:
         tws_port: int,
         symbols_to_collect_queue: queue.Queue[str],
         bars_ready_to_analyze_queue: queue.Queue[objects.Stock],
-        ibapi_requests: list[objects.IbAPIRequest],
         request_id_to_symbol: dict[int,objects.Stock],
         logger: logging.Logger,
         alerter_object: alerter.alerter.Alerter,
     ):
         self.logger = logger
-        self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
-        self.tws_client = client.Client(
+        self.tws_scanner = scanner.IbAPIScanner(
             host=tws_host,
             port=tws_port,
-            ibapi_requests=self.ibapi_requests,
-            request_id_to_symbol=self.request_id_to_symbol,
             symbols_to_collect_queue=symbols_to_collect_queue,
+            logger=logger,
+            alerter_object=alerter_object,
+        )
+        self.tws_data_streamer = data_streamer.IbAPIDataStreamer(
+            host=tws_host,
+            port=tws_port,
+            request_id_to_symbol=self.request_id_to_symbol,
             bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
             logger=logger,
             alerter_object=alerter_object,
@@ -38,14 +41,14 @@ class Collector:
         specific_bar_time: datetime.datetime = None,
     ):
         while True:
-            if not self.tws_client.symbols_to_collect_queue.empty():
-                symbol = self.tws_client.symbols_to_collect_queue.get()
+            if not self.tws_scanner.symbols_to_collect_queue.empty():
+                symbol = self.tws_scanner.symbols_to_collect_queue.get()
                 timeframes = [1, 5, 15, 30]
                 if manual_timeframe_for_tests:
                     timeframes = [1, manual_timeframe_for_tests]
 
                 for timeframe in timeframes:
-                    self.tws_client.request_historical_data(
+                    self.tws_data_streamer.request_historical_data(
                         symbol=symbol,
                         timeframe=timeframe,
                         specific_bar_time=specific_bar_time,
