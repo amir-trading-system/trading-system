@@ -95,6 +95,7 @@ Need to Fix - False positives:
 
 To do list:
   - make the confirmator worker more efficient, no need to run all the time only on new bars.
+  - need to check what was wrong in VERO - 01-16-2026 - no full indicator result has been made (5,15,30).
 
 Elastic:
  - username: elastic
