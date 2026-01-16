@@ -94,8 +94,7 @@ Need to identify:
 Need to Fix - False positives:
 
 To do list:
-  - make 1 minute timeframe bars accessible sooner than close (each 10 seconds).
-  - cancel trace stocks that has lower volume.
+  - make the confirmator worker more efficient, no need to run all the time only on new bars.
 
 Elastic:
  - username: elastic
