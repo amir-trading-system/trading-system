@@ -45,8 +45,8 @@
             "name": "test retroactive",
             "args": [
                 "test",
-                "--symbol=SPHL",
-                "--retroactive_from=2026-01-15",
+                "--symbol=VERO",
+                "--retroactive_from=2026-01-16",
                 "--timeframe=15",
             ],
             "type": "debugpy",

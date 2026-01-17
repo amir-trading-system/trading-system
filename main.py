@@ -25,6 +25,7 @@ def run_bot(
     analyzer_kwargs = {}
     c_obj.tws_data_streamer.on_specific_bar_time = specific_bar_time is not None
     c_obj.tws_data_streamer.is_retro = retroactive_from is not None
+    co_obj.is_retro = retroactive_from is not None or specific_bar_time is not None
 
     if symbol is not None:
         manual_results_for_test = [str.upper(symbol)]

@@ -8,6 +8,8 @@ import alerter
 from tws import objects as tws_objects
 
 class Confirmator:
+    is_retro: bool = False
+
     def __init__(
         self,
         waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
@@ -26,6 +28,7 @@ class Confirmator:
         original_bar_to_confirm: tws_objects.BarData,
     ):
         entry_position_confirmed: bool = False
+        break_original_low: bool = False
         entry_position_bar: tws_objects.BarData = None
         most_updated_datetime = None
 
@@ -37,18 +40,18 @@ class Confirmator:
             if not one_minute_stock_data.ready_to_confirm:
                 continue
 
-            most_updated_datetime = one_minute_stock_data.bars[-2].bar_time
-
-            self.logger.info(
-                msg="Trying to confirm bar",
-                extra={
-                    "worker": "Confirmator",
-                    "symbol": original_bar_to_confirm.symbol,
-                    "timeframe": original_bar_to_confirm.timeframe,
-                    "bar_time": original_bar_to_confirm.bar_time,
-                    "last_one_minute_bar_time": most_updated_datetime,
-                },
-            )
+            if most_updated_datetime is None or most_updated_datetime < one_minute_stock_data.bars[-1].bar_time:
+                self.logger.info(
+                    msg="Trying to confirm bar",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "last_one_minute_bar_time": most_updated_datetime,
+                    },
+                )
+                most_updated_datetime = one_minute_stock_data.bars[-1].bar_time
 
             relevant_bars = [
                 bar_object
@@ -59,9 +62,18 @@ class Confirmator:
                 and bar_object.bar_time.day == original_bar_to_confirm.bar_time.day
                 and (bar_object.bar_time - original_bar_to_confirm.bar_time).seconds <= 3600
                 and bar_object.ready_to_analyze
+                and bar_object.histogram is not None
             ]
 
             for i, bar_object in enumerate(relevant_bars):
+                if (
+                    True
+                    and bar_object.low < original_bar_to_confirm.low
+                    and not self.is_retro
+                ):
+                    break_original_low = True
+                    break
+
                 bars_to_check = relevant_bars[:i]
                 previous_bar = [
                     bar_obj
@@ -107,7 +119,7 @@ class Confirmator:
                         entry_position_bar = bar_object
                         break
 
-            if entry_position_confirmed:
+            if entry_position_confirmed or break_original_low:
                 break
 
         if entry_position_confirmed:
@@ -132,7 +144,8 @@ class Confirmator:
 <b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
 <b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
 <b>Time:</b> <code>{entry_position_bar.bar_time}</code>
-<b>Original bar to confirm Time:</b> <code>{original_bar_to_confirm.bar_time}</code>"""
+<b>Original bar to confirm Time:</b> <code>{original_bar_to_confirm.bar_time}</code>
+<b>Original bar to confirm Timeframe:</b> <code>{original_bar_to_confirm.timeframe}</code>"""
             )
 
     def confirm_data(
