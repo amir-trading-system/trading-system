@@ -1,3 +1,9 @@
+Watchlist For Tomorrow:
+ - VERO.
+ - ROLR.
+
+
+
 3 main Components:
  - Collector - Collects data from api.
  - Enricher - enrich data with indications such ema_9, ema_20, macd, vol_avg and vwap (based on base data)
