@@ -53,3 +53,4 @@ from . import has_classic_bars_wave
 from . import has_bull_pattern
 from . import current_bar_is_the_first_one_to_cross_top_bar
 from . import has_previous_bar_with_indication
+from . import most_of_move_signal_line_is_positive

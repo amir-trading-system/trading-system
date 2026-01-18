@@ -37,6 +37,7 @@ class Indicator:
             analyzer.evidences.current_bar_after_market_starts.Evidence,
             analyzer.evidences.top_bar_is_not_the_lowest_bar.Evidence,
             analyzer.evidences.at_least_one_bar_was_closed_to_9_ema_since_start.Evidence,
+            analyzer.evidences.most_of_move_signal_line_is_positive.Evidence,
         }
         self.must_to_have: list[bool] = []
         self.check_for_retracement_before: bool = True
