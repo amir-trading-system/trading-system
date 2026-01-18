@@ -81,21 +81,12 @@ Stocks Indications:
  - GVH: 2025-12-29 - 14,18,20,25.
  - INBS: 2025-12-31 - 8_a,16,25.
 
-Confirmations:
- - Go to 1 minute timeframe chart and look for bar after this one that is the following:
-   - positive.
-   - close above ema_9 and vwap.
-   - volume is bigger than volume_average.
-   - volume is bigger than all bars until the ones that under the bar before.
-
-
 Need to identify:
 
 Need to Fix - False positives:
 
 To do list:
   - make the confirmator worker more efficient, no need to run all the time only on new bars.
-  - need to check what was wrong in VERO - 01-16-2026 - no full indicator result has been made (5,15,30).
 
 Elastic:
  - username: elastic

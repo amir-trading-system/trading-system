@@ -250,8 +250,8 @@ class Analyzer:
     <b>Symbol:</b> <u>{stock.symbol_name}</u>
     <b>Timeframe:</b> <code>{stock.timeframe}</code>
     <b>Time:</b> <code>{current_bar.bar_time}</code>
-    <b>Starting Index:</b> <code>{milestones.starting_bar.index}</code>
-    <b>Top Index:</b> <code>{milestones.top_bar.index}</code>
+    <b>Starting Time:</b> <code>{milestones.starting_bar.bar_time}</code>
+    <b>Top Time:</b> <code>{milestones.top_bar.bar_time}</code>
 
     <b>{len(sorted_indicators)} Indications:</b>
     {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}

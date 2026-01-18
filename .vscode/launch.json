@@ -45,8 +45,8 @@
             "name": "test retroactive",
             "args": [
                 "test",
-                "--symbol=VERO",
-                "--retroactive_from=2026-01-16",
+                "--symbol=ASPC",
+                "--retroactive_from=2025-12-26",
                 "--timeframe=15",
             ],
             "type": "debugpy",
