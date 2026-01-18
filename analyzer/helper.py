@@ -169,12 +169,12 @@ class AnalyzerHelper:
             timeframe=stock.timeframe,
         )
 
-        if starting_bar.index == 0 or len(stock.bars[2:starting_bar.index-1]) == 0:
+        if starting_bar.index == 0 or len(stock.bars[2:starting_bar.index+1]) == 0:
             return top_bar
 
         high_picks_bars = [
             {"index": i, "bar": stock.bars[i]}
-            for i in range(2, starting_bar.index-1)
+            for i in range(2, starting_bar.index+1)
             if stock.bars[i].high > stock.bars[i-1].high
             and stock.bars[i].high > stock.bars[i+1].high
         ]
@@ -195,7 +195,7 @@ class AnalyzerHelper:
             return top_bar
 
         # pylint:disable=too-many-boolean-expressions
-        for i in range(2,starting_bar.index-1):
+        for i in range(2,starting_bar.index+1):
             potential_top_bar = stock.bars[i]
             previous_bar = stock.bars[i+1]
             right_after_bar = stock.bars[i-1]
