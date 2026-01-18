@@ -4,14 +4,16 @@ import requests
 
 
 class Alerter:
-    BOT_TOEKN = "8571936110:AAERqN-YhP_SZyj8_STi5nSwhqguwrUhcZc"
-    CHAT_ID = "-1003604401866"
-    URL = f"https://api.telegram.org/bot{BOT_TOEKN}/sendMessage"
-
     def __init__(
         self,
         logger: logging.Logger,
+        bot_token: str,
+        chat_id: str,
     ):
+        self.bot_token = bot_token
+        self.chat_id = chat_id
+        self.url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+
         self.logger = logger
 
     def _send_message(
@@ -19,12 +21,12 @@ class Alerter:
         message: str,
     ):
         payload = {
-            "chat_id": self.CHAT_ID,
+            "chat_id": self.chat_id,
             "text": message,
             "parse_mode": "HTML"
         }
         response = requests.post(
-            url=self.URL,
+            url=self.url,
             json=payload,
             timeout=10,
         )

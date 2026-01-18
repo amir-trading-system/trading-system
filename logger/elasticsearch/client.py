@@ -4,11 +4,14 @@ import elasticsearch
 class Client:
     def __init__(
         self,
+        username: str,
+        password: str,
+        certs_file_path: str,
     ):
         self.host = "https://localhost:9200"
-        self.username = "elastic"
-        self.password = "4obla=pJpXkiaeAglNQH"
-        self.certs_file_path = "logger/elasticsearch/ca_certs.crt"
+        self.username = username
+        self.password = password
+        self.certs_file_path = certs_file_path
 
     def connect(
         self,

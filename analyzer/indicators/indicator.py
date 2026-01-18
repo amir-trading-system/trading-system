@@ -47,15 +47,11 @@ class Indicator:
     def handle_response(
         self,
         success_results: list[analyzer.objects.EvidenceResponse],
-        printed_results: list[str],
         failed_base_evidences_count: int,
     ) -> objects.IndicatorResponse:
         total = len(self.unique_evidences)
         success_rate = len(success_results)/total
         result = success_rate >= 0.9
-
-        if success_rate >= 0.9 and failed_base_evidences_count <= 1:
-            print("\n".join(printed_results))
 
         return objects.IndicatorResponse(
             success_count=len(success_results),
@@ -71,7 +67,6 @@ class Indicator:
         current_bar: tws_objects.BarData,
     ) -> objects.IndicatorResponse:
         success_results: list[analyzer.objects.EvidenceResponse] = []
-        printed_results: list[str] = []
         failed_base_evidences_count = 0
 
         if not all(
@@ -120,17 +115,13 @@ class Indicator:
 
             if not result.result and evidence_object.must_to_be_true:
                 success_results = []
-                printed_results = []
                 break
 
             if result.result:
                 if not evidence_object.is_base_evidence or self.name == "already_has_indication":
                     success_results.append(result)
-            else:
-                printed_results.append(f"{stock.symbol_name}: {self.name} -  Evidence: {evidence_object.name}. Reason: {Fore.RED}{result.reason}.{Style.RESET_ALL}")
 
         return self.handle_response(
             success_results=success_results,
-            printed_results=printed_results,
             failed_base_evidences_count=failed_base_evidences_count,
         )

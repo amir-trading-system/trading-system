@@ -10,9 +10,16 @@ class Handler(
     def __init__(
         self,
         index: str,
+        username: str,
+        password: str,
+        certs_file_path: str,
     ):
         super().__init__()
-        elastic_client_object = client.Client()
+        elastic_client_object = client.Client(
+        username=username,
+        password=password,
+        certs_file_path=certs_file_path,
+        )
         self.index = index
         self.elastic_client = elastic_client_object.connect()
 

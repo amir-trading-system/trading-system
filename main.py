@@ -7,6 +7,7 @@ import queue
 import alerter
 import analyzer
 import buying_confirmator
+import config_manager
 import collector
 import logger
 import tws
@@ -66,15 +67,22 @@ def run_bot(
     ).start()
 
 if __name__ == "__main__":
+    configuration: config_manager.BotConfig = config_manager.ConfigManager().load_config()
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[tws.objects.Stock] = queue.Queue()
     waiting_for_confirmation_queue: queue.Queue[tws.objects.BarData] = queue.Queue()
     request_id_to_symbol: dict[int,tws.objects.Stock] = {}
-    logger_object = logger.logger.Logger()
+    logger_object = logger.logger.Logger(
+        username=configuration.logger.elasticsearch.username,
+        password=configuration.logger.elasticsearch.password,
+        certs_file_path=configuration.logger.elasticsearch.certs_file_path,
+    )
     logger_object = logger_object.get_logger()
 
     alerter_object = alerter.alerter.Alerter(
         logger=logger_object,
+        bot_token=configuration.alerts.telegram_alerter.bot_token,
+        chat_id=configuration.alerts.telegram_alerter.chat_id,
     )
     collector_obj = collector.collector.Collector(
         tws_host="localhost",
