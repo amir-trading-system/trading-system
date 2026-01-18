@@ -23,8 +23,8 @@ def run_bot(
     manual_results_for_test = []
     collector_kwargs = {}
     analyzer_kwargs = {}
-    c_obj.tws_data_streamer.on_specific_bar_time = specific_bar_time is not None
-    c_obj.tws_data_streamer.is_retro = retroactive_from is not None
+    c_obj.tws_client.data_streamer.on_specific_bar_time = specific_bar_time is not None
+    c_obj.tws_client.data_streamer.is_retro = retroactive_from is not None
     co_obj.is_retro = retroactive_from is not None or specific_bar_time is not None
 
     if symbol is not None:
@@ -47,7 +47,7 @@ def run_bot(
                 "retroactive_from": retroactive_from,
             }
 
-    c_obj.tws_scanner.start_scanner(
+    c_obj.tws_client.start_scanner(
         manual_results_for_test=manual_results_for_test,
     )
 
@@ -130,11 +130,7 @@ if __name__ == "__main__":
     args = argument_parser.parse_args()
 
     threading.Thread(
-        target=collector_obj.tws_scanner.run
-    ).start()
-    time.sleep(1)
-    threading.Thread(
-        target=collector_obj.tws_data_streamer.run
+        target=collector_obj.tws_client.run
     ).start()
     time.sleep(1)
 

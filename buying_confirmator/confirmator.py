@@ -66,6 +66,8 @@ class Confirmator:
             ]
 
             for i, bar_object in enumerate(relevant_bars):
+                if (bar_object.bar_time - original_bar_to_confirm.bar_time).seconds / 60 < original_bar_to_confirm.timeframe:
+                    continue
                 if (
                     True
                     and bar_object.low < original_bar_to_confirm.low

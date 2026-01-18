@@ -79,12 +79,19 @@ class AnalyzerHelper:
                     if j > len(stock.bars) - 2:
                         break
                     previous_bar: tws_objects.BarData = stock.bars[j]
+                    if j-1 < 0:
+                        continue
                     if (previous_bar.bar_time.date() < potential_starting_bar.bar_time.date()
                     and previous_bar.bar_time.time() < datetime.time(hour=16)):
                         continue
 
                     if previous_bar.bar_time.hour == 8 and previous_bar.bar_time.minute == 0:
                         continue
+
+                    if previous_bar.close - previous_bar.open_value == 0:
+                        continue
+
+                    bigger_than_potential_bar = (potential_starting_bar.close - potential_starting_bar.open_value)/abs(previous_bar.close - previous_bar.open_value) < 0.4
 
                     more_volatile_than_starting_bar = (
                         previous_bar.volume > potential_starting_bar.volume
@@ -118,6 +125,8 @@ class AnalyzerHelper:
                         and previous_bar.volume > bar_before_previous_bar.volume
                         and previous_bar.volume > previous_bar.volume_average * 3
                         and previous_bar.volume_average >= 10000
+                        and previous_bar.index - 1 > potential_starting_bar.index
+                        and previous_bar.bar_time.day == potential_starting_bar.bar_time.day
                     )
 
                     previous_bar_is_bigger_than_starting_bar = (
@@ -132,6 +141,7 @@ class AnalyzerHelper:
                         or potential_starting_bar_before_starting_bar
                         or previous_bar_is_bigger_than_starting_bar
                         or previous_bar_is_strong_almost_as_current
+                        or bigger_than_potential_bar
                     ):
                         is_really_potential_starting_bar = False
                         break
