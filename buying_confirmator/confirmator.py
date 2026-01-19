@@ -28,7 +28,7 @@ class Confirmator:
         original_bar_to_confirm: tws_objects.BarData,
     ):
         entry_position_confirmed: bool = False
-        break_original_low: bool = False
+        not_relevant_anymore: bool = False
         entry_position_bar: tws_objects.BarData = None
         most_updated_datetime = None
 
@@ -39,9 +39,6 @@ class Confirmator:
 
             if not one_minute_stock_data.ready_to_confirm:
                 continue
-
-            if one_minute_stock_data.bars[-1].bar_time.day > original_bar_to_confirm.bar_time.day:
-                break
 
             if most_updated_datetime is None or most_updated_datetime < one_minute_stock_data.bars[-1].bar_time:
                 self.logger.info(
@@ -76,7 +73,7 @@ class Confirmator:
                     and bar_object.low < original_bar_to_confirm.low
                     and not self.is_retro
                 ):
-                    break_original_low = True
+                    not_relevant_anymore = True
                     break
 
                 bars_to_check = relevant_bars[:i]
@@ -123,8 +120,16 @@ class Confirmator:
                         entry_position_confirmed = True
                         entry_position_bar = bar_object
                         break
+                else:
+                    if (
+                        True
+                        and not entry_position_confirmed
+                        and i == len(relevant_bars) - 1
+                    ):
+                        not_relevant_anymore = True
+                        break
 
-            if entry_position_confirmed or break_original_low:
+            if entry_position_confirmed or not_relevant_anymore:
                 break
 
         if entry_position_confirmed:
