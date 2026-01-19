@@ -1,7 +1,5 @@
 import logging
 
-from colorama import Fore, Style
-
 import analyzer.evidences
 import analyzer.objects
 
@@ -77,7 +75,7 @@ class Indicator:
             self.logger.error(
                 msg="Not all must_to_have terms are true for indicator",
                 extra={
-                    "worker": f"{__name__}.{__class__.__name__}",
+                    "worker": "Indicator",
                     "indicator_name": self.name,
                     "symbol": stock.symbol_name,
                     "timeframe": stock.timeframe,

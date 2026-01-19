@@ -102,7 +102,7 @@ class Analyzer:
             self.logger.info(
                 msg="One of the Milestones are not valid",
                 extra={
-                    "worker": f"{__name__}.{__class__.__name__}",
+                    "worker": "Analyzer",
                     "symbol": stock.symbol_name,
                     "timeframe": stock.timeframe,
                     "bar_time": current_bar.bar_time,
@@ -143,7 +143,7 @@ class Analyzer:
         self.logger.info(
             msg="Running analyzers",
             extra={
-                "worker": f"{__name__}.{__class__.__name__}",
+                "worker": "Analyzer",
                 "symbol": stock.symbol_name,
                 "timeframe": stock.timeframe,
                 "bar_time": current_bar.bar_time,
@@ -185,7 +185,7 @@ class Analyzer:
         self.logger.info(
             msg="Finished Running analyzers",
             extra={
-                "worker": f"{__name__}.{__class__.__name__}",
+                "worker": "Analyzer",
                 "symbol": stock.symbol_name,
                 "timeframe": stock.timeframe,
                 "bar_time": current_bar.bar_time,
@@ -230,7 +230,7 @@ class Analyzer:
                 self.logger.info(
                     msg="Bar has Indication",
                     extra={
-                        "worker": f"{__name__}.{__class__.__name__}",
+                        "worker": "Analyzer",
                         "symbol": stock.symbol_name,
                         "timeframe": stock.timeframe,
                         "bar_time": current_bar.bar_time,

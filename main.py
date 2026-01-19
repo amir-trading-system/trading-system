@@ -72,11 +72,7 @@ if __name__ == "__main__":
     bars_ready_to_analyze_queue: queue.Queue[tws.objects.Stock] = queue.Queue()
     waiting_for_confirmation_queue: queue.Queue[tws.objects.BarData] = queue.Queue()
     request_id_to_symbol: dict[int,tws.objects.Stock] = {}
-    logger_object = logger.logger.Logger(
-        username=configuration.logger.elasticsearch.username,
-        password=configuration.logger.elasticsearch.password,
-        certs_file_path=configuration.logger.elasticsearch.certs_file_path,
-    )
+    logger_object = logger.logger.Logger()
     logger_object = logger_object.get_logger()
 
     alerter_object = alerter.alerter.Alerter(

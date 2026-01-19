@@ -40,6 +40,9 @@ class Confirmator:
             if not one_minute_stock_data.ready_to_confirm:
                 continue
 
+            if one_minute_stock_data.bars[-1].bar_time.day > original_bar_to_confirm.bar_time.day:
+                break
+
             if most_updated_datetime is None or most_updated_datetime < one_minute_stock_data.bars[-1].bar_time:
                 self.logger.info(
                     msg="Trying to confirm bar",

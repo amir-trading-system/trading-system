@@ -63,7 +63,7 @@ class Scanner():
                     self.logger.info(
                         msg="New symbol founded by scanner",
                         extra={
-                            "worker": f"{__name__}.{__class__.__name__}",
+                            "worker": "Scanner",
                             "symbol": contract_details.contract.symbol,
                             "symbol_type": contract_details.stockType,
                         },

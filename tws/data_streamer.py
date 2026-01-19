@@ -166,7 +166,7 @@ class DataStreamer():
         self.logger.info(
             msg="Finished to collect data for symbol",
             extra={
-                "worker": f"{__name__}.{__class__.__name__}",
+                "worker": "DataStreamer",
                 "symbol": symbol,
             }
         )
@@ -231,7 +231,7 @@ class DataStreamer():
         self.logger.info(
             msg="Bar is ready to analyze and confirm",
             extra={
-                "worker": f"{__name__}.{__class__.__name__}",
+                "worker": "DataStreamer",
                 "symbol": relevant_symbol.symbol_name,
                 "timeframe": relevant_symbol.timeframe,
             }
