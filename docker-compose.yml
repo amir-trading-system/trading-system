@@ -14,6 +14,11 @@ services:
       - esdata:/usr/share/elasticsearch/data
     networks:
       - elastic-network
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -vq '\"status\":\"red\"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kibana:
     image: docker.elastic.co/kibana/kibana:9.2.4
@@ -26,6 +31,12 @@ services:
       - elasticsearch
     networks:
       - elastic-network
+
+  python-container:
+    build: .
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
 
 volumes:
   esdata:
