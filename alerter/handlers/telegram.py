@@ -3,15 +3,17 @@ import requests
 
 import config_manager
 
-from . import _alerter
+from . import _alert_handler
 
 
-class Telegram(
-    _alerter.BaseAlerter,
+class Handler(
+    _alert_handler.Handler,
 ):
+    name = "Telegram"
+
     def __init__(
         self,
-        configuration: config_manager.Telegram,
+        configuration: config_manager.Alerts,
         logger: logging.Logger,
     ):
         super().__init__(

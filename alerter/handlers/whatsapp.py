@@ -1,18 +1,19 @@
-import datetime
 import logging
 import requests
 
 import config_manager
 
-from . import _alerter
+from . import _alert_handler
 
 
-class Whatsapp(
-    _alerter.BaseAlerter,
+class Handler(
+    _alert_handler.Handler,
 ):
+    name = "Whatsapp"
+
     def __init__(
         self,
-        configuration: config_manager.Telegram,
+        configuration: config_manager.Alerts,
         logger: logging.Logger,
     ):
         super().__init__(

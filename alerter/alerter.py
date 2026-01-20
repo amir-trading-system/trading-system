@@ -4,9 +4,7 @@ import threading
 
 import config_manager
 
-from . import telegram
-from . import whatsapp
-from . import _alerter
+from . import handlers
 
 class Alerter:
     def __init__(
@@ -14,16 +12,8 @@ class Alerter:
         logger: logging.Logger,
         configuration: config_manager.Alerts,
     ):
-        self.alerters: list[_alerter.BaseAlerter] = [
-            telegram.Telegram(
-                configuration=configuration.telegram,
-                logger=logger,
-            ),
-            whatsapp.Whatsapp(
-                configuration=configuration.whatsapp,
-                logger=logger,
-            ),
-        ]
+        self.logger = logger
+        self.configuration = configuration
 
     def send_alert(
         self,
@@ -34,9 +24,13 @@ class Alerter:
         bar_index: int,
         message: str,
     ):
-        for alerter in self.alerters:
+        for handler in handlers.__handlers__:
+            handler_object: handlers._alert_handler.Handler = handler(
+                configuration=self.configuration,
+                logger=self.logger,
+            )
             threading.Thread(
-                target=alerter.alert,
+                target=handler_object.alert,
                 kwargs={
                     "sender": sender,
                     "symbol": symbol,

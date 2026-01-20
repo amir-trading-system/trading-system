@@ -3,13 +3,20 @@ import logging
 
 import config_manager
 
-class BaseAlerter:
+class Handler:
+    name = ""
+
     def __init__(
         self,
-        configuration: config_manager.Whatsapp | config_manager.Telegram,
+        configuration: config_manager.Alerts,
         logger: logging.Logger,
     ):
-        self.configuration = configuration
+        match self.name:
+            case "Telegram":
+                self.configuration = configuration.telegram
+            case "Whatsapp":
+                self.configuration = configuration.whatsapp
+
         self.logger = logger
 
     def _send_message(
@@ -29,7 +36,7 @@ class BaseAlerter:
     ):
         if not self.configuration.enabled:
             self.logger.warning(
-                msg="Whatsapp alerter is not enabled by configuration",
+                msg=f"{self.name} alerter is not enabled by configuration",
                 extra={
                     "worker": sender,
                     "symbol": symbol,
@@ -44,7 +51,7 @@ class BaseAlerter:
             message=message,
         )
         self.logger.info(
-            msg="Alert has been sent successfully",
+            msg=f"Alert has been sent successfully to {self.name}",
             extra={
                 "worker": sender,
                 "symbol": symbol,

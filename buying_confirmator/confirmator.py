@@ -33,6 +33,7 @@ class Confirmator:
         most_updated_datetime = None
 
         while True:
+            ## TODO: Need to read from queue and not from object. think abount how to do it.
             one_minute_stock_data: tws_objects.Stock = self.request_id_to_symbol[one_minute_timeframe_request_id]
             if len(one_minute_stock_data.bars) == 0:
                 continue
@@ -120,14 +121,14 @@ class Confirmator:
                         entry_position_confirmed = True
                         entry_position_bar = bar_object
                         break
-                else:
-                    if (
-                        True
-                        and not entry_position_confirmed
-                        and i == len(relevant_bars) - 1
-                    ):
-                        not_relevant_anymore = True
-                        break
+                # else:
+                #     if (
+                #         True
+                #         and not entry_position_confirmed
+                #         and i == len(relevant_bars) - 1
+                #     ):
+                #         not_relevant_anymore = True
+                #         break
 
             if entry_position_confirmed or not_relevant_anymore:
                 break

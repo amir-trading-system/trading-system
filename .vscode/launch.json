@@ -45,9 +45,9 @@
             "name": "test retroactive",
             "args": [
                 "test",
-                "--symbol=VERO",
-                "--retroactive_from=2026-01-16",
-                "--timeframe=15",
+                "--symbol=SEGG",
+                "--retroactive_from=2026-01-20",
+                "--timeframe=5",
             ],
             "type": "debugpy",
             "request": "launch",
