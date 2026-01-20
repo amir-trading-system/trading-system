@@ -146,6 +146,17 @@ class DataStreamer():
             )
         )
 
+    def insert_one_minute_bars_into_confirmation_queues(
+        self,
+        one_minute_request_id: int,
+        symbol: str,
+    ):
+        one_minute_bars = self.request_id_to_symbol[one_minute_request_id].bars
+        for _, stock in self.request_id_to_symbol.items():
+            if stock.symbol_name == symbol and stock.timeframe > 1:
+                for one_minute_bar in one_minute_bars:
+                    stock.one_minute_bars_queue.put(one_minute_bar)
+
     def on_historical_data_end(
         self,
         request_id: int,
@@ -160,6 +171,10 @@ class DataStreamer():
         self.request_id_to_symbol[request_id].bars = bars_data
         self.request_id_to_symbol[request_id].ready_to_confirm = True
         if self.request_id_to_symbol[request_id].timeframe == 1:
+            self.insert_one_minute_bars_into_confirmation_queues(
+                one_minute_request_id=request_id,
+                symbol=symbol,
+            )
             return
 
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
@@ -212,6 +227,10 @@ class DataStreamer():
                 bars_data[-1].ready_to_analyze = True
                 self.request_id_to_symbol[request_id].bars = bars_data
                 self.request_id_to_symbol[request_id].ready_to_confirm = True
+                self.insert_one_minute_bars_into_confirmation_queues(
+                    one_minute_request_id=request_id,
+                    symbol=self.request_id_to_symbol[request_id].symbol_name,
+                )
 
             return
 
@@ -224,6 +243,10 @@ class DataStreamer():
         self.request_id_to_symbol[request_id].ready_to_confirm = True
 
         if self.request_id_to_symbol[request_id].timeframe == 1:
+            self.insert_one_minute_bars_into_confirmation_queues(
+                one_minute_request_id=request_id,
+                symbol=self.request_id_to_symbol[request_id].symbol_name,
+            )
             return
 
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])

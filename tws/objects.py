@@ -1,4 +1,6 @@
 import datetime
+import queue
+
 
 class BarData:
     def __init__(
@@ -56,11 +58,13 @@ class Stock:
         bars: list[BarData],
         timeframe: int,
         ready_to_confirm: bool = False,
+        one_minute_bars_queue: queue.Queue[BarData] = None,
     ):
         self.symbol_name = symbol_name
         self.bars = bars
         self.timeframe = timeframe
         self.ready_to_confirm = ready_to_confirm
+        self.one_minute_bars_queue = one_minute_bars_queue
 
     def previous_bar(
         self,

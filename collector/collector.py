@@ -46,6 +46,7 @@ class Collector:
             symbol_name=symbol,
             bars=[],
             timeframe=timeframe,
+            one_minute_bars_queue=queue.Queue(),
         )
         ibapi_request = objects.IbAPIRequest(
             request_id=request_id,
