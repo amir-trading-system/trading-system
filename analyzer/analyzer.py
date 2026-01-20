@@ -258,7 +258,7 @@ class Analyzer:
     {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
     """
 
-                self.alerter_object.alert(
+                self.alerter_object.send_alert(
                     sender=f"{__name__}.{__class__.__name__}",
                     symbol=stock.symbol_name,
                     timeframe=stock.timeframe,

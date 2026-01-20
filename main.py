@@ -77,8 +77,7 @@ if __name__ == "__main__":
 
     alerter_object = alerter.alerter.Alerter(
         logger=logger_object,
-        bot_token=configuration.alerts.telegram_alerter.bot_token,
-        chat_id=configuration.alerts.telegram_alerter.chat_id,
+        configuration=configuration.alerts,
     )
     collector_obj = collector.collector.Collector(
         tws_host="localhost",

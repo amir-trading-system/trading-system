@@ -143,7 +143,7 @@ class Confirmator:
                 },
             )
 
-            self.alerter_object.alert(
+            self.alerter_object.send_alert(
                 sender=f"{__name__}.{__class__.__name__}",
                 symbol=entry_position_bar.symbol,
                 timeframe=1,
