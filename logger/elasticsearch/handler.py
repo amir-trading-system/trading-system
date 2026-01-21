@@ -40,6 +40,8 @@ class Handler(
             "lowest_low_index": record_as_dict.get("lowest_low_index", 0),
             "indicator_name": record_as_dict.get("indicator_name", ""),
             "error_message": record_as_dict.get("error_message", ""),
+            "order_action": record_as_dict.get("order_action", ""),
+            "quantity": record_as_dict.get("quantity", 0),
         }
 
         if record_as_dict.get("starting_index_time"):
