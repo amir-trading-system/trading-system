@@ -203,6 +203,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self,
         symbol: str,
         current_price: float,
+        transmit: bool,
     ) -> int:
         quantity = math.floor((self.available_funds / 2) / current_price)
         if quantity == 0:
@@ -219,6 +220,7 @@ class Client(client.EClient, wrapper.EWrapper):
             order_action="BUY",
             order_type="MKT",
             quantity=quantity,
+            transmit=transmit,
         )
 
         return quantity
@@ -237,6 +239,7 @@ class Client(client.EClient, wrapper.EWrapper):
             quantity=quantity,
             price=filled_price,
             parent_order_id=parent_order_id,
+            transmit=True,
         )
 
     def place_order(
@@ -245,6 +248,7 @@ class Client(client.EClient, wrapper.EWrapper):
         order_action: str,
         order_type: str,
         quantity: int,
+        transmit: bool,
         price: float = None,
         parent_order_id: int = None,
     ):
@@ -258,6 +262,7 @@ class Client(client.EClient, wrapper.EWrapper):
         order_object.action = order_action
         order_object.orderType = order_type
         order_object.totalQuantity = quantity
+        order_object.transmit = transmit
         if price is not None:
             order_object.lmtPrice = price
         if parent_order_id is not None:
