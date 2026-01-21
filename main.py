@@ -72,21 +72,25 @@ if __name__ == "__main__":
     bars_ready_to_analyze_queue: queue.Queue[tws.objects.Stock] = queue.Queue()
     waiting_for_confirmation_queue: queue.Queue[tws.objects.BarData] = queue.Queue()
     request_id_to_symbol: dict[int,tws.objects.Stock] = {}
-    logger_object = logger.logger.Logger()
-    logger_object = logger_object.get_logger()
+    logger_object = logger.logger.Logger().get_logger()
 
     alerter_object = alerter.alerter.Alerter(
         logger=logger_object,
         configuration=configuration.alerts,
     )
-    collector_obj = collector.collector.Collector(
-        tws_host="localhost",
-        tws_port=8081,
+    tws_client = tws.client.Client(
+        host="localhost",
+        port=8081,
         symbols_to_collect_queue=symbols_to_collect_queue,
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
         alerter_object=alerter_object,
+    )
+    collector_obj = collector.collector.Collector(
+        tws_client=tws_client,
+        request_id_to_symbol=request_id_to_symbol,
+        logger=logger_object,
     )
     analyzer_obj = analyzer.analyzer.Analyzer(
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
@@ -95,6 +99,7 @@ if __name__ == "__main__":
         logger=logger_object,
     )
     confirmator_obj = buying_confirmator.confirmator.Confirmator(
+        tws_client=tws_client,
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
         request_id_to_symbol=request_id_to_symbol,
         alerter_object=alerter_object,

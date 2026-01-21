@@ -5,18 +5,20 @@ import threading
 import queue
 
 import alerter
-from tws import objects as tws_objects
+from tws import objects as tws_objects, client
 
 class Confirmator:
     is_retro: bool = False
 
     def __init__(
         self,
+        tws_client: client.Client,
         waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
         request_id_to_symbol: dict[int,tws_objects.Stock],
         alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
     ):
+        self.tws_client = tws_client
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.request_id_to_symbol = request_id_to_symbol
         self.alerter_object = alerter_object

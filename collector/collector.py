@@ -3,31 +3,18 @@ import logging
 import time
 import queue
 
-import alerter
 from tws import objects, client
 
 class Collector:
     def __init__(
         self,
-        tws_host: str,
-        tws_port: int,
-        symbols_to_collect_queue: queue.Queue[str],
-        bars_ready_to_analyze_queue: queue.Queue[objects.Stock],
+        tws_client: client.Client,
         request_id_to_symbol: dict[int,objects.Stock],
         logger: logging.Logger,
-        alerter_object: alerter.alerter.Alerter,
     ):
         self.logger = logger
         self.request_id_to_symbol = request_id_to_symbol
-        self.tws_client = client.Client(
-            host=tws_host,
-            port=tws_port,
-            symbols_to_collect_queue=symbols_to_collect_queue,
-            bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
-            request_id_to_symbol=request_id_to_symbol,
-            logger=logger,
-            alerter_object=alerter_object,
-        )
+        self.tws_client = tws_client
 
     def request_historical_data(
         self,
