@@ -177,7 +177,7 @@ class Analyzer:
                 success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
                 if indicator_obj.can_be_confirm_by_itself:
                     self.waiting_for_confirmation_queue.put(current_bar)
-                    print(f"Bar has been indicated. Waiting for confirmation. Bar time: {current_bar.bar_time}. Timeframe: {current_bar.timeframe}")
+                    print(f"{current_bar.symbol}: Bar has been indicated. Waiting for confirmation. Bar time: {current_bar.bar_time}. Timeframe: {current_bar.timeframe}")
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True

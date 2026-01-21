@@ -151,9 +151,15 @@ class DataStreamer():
         one_minute_request_id: int,
         symbol: str,
     ):
-        one_minute_bars = self.request_id_to_symbol[one_minute_request_id].bars
-        for _, stock in self.request_id_to_symbol.items():
-            if stock.symbol_name == symbol and stock.timeframe > 1:
+        temp_request_id_to_symbol = {
+            key: value
+            for key, value in self.request_id_to_symbol.items()
+            if value.symbol_name == symbol
+        }
+        one_minute_bars = temp_request_id_to_symbol[one_minute_request_id].bars
+
+        for _, stock in temp_request_id_to_symbol.items():
+            if stock.timeframe > 1:
                 for one_minute_bar in one_minute_bars:
                     stock.one_minute_bars_queue.put(one_minute_bar)
 
