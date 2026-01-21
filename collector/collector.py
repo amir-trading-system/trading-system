@@ -39,7 +39,6 @@ class Collector:
             request_id=request_id,
             symbol=symbol,
             timeframe=timeframe,
-            last_time_analyzed=datetime.datetime.fromtimestamp(0),
         )
         if request_id not in self.tws_client.ibapi_requests:
             self.tws_client.ibapi_requests[request_id] = ibapi_request

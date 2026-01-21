@@ -1,7 +1,9 @@
 import logging
+import math
 import queue
+import time
 
-from ibapi import client, common, wrapper
+from ibapi import client, common, wrapper, order as tws_order
 
 import alerter
 from . import scanner
@@ -20,7 +22,8 @@ class Client(client.EClient, wrapper.EWrapper):
         logger: logging.Logger,
         alerter_object: alerter.alerter.Alerter,
     ):
-        self.order_id = None
+        self.order_id: int = None
+        self.available_funds: float = None
         client.EClient.__init__(
             self,
             self,
@@ -32,6 +35,7 @@ class Client(client.EClient, wrapper.EWrapper):
         )
         self.ibapi_requests: dict[int,objects.IbAPIRequest] = {}
         self.request_id_to_symbol = request_id_to_symbol
+        self.order_id_to_symbol: dict[int, objects.Order] = {}
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.relevant_symbols: list[str] = []
@@ -87,6 +91,14 @@ class Client(client.EClient, wrapper.EWrapper):
         self,
         manual_results_for_test: list[str] = None,
     ):
+        self.reqAccountSummary(
+            reqId=self.next_id(),
+            groupName="All",
+            tags="AvailableFunds",
+        )
+        while self.available_funds is None:
+            time.sleep(1)
+
         if manual_results_for_test:
             for test_symbol in manual_results_for_test:
                 self.symbols_to_collect_queue.put(test_symbol)
@@ -174,3 +186,105 @@ class Client(client.EClient, wrapper.EWrapper):
             request_id=reqId,
             tws_bar=bar,
         )
+
+    def accountSummary(
+        self,
+        reqId,
+        account,
+        tag,
+        value,
+        currency,
+    ):
+        self.available_funds = float(value)
+
+        return super().accountSummary(reqId, account, tag, value, currency)
+
+    def place_buy_order(
+        self,
+        symbol: str,
+        current_price: float,
+    ) -> int:
+        quantity = math.floor((self.available_funds / 2) / current_price)
+
+        self.place_order(
+            symbol=symbol,
+            order_action="BUY",
+            order_type="MKT",
+            quantity=quantity,
+        )
+
+        return quantity
+
+    def place_take_profit_order(
+        self,
+        symbol: str,
+        quantity: int,
+        filled_price: float,
+        parent_order_id: int,
+    ):
+        self.place_order(
+            symbol=symbol,
+            order_action="SELL",
+            order_type="LMT",
+            quantity=quantity,
+            price=filled_price,
+            parent_order_id=parent_order_id,
+        )
+
+    def place_order(
+        self,
+        symbol: str,
+        order_action: str,
+        order_type: str,
+        quantity: int,
+        price: float = None,
+        parent_order_id: int = None,
+    ):
+        contract = client.Contract()
+        contract.symbol = symbol
+        contract.secType = "STK"
+        contract.exchange = "SMART"
+        contract.currency = "USD"
+
+        order_object = tws_order.Order()
+        order_object.action = order_action
+        order_object.orderType = order_type
+        order_object.totalQuantity = quantity
+        if price is not None:
+            order_object.lmtPrice = price
+        if parent_order_id is not None:
+            order_object.parentId = parent_order_id
+
+        self.placeOrder(
+            orderId=self.next_id(),
+            contract=contract,
+            order=order_object,
+        )
+
+    def execDetails(
+        self,
+        reqId,
+        contract,
+        execution,
+    ):
+        super().execDetails(reqId, contract, execution)
+        self.order_id_to_symbol[execution.orderId] = objects.Order(
+            symbol=contract.symbol,
+            action=execution.side,
+            status="Filled",
+        )
+        self.logger.info(
+            msg="Order has been filled for symbol",
+            extra={
+                "order_action": execution.side,
+                "quantity": int(execution.shares),
+                "symbol": contract.symbol,
+            },
+        )
+        if execution.side == "BOT":
+            self.place_take_profit_order(
+                symbol=contract.symbol,
+                quantity=int(execution.shares),
+                filled_price=round(execution.price * 1.15, 2),
+                parent_order_id=execution.orderId,
+            )

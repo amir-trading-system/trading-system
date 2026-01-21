@@ -138,7 +138,7 @@ if __name__ == "__main__":
     args = argument_parser.parse_args()
 
     threading.Thread(
-        target=collector_obj.tws_client.run
+        target=tws_client.run
     ).start()
     time.sleep(1)
 

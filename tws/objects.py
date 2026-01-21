@@ -93,9 +93,19 @@ class IbAPIRequest:
         request_id: int,
         symbol: str,
         timeframe: int,
-        last_time_analyzed: datetime.datetime,
     ):
         self.request_id = request_id
         self.symbol = symbol
         self.timeframe = timeframe
-        self.last_time_analyzed = last_time_analyzed
+
+
+class Order:
+    def __init__(
+        self,
+        symbol: str,
+        action: str,
+        status: str,
+    ):
+        self.symbol = symbol
+        self.action = action
+        self.status = status
