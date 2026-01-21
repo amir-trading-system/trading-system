@@ -302,7 +302,6 @@ class Analyzer:
         specific_bar_time: datetime.datetime = None,
         retroactive_from: datetime.datetime = False,
     ):
-        confirm_test = True
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: tws_objects.Stock = self.bars_ready_to_analyze_queue.get()
@@ -374,10 +373,6 @@ class Analyzer:
 
                     if not current_bar.is_after_market_open:
                         continue
-
-                    if confirm_test:
-                        self.waiting_for_confirmation_queue.put(current_bar)
-                        confirm_test = False
 
                     self._analyze_bar(
                         stock=stock,

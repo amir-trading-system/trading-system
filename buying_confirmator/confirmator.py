@@ -30,18 +30,24 @@ class Confirmator:
         entry_position_confirmed: bool = False
         not_relevant_anymore: bool = False
         entry_position_bar: tws_objects.BarData = None
-        most_updated_datetime = None
-        print(f"original bar time: {original_bar_to_confirm.bar_time}. timeframe: {original_bar_to_confirm.timeframe}. symbol: {original_bar_to_confirm.symbol}")
+        most_updated_datetime = datetime.datetime.fromtimestamp(0)
+        one_minute_bars: list[tws_objects.BarData] = []
 
         while True:
             if not relevant_stock.one_minute_bars_queue.empty():
-                potential_confirmed_bar = relevant_stock.one_minute_bars_queue.get()
-                if most_updated_datetime is None:
-                     most_updated_datetime = potential_confirmed_bar.bar_time
-                if potential_confirmed_bar.bar_time < original_bar_to_confirm.bar_time or potential_confirmed_bar.bar_time < most_updated_datetime:
+                potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
+
+                if (
+                    potential_confirmation_bar.bar_time < original_bar_to_confirm.bar_time + datetime.timedelta(minutes=original_bar_to_confirm.timeframe-2)
+                    or potential_confirmation_bar.bar_time < most_updated_datetime
+                    or (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds > 7200
+                    or not potential_confirmation_bar.ready_to_analyze
+                    or potential_confirmation_bar.histogram is None
+                ):
                     continue
-                most_updated_datetime = potential_confirmed_bar.bar_time
-                print(f"potential bar time: {potential_confirmed_bar.bar_time}. current volume: {potential_confirmed_bar.volume}. current time: {datetime.datetime.now()}")
+
+                one_minute_bars.append(potential_confirmation_bar)
+                most_updated_datetime = potential_confirmation_bar.bar_time
 
                 self.logger.info(
                     msg="Trying to confirm bar",
@@ -50,116 +56,92 @@ class Confirmator:
                         "symbol": original_bar_to_confirm.symbol,
                         "timeframe": original_bar_to_confirm.timeframe,
                         "bar_time": original_bar_to_confirm.bar_time,
-                        # "last_one_minute_bar_time": most_updated_datetime,
+                        "last_one_minute_bar_time": most_updated_datetime,
                     },
                 )
 
-                ## TODO: make bottom logic to fit above.
+                if (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds / 60 < original_bar_to_confirm.timeframe:
+                    continue
+                if (
+                    True
+                    and potential_confirmation_bar.low < original_bar_to_confirm.low
+                    and not self.is_retro
+                ):
+                    not_relevant_anymore = True
+                    break
 
-#             relevant_bars = [
-#                 bar_object
-#                 for bar_object in one_minute_stock_data.bars
-#                 if bar_object.bar_time >= original_bar_to_confirm.bar_time + datetime.timedelta(
-#                     minutes=original_bar_to_confirm.timeframe-2,
-#                 )
-#                 and bar_object.bar_time.day == original_bar_to_confirm.bar_time.day
-#                 and (bar_object.bar_time - original_bar_to_confirm.bar_time).seconds <= 3600
-#                 and bar_object.ready_to_analyze
-#                 and bar_object.histogram is not None
-#             ]
+                previous_bar = [
+                    bar_obj
+                    for bar_obj in one_minute_bars
+                    if bar_obj.index == potential_confirmation_bar.index+1
+                ]
+                if len(previous_bar) == 0:
+                    continue
+                previous_bar = previous_bar[0]
 
-#             for i, bar_object in enumerate(relevant_bars):
-#                 if (bar_object.bar_time - original_bar_to_confirm.bar_time).seconds / 60 < original_bar_to_confirm.timeframe:
-#                     continue
-#                 if (
-#                     True
-#                     and bar_object.low < original_bar_to_confirm.low
-#                     and not self.is_retro
-#                 ):
-#                     not_relevant_anymore = True
-#                     break
+                if (
+                    True
+                    and potential_confirmation_bar.ready_to_analyze
+                    and potential_confirmation_bar.high >= original_bar_to_confirm.high
+                    and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+                    and potential_confirmation_bar.close > potential_confirmation_bar.open_value
+                    and previous_bar.volume/potential_confirmation_bar.volume <= 0.9
+                    and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
+                    and (potential_confirmation_bar.close-potential_confirmation_bar.open_value)/(potential_confirmation_bar.high-potential_confirmation_bar.low) >= 0.6
+                ):
+                    above_volume_average_count = len(
+                        [
+                            bar_obj
+                            for bar_obj in one_minute_bars
+                            if bar_obj.volume > bar_obj.volume_average
+                        ]
+                    )
+                    under_volume_average_count = len(
+                        [
+                            bar_obj
+                            for bar_obj in one_minute_bars
+                            if bar_obj.volume <= bar_obj.volume_average
+                        ]
+                    )
+                    bars_not_showing_real_retracement = (
+                        True
+                        and len(one_minute_bars) > 10
+                        and above_volume_average_count/under_volume_average_count >= 0.75
+                    )
 
-#                 bars_to_check = relevant_bars[:i]
-#                 previous_bar = [
-#                     bar_obj
-#                     for bar_obj in bars_to_check
-#                     if bar_obj.index == bar_object.index+1
-#                 ]
-#                 if len(previous_bar) == 0:
-#                     continue
-#                 previous_bar = previous_bar[0]
+                    if not bars_not_showing_real_retracement:
+                        entry_position_confirmed = True
+                        entry_position_bar = potential_confirmation_bar
+                        break
 
-#                 if (
-#                     True
-#                     and bar_object.ready_to_analyze
-#                     and bar_object.high >= original_bar_to_confirm.high
-#                     and bar_object.volume > bar_object.volume_average
-#                     and bar_object.close > bar_object.open_value
-#                     and previous_bar.volume/bar_object.volume <= 0.8
-#                     and bar_object.close > bar_object.ema_9
-#                     and (bar_object.close-bar_object.open_value)/(bar_object.high-bar_object.low) >= 0.7
-#                 ):
-#                     above_volume_average_count = len(
-#                         [
-#                             bar_obj
-#                             for bar_obj in bars_to_check
-#                             if bar_obj.volume > bar_obj.volume_average
-#                         ]
-#                     )
-#                     under_volume_average_count = len(
-#                         [
-#                             bar_obj
-#                             for bar_obj in bars_to_check
-#                             if bar_obj.volume <= bar_obj.volume_average
-#                         ]
-#                     )
-#                     bars_not_showing_real_retracement = (
-#                         True
-#                         and len(bars_to_check) > 10
-#                         and above_volume_average_count/under_volume_average_count >= 0.75
-#                     )
+            if entry_position_confirmed or not_relevant_anymore:
+                break
 
-#                     if not bars_not_showing_real_retracement:
-#                         entry_position_confirmed = True
-#                         entry_position_bar = bar_object
-#                         break
-#                 # else:
-#                 #     if (
-#                 #         True
-#                 #         and not entry_position_confirmed
-#                 #         and i == len(relevant_bars) - 1
-#                 #     ):
-#                 #         not_relevant_anymore = True
-#                 #         break
+        if entry_position_confirmed:
+            self.logger.info(
+                "Bar has confirmed",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "entry_position_bar_time": entry_position_bar.bar_time,
+                },
+            )
 
-#             if entry_position_confirmed or not_relevant_anymore:
-#                 break
-
-#         if entry_position_confirmed:
-#             self.logger.info(
-#                 "Bar has confirmed",
-#                 extra={
-#                     "worker": "Confirmator",
-#                     "symbol": original_bar_to_confirm.symbol,
-#                     "timeframe": original_bar_to_confirm.timeframe,
-#                     "entry_position_bar_time": entry_position_bar.bar_time,
-#                 },
-#             )
-
-#             self.alerter_object.send_alert(
-#                 sender=f"{__name__}.{__class__.__name__}",
-#                 symbol=entry_position_bar.symbol,
-#                 timeframe=1,
-#                 bar_date=entry_position_bar.bar_time,
-#                 bar_index=entry_position_bar.index,
-#                 message=f"""
-#                     <b>Entry position confirmed for:</b>
-# <b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
-# <b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
-# <b>Time:</b> <code>{entry_position_bar.bar_time}</code>
-# <b>Original bar to confirm Time:</b> <code>{original_bar_to_confirm.bar_time}</code>
-# <b>Original bar to confirm Timeframe:</b> <code>{original_bar_to_confirm.timeframe}</code>"""
-#             )
+            self.alerter_object.send_alert(
+                sender=f"{__name__}.{__class__.__name__}",
+                symbol=entry_position_bar.symbol,
+                timeframe=1,
+                bar_date=entry_position_bar.bar_time,
+                bar_index=entry_position_bar.index,
+                message=f"""
+                    <b>Entry position confirmed for:</b>
+<b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
+<b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
+<b>Time:</b> <code>{entry_position_bar.bar_time}</code>
+<b>Original bar to confirm Time:</b> <code>{original_bar_to_confirm.bar_time}</code>
+<b>Original bar to confirm Timeframe:</b> <code>{original_bar_to_confirm.timeframe}</code>"""
+            )
 
     def confirm_data(
         self,
