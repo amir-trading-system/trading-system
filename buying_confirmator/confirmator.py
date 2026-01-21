@@ -129,6 +129,10 @@ class Confirmator:
                     "entry_position_bar_time": entry_position_bar.bar_time,
                 },
             )
+            self.tws_client.place_buy_order(
+                symbol=original_bar_to_confirm.symbol,
+                current_price=entry_position_bar.close,
+            )
 
             self.alerter_object.send_alert(
                 sender=f"{__name__}.{__class__.__name__}",
