@@ -32,7 +32,7 @@
             "args": [
                 "test",
                 "--symbol=NAMM",
-                "--specific_bar_time=2026-01-21 11:35:00",
+                "--specific_bar_time=2026-01-22 10:30:00",
                 "--timeframe=5",
             ],
             "type": "debugpy",
@@ -45,9 +45,9 @@
             "name": "test retroactive",
             "args": [
                 "test",
-                "--symbol=SEGG",
-                "--retroactive_from=2026-01-20",
-                "--timeframe=5",
+                "--symbol=BGL",
+                "--retroactive_from=2026-01-22",
+                "--timeframe=15",
             ],
             "type": "debugpy",
             "request": "launch",

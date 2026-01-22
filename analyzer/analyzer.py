@@ -259,7 +259,7 @@ class Analyzer:
     """
 
                 self.alerter_object.send_alert(
-                    sender=f"{__name__}.{__class__.__name__}",
+                    sender="Analyzer",
                     symbol=stock.symbol_name,
                     timeframe=stock.timeframe,
                     bar_date=current_bar.bar_time,

@@ -47,6 +47,7 @@ class Confirmator:
                     or not potential_confirmation_bar.ready_to_analyze
                     or potential_confirmation_bar.histogram is None
                 ):
+                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
 
                 one_minute_bars.append(potential_confirmation_bar)
@@ -64,12 +65,14 @@ class Confirmator:
                 )
 
                 if (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds / 60 < original_bar_to_confirm.timeframe:
+                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
                 if (
                     True
                     and potential_confirmation_bar.low < original_bar_to_confirm.low
                     and not self.is_retro
                 ):
+                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     not_relevant_anymore = True
                     break
 
@@ -79,8 +82,11 @@ class Confirmator:
                     if bar_obj.index == potential_confirmation_bar.index+1
                 ]
                 if len(previous_bar) == 0:
+                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
                 previous_bar = previous_bar[0]
+
+                potential_bar_body_percentage = (potential_confirmation_bar.close-potential_confirmation_bar.open_value)/(potential_confirmation_bar.high-potential_confirmation_bar.low)
 
                 if (
                     True
@@ -90,7 +96,7 @@ class Confirmator:
                     and potential_confirmation_bar.close > potential_confirmation_bar.open_value
                     and previous_bar.volume/potential_confirmation_bar.volume <= 0.9
                     and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
-                    and (potential_confirmation_bar.close-potential_confirmation_bar.open_value)/(potential_confirmation_bar.high-potential_confirmation_bar.low) >= 0.6
+                    and potential_bar_body_percentage >= 0.6
                 ):
                     above_volume_average_count = len(
                         [
@@ -111,7 +117,6 @@ class Confirmator:
                         and len(one_minute_bars) > 10
                         and above_volume_average_count/under_volume_average_count >= 0.75
                     )
-
                     if not bars_not_showing_real_retracement:
                         entry_position_confirmed = True
                         entry_position_bar = potential_confirmation_bar
@@ -130,13 +135,6 @@ class Confirmator:
                     "entry_position_bar_time": entry_position_bar.bar_time,
                 },
             )
-            if not already_sent_buy_order_for_stock.get(original_bar_to_confirm.symbol, False):
-                already_sent_buy_order_for_stock[original_bar_to_confirm.symbol] = True
-                self.tws_client.place_buy_order(
-                    symbol=original_bar_to_confirm.symbol,
-                    current_price=entry_position_bar.close,
-                    transmit=False,
-                )
 
             self.alerter_object.send_alert(
                 sender=f"{__name__}.{__class__.__name__}",
@@ -152,6 +150,19 @@ class Confirmator:
 <b>Original bar to confirm Time:</b> <code>{original_bar_to_confirm.bar_time}</code>
 <b>Original bar to confirm Timeframe:</b> <code>{original_bar_to_confirm.timeframe}</code>"""
             )
+
+            if (
+                not already_sent_buy_order_for_stock.get(original_bar_to_confirm.symbol, False)
+                and not self.is_retro
+            ):
+                already_sent_buy_order_for_stock[original_bar_to_confirm.symbol] = True
+                self.tws_client.place_buy_order(
+                    symbol=original_bar_to_confirm.symbol,
+                    current_price=entry_position_bar.close,
+                    transmit=False,
+                )
+
+        return
 
     def confirm_data(
         self,

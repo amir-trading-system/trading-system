@@ -68,12 +68,7 @@ class Client(client.EClient, wrapper.EWrapper):
             return
 
         error_message = f"reqId: {reqId}, errorCode: {errorCode}, errorString: {errorString}, orderReject: {advancedOrderRejectJson}"
-        if errorCode == 366:
-            print(error_message)
-        else:
-            self.alerter_object.alert_on_error(
-                message=error_message,
-            )
+        print(error_message)
 
     def nextValidId(
         self,
