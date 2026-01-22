@@ -34,6 +34,7 @@ class Confirmator:
         entry_position_bar: tws_objects.BarData = None
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         one_minute_bars: list[tws_objects.BarData] = []
+        already_sent_buy_order_for_stock: dict[str,bool] = {}
 
         while True:
             if not relevant_stock.one_minute_bars_queue.empty():
@@ -129,11 +130,13 @@ class Confirmator:
                     "entry_position_bar_time": entry_position_bar.bar_time,
                 },
             )
-            self.tws_client.place_buy_order(
-                symbol=original_bar_to_confirm.symbol,
-                current_price=entry_position_bar.close,
-                transmit=False,
-            )
+            if not already_sent_buy_order_for_stock.get(original_bar_to_confirm.symbol, False):
+                already_sent_buy_order_for_stock[original_bar_to_confirm.symbol] = True
+                self.tws_client.place_buy_order(
+                    symbol=original_bar_to_confirm.symbol,
+                    current_price=entry_position_bar.close,
+                    transmit=False,
+                )
 
             self.alerter_object.send_alert(
                 sender=f"{__name__}.{__class__.__name__}",
