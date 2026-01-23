@@ -225,7 +225,6 @@ class Client(client.EClient, wrapper.EWrapper):
         symbol: str,
         quantity: int,
         filled_price: float,
-        parent_order_id: int,
     ):
         self.place_order(
             symbol=symbol,
@@ -233,7 +232,6 @@ class Client(client.EClient, wrapper.EWrapper):
             order_type="LMT",
             quantity=quantity,
             price=filled_price,
-            parent_order_id=parent_order_id,
             transmit=True,
         )
 
@@ -245,7 +243,6 @@ class Client(client.EClient, wrapper.EWrapper):
         quantity: int,
         transmit: bool,
         price: float = None,
-        parent_order_id: int = None,
     ):
         contract = client.Contract()
         contract.symbol = symbol
@@ -260,8 +257,6 @@ class Client(client.EClient, wrapper.EWrapper):
         order_object.transmit = transmit
         if price is not None:
             order_object.lmtPrice = price
-        if parent_order_id is not None:
-            order_object.parentId = parent_order_id
 
         self.placeOrder(
             orderId=self.next_id(),
@@ -294,5 +289,4 @@ class Client(client.EClient, wrapper.EWrapper):
                 symbol=contract.symbol,
                 quantity=int(execution.shares),
                 filled_price=round(execution.price * 1.15, 2),
-                parent_order_id=execution.orderId,
             )
