@@ -2,6 +2,8 @@ import logging
 import requests
 
 import config_manager
+from tws import objects as tws_objects
+from analyzer import objects as analyzer_objects
 
 from . import _alert_handler
 
@@ -20,6 +22,43 @@ class Handler(
             configuration=configuration,
             logger=logger,
         )
+
+    def design_indicated_bar_message(
+        self,
+        stock: tws_objects.Stock,
+        current_bar: tws_objects.BarData,
+        emoji: str,
+        base_except_one: bool,
+        milestones: analyzer_objects.Milestones,
+        sorted_indicators: dict[str,float],
+    ) -> str:
+        return f"""
+            <b>{emoji} Congrats! {emoji}</b>
+            {"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
+
+            <b>Symbol:</b> <u>{stock.symbol_name}</u>
+            <b>Timeframe:</b> <code>{stock.timeframe}</code>
+            <b>Time:</b> <code>{current_bar.bar_time}</code>
+            <b>Starting Time:</b> <code>{milestones.starting_bar.bar_time}</code>
+            <b>Top Time:</b> <code>{milestones.top_bar.bar_time}</code>
+
+            <b>{len(sorted_indicators)} Indications:</b>
+            {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
+            """
+
+    def design_confirmation_bar_message(
+        self,
+        original_bar,
+        entry_position_bar,
+    ) -> str:
+        return f"""
+            <b>Entry position confirmed for:</b>
+            <b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
+            <b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
+            <b>Time:</b> <code>{entry_position_bar.bar_time}</code>
+            <b>Original bar to confirm Time:</b> <code>{original_bar.bar_time}</code>
+            <b>Original bar to confirm Timeframe:</b> <code>{original_bar.timeframe}</code>
+        """
 
     def _send_message(
         self,

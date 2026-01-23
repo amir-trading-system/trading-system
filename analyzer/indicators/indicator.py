@@ -5,8 +5,6 @@ import analyzer.objects
 
 from tws import objects as tws_objects
 
-from . import objects
-
 class Indicator:
     name: str = ""
 
@@ -46,12 +44,12 @@ class Indicator:
         self,
         success_results: list[analyzer.objects.EvidenceResponse],
         failed_base_evidences_count: int,
-    ) -> objects.IndicatorResponse:
+    ) -> analyzer.objects.IndicatorResponse:
         total = len(self.unique_evidences)
         success_rate = len(success_results)/total
         result = success_rate >= 0.9
 
-        return objects.IndicatorResponse(
+        return analyzer.objects.IndicatorResponse(
             success_count=len(success_results),
             success_rate=success_rate,
             result=result,
@@ -63,7 +61,7 @@ class Indicator:
         stock: tws_objects.Stock,
         milestones: analyzer.objects.Milestones,
         current_bar: tws_objects.BarData,
-    ) -> objects.IndicatorResponse:
+    ) -> analyzer.objects.IndicatorResponse:
         success_results: list[analyzer.objects.EvidenceResponse] = []
         failed_base_evidences_count = 0
 
@@ -91,7 +89,7 @@ class Indicator:
                 }
             )
             print(f"Not all must_to_have terms are true for {self.name} indicator")
-            return objects.IndicatorResponse(
+            return analyzer.objects.IndicatorResponse(
                 success_count=0,
                 success_rate=0.0,
                 result=False,

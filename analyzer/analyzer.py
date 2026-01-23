@@ -166,7 +166,7 @@ class Analyzer:
                 milestones=milestones,
                 logger=self.logger,
             )
-            indicator_response: analyzer.indicators.objects.IndicatorResponse = indicator_obj.indicate(
+            indicator_response: analyzer.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,

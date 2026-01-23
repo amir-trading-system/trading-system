@@ -2,6 +2,8 @@ import datetime
 import logging
 
 import config_manager
+from tws import objects as tws_objects
+from analyzer import objects as analyzer_objects
 
 class Handler:
     name = ""
@@ -23,6 +25,24 @@ class Handler:
         self,
         message: str,
     ):
+        raise NotImplementedError()
+
+    def design_confirmation_bar_message(
+        self,
+        original_bar: tws_objects.BarData,
+        entry_position_bar: tws_objects.BarData,
+    ) -> str:
+        raise NotImplementedError()
+
+    def design_indicated_bar_message(
+        self,
+        stock: tws_objects.Stock,
+        current_bar: tws_objects.BarData,
+        emoji: str,
+        base_except_one: bool,
+        milestones: analyzer_objects.Milestones,
+        sorted_indicators: dict[str,float],
+    ) -> str:
         raise NotImplementedError()
 
     def alert(

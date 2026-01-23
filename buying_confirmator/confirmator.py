@@ -136,19 +136,10 @@ class Confirmator:
                 },
             )
 
-            self.alerter_object.send_alert(
-                sender=f"{__name__}.{__class__.__name__}",
-                symbol=entry_position_bar.symbol,
-                timeframe=1,
-                bar_date=entry_position_bar.bar_time,
-                bar_index=entry_position_bar.index,
-                message=f"""
-                    <b>Entry position confirmed for:</b>
-<b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
-<b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
-<b>Time:</b> <code>{entry_position_bar.bar_time}</code>
-<b>Original bar to confirm Time:</b> <code>{original_bar_to_confirm.bar_time}</code>
-<b>Original bar to confirm Timeframe:</b> <code>{original_bar_to_confirm.timeframe}</code>"""
+            self.alerter_object.send_confirmation_alert(
+                sender="Confirmator",
+                original_bar=original_bar_to_confirm,
+                entry_position_bar=entry_position_bar,
             )
 
             if (

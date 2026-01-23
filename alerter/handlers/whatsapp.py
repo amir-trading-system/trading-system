@@ -2,6 +2,8 @@ import logging
 import requests
 
 import config_manager
+from tws import objects as tws_objects
+from analyzer import objects as analyzer_objects
 
 from . import _alert_handler
 
@@ -20,6 +22,24 @@ class Handler(
             configuration=configuration,
             logger=logger,
         )
+
+    def design_indicated_bar_message(
+        self,
+        stock: tws_objects.Stock,
+        current_bar: tws_objects.BarData,
+        emoji: str,
+        base_except_one: bool,
+        milestones: analyzer_objects.Milestones,
+        sorted_indicators: dict[str,float],
+    ):
+        return ""
+
+    def design_confirmation_bar_message(
+        self,
+        original_bar: tws_objects.BarData,
+        entry_position_bar: tws_objects.BarData,
+    ) -> str:
+        return ""
 
     def _send_message(
         self,
