@@ -8,6 +8,7 @@ import alerter
 import analyzer
 import buying_confirmator
 import config_manager
+import common
 import collector
 import logger
 import tws
@@ -16,8 +17,8 @@ def run_bot(
     c_obj: collector.collector.Collector,
     a_obj: analyzer.analyzer.Analyzer,
     co_obj: buying_confirmator.confirmator.Confirmator,
-    symbol: str = None,
-    timeframe: int = None,
+    symbol: str = "",
+    timeframe: int = 0,
     specific_bar_time: datetime.datetime = None,
     retroactive_from: datetime.datetime = None,
 ):
@@ -28,7 +29,7 @@ def run_bot(
     c_obj.tws_client.data_streamer.is_retro = retroactive_from is not None
     co_obj.is_retro = retroactive_from is not None or specific_bar_time is not None
 
-    if symbol is not None:
+    if symbol:
         manual_results_for_test = [str.upper(symbol)]
 
         if specific_bar_time:
@@ -69,9 +70,9 @@ def run_bot(
 if __name__ == "__main__":
     configuration: config_manager.BotConfig = config_manager.ConfigManager().load_config()
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
-    bars_ready_to_analyze_queue: queue.Queue[tws.objects.Stock] = queue.Queue()
-    waiting_for_confirmation_queue: queue.Queue[tws.objects.BarData] = queue.Queue()
-    request_id_to_symbol: dict[int,tws.objects.Stock] = {}
+    bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
+    waiting_for_confirmation_queue: queue.Queue[common.objects.BarData] = queue.Queue()
+    request_id_to_symbol: dict[int,common.objects.Stock] = {}
     logger_object = logger.logger.Logger().get_logger()
 
     alerter_object = alerter.alerter.Alerter(

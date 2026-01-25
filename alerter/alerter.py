@@ -3,7 +3,7 @@ import logging
 import threading
 
 import config_manager
-import tws
+import common
 
 from . import handlers
 
@@ -45,15 +45,15 @@ class Alerter:
     def send_confirmation_alert(
         self,
         sender: str,
-        original_bar: tws.objects.BarData,
-        entry_position_bar: tws.objects.BarData,
+        original_bar: common.objects.BarData,
+        entry_position_bar: common.objects.BarData,
     ):
         for handler in handlers.__handlers__:
             handler_object: handlers._alert_handler.Handler = handler(
                 configuration=self.configuration,
                 logger=self.logger,
             )
-            designed_message = handler_object.design_confirmation_message(
+            designed_message = handler_object.design_confirmation_bar_message(
                 original_bar=original_bar,
                 entry_position_bar=entry_position_bar,
             )
@@ -64,8 +64,8 @@ class Alerter:
                     "sender": sender,
                     "symbol": original_bar.symbol,
                     "timeframe": original_bar.timeframe,
-                    "bar_date": original_bar.bar_date,
-                    "bar_index": original_bar.bar_index,
+                    "bar_date": original_bar.bar_time,
+                    "bar_index": original_bar.index,
                     "message": designed_message,
                 },
             ).start()

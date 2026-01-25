@@ -3,13 +3,14 @@ import logging
 import time
 import queue
 
-from tws import objects, client
+import common
+from tws import client
 
 class Collector:
     def __init__(
         self,
         tws_client: client.Client,
-        request_id_to_symbol: dict[int,objects.Stock],
+        request_id_to_symbol: dict[int,common.objects.Stock],
         logger: logging.Logger,
     ):
         self.logger = logger
@@ -29,13 +30,13 @@ class Collector:
         contract.exchange = "SMART"
         contract.currency = "USD"
 
-        self.request_id_to_symbol[request_id] = objects.Stock(
+        self.request_id_to_symbol[request_id] = common.objects.Stock(
             symbol_name=symbol,
             bars=[],
             timeframe=timeframe,
             one_minute_bars_queue=queue.Queue(),
         )
-        ibapi_request = objects.IbAPIRequest(
+        ibapi_request = common.objects.IbAPIRequest(
             request_id=request_id,
             symbol=symbol,
             timeframe=timeframe,
@@ -64,7 +65,7 @@ class Collector:
 
     def collect_data(
         self,
-        manual_timeframe_for_tests: int = None,
+        manual_timeframe_for_tests: int = 0,
         specific_bar_time: datetime.datetime = None,
     ):
         while True:

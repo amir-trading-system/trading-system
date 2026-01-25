@@ -4,11 +4,11 @@ import queue
 
 import pandas as pd
 import talib
-from talib import MA_Type
-from ibapi import common
+from talib import MA_Type # type: ignore
+from ibapi import common as ibapi_common
 
 import alerter
-from . import objects
+import common
 
 
 class DataStreamer():
@@ -17,9 +17,9 @@ class DataStreamer():
 
     def __init__(
         self,
-        request_id_to_symbol: dict[int, objects.Stock],
+        request_id_to_symbol: dict[int, common.objects.Stock],
         bars_ready_to_analyze_queue: queue.Queue,
-        ibapi_requests: dict[int,objects.IbAPIRequest],
+        ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
         alerter_object: alerter.alerter.Alerter,
     ):
@@ -31,9 +31,9 @@ class DataStreamer():
 
     def _filter_ignored_bars(
         self,
-        bars: list[objects.BarData],
+        bars: list[common.objects.BarData],
     ):
-        relevant_bars: list[objects.BarData] = []
+        relevant_bars: list[common.objects.BarData] = []
         for i, bar_object in enumerate(bars):
             if (
                 bar_object.bar_time.hour == 8
@@ -54,11 +54,10 @@ class DataStreamer():
 
         return relevant_bars
 
-    #pylint: disable=no-member
     def enrich_bars(
         self,
-        bars: list[objects.BarData],
-    ) -> list[objects.BarData]:
+        bars: list[common.objects.BarData],
+    ) -> list[common.objects.BarData]:
         fitered_bars = self._filter_ignored_bars(
             bars=bars,
         )
@@ -82,10 +81,10 @@ class DataStreamer():
             pd.to_datetime(bar_data_df["bar_time"])
         )
         since_open_bar_df = bar_data_df.where(
-            (bar_data_df["bar_time"].dt.time >= pd.to_datetime("09:30").time()) &
-            (bar_data_df["bar_time"].dt.time <= pd.to_datetime("16:00").time())
+            (bar_data_df["bar_time"].dt.time >= pd.to_datetime("09:30").time()) & # type: ignore
+            (bar_data_df["bar_time"].dt.time <= pd.to_datetime("16:00").time()) # type: ignore
         )
-        since_open_bar_df["session"] = since_open_bar_df["bar_time"].dt.date
+        since_open_bar_df["session"] = since_open_bar_df["bar_time"].dt.date # type: ignore
 
         since_open_bar_df["volume"] = since_open_bar_df["volume"].astype(float)
         since_open_bar_df["hlc3"] = (since_open_bar_df["high"] + since_open_bar_df["low"] + since_open_bar_df["close"]) / 3
@@ -108,7 +107,7 @@ class DataStreamer():
 
         results_dict = bar_data_df.to_dict(orient="records")
         bars = sorted(
-            [objects.BarData(**kwargs) for kwargs in results_dict],
+            [common.objects.BarData(**kwargs) for kwargs in results_dict], # pyright: ignore[reportCallIssue]
             key=lambda bar: bar.bar_time,
         )
         for i, bar_object in enumerate(bars):
@@ -119,7 +118,7 @@ class DataStreamer():
     def get_historical_data(
         self,
         request_id: int,
-        tws_bar: common.BarData,
+        tws_bar: ibapi_common.BarData,
     ):
         bar_time = datetime.datetime.fromtimestamp(float(tws_bar.date))
         now = datetime.datetime.now()
@@ -134,7 +133,7 @@ class DataStreamer():
             return
 
         self.request_id_to_symbol[request_id].bars.append(
-            objects.BarData(
+            common.objects.BarData(
                 symbol=ibapi_request.symbol,
                 timeframe=ibapi_request.timeframe,
                 open_value=tws_bar.open,
@@ -195,7 +194,7 @@ class DataStreamer():
     def on_historical_data_update(
         self,
         request_id: int,
-        tws_bar: common.BarData,
+        tws_bar: ibapi_common.BarData,
     ):
         if tws_bar.volume == 0.0:
             return
@@ -207,7 +206,7 @@ class DataStreamer():
         if ibapi_request is None:
             return
 
-        current_bar = objects.BarData(
+        current_bar = common.objects.BarData(
             symbol=ibapi_request.symbol,
             timeframe=ibapi_request.timeframe,
             open_value=tws_bar.open,

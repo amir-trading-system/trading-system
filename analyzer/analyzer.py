@@ -6,17 +6,18 @@ import logging
 
 
 import alerter
-from analyzer import objects, helper
 import analyzer.indicators
 import analyzer.evidences
-from tws import objects as tws_objects
+import common
+
+from . import helper
 
 
 class Analyzer:
     def __init__(
         self,
-        bars_ready_to_analyze_queue: queue.Queue[tws_objects.BarData],
-        waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
+        bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock],
+        waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
         alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
     ):
@@ -30,16 +31,16 @@ class Analyzer:
 
     def _prepare_milestones(
         self,
-        stock: tws_objects.Stock,
-        current_bar: tws_objects.BarData,
-    ) -> objects.Milestones:
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.Milestones:
         are_valid = False
-        starting_bar: objects.MilestoneBar = self.helper.get_strating_bar(
+        starting_bar: common.objects.MilestoneBar = self.helper.get_strating_bar(
             stock=stock,
             current_bar=current_bar,
         )
 
-        top_bar: objects.MilestoneBar = self.helper.get_top_bar(
+        top_bar: common.objects.MilestoneBar = self.helper.get_top_bar(
             stock=stock,
             starting_bar=starting_bar,
         )
@@ -53,13 +54,13 @@ class Analyzer:
                 and bar_object.volume > top_bar.bar_object.volume
             ]
             if len(already_passed_top_bar) > 0:
-                top_bar = objects.MilestoneBar(
+                top_bar = common.objects.MilestoneBar(
                     index=0,
-                    bar_type=objects.MilestoneType.TOP_BAR,
+                    bar_type=common.objects.MilestoneType.TOP_BAR,
                     timeframe=stock.timeframe,
                 )
 
-        lowest_low_bar: objects.MilestoneBar = self.helper.get_lowest_bar_from_top_bar(
+        lowest_low_bar: common.objects.MilestoneBar = self.helper.get_lowest_bar_from_top_bar(
             stock=stock,
             top_bar=top_bar,
         )
@@ -67,7 +68,7 @@ class Analyzer:
             bar_object=current_bar,
         )
         if not previous_bar:
-            return objects.Milestones(
+            return common.objects.Milestones(
                 starting_bar=starting_bar,
                 top_bar=top_bar,
                 lowest_low_bar=lowest_low_bar,
@@ -75,10 +76,10 @@ class Analyzer:
                 are_valid=are_valid,
             )
 
-        previous_bar = objects.MilestoneBar(
+        previous_bar = common.objects.MilestoneBar(
             index=previous_bar.index,
             bar_object=previous_bar,
-            bar_type=objects.MilestoneType.PREVIOUS_BAR,
+            bar_type=common.objects.MilestoneType.PREVIOUS_BAR,
             bar_time=previous_bar.bar_time,
             timeframe=stock.timeframe,
         )
@@ -91,7 +92,7 @@ class Analyzer:
         ):
             are_valid = True
 
-        milestones = objects.Milestones(
+        milestones = common.objects.Milestones(
             starting_bar=starting_bar,
             top_bar=top_bar,
             lowest_low_bar=lowest_low_bar,
@@ -136,9 +137,9 @@ class Analyzer:
 
     def _run_indicators(
         self,
-        stock: tws_objects.Stock,
-        current_bar: tws_objects.BarData,
-        milestones: objects.Milestones,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+        milestones: common.objects.Milestones,
     ) -> None:
         self.logger.info(
             msg="Running analyzers",
@@ -166,7 +167,7 @@ class Analyzer:
                 milestones=milestones,
                 logger=self.logger,
             )
-            indicator_response: analyzer.objects.IndicatorResponse = indicator_obj.indicate(
+            indicator_response: common.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
@@ -270,8 +271,8 @@ class Analyzer:
 
     def _analyze_bar(
         self,
-        stock: tws_objects.Stock,
-        current_bar: tws_objects.BarData,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
     ):
         current_bar_is_valid = (
             True
@@ -283,7 +284,7 @@ class Analyzer:
         if not current_bar_is_valid:
             return
 
-        milestones: objects.Milestones = self._prepare_milestones(
+        milestones: common.objects.Milestones = self._prepare_milestones(
             stock=stock,
             current_bar=current_bar,
         )
@@ -300,12 +301,12 @@ class Analyzer:
     def analyze_data(
         self,
         specific_bar_time: datetime.datetime = None,
-        retroactive_from: datetime.datetime = False,
+        retroactive_from: datetime.datetime = None,
     ):
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
-                stock_object: tws_objects.Stock = self.bars_ready_to_analyze_queue.get()
-                stock = tws_objects.Stock(
+                stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
+                stock = common.objects.Stock(
                     symbol_name=stock_object.symbol_name,
                     timeframe=stock_object.timeframe,
                     bars=copy.deepcopy(stock_object.bars),
@@ -336,7 +337,7 @@ class Analyzer:
                             continue
 
                         current_bar = current_bar[0]
-                        new_stock_object = tws_objects.Stock(
+                        new_stock_object = common.objects.Stock(
                             symbol_name=stock_object.symbol_name,
                             bars=relevant_bars,
                             timeframe=stock_object.timeframe,
@@ -353,14 +354,14 @@ class Analyzer:
                         stock.bars = stock.bars[1:]
 
                     if specific_bar_time is not None:
-                        current_bar = [
+                        relevant_bars = [
                             bar_data
                             for bar_data in stock.bars
                             if bar_data.bar_time == specific_bar_time
                         ]
 
-                        if len(current_bar) == 1:
-                            current_bar = current_bar[0]
+                        if len(relevant_bars) == 1:
+                            current_bar = relevant_bars[0]
                             stock.bars = stock.bars[current_bar.index:]
                             for i, bar_object in enumerate(stock.bars):
                                 bar_object.index = i

@@ -1,6 +1,4 @@
-from analyzer import objects
-from tws import objects as tws_objects
-
+import common
 from . import _evidence
 from . import histogram_mostly_positive
 
@@ -12,13 +10,13 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         relevant_bars = stock.bars[:milestones.starting_bar.index]
         if len(relevant_bars) == 0:
-            return objects.EvidenceResponse(
+            return common.objects.EvidenceResponse(
                 result=False,
                 reason="no bars to indicate",
             )
@@ -39,7 +37,7 @@ class Evidence(
             if histogram_mostly_positive_result.result:
                 return histogram_mostly_positive_result
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=histogram_is_positive_until_now,
             reason=""
             if histogram_is_positive_until_now

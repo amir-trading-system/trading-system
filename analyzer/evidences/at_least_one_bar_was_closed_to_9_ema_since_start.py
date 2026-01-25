@@ -1,6 +1,4 @@
-from analyzer import objects
-from tws import objects as tws_objects
-
+import common
 from . import _evidence
 
 
@@ -13,13 +11,13 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         relevant_bars = stock.bars[:milestones.starting_bar.index]
         if len(relevant_bars) == 0:
-            return objects.EvidenceResponse(
+            return common.objects.EvidenceResponse(
                 result=False,
                 reason="no bars to indicate",
             )
@@ -42,7 +40,7 @@ class Evidence(
             )
         )
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=at_least_one_bar_was_closed_to_9_ema_since_start,
             reason=""
             if at_least_one_bar_was_closed_to_9_ema_since_start

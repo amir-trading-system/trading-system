@@ -1,6 +1,4 @@
-from tws import objects as tws_objects
-
-from analyzer import objects
+import common
 from . import _evidence
 
 class Evidence(
@@ -11,13 +9,13 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         relevant_bars = stock.bars[1:milestones.top_bar.index]
         if len(relevant_bars) == 0:
-            return objects.EvidenceResponse(
+            return common.objects.EvidenceResponse(
                 result=False,
                 reason="no bars to indicate",
             )
@@ -61,7 +59,7 @@ class Evidence(
         ):
             most_volatile_bar_from_top_is_strong = True
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=most_volatile_bar_from_top_is_strong,
             reason=""
             if most_volatile_bar_from_top_is_strong

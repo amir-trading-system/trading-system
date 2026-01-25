@@ -1,6 +1,4 @@
-from analyzer import objects
-from tws import objects as tws_objects
-
+import common
 from . import _evidence
 
 
@@ -11,10 +9,10 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         current_bar_has_buyers = (
             True
             and current_bar.close > current_bar.open_value
@@ -24,7 +22,7 @@ class Evidence(
 
         relevant_bars = stock.bars[:milestones.top_bar.index]
         if len(relevant_bars) == 0:
-            return objects.EvidenceResponse(
+            return common.objects.EvidenceResponse(
                 result=False,
                 reason="no bars to indicate",
             )
@@ -43,7 +41,7 @@ class Evidence(
             and not any_bar_is_stronger
         )
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=current_bar_is_strong_with_high_volume,
             reason=""
             if current_bar_is_strong_with_high_volume

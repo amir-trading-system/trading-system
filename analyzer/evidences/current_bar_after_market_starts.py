@@ -1,6 +1,4 @@
-from tws import objects as tws_objects
-
-from analyzer import objects
+import common
 from . import _evidence
 
 class Evidence(
@@ -12,13 +10,13 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         current_bar_after_market_starts = current_bar.is_after_market_open
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=current_bar_after_market_starts,
             reason=""
             if current_bar_after_market_starts

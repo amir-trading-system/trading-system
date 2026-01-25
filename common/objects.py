@@ -1,4 +1,5 @@
 import datetime
+import enum
 import queue
 
 
@@ -13,14 +14,14 @@ class BarData:
         low: float,
         volume: float,
         bar_time: datetime.datetime,
-        vwap: float = None,
-        volume_average: float = None,
-        ema_9: float = None,
-        ema_20: float = None,
-        histogram: float = None,
-        macd: float = None,
-        signal_line: float = None,
-        index: int = None,
+        vwap: float = 0.0,
+        volume_average: float = 0.0,
+        ema_9: float = 0.0,
+        ema_20: float = 0.0,
+        histogram: float = 0.0,
+        macd: float = 0.0,
+        signal_line: float = 0.0,
+        index: int = 0,
         is_after_market_open: bool = None,
         ready_to_analyze: bool = False,
         has_indication: bool = False,
@@ -69,7 +70,7 @@ class Stock:
     def previous_bar(
         self,
         bar_object: BarData,
-    ) -> BarData:
+    ) -> BarData | None:
         previous_bar_index = bar_object.index + 1
         if previous_bar_index < len(self.bars):
             return self.bars[previous_bar_index]
@@ -79,13 +80,12 @@ class Stock:
     def next_bar(
         self,
         bar_object: BarData,
-    ) -> BarData:
+    ) -> BarData | None:
         next_bar_index = bar_object.index - 1
         if next_bar_index > 0:
             return self.bars[next_bar_index]
 
         return None
-
 
 class IbAPIRequest:
     def __init__(
@@ -98,7 +98,6 @@ class IbAPIRequest:
         self.symbol = symbol
         self.timeframe = timeframe
 
-
 class Order:
     def __init__(
         self,
@@ -109,3 +108,67 @@ class Order:
         self.symbol = symbol
         self.action = action
         self.status = status
+
+class MilestoneType(enum.Enum):
+    STARTING_BAR = 1
+    TOP_BAR = 2
+    LOWEST_BAR = 3
+    PREVIOUS_BAR = 4
+
+class MilestoneBar:
+    def __init__(
+        self,
+        index: int,
+        bar_object: BarData = None,
+        bar_type: MilestoneType = None,
+        bar_time: datetime.datetime = None,
+        timeframe: int = 0,
+    ):
+        self.index = index
+        self.bar_object = bar_object
+        self.type = bar_type
+        self.bar_time = bar_time
+        self.timeframe = timeframe
+
+class Milestones:
+    def __init__(
+        self,
+        starting_bar: MilestoneBar,
+        top_bar: MilestoneBar,
+        lowest_low_bar: MilestoneBar,
+        are_valid: bool,
+        previous_bar: MilestoneBar = None,
+        fibonacci_retracement: float = 0.0,
+        retracement_indexes: list[int] = [],
+    ):
+        self.starting_bar = starting_bar
+        self.top_bar = top_bar
+        self.lowest_low_bar = lowest_low_bar
+        self.previous_bar = previous_bar
+        self.are_valid = are_valid
+        self.fibonacci_retracement = fibonacci_retracement
+        self.retracement_indexes = retracement_indexes
+
+class EvidenceResponse:
+    def __init__(
+        self,
+        result: bool,
+        reason: str | None = None,
+        value: any = None,
+    ):
+        self.result = result
+        self.reason = reason
+        self.value = value
+
+class IndicatorResponse:
+    def __init__(
+        self,
+        success_count: int,
+        success_rate: float,
+        result: bool,
+        failed_base_evidences_count: int,
+    ):
+        self.success_rate = success_rate
+        self.success_count = success_count
+        self.result = result
+        self.failed_base_evidences_count = failed_base_evidences_count

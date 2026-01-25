@@ -2,23 +2,18 @@ import datetime
 import logging
 
 import config_manager
-from tws import objects as tws_objects
-from analyzer import objects as analyzer_objects
+import common
 
 class Handler:
     name = ""
+    is_enabled = False
 
     def __init__(
         self,
         configuration: config_manager.Alerts,
         logger: logging.Logger,
     ):
-        match self.name:
-            case "Telegram":
-                self.configuration = configuration.telegram
-            case "Whatsapp":
-                self.configuration = configuration.whatsapp
-
+        self.configuration = configuration
         self.logger = logger
 
     def _send_message(
@@ -29,18 +24,18 @@ class Handler:
 
     def design_confirmation_bar_message(
         self,
-        original_bar: tws_objects.BarData,
-        entry_position_bar: tws_objects.BarData,
+        original_bar: common.objects.BarData,
+        entry_position_bar: common.objects.BarData,
     ) -> str:
         raise NotImplementedError()
 
     def design_indicated_bar_message(
         self,
-        stock: tws_objects.Stock,
-        current_bar: tws_objects.BarData,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
         emoji: str,
         base_except_one: bool,
-        milestones: analyzer_objects.Milestones,
+        milestones: common.objects.Milestones,
         sorted_indicators: dict[str,float],
     ) -> str:
         raise NotImplementedError()
@@ -54,7 +49,7 @@ class Handler:
         bar_index: int,
         message: str,
     ):
-        if not self.configuration.enabled:
+        if not self.is_enabled:
             self.logger.warning(
                 msg=f"{self.name} alerter is not enabled by configuration",
                 extra={

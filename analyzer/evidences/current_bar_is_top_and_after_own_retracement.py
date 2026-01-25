@@ -1,6 +1,4 @@
-from analyzer import objects
-from tws import objects as tws_objects
-
+import common
 from . import _evidence
 
 
@@ -11,10 +9,10 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         current_bar_is_highest = current_bar.high >= milestones.top_bar.bar_object.high
         current_bar_after_own_retracement = (
             True
@@ -39,7 +37,7 @@ class Evidence(
         )
 
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=current_bar_is_top_and_after_own_retracement,
             reason=""
             if current_bar_is_top_and_after_own_retracement

@@ -45,27 +45,27 @@ class Handler(
         }
 
         if record_as_dict.get("starting_index_time"):
-            document["starting_index_time"] = record_as_dict.get("starting_index_time") + datetime.timedelta(
+            document["starting_index_time"] = record_as_dict.get("starting_index_time", datetime.datetime) + datetime.timedelta(
                 hours=5,
             )
         if record_as_dict.get("top_index_time"):
-            document["top_index_time"] = record_as_dict.get("top_index_time") + datetime.timedelta(
+            document["top_index_time"] = record_as_dict.get("top_index_time", datetime.datetime) + datetime.timedelta(
                 hours=5,
             )
         if record_as_dict.get("lowest_low_time"):
-            document["lowest_low_time"] = record_as_dict.get("lowest_low_time") + datetime.timedelta(
+            document["lowest_low_time"] = record_as_dict.get("lowest_low_time", datetime.datetime) + datetime.timedelta(
                 hours=5,
             )
         if record_as_dict.get("bar_time"):
-            document["bar_time"] = record_as_dict.get("bar_time") + datetime.timedelta(
+            document["bar_time"] = record_as_dict.get("bar_time", datetime.datetime) + datetime.timedelta(
                 hours=5,
             )
         if record_as_dict.get("last_one_minute_bar_time"):
-            document["last_one_minute_bar_time"] = record_as_dict.get("last_one_minute_bar_time") + datetime.timedelta(
+            document["last_one_minute_bar_time"] = record_as_dict.get("last_one_minute_bar_time", datetime.datetime) + datetime.timedelta(
                 hours=5,
             )
         if record_as_dict.get("entry_position_bar_time"):
-            document["entry_position_bar_time"] = record_as_dict.get("entry_position_bar_time") + datetime.timedelta(
+            document["entry_position_bar_time"] = record_as_dict.get("entry_position_bar_time", datetime.datetime) + datetime.timedelta(
                 hours=5,
             )
 

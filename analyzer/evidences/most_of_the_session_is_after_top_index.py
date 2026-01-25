@@ -1,6 +1,4 @@
-from analyzer import objects
-from tws import objects as tws_objects
-
+import common
 from . import _evidence
 
 
@@ -11,13 +9,13 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         most_of_the_session_is_after_top_index = milestones.top_bar.index/milestones.starting_bar.index > 0.7
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=most_of_the_session_is_after_top_index,
             reason=""
             if most_of_the_session_is_after_top_index

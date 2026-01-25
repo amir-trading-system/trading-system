@@ -56,14 +56,14 @@ class ConfigManager:
         return BotConfig(
             alerts=Alerts(
                 telegram=Telegram(
-                    bot_token=os.getenv("TELEGRAM_BOT_TOKEN"),
-                    chat_id=os.getenv("TELEGRAM_CHAT_ID"),
+                    bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+                    chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
                     enabled=True if os.getenv("TELEGRAM_ENABLED") == 'true' else False,
                 ),
                 whatsapp=Whatsapp(
-                    access_token=os.getenv("WHATSAPP_ACCESS_TOKEN"),
-                    phone_number_id=os.getenv("WHATSAPP_PHONE_NUMBER_ID"),
-                    recipient=os.getenv("WHATSAPP_RECIPIENT"),
+                    access_token=os.getenv("WHATSAPP_ACCESS_TOKEN", ""),
+                    phone_number_id=os.getenv("WHATSAPP_PHONE_NUMBER_ID", ""),
+                    recipient=os.getenv("WHATSAPP_RECIPIENT", ""),
                     enabled=True if os.getenv("WHATSAPP_ENABLED") == 'true' else False,
                 ),
             ),

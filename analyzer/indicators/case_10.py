@@ -1,4 +1,5 @@
 import analyzer.evidences
+import common
 
 from . import indicator
 
@@ -9,7 +10,7 @@ class Indicator(
 
     def __init__(
         self,
-        milestones: analyzer.objects.Milestones,
+        milestones: common.objects.Milestones,
         logger,
     ):
         super().__init__(

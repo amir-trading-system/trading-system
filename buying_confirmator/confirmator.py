@@ -5,7 +5,8 @@ import threading
 import queue
 
 import alerter
-from tws import objects as tws_objects, client
+import common
+from tws import client
 
 class Confirmator:
     is_retro: bool = False
@@ -13,8 +14,8 @@ class Confirmator:
     def __init__(
         self,
         tws_client: client.Client,
-        waiting_for_confirmation_queue: queue.Queue[tws_objects.BarData],
-        request_id_to_symbol: dict[int,tws_objects.Stock],
+        waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
+        request_id_to_symbol: dict[int,common.objects.Stock],
         alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
     ):
@@ -26,14 +27,14 @@ class Confirmator:
 
     def confirm_entry_position(
         self,
-        relevant_stock: tws_objects.Stock,
-        original_bar_to_confirm: tws_objects.BarData,
+        relevant_stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
     ):
         entry_position_confirmed: bool = False
         not_relevant_anymore: bool = False
-        entry_position_bar: tws_objects.BarData = None
+        entry_position_bar: common.objects.BarData = None
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
-        one_minute_bars: list[tws_objects.BarData] = []
+        one_minute_bars: list[common.objects.BarData] = []
         already_sent_buy_order_for_stock: dict[str,bool] = {}
 
         while True:
@@ -45,7 +46,7 @@ class Confirmator:
                     or potential_confirmation_bar.bar_time < most_updated_datetime
                     or (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds > 7200
                     or not potential_confirmation_bar.ready_to_analyze
-                    or potential_confirmation_bar.histogram is None
+                    or not potential_confirmation_bar.histogram
                 ):
                     relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
@@ -112,11 +113,13 @@ class Confirmator:
                             if bar_obj.volume <= bar_obj.volume_average
                         ]
                     )
+
                     bars_not_showing_real_retracement = (
                         True
                         and len(one_minute_bars) > 10
                         and above_volume_average_count/under_volume_average_count >= 0.75
                     )
+
                     if not bars_not_showing_real_retracement:
                         entry_position_confirmed = True
                         entry_position_bar = potential_confirmation_bar
@@ -160,7 +163,7 @@ class Confirmator:
     ):
         while True:
             if not self.waiting_for_confirmation_queue.empty():
-                bar_to_confirm: tws_objects.BarData = self.waiting_for_confirmation_queue.get()
+                bar_to_confirm: common.objects.BarData = self.waiting_for_confirmation_queue.get()
                 relevant_stock = [
                     stock
                     for _, stock in self.request_id_to_symbol.items()

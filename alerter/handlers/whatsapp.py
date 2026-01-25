@@ -2,8 +2,7 @@ import logging
 import requests
 
 import config_manager
-from tws import objects as tws_objects
-from analyzer import objects as analyzer_objects
+import common
 
 from . import _alert_handler
 
@@ -25,19 +24,19 @@ class Handler(
 
     def design_indicated_bar_message(
         self,
-        stock: tws_objects.Stock,
-        current_bar: tws_objects.BarData,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
         emoji: str,
         base_except_one: bool,
-        milestones: analyzer_objects.Milestones,
+        milestones: common.objects.Milestones,
         sorted_indicators: dict[str,float],
     ):
         return ""
 
     def design_confirmation_bar_message(
         self,
-        original_bar: tws_objects.BarData,
-        entry_position_bar: tws_objects.BarData,
+        original_bar: common.objects.BarData,
+        entry_position_bar: common.objects.BarData,
     ) -> str:
         return ""
 
@@ -45,14 +44,14 @@ class Handler(
         self,
         message: str,
     ):
-        url = f"https://graph.facebook.com/v19.0/{self.configuration.phone_number_id}/messages"
+        url = f"https://graph.facebook.com/v19.0/{self.configuration.whatsapp.phone_number_id}/messages"
         headers = {
-            "Authorization": f"Bearer {self.configuration.access_token}",
+            "Authorization": f"Bearer {self.configuration.whatsapp.access_token}",
             "Content-Type": "application/json",
         }
         payload = {
             "messaging_product": "whatsapp",
-            "to": self.configuration.recipient,
+            "to": self.configuration.whatsapp.recipient,
             "type": "text",
             "text": {
                 "body": message,

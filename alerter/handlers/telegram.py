@@ -2,8 +2,7 @@ import logging
 import requests
 
 import config_manager
-from tws import objects as tws_objects
-from analyzer import objects as analyzer_objects
+import common
 
 from . import _alert_handler
 
@@ -12,6 +11,7 @@ class Handler(
     _alert_handler.Handler,
 ):
     name = "Telegram"
+    is_enabled = True
 
     def __init__(
         self,
@@ -25,11 +25,11 @@ class Handler(
 
     def design_indicated_bar_message(
         self,
-        stock: tws_objects.Stock,
-        current_bar: tws_objects.BarData,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
         emoji: str,
         base_except_one: bool,
-        milestones: analyzer_objects.Milestones,
+        milestones: common.objects.Milestones,
         sorted_indicators: dict[str,float],
     ) -> str:
         return f"""
@@ -65,11 +65,11 @@ class Handler(
         message: str,
     ):
         payload = {
-            "chat_id": self.configuration.chat_id,
+            "chat_id": self.configuration.telegram.chat_id,
             "text": message,
             "parse_mode": "HTML"
         }
-        url = f"https://api.telegram.org/bot{self.configuration.bot_token}/sendMessage"
+        url = f"https://api.telegram.org/bot{self.configuration.telegram.bot_token}/sendMessage"
 
         response = requests.post(
             url=url,

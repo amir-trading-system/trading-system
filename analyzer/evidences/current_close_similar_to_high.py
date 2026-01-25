@@ -1,6 +1,4 @@
-from tws import objects as tws_objects
-
-from analyzer import objects
+import common
 from . import _evidence
 
 class Evidence(
@@ -11,13 +9,13 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         current_close_similar_to_high = current_bar.close/current_bar.high >= 0.7
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=current_close_similar_to_high,
             reason=""
             if current_close_similar_to_high

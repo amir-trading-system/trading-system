@@ -1,21 +1,19 @@
 import logging
 
 import analyzer.evidences
-import analyzer.objects
-
-from tws import objects as tws_objects
+import common
 
 class Indicator:
     name: str = ""
 
     def __init__(
         self,
-        milestones: analyzer.objects.Milestones,
+        milestones: common.objects.Milestones,
         logger: logging.Logger,
     ):
         self.logger = logger
-        self.unique_evidences: set[analyzer.evidences._evidence.Evidence] = {}
-        self.evidences: set[analyzer.evidences._evidence.Evidence] = {
+        self.unique_evidences: set[type[analyzer.evidences._evidence.Evidence]] = set()
+        self.evidences: set[type[analyzer.evidences._evidence.Evidence]] = {
             analyzer.evidences.movement_is_after_market_starts.Evidence,
             analyzer.evidences.current_close_similar_to_high.Evidence,
             analyzer.evidences.current_high_close_to_top_bar_high.Evidence,
@@ -42,14 +40,14 @@ class Indicator:
 
     def handle_response(
         self,
-        success_results: list[analyzer.objects.EvidenceResponse],
+        success_results: list[common.objects.EvidenceResponse],
         failed_base_evidences_count: int,
-    ) -> analyzer.objects.IndicatorResponse:
+    ) -> common.objects.IndicatorResponse:
         total = len(self.unique_evidences)
         success_rate = len(success_results)/total
         result = success_rate >= 0.9
 
-        return analyzer.objects.IndicatorResponse(
+        return common.objects.IndicatorResponse(
             success_count=len(success_results),
             success_rate=success_rate,
             result=result,
@@ -58,11 +56,11 @@ class Indicator:
 
     def indicate(
         self,
-        stock: tws_objects.Stock,
-        milestones: analyzer.objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> analyzer.objects.IndicatorResponse:
-        success_results: list[analyzer.objects.EvidenceResponse] = []
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.IndicatorResponse:
+        success_results: list[common.objects.EvidenceResponse] = []
         failed_base_evidences_count = 0
 
         if not all(
@@ -89,18 +87,18 @@ class Indicator:
                 }
             )
             print(f"Not all must_to_have terms are true for {self.name} indicator")
-            return analyzer.objects.IndicatorResponse(
+            return common.objects.IndicatorResponse(
                 success_count=0,
                 success_rate=0.0,
                 result=False,
                 failed_base_evidences_count=0,
             )
 
-        for evidence_object in self.evidences:
-            if not self.check_for_retracement_before and evidence_object.name == analyzer.evidences.retracement_occured_since_top_bar:
+        for evidence_class in self.evidences:
+            if not self.check_for_retracement_before and evidence_class.name == analyzer.evidences.retracement_occured_since_top_bar:
                 continue
 
-            evidence_object: analyzer.evidences._evidence.Evidence = evidence_object()
+            evidence_object: analyzer.evidences._evidence.Evidence = evidence_class()
             result = evidence_object.find_evidence(
                 stock=stock,
                 milestones=milestones,

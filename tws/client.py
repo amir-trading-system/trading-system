@@ -1,14 +1,15 @@
+import decimal
 import logging
 import math
 import queue
 import time
 
-from ibapi import client, common, wrapper, order as tws_order
+from ibapi import client, common as ibapi_common, wrapper, order as tws_order
 
 import alerter
+import common
 from . import scanner
 from . import data_streamer
-from . import objects
 
 
 class Client(client.EClient, wrapper.EWrapper):
@@ -17,13 +18,13 @@ class Client(client.EClient, wrapper.EWrapper):
         host: str,
         port: int,
         symbols_to_collect_queue: queue.Queue,
-        request_id_to_symbol: dict[int, objects.Stock],
+        request_id_to_symbol: dict[int, common.objects.Stock],
         bars_ready_to_analyze_queue: queue.Queue,
         logger: logging.Logger,
         alerter_object: alerter.alerter.Alerter,
     ):
-        self.order_id: int = None
-        self.available_funds: float = None
+        self.order_id: int = 0
+        self.available_funds: float = 0.0
         client.EClient.__init__(
             self,
             self,
@@ -33,9 +34,9 @@ class Client(client.EClient, wrapper.EWrapper):
             port=port,
             clientId=0,
         )
-        self.ibapi_requests: dict[int,objects.IbAPIRequest] = {}
+        self.ibapi_requests: dict[int,common.objects.IbAPIRequest] = {}
         self.request_id_to_symbol = request_id_to_symbol
-        self.order_id_to_symbol: dict[int, objects.Order] = {}
+        self.order_id_to_symbol: dict[int, common.objects.Order] = {}
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.relevant_symbols: list[str] = []
@@ -91,7 +92,7 @@ class Client(client.EClient, wrapper.EWrapper):
             groupName="All",
             tags="AvailableFunds",
         )
-        while self.available_funds is None:
+        while not self.available_funds:
             time.sleep(1)
 
         if manual_results_for_test:
@@ -155,7 +156,7 @@ class Client(client.EClient, wrapper.EWrapper):
     def historicalData(
         self,
         reqId: int,
-        bar: common.BarData,
+        bar: ibapi_common.BarData,
     ):
         self.data_streamer.get_historical_data(
             request_id=reqId,
@@ -175,7 +176,7 @@ class Client(client.EClient, wrapper.EWrapper):
     def historicalDataUpdate(
         self,
         reqId: int,
-        bar: common.BarData,
+        bar: ibapi_common.BarData,
     ):
         self.data_streamer.on_historical_data_update(
             request_id=reqId,
@@ -253,7 +254,7 @@ class Client(client.EClient, wrapper.EWrapper):
         order_object = tws_order.Order()
         order_object.action = order_action
         order_object.orderType = order_type
-        order_object.totalQuantity = quantity
+        order_object.totalQuantity = decimal.Decimal(quantity)
         order_object.transmit = transmit
         if price is not None:
             order_object.lmtPrice = price
@@ -271,7 +272,7 @@ class Client(client.EClient, wrapper.EWrapper):
         execution,
     ):
         super().execDetails(reqId, contract, execution)
-        self.order_id_to_symbol[execution.orderId] = objects.Order(
+        self.order_id_to_symbol[execution.orderId] = common.objects.Order(
             symbol=contract.symbol,
             action=execution.side,
             status="Filled",

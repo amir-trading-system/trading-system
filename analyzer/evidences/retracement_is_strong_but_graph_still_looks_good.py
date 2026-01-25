@@ -1,6 +1,4 @@
-from tws import objects as tws_objects
-
-from analyzer import objects
+import common
 from . import _evidence
 from . import fibonacci_retracement
 
@@ -11,13 +9,13 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         relevant_bars = stock.bars[:milestones.starting_bar.index+1]
         if len(relevant_bars) == 0:
-            return objects.EvidenceResponse(
+            return common.objects.EvidenceResponse(
                 result=False,
                 reason="no bars to indicate",
             )
@@ -30,7 +28,7 @@ class Evidence(
         )
 
         if fibonacci_retracement_result.result:
-            return objects.EvidenceResponse(
+            return common.objects.EvidenceResponse(
                 result=False,
                 reason="Fibonacci retracement is good so indicator wont run",
             )
@@ -67,7 +65,7 @@ class Evidence(
             and price_jumps_on_current_bar
         )
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=retracement_is_strong_but_graph_still_looks_good,
             reason=""
             if retracement_is_strong_but_graph_still_looks_good

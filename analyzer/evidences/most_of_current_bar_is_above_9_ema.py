@@ -1,6 +1,4 @@
-from analyzer import objects
-from tws import objects as tws_objects
-
+import common
 from . import _evidence
 
 
@@ -11,10 +9,10 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         most_of_current_bar_is_above_9_ema = (
             True
             and (
@@ -44,7 +42,7 @@ class Evidence(
             and low_close_to_9_ema
         )
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=result,
             reason=""
             if result

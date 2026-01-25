@@ -25,7 +25,7 @@ class Logger:
 
         for logger_name, logger_object in logging.root.manager.loggerDict.items():
             if not logger_name.startswith(name):
-                logger_object.disabled = True
+                logger_object.disabled = True # type: ignore
 
     def get_logger(
         self,

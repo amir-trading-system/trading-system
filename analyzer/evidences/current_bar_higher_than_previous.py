@@ -1,6 +1,4 @@
-from tws import objects as tws_objects
-
-from analyzer import objects
+import common
 from . import _evidence
 
 class Evidence(
@@ -11,14 +9,14 @@ class Evidence(
 
     def find_evidence(
         self,
-        stock: tws_objects.Stock,
-        milestones: objects.Milestones,
-        current_bar: tws_objects.BarData,
-    ) -> objects.EvidenceResponse:
+        stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.EvidenceResponse:
         previous_bar = milestones.previous_bar.bar_object
         current_bar_higher_than_previous = current_bar.high > previous_bar.high
 
-        return objects.EvidenceResponse(
+        return common.objects.EvidenceResponse(
             result=current_bar_higher_than_previous,
             reason=""
             if current_bar_higher_than_previous
