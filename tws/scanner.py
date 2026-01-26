@@ -50,14 +50,8 @@ class Scanner():
         symbol_name = contract_details.contract.symbol
         if symbol_name not in self.relevant_symbols:
             if contract_details.ineligibilityReasonList is not None:
-                for reason in contract_details.ineligibilityReasonList:
-                    if (
-                        str(reason.description).startswith("No Opening Trades")
-                        or "this product is in closing-only status" in str(reason.description)
-                    ):
-                        no_opening_trades = True
-                        self.relevant_symbols.append(contract_details.contract.symbol)
-                        break
+                no_opening_trades = True
+                self.relevant_symbols.append(contract_details.contract.symbol)
             if not no_opening_trades:
                 if contract_details.contract.symbol not in self.relevant_symbols:
                     self.logger.info(
@@ -68,5 +62,6 @@ class Scanner():
                             "symbol_type": contract_details.stockType,
                         },
                     )
+                    print(symbol_name)
                     self.relevant_symbols.append(contract_details.contract.symbol)
                     self.symbols_to_collect_queue.put(contract_details.contract.symbol)
