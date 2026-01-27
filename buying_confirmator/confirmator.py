@@ -40,6 +40,10 @@ class Confirmator:
         while True:
             if not relevant_stock.one_minute_bars_queue.empty():
                 potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
+                if not self.is_retro:
+                    one_minute_bar_is_too_late = (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds > 3600
+                    if one_minute_bar_is_too_late:
+                        break
 
                 if (
                     potential_confirmation_bar.bar_time < original_bar_to_confirm.bar_time + datetime.timedelta(minutes=original_bar_to_confirm.timeframe-2)
@@ -150,9 +154,11 @@ class Confirmator:
 
             if (
                 not already_sent_buy_order_for_stock.get(original_bar_to_confirm.symbol, False)
-                and not self.is_retro
             ):
                 already_sent_buy_order_for_stock[original_bar_to_confirm.symbol] = True
+                if self.is_retro:
+                    return
+
                 self.tws_client.place_buy_order(
                     symbol=original_bar_to_confirm.symbol,
                     current_price=entry_position_bar.close,
