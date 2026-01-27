@@ -126,7 +126,11 @@ class Client(client.EClient, wrapper.EWrapper):
             contract=contractDetails.contract,
         )
 
-    def contractDetails(self, reqId, contractDetails):
+    def contractDetails(
+        self,
+        reqId,
+        contractDetails,
+    ):
         self.scanner.get_contract_details(
             contract_details=contractDetails,
         )

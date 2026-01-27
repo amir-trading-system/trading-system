@@ -87,6 +87,9 @@ class Confirmator:
                     continue
                 previous_bar = previous_bar[0]
 
+                if potential_confirmation_bar.high-potential_confirmation_bar.low == 0:
+                    continue
+
                 potential_bar_body_percentage = (potential_confirmation_bar.close-potential_confirmation_bar.open_value)/(potential_confirmation_bar.high-potential_confirmation_bar.low)
 
                 if (

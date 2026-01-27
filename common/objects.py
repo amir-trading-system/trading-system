@@ -42,7 +42,7 @@ class BarData:
         self.signal_line = signal_line
         self.bar_time = bar_time
         self.index = index
-        self.is_after_market_open = is_after_market_open if is_after_market_open is not None else bar_time >= datetime.datetime(
+        self.is_after_market_open = is_after_market_open if is_after_market_open is not None else bar_time > datetime.datetime(
             year=bar_time.year,
             month=bar_time.month,
             day=bar_time.day,

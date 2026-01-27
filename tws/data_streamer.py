@@ -255,12 +255,3 @@ class DataStreamer():
             return
 
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
-        relevant_symbol = self.request_id_to_symbol[request_id]
-        self.logger.info(
-            msg="Bar is ready to analyze and confirm",
-            extra={
-                "worker": "DataStreamer",
-                "symbol": relevant_symbol.symbol_name,
-                "timeframe": relevant_symbol.timeframe,
-            }
-        )

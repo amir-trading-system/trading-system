@@ -69,7 +69,11 @@ class Handler(
                 hours=5,
             )
 
-        self.elastic_client.index(
-            index=self.index,
-            document=document,
-        )
+        try:
+            self.elastic_client.index(
+                index=self.index,
+                document=document,
+            )
+        except Exception as e:
+            exception_message = f"An exception has been thrown from elasticsearch: {e}"
+            print(exception_message)
