@@ -58,13 +58,11 @@ class Stock:
         symbol_name: str,
         bars: list[BarData],
         timeframe: int,
-        ready_to_confirm: bool = False,
         one_minute_bars_queue: queue.Queue[BarData] = None,
     ):
         self.symbol_name = symbol_name
         self.bars = bars
         self.timeframe = timeframe
-        self.ready_to_confirm = ready_to_confirm
         self.one_minute_bars_queue = one_minute_bars_queue
 
     def previous_bar(

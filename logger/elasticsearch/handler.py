@@ -68,6 +68,13 @@ class Handler(
             document["entry_position_bar_time"] = record_as_dict.get("entry_position_bar_time", datetime.datetime) + datetime.timedelta(
                 hours=5,
             )
+        if record_as_dict.get("retroactive_from"):
+            document["retroactive_from"] = record_as_dict.get("retroactive_from", datetime.datetime) + datetime.timedelta(
+                hours=5,
+            )
+
+        if record_as_dict.get("exception_message"):
+            document["exception_message"] = record_as_dict.get("exception_message")
 
         try:
             self.elastic_client.index(

@@ -178,7 +178,6 @@ class Analyzer:
                 success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
                 if indicator_obj.can_be_confirm_by_itself:
                     self.waiting_for_confirmation_queue.put(current_bar)
-                    print(f"{current_bar.symbol}: Bar has been indicated. Waiting for confirmation. Bar time: {current_bar.bar_time}. Timeframe: {current_bar.timeframe}")
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
@@ -298,6 +297,77 @@ class Analyzer:
             milestones=milestones,
         )
 
+    def analyze_retroactive_case(
+        self,
+        stock: common.objects.Stock,
+        retroactive_from: datetime.datetime,
+    ):
+        all_bars = copy.deepcopy(stock.bars)
+        for bar_object in stock.bars:
+            if bar_object.bar_time.day != retroactive_from.day or not bar_object.ready_to_analyze:
+                continue
+
+            relevant_bars = all_bars[bar_object.index:]
+            for i, bar_obj in enumerate(relevant_bars):
+                bar_obj.index = i
+
+            current_bar = [
+                bar_obj
+                for bar_obj in relevant_bars
+                if bar_obj.bar_time == bar_object.bar_time
+            ]
+            if len(current_bar) == 0:
+                continue
+
+            current_bar = current_bar[0]
+            new_stock_object = common.objects.Stock(
+                symbol_name=stock.symbol_name,
+                bars=relevant_bars,
+                timeframe=stock.timeframe,
+            )
+
+            self._analyze_bar(
+                stock=new_stock_object,
+                current_bar=current_bar,
+            )
+
+    def analyze_live_case(
+        self,
+        stock: common.objects.Stock,
+        specific_bar_time: datetime.datetime,
+    ):
+        current_bar = stock.bars[0]
+        if not stock.bars[0].ready_to_analyze and stock.bars[1].ready_to_analyze:
+            current_bar = stock.bars[1]
+            stock.bars = stock.bars[1:]
+
+        if specific_bar_time is not None:
+            relevant_bars = [
+                bar_data
+                for bar_data in stock.bars
+                if bar_data.bar_time == specific_bar_time
+            ]
+
+            if len(relevant_bars) == 1:
+                current_bar = relevant_bars[0]
+                stock.bars = stock.bars[current_bar.index:]
+                for i, bar_object in enumerate(stock.bars):
+                    bar_object.index = i
+                current_bar.index = 0
+        else:
+            current_bar.index = 0
+            stock.bars = stock.bars[current_bar.index:]
+            for i, bar_object in enumerate(stock.bars):
+                bar_object.index = i
+
+        if not current_bar.is_after_market_open:
+            return
+
+        self._analyze_bar(
+            stock=stock,
+            current_bar=current_bar,
+        )
+
     def analyze_data(
         self,
         specific_bar_time: datetime.datetime = None,
@@ -310,6 +380,7 @@ class Analyzer:
                     symbol_name=stock_object.symbol_name,
                     timeframe=stock_object.timeframe,
                     bars=copy.deepcopy(stock_object.bars),
+                    one_minute_bars_queue=stock_object.one_minute_bars_queue,
                 )
 
                 stock.bars = sorted(
@@ -319,63 +390,34 @@ class Analyzer:
                 )
 
                 if retroactive_from:
-                    all_bars = copy.deepcopy(stock.bars)
-                    for bar_object in stock.bars:
-                        if bar_object.bar_time.day != retroactive_from.day or not bar_object.ready_to_analyze:
-                            continue
-
-                        relevant_bars = all_bars[bar_object.index:]
-                        for i, bar_obj in enumerate(relevant_bars):
-                            bar_obj.index = i
-
-                        current_bar = [
-                            bar_obj
-                            for bar_obj in relevant_bars
-                            if bar_obj.bar_time == bar_object.bar_time
-                        ]
-                        if len(current_bar) == 0:
-                            continue
-
-                        current_bar = current_bar[0]
-                        new_stock_object = common.objects.Stock(
-                            symbol_name=stock_object.symbol_name,
-                            bars=relevant_bars,
-                            timeframe=stock_object.timeframe,
+                    try:
+                        self.analyze_retroactive_case(
+                            stock=stock,
+                            retroactive_from=retroactive_from,
                         )
-
-                        self._analyze_bar(
-                            stock=new_stock_object,
-                            current_bar=current_bar,
+                    except Exception as e:
+                        self.logger.error(
+                            msg="Exception occured while analyzing stock retroactively",
+                            extra={
+                                "exception_message": str(e),
+                                "symbol": stock.symbol_name,
+                                "timeframe": stock.timeframe,
+                                "retroactive_from": retroactive_from,
+                            }
                         )
                 else:
-                    current_bar = stock.bars[0]
-                    if not stock.bars[0].ready_to_analyze and stock.bars[1].ready_to_analyze:
-                        current_bar = stock.bars[1]
-                        stock.bars = stock.bars[1:]
-
-                    if specific_bar_time is not None:
-                        relevant_bars = [
-                            bar_data
-                            for bar_data in stock.bars
-                            if bar_data.bar_time == specific_bar_time
-                        ]
-
-                        if len(relevant_bars) == 1:
-                            current_bar = relevant_bars[0]
-                            stock.bars = stock.bars[current_bar.index:]
-                            for i, bar_object in enumerate(stock.bars):
-                                bar_object.index = i
-                            current_bar.index = 0
-                    else:
-                        current_bar.index = 0
-                        stock.bars = stock.bars[current_bar.index:]
-                        for i, bar_object in enumerate(stock.bars):
-                            bar_object.index = i
-
-                    if not current_bar.is_after_market_open:
-                        continue
-
-                    self._analyze_bar(
-                        stock=stock,
-                        current_bar=current_bar,
-                    )
+                    try:
+                        self.analyze_live_case(
+                            stock=stock,
+                            specific_bar_time=specific_bar_time,
+                        )
+                    except Exception as e:
+                        self.logger.error(
+                            msg="Exception occured while analyzing stock on live or on specific bar time",
+                            extra={
+                                "exception_message": str(e),
+                                "symbol": stock.symbol_name,
+                                "timeframe": stock.timeframe,
+                                "specific_bar_time": specific_bar_time,
+                            }
+                        )

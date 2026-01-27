@@ -174,7 +174,6 @@ class DataStreamer():
         for bar_object in bars_data:
             bar_object.ready_to_analyze = True
         self.request_id_to_symbol[request_id].bars = bars_data
-        self.request_id_to_symbol[request_id].ready_to_confirm = True
         if self.request_id_to_symbol[request_id].timeframe == 1:
             self.insert_one_minute_bars_into_confirmation_queues(
                 one_minute_request_id=request_id,
@@ -231,7 +230,6 @@ class DataStreamer():
             if ibapi_request.timeframe == 1:
                 bars_data[-1].ready_to_analyze = True
                 self.request_id_to_symbol[request_id].bars = bars_data
-                self.request_id_to_symbol[request_id].ready_to_confirm = True
                 self.insert_one_minute_bars_into_confirmation_queues(
                     one_minute_request_id=request_id,
                     symbol=self.request_id_to_symbol[request_id].symbol_name,
@@ -245,7 +243,6 @@ class DataStreamer():
             bars=relevant_symbol_bars,
         )
         self.request_id_to_symbol[request_id].bars = bars_data
-        self.request_id_to_symbol[request_id].ready_to_confirm = True
 
         if self.request_id_to_symbol[request_id].timeframe == 1:
             self.insert_one_minute_bars_into_confirmation_queues(
