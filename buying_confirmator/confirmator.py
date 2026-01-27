@@ -52,12 +52,30 @@ class Confirmator:
                     continue
 
                 if not self.is_retro:
+                    log_message = ""
+                    if potential_confirmation_bar.low < original_bar_to_confirm.low:
+                        log_message = "No need to confirm bar anymore, got lower than bar himself"
+
                     one_minute_bar_is_too_late = (
                         True
                         and (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds > 3600
                         and potential_confirmation_bar.bar_time > original_bar_to_confirm.bar_time
                     )
                     if one_minute_bar_is_too_late:
+                        log_message = "No need to confirm bar anymore: It has been more than an hour since original bar"
+
+                    if log_message:
+                        not_relevant_anymore = True
+                        self.logger.info(
+                            msg=log_message,
+                            extra={
+                                "worker": "Confirmator",
+                                "symbol": original_bar_to_confirm.symbol,
+                                "timeframe": original_bar_to_confirm.timeframe,
+                                "bar_time": original_bar_to_confirm.bar_time,
+                                "last_one_minute_bar_time": most_updated_datetime,
+                            },
+                        )
                         break
 
                 one_minute_bars.append(potential_confirmation_bar)
@@ -77,14 +95,6 @@ class Confirmator:
                 if (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds / 60 < original_bar_to_confirm.timeframe:
                     relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
-                if (
-                    True
-                    and potential_confirmation_bar.low < original_bar_to_confirm.low
-                    and not self.is_retro
-                ):
-                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
-                    not_relevant_anymore = True
-                    break
 
                 previous_bar = [
                     bar_obj
