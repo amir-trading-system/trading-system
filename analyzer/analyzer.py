@@ -100,22 +100,6 @@ class Analyzer:
             are_valid=are_valid,
         )
         if not milestones.are_valid:
-            self.logger.info(
-                msg="One of the Milestones are not valid",
-                extra={
-                    "worker": "Analyzer",
-                    "symbol": stock.symbol_name,
-                    "timeframe": stock.timeframe,
-                    "bar_time": current_bar.bar_time,
-                    "current_index": current_bar.index,
-                    "starting_index": milestones.starting_bar.index,
-                    "starting_index_time": milestones.starting_bar.bar_time,
-                    "top_index": milestones.top_bar.index,
-                    "top_index_time": milestones.top_bar.bar_time,
-                    "lowest_low_index": milestones.lowest_low_bar.index,
-                    "lowest_low_time": milestones.lowest_low_bar.bar_time,
-                },
-            )
             return milestones
 
         fibonacci_retracement_evidence_object = analyzer.evidences.fibonacci_retracement.Evidence()
@@ -281,6 +265,16 @@ class Analyzer:
             and current_bar.high > current_bar.vwap
         )
         if not current_bar_is_valid:
+            self.logger.info(
+                msg="Bar is not valid, analyzer will wait for the next bar",
+                extra={
+                    "worker": "Analyzer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "bar_time": current_bar.bar_time,
+                    "current_index": current_bar.index,
+                }
+            )
             return
 
         milestones: common.objects.Milestones = self._prepare_milestones(
@@ -289,6 +283,22 @@ class Analyzer:
         )
 
         if not milestones.are_valid:
+            self.logger.info(
+                msg="One of the Milestones are not valid",
+                extra={
+                    "worker": "Analyzer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "bar_time": current_bar.bar_time,
+                    "current_index": current_bar.index,
+                    "starting_index": milestones.starting_bar.index,
+                    "starting_index_time": milestones.starting_bar.bar_time,
+                    "top_index": milestones.top_bar.index,
+                    "top_index_time": milestones.top_bar.bar_time,
+                    "lowest_low_index": milestones.lowest_low_bar.index,
+                    "lowest_low_time": milestones.lowest_low_bar.bar_time,
+                },
+            )
             return
 
         self._run_indicators(

@@ -64,7 +64,7 @@ class AnalyzerHelper:
                 and potential_starting_bar.high - potential_starting_bar.low > (previous_bar.high - previous_bar.low) * 2
                 and potential_starting_bar.bar_time.day == current_bar.bar_time.day
                 and (
-                    potential_starting_bar.volume > 50000
+                    potential_starting_bar.volume > 40000
                     or potential_starting_bar.bar_time.minute - previous_bar.bar_time.minute > stock.timeframe
                     or potential_starting_bar.close - potential_starting_bar.open_value > 1
                 )

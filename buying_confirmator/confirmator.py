@@ -40,10 +40,6 @@ class Confirmator:
         while True:
             if not relevant_stock.one_minute_bars_queue.empty():
                 potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
-                if not self.is_retro:
-                    one_minute_bar_is_too_late = (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds > 3600
-                    if one_minute_bar_is_too_late:
-                        break
 
                 if (
                     potential_confirmation_bar.bar_time < original_bar_to_confirm.bar_time + datetime.timedelta(minutes=original_bar_to_confirm.timeframe-2)
@@ -54,6 +50,15 @@ class Confirmator:
                 ):
                     relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
+
+                if not self.is_retro:
+                    one_minute_bar_is_too_late = (
+                        True
+                        and (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds > 3600
+                        and potential_confirmation_bar.bar_time > original_bar_to_confirm.bar_time
+                    )
+                    if one_minute_bar_is_too_late:
+                        break
 
                 one_minute_bars.append(potential_confirmation_bar)
                 most_updated_datetime = potential_confirmation_bar.bar_time
