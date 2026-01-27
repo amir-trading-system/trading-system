@@ -125,24 +125,16 @@ class Client(client.EClient, wrapper.EWrapper):
             reqId=reqId,
             contract=contractDetails.contract,
         )
-        # self.reqNewsBulletins(
-        #     allMsgs=True,
-        # )
 
-    def contractDetails(self, reqId, contractDetails):
+    def contractDetails(
+        self,
+        reqId,
+        contractDetails,
+    ):
         self.scanner.get_contract_details(
             contract_details=contractDetails,
         )
         return super().contractDetails(reqId, contractDetails)
-
-    # def updateNewsBulletin(
-    #     self,
-    #     msgId: int,
-    #     msgType: int,
-    #     newsMessage: str,
-    #     originExch: str,
-    # ):
-    #     return super().updateNewsBulletin(msgId, msgType, newsMessage, originExch)
 
     def request_historical_data(
         self,

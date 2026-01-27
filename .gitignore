@@ -8,3 +8,4 @@ __pycache__/
 stocks_by*.csv
 .Ds_Store
 .env
+.vscode/
