@@ -58,6 +58,9 @@ class DataStreamer():
         self,
         bars: list[common.objects.BarData],
     ) -> list[common.objects.BarData]:
+        if not bars:
+            return []
+
         fitered_bars = self._filter_ignored_bars(
             bars=bars,
         )
@@ -120,11 +123,21 @@ class DataStreamer():
         request_id: int,
         tws_bar: ibapi_common.BarData,
     ):
-        bar_time = datetime.datetime.fromtimestamp(float(tws_bar.date))
+        is_timestamp = len(tws_bar.date) == 10
+        is_date = len(tws_bar.date) == 8
+        bar_time = None
+        if is_timestamp:
+            bar_time = datetime.datetime.fromtimestamp(float(tws_bar.date))
+        if is_date:
+            bar_time = datetime.datetime.strptime(tws_bar.date, '%Y%m%d')
+
         now = datetime.datetime.now()
         if (
-            (now.day != bar_time.day and bar_time.hour < 16 and not self.on_specific_bar_time and not self.is_retro)
-            or tws_bar.volume == 0.0
+            is_timestamp
+            and (
+                (now.day != bar_time.day and bar_time.hour < 16 and not self.on_specific_bar_time and not self.is_retro)
+                or tws_bar.volume == 0.0
+            )
         ):
             return
 
@@ -136,6 +149,7 @@ class DataStreamer():
             common.objects.BarData(
                 symbol=ibapi_request.symbol,
                 timeframe=ibapi_request.timeframe,
+                timeframe_type=ibapi_request.timeframe_type,
                 open_value=tws_bar.open,
                 close=tws_bar.close,
                 high=tws_bar.high,
@@ -158,7 +172,7 @@ class DataStreamer():
         one_minute_bars = temp_request_id_to_symbol[one_minute_request_id].bars
 
         for _, stock in temp_request_id_to_symbol.items():
-            if stock.timeframe > 1:
+            if stock.timeframe > 1 or stock.timeframe_type == common.objects.TimeframeType.DAY:
                 for one_minute_bar in one_minute_bars:
                     stock.one_minute_bars_queue.put(one_minute_bar)
 
@@ -174,7 +188,7 @@ class DataStreamer():
         for bar_object in bars_data:
             bar_object.ready_to_analyze = True
         self.request_id_to_symbol[request_id].bars = bars_data
-        if self.request_id_to_symbol[request_id].timeframe == 1:
+        if self.request_id_to_symbol[request_id].is_one_minute_timeframe():
             self.insert_one_minute_bars_into_confirmation_queues(
                 one_minute_request_id=request_id,
                 symbol=symbol,
@@ -208,6 +222,7 @@ class DataStreamer():
         current_bar = common.objects.BarData(
             symbol=ibapi_request.symbol,
             timeframe=ibapi_request.timeframe,
+            timeframe_type=ibapi_request.timeframe_type,
             open_value=tws_bar.open,
             close=tws_bar.close,
             high=tws_bar.high,
@@ -227,7 +242,7 @@ class DataStreamer():
                 bars=relevant_symbol_bars,
             )
 
-            if ibapi_request.timeframe == 1:
+            if ibapi_request.is_one_minute_timeframe():
                 bars_data[-1].ready_to_analyze = True
                 self.request_id_to_symbol[request_id].bars = bars_data
                 self.insert_one_minute_bars_into_confirmation_queues(
@@ -244,7 +259,7 @@ class DataStreamer():
         )
         self.request_id_to_symbol[request_id].bars = bars_data
 
-        if self.request_id_to_symbol[request_id].timeframe == 1:
+        if self.request_id_to_symbol[request_id].is_one_minute_timeframe():
             self.insert_one_minute_bars_into_confirmation_queues(
                 one_minute_request_id=request_id,
                 symbol=self.request_id_to_symbol[request_id].symbol_name,

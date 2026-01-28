@@ -18,7 +18,7 @@ def run_bot(
     a_obj: analyzer.analyzer.Analyzer,
     co_obj: buying_confirmator.confirmator.Confirmator,
     symbol: str = "",
-    timeframe: int = 0,
+    timeframe: common.objects.TimeframeInput = None,
     specific_bar_time: datetime.datetime = None,
     retroactive_from: datetime.datetime = None,
 ):
@@ -135,6 +135,10 @@ if __name__ == "__main__":
         "--timeframe",
         type=int,
     )
+    test_parser.add_argument(
+        "--timeframe_type",
+        type=int,
+    )
 
     args = argument_parser.parse_args()
 
@@ -155,7 +159,10 @@ if __name__ == "__main__":
             a_obj=analyzer_obj,
             co_obj=confirmator_obj,
             symbol=args.symbol,
-            timeframe=args.timeframe,
+            timeframe=common.objects.TimeframeInput(
+                timeframe=args.timeframe,
+                timeframe_type=args.timeframe_type,
+            ),
             specific_bar_time=args.specific_bar_time,
             retroactive_from=args.retroactive_from,
         )

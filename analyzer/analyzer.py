@@ -334,6 +334,7 @@ class Analyzer:
                 symbol_name=stock.symbol_name,
                 bars=relevant_bars,
                 timeframe=stock.timeframe,
+                timeframe_type=stock.timeframe_type,
             )
 
             self._analyze_bar(
@@ -389,6 +390,7 @@ class Analyzer:
                 stock = common.objects.Stock(
                     symbol_name=stock_object.symbol_name,
                     timeframe=stock_object.timeframe,
+                    timeframe_type=stock_object.timeframe_type,
                     bars=copy.deepcopy(stock_object.bars),
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
                 )
