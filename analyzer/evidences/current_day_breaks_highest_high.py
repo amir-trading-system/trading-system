@@ -5,7 +5,7 @@ from . import _evidence
 class Evidence(
     _evidence.Evidence,
 ):
-    name = "third_day_breaks_highest_high"
+    name = "current_day_breaks_highest_high"
 
     def find_evidence(
         self,
@@ -34,10 +34,10 @@ class Evidence(
         third_day_starts_positive_trend = (
             True
             and third_day_bar.low > forth_day_bar.high
-            and third_day_bar.close > third_day_bar.open_value
-            and third_day_bar.close > third_day_bar.ema_9
-            and third_day_bar.close > third_day_bar.ema_20
+            and third_day_bar.high > third_day_bar.ema_9
+            and third_day_bar.high > third_day_bar.ema_20
             and third_day_bar.volume > third_day_bar.volume_average
+            and forth_day_bar.high < third_day_bar.high > second_day_bar.high
         )
 
         second_day_has_small_retracement = (
@@ -52,7 +52,7 @@ class Evidence(
             and current_bar.close > current_bar.open_value
         )
 
-        third_day_breaks_highest_high = (
+        current_day_breaks_highest_high = (
             True
             and third_day_starts_positive_trend
             and second_day_has_small_retracement
@@ -60,8 +60,8 @@ class Evidence(
         )
 
         return common.objects.EvidenceResponse(
-            result=third_day_breaks_highest_high,
+            result=current_day_breaks_highest_high,
             reason=""
-            if third_day_breaks_highest_high
+            if current_day_breaks_highest_high
             else "Current day does not break highest high",
         )

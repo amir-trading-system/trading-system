@@ -18,6 +18,6 @@ class Indicator(
             logger=logger,
         )
         self.unique_evidences = {
-            analyzer.evidences.third_day_breaks_highest_high.Evidence,
+            analyzer.evidences.current_day_breaks_highest_high.Evidence,
         }
         self.evidences = self.unique_evidences
