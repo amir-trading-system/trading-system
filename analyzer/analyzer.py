@@ -482,7 +482,7 @@ class Analyzer:
             for i, bar_object in enumerate(stock.bars):
                 bar_object.index = i
 
-        if not current_bar.is_after_market_open and not stock.is_day_timeframe():
+        if not current_bar.is_after_market_open:
             return
 
         if stock.is_day_timeframe():
