@@ -64,7 +64,7 @@ class BarData:
             day=bar_time.day,
             hour=9,
             minute=30,
-        )
+        ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
         self.has_indication = has_indication
 

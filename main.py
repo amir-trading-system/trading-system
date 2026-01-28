@@ -161,7 +161,7 @@ if __name__ == "__main__":
             symbol=args.symbol,
             timeframe=common.objects.TimeframeInput(
                 timeframe=args.timeframe,
-                timeframe_type=args.timeframe_type,
+                timeframe_type=common.objects.TimeframeType(args.timeframe_type),
             ),
             specific_bar_time=args.specific_bar_time,
             retroactive_from=args.retroactive_from,

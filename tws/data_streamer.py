@@ -83,10 +83,15 @@ class DataStreamer():
         bar_data_df["bar_time"] = (
             pd.to_datetime(bar_data_df["bar_time"])
         )
+
         since_open_bar_df = bar_data_df.where(
             (bar_data_df["bar_time"].dt.time >= pd.to_datetime("09:30").time()) & # type: ignore
             (bar_data_df["bar_time"].dt.time <= pd.to_datetime("16:00").time()) # type: ignore
         )
+        is_one_day_bars = fitered_bars[0].timeframe_type == common.objects.TimeframeType.DAY
+        if is_one_day_bars:
+            since_open_bar_df = bar_data_df.copy()
+
         since_open_bar_df["session"] = since_open_bar_df["bar_time"].dt.date # type: ignore
 
         since_open_bar_df["volume"] = since_open_bar_df["volume"].astype(float)
@@ -250,7 +255,8 @@ class DataStreamer():
                     symbol=self.request_id_to_symbol[request_id].symbol_name,
                 )
 
-            return
+            if not ibapi_request.is_day_timeframe():
+                return
 
         relevant_symbol_bars[-1].ready_to_analyze = True
         relevant_symbol_bars.append(current_bar)
