@@ -167,7 +167,6 @@ class Analyzer:
                     bar_index=current_bar.index,
                     message=message,
                 )
-                self.waiting_for_confirmation_queue.put(current_bar)
                 break
 
     def _run_indicators(
