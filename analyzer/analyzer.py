@@ -119,11 +119,61 @@ class Analyzer:
 
         return milestones
 
-    def _run_indicators(
+    def _run_one_day_indicators(
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
+    ):
+        for indicator in analyzer.indicators.__one_day_indicators__:
+            indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
+                milestones=milestones,
+                logger=self.logger,
+            )
+            indicator_response: common.objects.IndicatorResponse = indicator_obj.indicate(
+                stock=stock,
+                milestones=milestones,
+                current_bar=current_bar,
+            )
+            if indicator_response.result and indicator_response.success_rate == 1:
+                emoji = "✅"
+
+                stock.bars[current_bar.index].has_indication = True
+                self.logger.info(
+                    msg="Bar has Indication",
+                    extra={
+                        "worker": "Analyzer",
+                        "symbol": stock.symbol_name,
+                        "timeframe": stock.timeframe,
+                        "bar_time": current_bar.bar_time,
+                        "current_index": current_bar.index,
+                    }
+                )
+
+                message = f"""
+    <b>{emoji} Congrats - One Day Bar! {emoji}</b>
+
+    <b>Symbol:</b> <u>{stock.symbol_name}</u>
+    <b>Timeframe:</b> <code>{stock.timeframe}</code>
+    <b>Time:</b> <code>{current_bar.bar_time}</code>
+    <b>Indication Name:</b> <code>{indicator_obj.name}</code>
+    """
+
+                self.alerter_object.send_alert(
+                    sender="Analyzer",
+                    symbol=stock.symbol_name,
+                    timeframe=stock.timeframe,
+                    bar_date=current_bar.bar_time,
+                    bar_index=current_bar.index,
+                    message=message,
+                )
+                break
+
+    def _run_indicators(
+        self,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+        milestones: common.objects.Milestones = None,
     ) -> None:
         self.logger.info(
             msg="Running analyzers",
@@ -252,6 +302,61 @@ class Analyzer:
                 )
                 self.waiting_for_confirmation_queue.put(current_bar)
 
+    def _analyze_day_bar(
+        self,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+    ):
+        current_bar_is_valid = (
+            True
+            and current_bar.close > current_bar.open_value
+            and current_bar.close > current_bar.ema_9
+            and current_bar.close > current_bar.ema_20
+            and current_bar.histogram > 0
+            and current_bar.signal_line > 0
+            and current_bar.macd > 0
+        )
+        if not current_bar_is_valid:
+            self.logger.info(
+                msg="Bar is not valid, analyzer will wait for the next bar",
+                extra={
+                    "worker": "Analyzer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "bar_time": current_bar.bar_time,
+                    "current_index": current_bar.index,
+                }
+            )
+            return
+
+        milestones = common.objects.Milestones(
+            starting_bar=common.objects.MilestoneBar(
+                index=0,
+                bar_object=current_bar,
+                bar_type=common.objects.MilestoneType.STARTING_BAR,
+                bar_time=current_bar.bar_time,
+            ),
+            top_bar=common.objects.MilestoneBar(
+                index=0,
+                bar_object=current_bar,
+                bar_type=common.objects.MilestoneType.TOP_BAR,
+                bar_time=current_bar.bar_time,
+            ),
+            lowest_low_bar=common.objects.MilestoneBar(
+                index=0,
+                bar_object=current_bar,
+                bar_type=common.objects.MilestoneType.LOWEST_BAR,
+                bar_time=current_bar.bar_time,
+            ),
+            are_valid=True,
+        )
+
+        self._run_one_day_indicators(
+            stock=stock,
+            current_bar=current_bar,
+            milestones=milestones,
+        )
+
     def _analyze_bar(
         self,
         stock: common.objects.Stock,
@@ -334,12 +439,19 @@ class Analyzer:
                 symbol_name=stock.symbol_name,
                 bars=relevant_bars,
                 timeframe=stock.timeframe,
+                timeframe_type=stock.timeframe_type,
             )
 
-            self._analyze_bar(
-                stock=new_stock_object,
-                current_bar=current_bar,
-            )
+            if new_stock_object.is_day_timeframe():
+                self._analyze_day_bar(
+                    stock=new_stock_object,
+                    current_bar=current_bar,
+                )
+            else:
+                self._analyze_bar(
+                    stock=new_stock_object,
+                    current_bar=current_bar,
+                )
 
     def analyze_live_case(
         self,
@@ -373,10 +485,16 @@ class Analyzer:
         if not current_bar.is_after_market_open:
             return
 
-        self._analyze_bar(
-            stock=stock,
-            current_bar=current_bar,
-        )
+        if stock.is_day_timeframe():
+            self._analyze_day_bar(
+                stock=stock,
+                current_bar=current_bar,
+            )
+        else:
+            self._analyze_bar(
+                stock=stock,
+                current_bar=current_bar,
+            )
 
     def analyze_data(
         self,
@@ -389,6 +507,7 @@ class Analyzer:
                 stock = common.objects.Stock(
                     symbol_name=stock_object.symbol_name,
                     timeframe=stock_object.timeframe,
+                    timeframe_type=stock_object.timeframe_type,
                     bars=copy.deepcopy(stock_object.bars),
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
                 )

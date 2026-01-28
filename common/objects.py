@@ -3,11 +3,26 @@ import enum
 import queue
 
 
+class TimeframeType(enum.Enum):
+    MINUTE = 1
+    DAY = 2
+
+
+class TimeframeInput:
+    def __init__(
+        self,
+        timeframe: int,
+        timeframe_type: TimeframeType,
+    ):
+        self.timeframe = timeframe
+        self.timeframe_type = timeframe_type
+
 class BarData:
     def __init__(
         self,
         symbol: str,
         timeframe: int,
+        timeframe_type: TimeframeType,
         open_value: float,
         close: float,
         high: float,
@@ -28,6 +43,7 @@ class BarData:
     ):
         self.symbol = symbol
         self.timeframe = timeframe
+        self.timeframe_type = timeframe_type
         self.open_value = open_value
         self.close = close
         self.high = high
@@ -48,7 +64,7 @@ class BarData:
             day=bar_time.day,
             hour=9,
             minute=30,
-        )
+        ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
         self.has_indication = has_indication
 
@@ -58,11 +74,13 @@ class Stock:
         symbol_name: str,
         bars: list[BarData],
         timeframe: int,
+        timeframe_type: TimeframeType,
         one_minute_bars_queue: queue.Queue[BarData] = None,
     ):
         self.symbol_name = symbol_name
         self.bars = bars
         self.timeframe = timeframe
+        self.timeframe_type = timeframe_type
         self.one_minute_bars_queue = one_minute_bars_queue
 
     def previous_bar(
@@ -85,16 +103,72 @@ class Stock:
 
         return None
 
+    def is_one_minute_timeframe(
+        self,
+    ) -> bool:
+        return (
+            True
+            and self.timeframe_type == TimeframeType.MINUTE
+            and self.timeframe == 1
+        )
+
+    def is_day_timeframe(
+        self,
+    ) -> bool:
+        return self.timeframe_type == TimeframeType.DAY
+
+    def is_same(
+        self,
+        symbol: str,
+        timeframe: int,
+        timeframe_type: TimeframeType,
+    ) -> bool:
+        return (
+            True
+            and self.symbol_name == symbol
+            and self.timeframe == timeframe
+            and self.timeframe_type == timeframe_type
+        )
+
 class IbAPIRequest:
     def __init__(
         self,
         request_id: int,
         symbol: str,
         timeframe: int,
+        timeframe_type: TimeframeType,
     ):
         self.request_id = request_id
         self.symbol = symbol
         self.timeframe = timeframe
+        self.timeframe_type = timeframe_type
+
+    def is_one_minute_timeframe(
+        self,
+    ) -> bool:
+        return (
+            True
+            and self.timeframe_type == TimeframeType.MINUTE
+            and self.timeframe == 1
+        )
+
+    def is_day_timeframe(
+        self,
+    ) -> bool:
+        return self.timeframe_type == TimeframeType.DAY
+
+    def is_same(
+        self,
+        symbol: str,
+        timeframe: int,
+        timeframe_type: TimeframeType,
+    ) -> bool:
+        return (
+            True
+            and self.symbol == symbol
+            and self.timeframe == timeframe
+            and self.timeframe_type == timeframe_type
+        )
 
 class Order:
     def __init__(

@@ -191,10 +191,10 @@ class Confirmator:
                 relevant_stock = [
                     stock
                     for _, stock in self.request_id_to_symbol.items()
-                    if (
-                        True
-                        and stock.symbol_name == bar_to_confirm.symbol
-                        and stock.timeframe == bar_to_confirm.timeframe
+                    if stock.is_same(
+                        symbol=bar_to_confirm.symbol,
+                        timeframe=bar_to_confirm.timeframe,
+                        timeframe_type=bar_to_confirm.timeframe_type,
                     )
                 ][0]
 
