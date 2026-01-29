@@ -206,6 +206,8 @@ class DataStreamer():
             extra={
                 "worker": "DataStreamer",
                 "symbol": symbol,
+                "timeframe": self.request_id_to_symbol[request_id].timeframe,
+                "timeframe_type": self.request_id_to_symbol[request_id].timeframe_type.value,
             }
         )
 

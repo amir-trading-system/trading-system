@@ -75,6 +75,7 @@ class Indicator:
                     "indicator_name": self.name,
                     "symbol": stock.symbol_name,
                     "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
                     "bar_time": current_bar.bar_time,
                     "bar_index": current_bar.index,
                     "current_bar": current_bar,

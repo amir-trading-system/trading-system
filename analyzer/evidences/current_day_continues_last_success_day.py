@@ -31,7 +31,7 @@ class Evidence(
             True
             and second_day.close > second_day.open_value
             and second_day.volume > second_day.volume_average
-            and (second_day.close - second_day.open_value)/(second_day.high - second_day.low) > 0.5
+            and (second_day.close - second_day.open_value)/(second_day.high - second_day.low) > 0.3
             and second_day.close > second_day.ema_9
             and second_day.close > second_day.ema_20
             and second_day.close > second_day.vwap

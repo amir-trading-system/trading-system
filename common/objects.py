@@ -68,6 +68,11 @@ class BarData:
         self.ready_to_analyze = ready_to_analyze
         self.has_indication = has_indication
 
+    def generate_unique_identifier(
+        self,
+    ) -> str:
+        return f"{self.symbol}-{self.timeframe}-{self.timeframe_type}-{self.bar_time}"
+
 class Stock:
     def __init__(
         self,

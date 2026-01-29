@@ -28,6 +28,7 @@ class Analyzer:
         )
         self.logger = logger
         self.alerter_object = alerter_object
+        self.has_indications_bars: dict[str, common.objects.BarData] = {}
 
     def _prepare_milestones(
         self,
@@ -138,13 +139,13 @@ class Analyzer:
             if indicator_response.result and indicator_response.success_rate == 1:
                 emoji = "✅"
 
-                stock.bars[current_bar.index].has_indication = True
                 self.logger.info(
                     msg="Bar has Indication",
                     extra={
                         "worker": "Analyzer",
                         "symbol": stock.symbol_name,
                         "timeframe": stock.timeframe,
+                        "timeframe_type": stock.timeframe_type.value,
                         "bar_time": current_bar.bar_time,
                         "current_index": current_bar.index,
                     }
@@ -167,6 +168,9 @@ class Analyzer:
                     bar_index=current_bar.index,
                     message=message,
                 )
+                bar_unique_identifier = current_bar.generate_unique_identifier()
+                self.has_indications_bars[bar_unique_identifier] = current_bar
+                stock.bars[current_bar.index].has_indication = True
                 break
 
     def _run_indicators(
@@ -181,6 +185,7 @@ class Analyzer:
                 "worker": "Analyzer",
                 "symbol": stock.symbol_name,
                 "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
                 "bar_time": current_bar.bar_time,
                 "current_index": current_bar.index,
                 "starting_index": milestones.starting_bar.index,
@@ -222,6 +227,7 @@ class Analyzer:
                 "worker": "Analyzer",
                 "symbol": stock.symbol_name,
                 "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
                 "bar_time": current_bar.bar_time,
                 "current_index": current_bar.index,
                 "current_volume": current_bar.volume,
@@ -260,13 +266,13 @@ class Analyzer:
                 else:
                     emoji = "👀"
 
-                stock.bars[current_bar.index].has_indication = True
                 self.logger.info(
                     msg="Bar has Indication",
                     extra={
                         "worker": "Analyzer",
                         "symbol": stock.symbol_name,
                         "timeframe": stock.timeframe,
+                        "timeframe_type": stock.timeframe_type.value,
                         "bar_time": current_bar.bar_time,
                         "current_index": current_bar.index,
                         "starting_index": milestones.starting_bar.index,
@@ -300,6 +306,9 @@ class Analyzer:
                     bar_index=current_bar.index,
                     message=message,
                 )
+                bar_unique_identifier = current_bar.generate_unique_identifier()
+                self.has_indications_bars[bar_unique_identifier] = current_bar
+                stock.bars[current_bar.index].has_indication = True
                 self.waiting_for_confirmation_queue.put(current_bar)
 
     def _analyze_day_bar(
@@ -314,20 +323,18 @@ class Analyzer:
             and current_bar.close > current_bar.ema_20
             and current_bar.histogram > 0
         )
-        if not current_bar_is_valid:
+        if not current_bar_is_valid and stock.timeframe_type == 2:
             self.logger.info(
                 msg="Bar is not valid, analyzer will wait for the next bar",
                 extra={
                     "worker": "Analyzer",
                     "symbol": stock.symbol_name,
                     "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
                 }
             )
-            return
-
-        if current_bar.has_indication:
             return
 
         milestones = common.objects.Milestones(
@@ -377,6 +384,7 @@ class Analyzer:
                     "worker": "Analyzer",
                     "symbol": stock.symbol_name,
                     "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
                 }
@@ -395,6 +403,7 @@ class Analyzer:
                     "worker": "Analyzer",
                     "symbol": stock.symbol_name,
                     "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
                     "starting_index": milestones.starting_bar.index,
@@ -486,6 +495,10 @@ class Analyzer:
         if not current_bar.is_after_market_open:
             return
 
+        bar_unique_identifer = current_bar.generate_unique_identifier()
+        if bar_unique_identifer in self.has_indications_bars:
+            return
+
         if stock.is_day_timeframe():
             self._analyze_day_bar(
                 stock=stock,
@@ -532,6 +545,7 @@ class Analyzer:
                                 "exception_message": str(e),
                                 "symbol": stock.symbol_name,
                                 "timeframe": stock.timeframe,
+                                "timeframe_type": stock.timeframe_type.value,
                                 "retroactive_from": retroactive_from,
                             }
                         )
@@ -548,6 +562,7 @@ class Analyzer:
                                 "exception_message": str(e),
                                 "symbol": stock.symbol_name,
                                 "timeframe": stock.timeframe,
+                                "timeframe_type": stock.timeframe_type.value,
                                 "specific_bar_time": specific_bar_time,
                             }
                         )
