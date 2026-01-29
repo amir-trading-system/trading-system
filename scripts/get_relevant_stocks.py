@@ -1,6 +1,6 @@
 import csv
 import datetime
-import tqdm
+
 import yfinance
 import requests
 
@@ -38,100 +38,90 @@ def get_stocks_list_from_nasdaq():
             'Price': stock['lastsale']
         }
         for stock in stocks_data['data']['rows']
-    ]
+    ][:1000]
 
 #pylint:disable=unspecified-encoding,too-many-locals
-def get_stocks_by_price_change_and_volume():
+def get_stocks_by_price_change_and_volume() -> list[str]:
+    relevant_stocks: list[str] = []
     all_stocks = get_stocks_list_from_nasdaq()
-    t = tqdm.tqdm(all_stocks)
-    with open("stocks_by_price_change.csv", "w") as csv_write_file:
-        writer = csv.DictWriter(
-            csv_write_file,
-            fieldnames=["Symbol", "Date"],
-        )
-        writer.writeheader()
-        for stock in all_stocks:
-            t.update(1)
-            if stock["Market Cap"] == '':
+    for stock in all_stocks:
+        if stock["Market Cap"] == '':
+            continue
+        is_valid_symbol = True
+        for char in stock["Symbol"]:
+            if not char.isalpha():
+                is_valid_symbol = False
+                break
+
+        if not is_valid_symbol:
+            continue
+
+        low_to_high = {}
+        symbol = stock["Symbol"].rstrip()
+        market_cap = int(float(stock["Market Cap"]))
+        price = float(stock["Price"].replace('$', ''))
+
+        if market_cap > 0 and market_cap < 100000000 and price > 1:
+            stock_float = int(market_cap/price)
+            if stock_float > FLOAT_THRESHOLD:
                 continue
-            is_valid_symbol = True
-            for char in stock["Symbol"]:
-                if not char.isalpha():
-                    is_valid_symbol = False
-                    break
 
-            if not is_valid_symbol:
-                continue
+            historical_data = yfinance.download(
+                symbol,
+                period="5d",
+                interval="1d",
+                auto_adjust=False,
+                progress=False,
+                prepost=False,
+                threads=40,
+                timeout=5,
+            )
+            filtered_data_by_price = historical_data.Low[symbol][
+                (historical_data.Low[symbol] > 1)
+            ]
 
-            low_to_high = {}
-            symbol = stock["Symbol"].rstrip()
-            market_cap = int(float(stock["Market Cap"]))
-            price = float(stock["Price"].replace('$', ''))
-
-            if market_cap > 0 and market_cap < 100000000 and price > 1:
-                stock_float = int(market_cap/price)
-                if stock_float > FLOAT_THRESHOLD:
-                    continue
-
-                historical_data = yfinance.download(
-                    symbol,
-                    period="1mo",
-                    interval="1d",
-                    auto_adjust=False,
-                    progress=False,
-                    prepost=True,
-                    threads=40,
-                    timeout=5,
-                )
-                filtered_data_by_price = historical_data.Low[symbol][
-                    (historical_data.Low[symbol] > 1)
-                ]
-
-                for date, stock_low_price in filtered_data_by_price.items():
-                    if not low_to_high.get(symbol, None):
-                        low_to_high[symbol] = {
-                            date: {
-                                "low": stock_low_price,
-                            },
+            for date, stock_low_price in filtered_data_by_price.items():
+                if not low_to_high.get(symbol, None):
+                    low_to_high[symbol] = {
+                        date: {
+                            "low": stock_low_price,
+                        },
+                    }
+                else:
+                    if not low_to_high[symbol].get(date, None):
+                        low_to_high[symbol][date] = {
+                            "low": stock_low_price
                         }
                     else:
-                        if not low_to_high[symbol].get(date, None):
-                            low_to_high[symbol][date] = {
-                                "low": stock_low_price
-                            }
-                        else:
-                            low_to_high[symbol][date]["low"] = stock_low_price
+                        low_to_high[symbol][date]["low"] = stock_low_price
 
-                filtered_data_by_price = historical_data.High[symbol][historical_data.High[symbol] > 1]
-                for date, stock_high_price in filtered_data_by_price.items():
-                    if not low_to_high.get(symbol, None):
-                        low_to_high[symbol] = {
-                            date: {
-                                "high": stock_high_price,
-                            },
+            filtered_data_by_price = historical_data.High[symbol][historical_data.High[symbol] > 1]
+            for date, stock_high_price in filtered_data_by_price.items():
+                if not low_to_high.get(symbol, None):
+                    low_to_high[symbol] = {
+                        date: {
+                            "high": stock_high_price,
+                        },
+                    }
+                else:
+                    if not low_to_high[symbol].get(date, None):
+                        low_to_high[symbol][date] = {
+                            "high": stock_high_price
                         }
                     else:
-                        if not low_to_high[symbol].get(date, None):
-                            low_to_high[symbol][date] = {
-                                "high": stock_high_price
-                            }
-                        else:
-                            low_to_high[symbol][date]["high"] = stock_high_price
+                        low_to_high[symbol][date]["high"] = stock_high_price
 
-                for symbol, dates in low_to_high.items():
-                    for date, price in dates.items():
-                        if not price.get("low", None):
-                            continue
-                        ratio = (price["high"] - price["low"])/price["low"]
-                        if ratio < 0.8 or price["high"] < price["low"]:
-                            continue
-                        writer.writerow(
-                            {
-                                "Symbol": symbol,
-                                "Date": date.date(),
-                            }
-                        )
-                        csv_write_file.flush()
+            for symbol, dates in low_to_high.items():
+                for date, price in dates.items():
+                    if not price.get("low", None):
+                        continue
+                    ratio = (price["high"] - price["low"])/price["low"]
+                    if ratio < 0.8 or price["high"] < price["low"]:
+                        continue
+
+                    relevant_stocks.append(symbol)
+
+    return relevant_stocks
 
 def extract_symbols_names_from_csv():
     symbols_names = []
@@ -153,5 +143,5 @@ def extract_symbols_names_from_csv():
             f.write(f"{symbol}\n")
 
 
-if __name__ == "__main__":
-    get_stocks_by_price_change_and_volume()
+# if __name__ == "__main__":
+#     get_stocks_by_price_change_and_volume()

@@ -7,7 +7,6 @@ import talib
 from talib import MA_Type # type: ignore
 from ibapi import common as ibapi_common
 
-import alerter
 import common
 
 
@@ -21,13 +20,11 @@ class DataStreamer():
         bars_ready_to_analyze_queue: queue.Queue,
         ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
-        alerter_object: alerter.alerter.Alerter,
     ):
         self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
-        self.alerter_object = alerter_object
 
     def _filter_ignored_bars(
         self,

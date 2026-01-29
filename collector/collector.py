@@ -7,6 +7,29 @@ import common
 from tws import client
 
 class Collector:
+    default_timeframes = [
+        common.objects.TimeframeInput(
+            timeframe=1,
+            timeframe_type=common.objects.TimeframeType.MINUTE,
+        ),
+        common.objects.TimeframeInput(
+            timeframe=5,
+            timeframe_type=common.objects.TimeframeType.MINUTE,
+        ),
+        common.objects.TimeframeInput(
+            timeframe=15,
+            timeframe_type=common.objects.TimeframeType.MINUTE,
+        ),
+        common.objects.TimeframeInput(
+            timeframe=30,
+            timeframe_type=common.objects.TimeframeType.MINUTE,
+        ),
+        common.objects.TimeframeInput(
+            timeframe=1,
+            timeframe_type=common.objects.TimeframeType.DAY,
+        ),
+    ]
+
     def __init__(
         self,
         tws_client: client.Client,
@@ -78,6 +101,39 @@ class Collector:
             keep_up_to_date=keep_up_to_date,
         )
 
+    def collect_by_symbol(
+        self,
+        symbol: str,
+        manual_timeframe_for_tests: common.objects.TimeframeInput = None,
+        specific_bar_time: datetime.datetime = None,
+        timeframes: list[common.objects.TimeframeInput] = [],
+    ):
+        if not timeframes:
+            timeframes = self.default_timeframes
+
+        if manual_timeframe_for_tests:
+            timeframes = [
+                common.objects.TimeframeInput(
+                    timeframe=1,
+                    timeframe_type=common.objects.TimeframeType.MINUTE,
+                ),
+                common.objects.TimeframeInput(
+                    timeframe=manual_timeframe_for_tests.timeframe,
+                    timeframe_type=manual_timeframe_for_tests.timeframe_type,
+                ),
+            ]
+
+        for timeframe_input in timeframes:
+            next_request_id = self.tws_client.next_id()
+
+            self.request_historical_data(
+                symbol=symbol,
+                timeframe=timeframe_input.timeframe,
+                timeframe_type=timeframe_input.timeframe_type,
+                specific_bar_time=specific_bar_time,
+                request_id=next_request_id,
+            )
+
     def collect_data(
         self,
         manual_timeframe_for_tests: common.objects.TimeframeInput = None,
@@ -86,49 +142,10 @@ class Collector:
         while True:
             if not self.tws_client.symbols_to_collect_queue.empty():
                 symbol = self.tws_client.symbols_to_collect_queue.get()
-                timeframes = [
-                    common.objects.TimeframeInput(
-                        timeframe=1,
-                        timeframe_type=common.objects.TimeframeType.MINUTE,
-                    ),
-                    common.objects.TimeframeInput(
-                        timeframe=5,
-                        timeframe_type=common.objects.TimeframeType.MINUTE,
-                    ),
-                    common.objects.TimeframeInput(
-                        timeframe=15,
-                        timeframe_type=common.objects.TimeframeType.MINUTE,
-                    ),
-                    common.objects.TimeframeInput(
-                        timeframe=30,
-                        timeframe_type=common.objects.TimeframeType.MINUTE,
-                    ),
-                    common.objects.TimeframeInput(
-                        timeframe=1,
-                        timeframe_type=common.objects.TimeframeType.DAY,
-                    ),
-                ]
-                if manual_timeframe_for_tests:
-                    timeframes = [
-                        common.objects.TimeframeInput(
-                            timeframe=1,
-                            timeframe_type=common.objects.TimeframeType.MINUTE,
-                        ),
-                        common.objects.TimeframeInput(
-                            timeframe=manual_timeframe_for_tests.timeframe,
-                            timeframe_type=manual_timeframe_for_tests.timeframe_type,
-                        ),
-                    ]
-
-                for timeframe_input in timeframes:
-                    next_request_id = self.tws_client.next_id()
-
-                    self.request_historical_data(
-                        symbol=symbol,
-                        timeframe=timeframe_input.timeframe,
-                        timeframe_type=timeframe_input.timeframe_type,
-                        specific_bar_time=specific_bar_time,
-                        request_id=next_request_id,
-                    )
+                self.collect_by_symbol(
+                    symbol=symbol,
+                    manual_timeframe_for_tests=manual_timeframe_for_tests,
+                    specific_bar_time=specific_bar_time,
+                )
             else:
                 time.sleep(1)

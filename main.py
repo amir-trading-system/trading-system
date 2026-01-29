@@ -86,7 +86,6 @@ if __name__ == "__main__":
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
-        alerter_object=alerter_object,
     )
     collector_obj = collector.collector.Collector(
         tws_client=tws_client,
