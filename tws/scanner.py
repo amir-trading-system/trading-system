@@ -3,20 +3,16 @@ import queue
 
 from ibapi import client, contract, tag_value
 
-import alerter
-
 
 class Scanner():
     def __init__(
         self,
         symbols_to_collect_queue: queue.Queue,
         logger: logging.Logger,
-        alerter_object: alerter.alerter.Alerter,
     ):
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.relevant_symbols: list[str] = []
         self.logger = logger
-        self.alerter_object = alerter_object
         self.next_id = 1
 
     def get_scanner_subscription(

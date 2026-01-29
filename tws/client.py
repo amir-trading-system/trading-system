@@ -46,14 +46,12 @@ class Client(client.EClient, wrapper.EWrapper):
         self.scanner = scanner.Scanner(
             symbols_to_collect_queue=symbols_to_collect_queue,
             logger=logger,
-            alerter_object=alerter_object,
         )
         self.data_streamer = data_streamer.DataStreamer(
             request_id_to_symbol=request_id_to_symbol,
             bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
             ibapi_requests=self.ibapi_requests,
             logger=logger,
-            alerter_object=alerter_object,
         )
 
     #pylint: disable=too-many-arguments,too-many-positional-arguments
