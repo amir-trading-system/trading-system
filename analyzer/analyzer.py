@@ -9,6 +9,7 @@ import alerter
 import analyzer.indicators
 import analyzer.evidences
 import common
+from tws import client
 
 from . import helper
 
@@ -19,6 +20,7 @@ class Analyzer:
         bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock],
         waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
         alerter_object: alerter.alerter.Alerter,
+        tws_client: client.Client,
         logger: logging.Logger,
     ):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
@@ -26,6 +28,7 @@ class Analyzer:
         self.helper = helper.AnalyzerHelper(
             logger=logger,
         )
+        self.tws_client = tws_client
         self.logger = logger
         self.alerter_object = alerter_object
         self.has_indications_bars: dict[str, common.objects.BarData] = {}
@@ -125,6 +128,7 @@ class Analyzer:
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
+        is_retro: bool,
     ):
         for indicator in analyzer.indicators.__one_day_indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
@@ -171,6 +175,14 @@ class Analyzer:
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
+                if is_retro:
+                    return
+
+                self.tws_client.place_buy_order(
+                    symbol=current_bar.symbol,
+                    current_price=current_bar.close,
+                    transmit=False,
+                )
                 break
 
     def _run_indicators(
@@ -315,6 +327,7 @@ class Analyzer:
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ):
         current_bar_is_valid = (
             True
@@ -363,6 +376,7 @@ class Analyzer:
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
+            is_retro=is_retro,
         )
 
     def _analyze_bar(
@@ -456,6 +470,7 @@ class Analyzer:
                 self._analyze_day_bar(
                     stock=new_stock_object,
                     current_bar=current_bar,
+                    is_retro=True,
                 )
             else:
                 self._analyze_bar(
@@ -473,7 +488,9 @@ class Analyzer:
             current_bar = stock.bars[1]
             stock.bars = stock.bars[1:]
 
-        if specific_bar_time is not None:
+        is_retro = specific_bar_time is not None
+
+        if is_retro:
             relevant_bars = [
                 bar_data
                 for bar_data in stock.bars
@@ -503,6 +520,7 @@ class Analyzer:
             self._analyze_day_bar(
                 stock=stock,
                 current_bar=current_bar,
+                is_retro=is_retro,
             )
         else:
             self._analyze_bar(
