@@ -329,6 +329,9 @@ class Analyzer:
             )
             return
 
+        if not current_bar.has_indication:
+            return
+
         milestones = common.objects.Milestones(
             starting_bar=common.objects.MilestoneBar(
                 index=0,
