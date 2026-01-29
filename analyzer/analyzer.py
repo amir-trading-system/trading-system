@@ -313,8 +313,6 @@ class Analyzer:
             and current_bar.close > current_bar.ema_9
             and current_bar.close > current_bar.ema_20
             and current_bar.histogram > 0
-            and current_bar.signal_line > 0
-            and current_bar.macd > 0
         )
         if not current_bar_is_valid:
             self.logger.info(
@@ -329,7 +327,7 @@ class Analyzer:
             )
             return
 
-        if not current_bar.has_indication:
+        if current_bar.has_indication:
             return
 
         milestones = common.objects.Milestones(

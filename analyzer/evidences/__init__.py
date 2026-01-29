@@ -55,3 +55,4 @@ from . import current_bar_is_the_first_one_to_cross_top_bar
 from . import has_previous_bar_with_indication
 from . import most_of_move_signal_line_is_positive
 from . import current_day_breaks_highest_high
+from . import current_day_continues_last_success_day
