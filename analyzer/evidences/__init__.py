@@ -56,3 +56,4 @@ from . import has_previous_bar_with_indication
 from . import most_of_move_signal_line_is_positive
 from . import current_day_breaks_highest_high
 from . import current_day_continues_last_success_day
+from . import current_day_continues_trend

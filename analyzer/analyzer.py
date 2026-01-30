@@ -175,15 +175,8 @@ class Analyzer:
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
-                if is_retro:
-                    return
-
-                self.tws_client.place_buy_order(
-                    symbol=current_bar.symbol,
-                    current_price=current_bar.close,
-                    transmit=False,
-                )
-                break
+                ## TODO: implelemnt confirmation logic by confirmator
+                return
 
     def _run_indicators(
         self,
@@ -488,9 +481,9 @@ class Analyzer:
             current_bar = stock.bars[1]
             stock.bars = stock.bars[1:]
 
-        is_retro = specific_bar_time is not None
+        for_specific_date = specific_bar_time is not None
 
-        if is_retro:
+        if for_specific_date:
             relevant_bars = [
                 bar_data
                 for bar_data in stock.bars
@@ -520,7 +513,7 @@ class Analyzer:
             self._analyze_day_bar(
                 stock=stock,
                 current_bar=current_bar,
-                is_retro=is_retro,
+                is_retro=for_specific_date,
             )
         else:
             self._analyze_bar(
