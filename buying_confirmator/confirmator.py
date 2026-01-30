@@ -139,6 +139,7 @@ class Confirmator:
                     bars_not_showing_real_retracement = (
                         True
                         and len(one_minute_bars) > 10
+                        and under_volume_average_count > 0
                         and above_volume_average_count/under_volume_average_count >= 0.75
                     )
 
