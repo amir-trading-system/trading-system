@@ -12,6 +12,7 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         current_bar_is_highest = current_bar.high >= milestones.top_bar.bar_object.high
         current_bar_after_own_retracement = (

@@ -12,6 +12,7 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         movement_is_after_market_starts = 9 <= current_bar.bar_time.hour <= 20
 

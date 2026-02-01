@@ -13,6 +13,7 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         relevant_bars = stock.bars[:milestones.starting_bar.index]
         if len(relevant_bars) == 0:
@@ -32,6 +33,7 @@ class Evidence(
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
+                is_retro=is_retro,
             )
 
             if histogram_mostly_positive_result.result:

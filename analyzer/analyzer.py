@@ -37,6 +37,7 @@ class Analyzer:
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.Milestones:
         are_valid = False
         starting_bar: common.objects.MilestoneBar = self.helper.get_strating_bar(
@@ -112,11 +113,13 @@ class Analyzer:
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
+            is_retro=is_retro,
         )
         retracements_result = retracements_evidence_object.find_evidence(
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
+            is_retro=is_retro,
         )
         milestones.fibonacci_retracement = float(fibonacci_retracement_result.value)
         milestones.retracement_indexes = retracements_result.value
@@ -139,6 +142,7 @@ class Analyzer:
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
+                is_retro=is_retro,
             )
             if indicator_response.result and indicator_response.success_rate == 1:
                 self.logger.info(
@@ -210,6 +214,7 @@ class Analyzer:
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
+                is_retro=is_retro,
             )
             if indicator_response.failed_base_evidences_count > 1:
                 continue
@@ -395,6 +400,7 @@ class Analyzer:
         milestones: common.objects.Milestones = self._prepare_milestones(
             stock=stock,
             current_bar=current_bar,
+            is_retro=is_retro,
         )
 
         if not milestones.are_valid:

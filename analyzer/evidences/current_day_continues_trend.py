@@ -100,7 +100,6 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
-        ## TODO: continue from here.
         is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         relevant_bars = stock.bars[1:]

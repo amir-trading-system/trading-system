@@ -78,22 +78,32 @@ class Confirmator:
                     },
                 )
 
-                highest_point_to_cross = milestones.starting_bar.bar_object.high if milestones.top_bar.index == 0 else milestones.top_bar.bar_object.high
+                highest_until_now_by_one_minute = max(
+                    [
+                        bar_obj.high
+                        for bar_obj in one_minute_bars
+                        if bar_obj.bar_time < potential_confirmation_bar.bar_time
+                    ]
+                )
+                if milestones.top_bar.bar_object.index == 0:
+                    milestones.top_bar.bar_object.high = 0.0
+
+                highest_point_to_cross = max(
+                    [
+                        milestones.starting_bar.bar_object.high,
+                        milestones.top_bar.bar_object.high,
+                        highest_until_now_by_one_minute,
+                    ]
+                )
 
                 if (
                     True
                     and potential_confirmation_bar.close > potential_confirmation_bar.open_value
-                    and potential_confirmation_bar.close > highest_point_to_cross
+                    and potential_confirmation_bar.high > highest_point_to_cross
                     and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
                     and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
                     and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
                     and potential_confirmation_bar.close > potential_confirmation_bar.vwap
-                    and not any(
-                        one_minute_bar
-                        for one_minute_bar in one_minute_bars
-                        if one_minute_bar.high > potential_confirmation_bar.close
-                        and one_minute_bar.index != potential_confirmation_bar.index
-                    )
                 ):
                     entry_position_confirmed = True
                     entry_position_bar = potential_confirmation_bar
@@ -109,6 +119,8 @@ class Confirmator:
                     "entry_position_bar_time": entry_position_bar.bar_time,
                 },
             )
+            if self.is_retro:
+                print(f"{original_bar_to_confirm.symbol} - entry_position_bar_time: {entry_position_bar.bar_time}")
 
             self.alerter_object.send_confirmation_alert(
                 sender="Confirmator",

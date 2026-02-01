@@ -59,6 +59,7 @@ class Indicator:
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.IndicatorResponse:
         success_results: list[common.objects.EvidenceResponse] = []
         failed_base_evidences_count = 0
@@ -104,6 +105,7 @@ class Indicator:
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
+                is_retro=is_retro,
             )
             if not result.result and evidence_object.is_base_evidence:
                 failed_base_evidences_count += 1

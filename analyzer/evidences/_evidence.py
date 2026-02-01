@@ -10,5 +10,6 @@ class Evidence:
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         raise NotImplementedError()

@@ -12,6 +12,7 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         previous_bar = milestones.previous_bar.bar_object
         current_bar_higher_than_previous = current_bar.high > previous_bar.high

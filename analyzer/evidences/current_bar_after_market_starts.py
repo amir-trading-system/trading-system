@@ -13,6 +13,7 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         current_bar_after_market_starts = current_bar.is_after_market_open
 
