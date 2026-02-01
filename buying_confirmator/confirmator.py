@@ -31,7 +31,106 @@ class Confirmator:
         original_bar_to_confirm: common.objects.BarData,
         milestones: common.objects.Milestones,
     ):
-        pass
+        entry_position_confirmed: bool = False
+        entry_position_bar: common.objects.BarData = None
+        one_minute_bars: list[common.objects.BarData] = []
+        most_updated_datetime = datetime.datetime.fromtimestamp(0)
+        already_sent_buy_order_for_stock: dict[str,bool] = {}
+
+        while True:
+            if not relevant_stock.one_minute_bars_queue.empty():
+                potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
+
+                if (
+                    potential_confirmation_bar.bar_time < datetime.datetime(
+                        year=original_bar_to_confirm.bar_time.year,
+                        month=original_bar_to_confirm.bar_time.month,
+                        day=original_bar_to_confirm.bar_time.day,
+                        hour=4,
+                    )
+                    or potential_confirmation_bar.bar_time < most_updated_datetime
+                    or not potential_confirmation_bar.ready_to_analyze
+                    or not potential_confirmation_bar.histogram
+                ):
+                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
+                    continue
+
+                one_minute_bars.append(potential_confirmation_bar)
+                if potential_confirmation_bar.bar_time < datetime.datetime(
+                    year=original_bar_to_confirm.bar_time.year,
+                    month=original_bar_to_confirm.bar_time.month,
+                    day=original_bar_to_confirm.bar_time.day,
+                    hour=9,
+                    minute=30,
+                ):
+                    continue
+
+                most_updated_datetime = potential_confirmation_bar.bar_time
+
+                self.logger.info(
+                    msg="Trying to confirm bar",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "last_one_minute_bar_time": most_updated_datetime,
+                    },
+                )
+
+                highest_point_to_cross = milestones.starting_bar.bar_object.high if milestones.top_bar.index == 0 else milestones.top_bar.bar_object.high
+
+                if (
+                    True
+                    and potential_confirmation_bar.close > potential_confirmation_bar.open_value
+                    and potential_confirmation_bar.close > highest_point_to_cross
+                    and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+                    and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
+                    and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
+                    and potential_confirmation_bar.close > potential_confirmation_bar.vwap
+                    and not any(
+                        one_minute_bar
+                        for one_minute_bar in one_minute_bars
+                        if one_minute_bar.high > potential_confirmation_bar.close
+                        and one_minute_bar.index != potential_confirmation_bar.index
+                    )
+                ):
+                    entry_position_confirmed = True
+                    entry_position_bar = potential_confirmation_bar
+                    break
+
+        if entry_position_confirmed:
+            self.logger.info(
+                "Bar has confirmed",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "entry_position_bar_time": entry_position_bar.bar_time,
+                },
+            )
+
+            self.alerter_object.send_confirmation_alert(
+                sender="Confirmator",
+                original_bar=original_bar_to_confirm,
+                entry_position_bar=entry_position_bar,
+                is_retro=self.is_retro,
+            )
+
+            if (
+                not already_sent_buy_order_for_stock.get(original_bar_to_confirm.symbol, False)
+            ):
+                already_sent_buy_order_for_stock[original_bar_to_confirm.symbol] = True
+                if self.is_retro:
+                    return
+
+                self.tws_client.place_buy_order(
+                    symbol=original_bar_to_confirm.symbol,
+                    current_price=entry_position_bar.close,
+                    transmit=False,
+                )
+
+        return
 
     def confirm_entry_position_for_minutes_bars(
         self,
@@ -228,6 +327,5 @@ class Confirmator:
                             "milestones": milestones,
                         },
                     ).start()
-
 
             time.sleep(1)

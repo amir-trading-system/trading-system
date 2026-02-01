@@ -64,7 +64,12 @@ class Handler:
             return
 
         if is_retro:
-            message = f"Congrats! {symbol} has indication on {bar_date}"
+            message = ""
+            if sender == "Confirmator":
+                message = f"Congrats! {symbol} has been confirmed on {bar_date}"
+            else:
+                message = f"Congrats! {symbol} has indication on {bar_date}"
+
             self.logger.info(
                 msg=message,
                 extra={

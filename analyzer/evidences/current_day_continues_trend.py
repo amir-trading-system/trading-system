@@ -62,11 +62,46 @@ class Evidence(
                     timeframe=bar_object.timeframe,
                 )
 
+    def get_top_bar(
+        self,
+        starting_bar: common.objects.BarData,
+        relevant_bars: list[common.objects.BarData],
+        current_bar: common.objects.BarData,
+    ) -> common.objects.MilestoneBar | None:
+        top_bar_options = [
+            bar_object
+            for bar_object in relevant_bars[:starting_bar.index]
+            if (
+                True
+                and bar_object.index > current_bar.index
+                and bar_object.high > starting_bar.high
+                and len(relevant_bars[1:starting_bar.index]) > 0
+                and bar_object.high == max(
+                    [
+                        bar_obj.high
+                        for bar_obj in relevant_bars[:starting_bar.index]
+                        if bar_obj.index > current_bar.index
+                    ]
+                )
+            )
+        ]
+        if len(top_bar_options) > 0:
+            top_bar = top_bar_options[0]
+            return common.objects.MilestoneBar(
+                index=top_bar.index,
+                bar_object=top_bar,
+                bar_type=common.objects.MilestoneType.TOP_BAR,
+                bar_time=top_bar.bar_time,
+                timeframe=top_bar.timeframe,
+            )
+
     def find_evidence(
         self,
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        ## TODO: continue from here.
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         relevant_bars = stock.bars[1:]
         if len(relevant_bars) == 0:
@@ -87,6 +122,15 @@ class Evidence(
             )
 
         milestones.starting_bar = starting_bar
+
+        top_bar = self.get_top_bar(
+            starting_bar=starting_bar.bar_object,
+            relevant_bars=relevant_bars,
+            current_bar=current_bar,
+        )
+        if top_bar is not None:
+            milestones.top_bar = top_bar
+
         previous_day = relevant_bars[0]
         previous_day_looks_good = (
             True
@@ -96,12 +140,19 @@ class Evidence(
             and current_bar.low > previous_day.low
         )
 
+        boundries_bar = starting_bar.bar_object
+        if top_bar is not None:
+            boundries_bar = top_bar.bar_object
+
+        between_bounderis = starting_bar.bar_object.low < current_bar.low < boundries_bar.high
+
         current_bar_is_strong = (
             True
-            and current_bar.close > current_bar.open_value
+            and current_bar.close > current_bar.open_value or is_retro
             and current_bar.close > current_bar.ema_9
             and current_bar.close > current_bar.ema_20
             and current_bar.histogram > 0
+            and between_bounderis
         )
         if len(relevant_bars[:starting_bar.index-1]) > 0:
             current_bar_is_strong = (
