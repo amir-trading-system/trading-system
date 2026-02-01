@@ -1,5 +1,6 @@
 import datetime
 import logging
+import traceback
 
 from . import client
 
@@ -46,12 +47,19 @@ class Handler(
             "top_index",
             "lowest_low_index",
             "quantity",
-            "exception_message",
         ]
 
         for field in fields:
             if record_as_dict.get(field):
                 document[field] = record_as_dict[field]
+
+        if record_as_dict.get("exception"):
+            exception: Exception = record_as_dict["exception"]
+            document["message"] = str(exception),
+            document["error"] = {
+                "type": type(exception).__name__,
+                "stack_trace": traceback.format_exc(),
+            }
 
         date_fields = [
             "starting_index_time",

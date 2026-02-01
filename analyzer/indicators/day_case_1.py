@@ -6,7 +6,7 @@ from . import indicator
 class Indicator(
     indicator.Indicator,
 ):
-    name = "case_31"
+    name = "day_case_1"
 
     def __init__(
         self,
@@ -18,6 +18,6 @@ class Indicator(
             logger=logger,
         )
         self.unique_evidences = {
-            analyzer.evidences.current_day_continues_last_success_day.Evidence,
+            analyzer.evidences.current_day_continues_trend.Evidence,
         }
         self.evidences = self.unique_evidences

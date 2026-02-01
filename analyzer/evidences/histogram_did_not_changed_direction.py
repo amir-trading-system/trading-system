@@ -13,12 +13,14 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         evidence_object = histogram_changed_direction.Evidence()
         evidence_result = evidence_object.find_evidence(
             stock=stock,
             milestones=milestones,
             current_bar=current_bar,
+            is_retro=is_retro,
         )
 
         return common.objects.EvidenceResponse(

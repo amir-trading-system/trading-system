@@ -1,4 +1,3 @@
-import datetime
 import logging
 import threading
 
@@ -19,26 +18,38 @@ class Alerter:
     def send_alert(
         self,
         sender: str,
-        symbol: str,
-        timeframe: int,
-        bar_date: datetime.datetime,
-        bar_index: int,
-        message: str,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+        emoji: str,
+        milestones: common.objects.Milestones,
+        is_retro: bool,
+        sorted_indicators: dict[str, float] = {},
+        base_except_one: bool = None,
     ):
         for handler in handlers.__handlers__:
             handler_object: handlers._alert_handler.Handler = handler(
                 configuration=self.configuration,
                 logger=self.logger,
             )
+            designed_message = handler_object.design_indicated_bar_message(
+                stock=stock,
+                current_bar=current_bar,
+                emoji=emoji,
+                base_except_one=base_except_one,
+                milestones=milestones,
+                sorted_indicators=sorted_indicators,
+            )
+
             threading.Thread(
                 target=handler_object.alert,
                 kwargs={
                     "sender": sender,
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "bar_date": bar_date,
-                    "bar_index": bar_index,
-                    "message": message,
+                    "symbol": current_bar.symbol,
+                    "timeframe": current_bar.timeframe,
+                    "bar_date": current_bar.bar_time,
+                    "bar_index": current_bar.index,
+                    "message": designed_message,
+                    "is_retro": is_retro,
                 },
             ).start()
 
@@ -47,6 +58,7 @@ class Alerter:
         sender: str,
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
+        is_retro: bool,
     ):
         for handler in handlers.__handlers__:
             handler_object: handlers._alert_handler.Handler = handler(
@@ -67,5 +79,6 @@ class Alerter:
                     "bar_date": original_bar.bar_time,
                     "bar_index": original_bar.index,
                     "message": designed_message,
+                    "is_retro": is_retro,
                 },
             ).start()

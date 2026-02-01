@@ -71,7 +71,7 @@ if __name__ == "__main__":
     configuration: config_manager.BotConfig = config_manager.ConfigManager().load_config()
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
-    waiting_for_confirmation_queue: queue.Queue[common.objects.BarData] = queue.Queue()
+    waiting_for_confirmation_queue: queue.Queue[dict[str, common.objects.BarData|common.objects.Milestones]] = queue.Queue()
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
     logger_object = logger.logger.Logger().get_logger()
 

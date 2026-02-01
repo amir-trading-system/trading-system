@@ -48,6 +48,7 @@ class Handler:
         bar_date: datetime.datetime,
         bar_index: int,
         message: str,
+        is_retro: bool,
     ):
         if not self.is_enabled:
             self.logger.warning(
@@ -58,6 +59,23 @@ class Handler:
                     "timeframe": timeframe,
                     "bar_time": bar_date,
                     "current_index": bar_index,
+                },
+            )
+            return
+
+        if is_retro:
+            message = ""
+            if sender == "Confirmator":
+                message = f"Congrats! {symbol} has been confirmed on {bar_date}"
+            else:
+                message = f"Congrats! {symbol} has indication on {bar_date}"
+
+            self.logger.info(
+                msg=message,
+                extra={
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "bar_time": bar_date,
                 },
             )
             return

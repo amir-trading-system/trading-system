@@ -37,6 +37,7 @@ class Analyzer:
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.Milestones:
         are_valid = False
         starting_bar: common.objects.MilestoneBar = self.helper.get_strating_bar(
@@ -112,11 +113,13 @@ class Analyzer:
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
+            is_retro=is_retro,
         )
         retracements_result = retracements_evidence_object.find_evidence(
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
+            is_retro=is_retro,
         )
         milestones.fibonacci_retracement = float(fibonacci_retracement_result.value)
         milestones.retracement_indexes = retracements_result.value
@@ -139,10 +142,9 @@ class Analyzer:
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
+                is_retro=is_retro,
             )
             if indicator_response.result and indicator_response.success_rate == 1:
-                emoji = "✅"
-
                 self.logger.info(
                     msg="Bar has Indication",
                     extra={
@@ -155,40 +157,30 @@ class Analyzer:
                     }
                 )
 
-                message = f"""
-    <b>{emoji} Congrats - One Day Bar! {emoji}</b>
-
-    <b>Symbol:</b> <u>{stock.symbol_name}</u>
-    <b>Timeframe:</b> <code>{stock.timeframe}</code>
-    <b>Time:</b> <code>{current_bar.bar_time}</code>
-    <b>Indication Name:</b> <code>{indicator_obj.name}</code>
-    """
-
                 self.alerter_object.send_alert(
                     sender="Analyzer",
-                    symbol=stock.symbol_name,
-                    timeframe=stock.timeframe,
-                    bar_date=current_bar.bar_time,
-                    bar_index=current_bar.index,
-                    message=message,
+                    stock=stock,
+                    current_bar=current_bar,
+                    emoji="✅",
+                    milestones=milestones,
+                    is_retro=is_retro,
                 )
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
-                if is_retro:
-                    return
-
-                self.tws_client.place_buy_order(
-                    symbol=current_bar.symbol,
-                    current_price=current_bar.close,
-                    transmit=False,
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
                 )
-                break
+                return
 
     def _run_indicators(
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        is_retro: bool,
         milestones: common.objects.Milestones = None,
     ) -> None:
         self.logger.info(
@@ -222,13 +214,19 @@ class Analyzer:
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
+                is_retro=is_retro,
             )
             if indicator_response.failed_base_evidences_count > 1:
                 continue
             if indicator_response.result:
                 success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
                 if indicator_obj.can_be_confirm_by_itself:
-                    self.waiting_for_confirmation_queue.put(current_bar)
+                    self.waiting_for_confirmation_queue.put(
+                        {
+                            "bar_to_confirm": current_bar,
+                            "milestones": milestones,
+                        },
+                    )
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
@@ -296,32 +294,25 @@ class Analyzer:
                     }
                 )
 
-                message = f"""
-    <b>{emoji} Congrats! {emoji}</b>
-    {"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
-
-    <b>Symbol:</b> <u>{stock.symbol_name}</u>
-    <b>Timeframe:</b> <code>{stock.timeframe}</code>
-    <b>Time:</b> <code>{current_bar.bar_time}</code>
-    <b>Starting Time:</b> <code>{milestones.starting_bar.bar_time}</code>
-    <b>Top Time:</b> <code>{milestones.top_bar.bar_time}</code>
-
-    <b>{len(sorted_indicators)} Indications:</b>
-    {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
-    """
-
                 self.alerter_object.send_alert(
                     sender="Analyzer",
-                    symbol=stock.symbol_name,
-                    timeframe=stock.timeframe,
-                    bar_date=current_bar.bar_time,
-                    bar_index=current_bar.index,
-                    message=message,
+                    stock=stock,
+                    current_bar=current_bar,
+                    emoji=emoji,
+                    base_except_one=base_except_one,
+                    milestones=milestones,
+                    sorted_indicators=sorted_indicators,
+                    is_retro=is_retro,
                 )
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
-                self.waiting_for_confirmation_queue.put(current_bar)
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
+                )
 
     def _analyze_day_bar(
         self,
@@ -331,7 +322,7 @@ class Analyzer:
     ):
         current_bar_is_valid = (
             True
-            and current_bar.close > current_bar.open_value
+            and (current_bar.close > current_bar.open_value or is_retro)
             and current_bar.close > current_bar.ema_9
             and current_bar.close > current_bar.ema_20
             and current_bar.histogram > 0
@@ -383,6 +374,7 @@ class Analyzer:
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ):
         current_bar_is_valid = (
             True
@@ -408,6 +400,7 @@ class Analyzer:
         milestones: common.objects.Milestones = self._prepare_milestones(
             stock=stock,
             current_bar=current_bar,
+            is_retro=is_retro,
         )
 
         if not milestones.are_valid:
@@ -434,6 +427,7 @@ class Analyzer:
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
+            is_retro=is_retro,
         )
 
     def analyze_retroactive_case(
@@ -476,6 +470,7 @@ class Analyzer:
                 self._analyze_bar(
                     stock=new_stock_object,
                     current_bar=current_bar,
+                    is_retro=True,
                 )
 
     def analyze_live_case(
@@ -488,9 +483,9 @@ class Analyzer:
             current_bar = stock.bars[1]
             stock.bars = stock.bars[1:]
 
-        is_retro = specific_bar_time is not None
+        for_specific_date = specific_bar_time is not None
 
-        if is_retro:
+        if for_specific_date:
             relevant_bars = [
                 bar_data
                 for bar_data in stock.bars
@@ -520,12 +515,13 @@ class Analyzer:
             self._analyze_day_bar(
                 stock=stock,
                 current_bar=current_bar,
-                is_retro=is_retro,
+                is_retro=for_specific_date,
             )
         else:
             self._analyze_bar(
                 stock=stock,
                 current_bar=current_bar,
+                is_retro=for_specific_date,
             )
 
     def analyze_data(
@@ -560,12 +556,12 @@ class Analyzer:
                         self.logger.error(
                             msg="Exception occured while analyzing stock retroactively",
                             extra={
-                                "exception_message": str(e),
+                                "exception": e,
                                 "symbol": stock.symbol_name,
                                 "timeframe": stock.timeframe,
                                 "timeframe_type": stock.timeframe_type.value,
                                 "retroactive_from": retroactive_from,
-                            }
+                            },
                         )
                 else:
                     try:
@@ -577,10 +573,10 @@ class Analyzer:
                         self.logger.error(
                             msg="Exception occured while analyzing stock on live or on specific bar time",
                             extra={
-                                "exception_message": str(e),
+                                "exception": e,
                                 "symbol": stock.symbol_name,
                                 "timeframe": stock.timeframe,
                                 "timeframe_type": stock.timeframe_type.value,
                                 "specific_bar_time": specific_bar_time,
-                            }
+                            },
                         )

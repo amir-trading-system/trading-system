@@ -11,6 +11,7 @@ class Evidence(
         stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ) -> common.objects.EvidenceResponse:
         top_high = milestones.top_bar.bar_object.high
         lowest_low_after = milestones.lowest_low_bar.bar_object.low
