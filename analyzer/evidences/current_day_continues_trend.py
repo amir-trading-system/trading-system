@@ -21,6 +21,7 @@ class Evidence(
             and bar_object.close > bar_object.ema_9
             and bar_object.close > bar_object.ema_20
             and bar_object.volume > bar_object.volume_average
+            and bar_object.volume > 500000
             and bar_object.high > bar_object.vwap
         )
 
@@ -33,7 +34,7 @@ class Evidence(
             previous_bar = stock.previous_bar(
                 bar_object=bar_object,
             )
-            if (
+            potential_starting_bar = (
                 True
                 and self.is_potential_starting_bar(
                     bar_object=bar_object
@@ -43,13 +44,16 @@ class Evidence(
                         bar_object=previous_bar,
                     ) if previous_bar is not None else True
                 )
-                and max(
-                    [
-                        bar_obj.high
-                        for bar_obj in relevant_bars[:10]
-                    ]
-                ) == bar_object.high
-            ):
+            )
+            if potential_starting_bar:
+                if len(relevant_bars[:10]) > 0:
+                    potential_starting_bar = max(
+                        [
+                            bar_obj.high
+                            for bar_obj in relevant_bars[:10]
+                        ]
+                    ) == bar_object.high
+
                 return common.objects.MilestoneBar(
                     index=bar_object.index,
                     bar_object=bar_object,
@@ -98,13 +102,18 @@ class Evidence(
             and current_bar.close > current_bar.ema_9
             and current_bar.close > current_bar.ema_20
             and current_bar.histogram > 0
-            and max(
-                [
-                    bar_obj.high
-                    for bar_obj in relevant_bars[:starting_bar.index-1]
-                ]
-            ) < current_bar.high
         )
+        if len(relevant_bars[:starting_bar.index-1]) > 0:
+            current_bar_is_strong = (
+                True
+                and current_bar_is_strong
+                and max(
+                    [
+                        bar_obj.high
+                        for bar_obj in relevant_bars[:starting_bar.index-1]
+                    ]
+                ) < current_bar.high
+            )
 
         current_day_continues_trend = (
             True

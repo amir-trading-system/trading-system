@@ -550,12 +550,12 @@ class Analyzer:
                         self.logger.error(
                             msg="Exception occured while analyzing stock retroactively",
                             extra={
-                                "exception_message": str(e),
+                                "exception": e,
                                 "symbol": stock.symbol_name,
                                 "timeframe": stock.timeframe,
                                 "timeframe_type": stock.timeframe_type.value,
                                 "retroactive_from": retroactive_from,
-                            }
+                            },
                         )
                 else:
                     try:
@@ -567,10 +567,10 @@ class Analyzer:
                         self.logger.error(
                             msg="Exception occured while analyzing stock on live or on specific bar time",
                             extra={
-                                "exception_message": str(e),
+                                "exception": e,
                                 "symbol": stock.symbol_name,
                                 "timeframe": stock.timeframe,
                                 "timeframe_type": stock.timeframe_type.value,
                                 "specific_bar_time": specific_bar_time,
-                            }
+                            },
                         )

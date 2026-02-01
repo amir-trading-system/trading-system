@@ -85,7 +85,7 @@ class Indicator:
                     "top_index_time": milestones.top_bar.bar_time,
                     "lowest_low_index": milestones.lowest_low_bar.index,
                     "lowest_low_time": milestones.lowest_low_bar.bar_time,
-                }
+                },
             )
             print(f"Not all must_to_have terms are true for {self.name} indicator")
             return common.objects.IndicatorResponse(
