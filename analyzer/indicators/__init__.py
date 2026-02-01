@@ -29,7 +29,7 @@ from . import case_26
 from . import case_27
 from . import case_28
 from . import case_29
-from . import case_32
+from . import day_case_1
 
 __indicators__: list[type[indicator.Indicator]] = [
     case_1.Indicator,
@@ -65,5 +65,5 @@ __indicators__: list[type[indicator.Indicator]] = [
 ]
 
 __one_day_indicators__ : list[type[indicator.Indicator]] = [
-    case_32.Indicator,
+    day_case_1.Indicator,
 ]

@@ -6,7 +6,7 @@ from . import indicator
 class Indicator(
     indicator.Indicator,
 ):
-    name = "case_31"
+    name = "day_case_1"
 
     def __init__(
         self,
