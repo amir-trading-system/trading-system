@@ -82,6 +82,7 @@ class Evidence(
                 reason="No strating bar for this day trend",
             )
 
+        milestones.starting_bar = starting_bar
         previous_day = relevant_bars[0]
         previous_day_looks_good = (
             True
@@ -100,7 +101,7 @@ class Evidence(
             and max(
                 [
                     bar_obj.high
-                    for bar_obj in relevant_bars[:starting_bar.index]
+                    for bar_obj in relevant_bars[:starting_bar.index-1]
                 ]
             ) < current_bar.high
         )

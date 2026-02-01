@@ -25,7 +25,15 @@ class Confirmator:
         self.alerter_object = alerter_object
         self.logger = logger
 
-    def confirm_entry_position(
+    def confirm_entry_position_for_days_bars(
+        self,
+        relevant_stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
+        milestones: common.objects.Milestones,
+    ):
+        pass
+
+    def confirm_entry_position_for_minutes_bars(
         self,
         relevant_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
@@ -166,6 +174,7 @@ class Confirmator:
                 sender="Confirmator",
                 original_bar=original_bar_to_confirm,
                 entry_position_bar=entry_position_bar,
+                is_retro=self.is_retro,
             )
 
             if (
@@ -188,7 +197,10 @@ class Confirmator:
     ):
         while True:
             if not self.waiting_for_confirmation_queue.empty():
-                bar_to_confirm: common.objects.BarData = self.waiting_for_confirmation_queue.get()
+                bar_to_milestones: dict[str, any] = self.waiting_for_confirmation_queue.get()
+
+                bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
+                milestones: common.objects.Milestones = bar_to_milestones["milestones"]
                 relevant_stock = [
                     stock
                     for _, stock in self.request_id_to_symbol.items()
@@ -199,12 +211,23 @@ class Confirmator:
                     )
                 ][0]
 
-                threading.Thread(
-                    target=self.confirm_entry_position,
-                    kwargs={
-                        "relevant_stock": relevant_stock,
-                        "original_bar_to_confirm": bar_to_confirm,
-                    },
-                ).start()
+                if bar_to_confirm.timeframe_type == common.objects.TimeframeType.MINUTE:
+                    threading.Thread(
+                        target=self.confirm_entry_position_for_minutes_bars,
+                        kwargs={
+                            "relevant_stock": relevant_stock,
+                            "original_bar_to_confirm": bar_to_confirm,
+                        },
+                    ).start()
+                else:
+                    threading.Thread(
+                        target=self.confirm_entry_position_for_days_bars,
+                        kwargs={
+                            "relevant_stock": relevant_stock,
+                            "original_bar_to_confirm": bar_to_confirm,
+                            "milestones": milestones,
+                        },
+                    ).start()
+
 
             time.sleep(1)

@@ -164,7 +164,12 @@ class Analyzer:
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
-                ## TODO: implelemnt confirmation logic by confirmator
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
+                )
                 return
 
     def _run_indicators(
@@ -211,7 +216,12 @@ class Analyzer:
             if indicator_response.result:
                 success_indicators[indicator_obj.name] = round(indicator_response.success_rate, 3)
                 if indicator_obj.can_be_confirm_by_itself:
-                    self.waiting_for_confirmation_queue.put(current_bar)
+                    self.waiting_for_confirmation_queue.put(
+                        {
+                            "bar_to_confirm": current_bar,
+                            "milestones": milestones,
+                        },
+                    )
 
                 if indicator_response.failed_base_evidences_count == 1:
                     base_except_one = True
@@ -292,7 +302,12 @@ class Analyzer:
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
-                self.waiting_for_confirmation_queue.put(current_bar)
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
+                )
 
     def _analyze_day_bar(
         self,

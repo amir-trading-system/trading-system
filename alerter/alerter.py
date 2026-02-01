@@ -39,17 +39,6 @@ class Alerter:
                 milestones=milestones,
                 sorted_indicators=sorted_indicators,
             )
-            if is_retro and handler.is_enabled:
-                self.logger.info(
-                    msg=designed_message,
-                    extra={
-                        "symbol": stock.symbol_name,
-                        "timeframe": current_bar.timeframe,
-                        "timeframe_type": stock.timeframe_type,
-                        "bar_time": current_bar.bar_time,
-                    },
-                )
-                return
 
             threading.Thread(
                 target=handler_object.alert,
@@ -60,6 +49,7 @@ class Alerter:
                     "bar_date": current_bar.bar_time,
                     "bar_index": current_bar.index,
                     "message": designed_message,
+                    "is_retro": is_retro,
                 },
             ).start()
 
@@ -68,6 +58,7 @@ class Alerter:
         sender: str,
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
+        is_retro: bool,
     ):
         for handler in handlers.__handlers__:
             handler_object: handlers._alert_handler.Handler = handler(
@@ -88,5 +79,6 @@ class Alerter:
                     "bar_date": original_bar.bar_time,
                     "bar_index": original_bar.index,
                     "message": designed_message,
+                    "is_retro": is_retro,
                 },
             ).start()
