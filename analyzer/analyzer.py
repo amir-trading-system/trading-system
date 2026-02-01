@@ -141,8 +141,6 @@ class Analyzer:
                 current_bar=current_bar,
             )
             if indicator_response.result and indicator_response.success_rate == 1:
-                emoji = "✅"
-
                 self.logger.info(
                     msg="Bar has Indication",
                     extra={
@@ -155,22 +153,13 @@ class Analyzer:
                     }
                 )
 
-                message = f"""
-    <b>{emoji} Congrats - One Day Bar! {emoji}</b>
-
-    <b>Symbol:</b> <u>{stock.symbol_name}</u>
-    <b>Timeframe:</b> <code>{stock.timeframe}</code>
-    <b>Time:</b> <code>{current_bar.bar_time}</code>
-    <b>Indication Name:</b> <code>{indicator_obj.name}</code>
-    """
-
                 self.alerter_object.send_alert(
                     sender="Analyzer",
-                    symbol=stock.symbol_name,
-                    timeframe=stock.timeframe,
-                    bar_date=current_bar.bar_time,
-                    bar_index=current_bar.index,
-                    message=message,
+                    stock=stock,
+                    current_bar=current_bar,
+                    emoji="✅",
+                    milestones=milestones,
+                    is_retro=is_retro,
                 )
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
@@ -182,6 +171,7 @@ class Analyzer:
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        is_retro: bool,
         milestones: common.objects.Milestones = None,
     ) -> None:
         self.logger.info(
@@ -289,27 +279,15 @@ class Analyzer:
                     }
                 )
 
-                message = f"""
-    <b>{emoji} Congrats! {emoji}</b>
-    {"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
-
-    <b>Symbol:</b> <u>{stock.symbol_name}</u>
-    <b>Timeframe:</b> <code>{stock.timeframe}</code>
-    <b>Time:</b> <code>{current_bar.bar_time}</code>
-    <b>Starting Time:</b> <code>{milestones.starting_bar.bar_time}</code>
-    <b>Top Time:</b> <code>{milestones.top_bar.bar_time}</code>
-
-    <b>{len(sorted_indicators)} Indications:</b>
-    {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
-    """
-
                 self.alerter_object.send_alert(
                     sender="Analyzer",
-                    symbol=stock.symbol_name,
-                    timeframe=stock.timeframe,
-                    bar_date=current_bar.bar_time,
-                    bar_index=current_bar.index,
-                    message=message,
+                    stock=stock,
+                    current_bar=current_bar,
+                    emoji=emoji,
+                    base_except_one=base_except_one,
+                    milestones=milestones,
+                    sorted_indicators=sorted_indicators,
+                    is_retro=is_retro,
                 )
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
@@ -376,6 +354,7 @@ class Analyzer:
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        is_retro: bool,
     ):
         current_bar_is_valid = (
             True
@@ -427,6 +406,7 @@ class Analyzer:
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,
+            is_retro=is_retro,
         )
 
     def analyze_retroactive_case(
@@ -469,6 +449,7 @@ class Analyzer:
                 self._analyze_bar(
                     stock=new_stock_object,
                     current_bar=current_bar,
+                    is_retro=True,
                 )
 
     def analyze_live_case(
@@ -519,6 +500,7 @@ class Analyzer:
             self._analyze_bar(
                 stock=stock,
                 current_bar=current_bar,
+                is_retro=for_specific_date,
             )
 
     def analyze_data(

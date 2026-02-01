@@ -7,22 +7,42 @@ class Evidence(
 ):
     name = "current_day_continues_trend"
 
+    def is_potential_starting_bar(
+        self,
+        bar_object: common.objects.BarData,
+    ) -> bool:
+        return (
+            True
+            and bar_object.vwap is not None
+            and bar_object.ema_9 is not None
+            and bar_object.ema_20 is not None
+            and bar_object.volume_average is not None
+            and bar_object.close > bar_object.open_value
+            and bar_object.close > bar_object.ema_9
+            and bar_object.close > bar_object.ema_20
+            and bar_object.volume > bar_object.volume_average
+            and bar_object.high > bar_object.vwap
+        )
+
     def get_starting_bar(
         self,
+        stock: common.objects.Stock,
         relevant_bars: list[common.objects.BarData],
     ) -> common.objects.MilestoneBar | None:
         for bar_object in relevant_bars:
+            previous_bar = stock.previous_bar(
+                bar_object=bar_object,
+            )
             if (
                 True
-                and bar_object.vwap is not None
-                and bar_object.ema_9 is not None
-                and bar_object.ema_20 is not None
-                and bar_object.volume_average is not None
-                and bar_object.close > bar_object.open_value
-                and bar_object.close > bar_object.ema_9
-                and bar_object.close > bar_object.ema_20
-                and bar_object.volume > bar_object.volume_average
-                and bar_object.high > bar_object.vwap
+                and self.is_potential_starting_bar(
+                    bar_object=bar_object
+                )
+                and (
+                    not self.is_potential_starting_bar(
+                        bar_object=previous_bar,
+                    ) if previous_bar is not None else True
+                )
                 and max(
                     [
                         bar_obj.high
@@ -52,6 +72,7 @@ class Evidence(
             )
 
         starting_bar = self.get_starting_bar(
+            stock=stock,
             relevant_bars=relevant_bars,
         )
 
