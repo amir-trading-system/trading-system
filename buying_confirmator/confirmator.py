@@ -78,13 +78,16 @@ class Confirmator:
                     },
                 )
 
-                highest_until_now_by_one_minute = max(
-                    [
-                        bar_obj.high
-                        for bar_obj in one_minute_bars
-                        if bar_obj.bar_time < potential_confirmation_bar.bar_time
-                    ]
-                )
+                highest_highs_one_minute_bars = [
+                    bar_obj.high
+                    for bar_obj in one_minute_bars
+                    if bar_obj.bar_time < potential_confirmation_bar.bar_time
+                ]
+
+                if len(highest_highs_one_minute_bars) == 0:
+                    continue
+
+                highest_until_now_by_one_minute = max(highest_highs_one_minute_bars)
                 if milestones.top_bar.bar_object.index == 0:
                     milestones.top_bar.bar_object.high = 0.0
 
