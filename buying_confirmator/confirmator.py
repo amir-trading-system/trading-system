@@ -36,6 +36,11 @@ class Confirmator:
         one_minute_bars: list[common.objects.BarData] = []
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         already_sent_buy_order_for_stock: dict[str,bool] = {}
+        relevant_stock.bars = sorted(
+            relevant_stock.bars,
+            key=lambda bar_object: bar_object.bar_time,
+            reverse=True,
+        )
 
         while True:
             if not relevant_stock.one_minute_bars_queue.empty():
@@ -98,12 +103,21 @@ class Confirmator:
                         highest_until_now_by_one_minute,
                     ]
                 )
-                ## TODO: implement here the logic of CATX - 02.02.26 - need to think about that.
+
+                crossed_previous_day_only = (
+                    True
+                    and potential_confirmation_bar.high > highest_until_now_by_one_minute
+                    and potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high
+                    and potential_confirmation_bar.high > relevant_stock.bars[1].high
+                )
 
                 if (
                     True
                     and potential_confirmation_bar.close > potential_confirmation_bar.open_value
-                    and potential_confirmation_bar.high > highest_point_to_cross
+                    and (
+                        potential_confirmation_bar.high > highest_point_to_cross
+                        or crossed_previous_day_only
+                    )
                     and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
                     and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
                     and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
