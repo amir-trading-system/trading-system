@@ -133,6 +133,17 @@ class Analyzer:
         milestones: common.objects.Milestones,
         is_retro: bool,
     ):
+        self.logger.info(
+            msg="Running analyzers",
+            extra={
+                "worker": "Analyzer",
+                "symbol": stock.symbol_name,
+                "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
+                "bar_time": current_bar.bar_time,
+                "current_index": current_bar.index,
+            },
+        )
         for indicator in analyzer.indicators.__one_day_indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
                 milestones=milestones,
@@ -174,7 +185,20 @@ class Analyzer:
                         "milestones": milestones,
                     },
                 )
-                return
+                break
+
+        self.logger.info(
+            msg="Finished Running analyzers",
+            extra={
+                "worker": "Analyzer",
+                "symbol": stock.symbol_name,
+                "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
+                "bar_time": current_bar.bar_time,
+                "current_index": current_bar.index,
+                "current_volume": current_bar.volume,
+            },
+        )
 
     def _run_indicators(
         self,
@@ -228,8 +252,26 @@ class Analyzer:
                         },
                     )
 
-                if indicator_response.failed_base_evidences_count == 1:
-                    base_except_one = True
+                self.logger.info(
+                    msg="Bar has Indication",
+                    extra={
+                        "worker": "Analyzer",
+                        "symbol": stock.symbol_name,
+                        "timeframe": stock.timeframe,
+                        "timeframe_type": stock.timeframe_type.value,
+                        "bar_time": current_bar.bar_time,
+                        "current_index": current_bar.index,
+                    }
+                )
+
+                self.alerter_object.send_alert(
+                    sender="Analyzer",
+                    stock=stock,
+                    current_bar=current_bar,
+                    emoji=emoji,
+                    milestones=milestones,
+                    is_retro=is_retro,
+                )
 
         self.logger.info(
             msg="Finished Running analyzers",
@@ -327,7 +369,7 @@ class Analyzer:
             and current_bar.close > current_bar.ema_20
             and current_bar.histogram > 0
         )
-        if not current_bar_is_valid and stock.timeframe_type == 2:
+        if not current_bar_is_valid:
             self.logger.info(
                 msg="Bar is not valid, analyzer will wait for the next bar",
                 extra={
