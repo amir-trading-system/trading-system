@@ -98,7 +98,6 @@ if __name__ == "__main__":
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
         alerter_object=alerter_object,
         logger=logger_object,
-        tws_client=tws_client,
     )
     confirmator_obj = buying_confirmator.confirmator.Confirmator(
         tws_client=tws_client,

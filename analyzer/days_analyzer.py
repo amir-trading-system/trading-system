@@ -1,0 +1,154 @@
+import logging
+import queue
+
+import alerter
+import analyzer.indicators
+import common
+
+
+class Analyzer:
+    def __init__(
+        self,
+        alerter_object: alerter.alerter.Alerter,
+        logger: logging.Logger,
+        waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
+    ):
+        self.logger = logger
+        self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
+        self.alerter_object = alerter_object
+
+        self.has_indications_bars: dict[str, common.objects.BarData] = {}
+
+    def _run_one_day_indicators(
+        self,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+        milestones: common.objects.Milestones,
+        is_retro: bool,
+    ):
+        self.logger.info(
+            msg="Running analyzers",
+            extra={
+                "worker": "Analyzer",
+                "symbol": stock.symbol_name,
+                "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
+                "bar_time": current_bar.bar_time,
+                "current_index": current_bar.index,
+            },
+        )
+        for indicator in analyzer.indicators.__one_day_indicators__:
+            indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
+                milestones=milestones,
+                logger=self.logger,
+            )
+            indicator_response: common.objects.IndicatorResponse = indicator_obj.indicate(
+                stock=stock,
+                milestones=milestones,
+                current_bar=current_bar,
+                is_retro=is_retro,
+            )
+            if indicator_response.result and indicator_response.success_rate == 1:
+                self.logger.info(
+                    msg="Bar has Indication",
+                    extra={
+                        "worker": "Analyzer",
+                        "symbol": stock.symbol_name,
+                        "timeframe": stock.timeframe,
+                        "timeframe_type": stock.timeframe_type.value,
+                        "bar_time": current_bar.bar_time,
+                        "current_index": current_bar.index,
+                    }
+                )
+
+                self.alerter_object.send_alert(
+                    sender="Analyzer",
+                    stock=stock,
+                    current_bar=current_bar,
+                    emoji="✅",
+                    milestones=milestones,
+                    is_retro=is_retro,
+                )
+                bar_unique_identifier = current_bar.generate_unique_identifier()
+                self.has_indications_bars[bar_unique_identifier] = current_bar
+                stock.bars[current_bar.index].has_indication = True
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
+                )
+                break
+
+        self.logger.info(
+            msg="Finished Running analyzers",
+            extra={
+                "worker": "Analyzer",
+                "symbol": stock.symbol_name,
+                "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
+                "bar_time": current_bar.bar_time,
+                "current_index": current_bar.index,
+                "current_volume": current_bar.volume,
+            },
+        )
+
+    def analyze_day_bar(
+        self,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+        is_retro: bool,
+    ):
+        bar_unique_identifer = current_bar.generate_unique_identifier()
+        if bar_unique_identifer in self.has_indications_bars:
+            return
+
+        current_bar_is_valid = (
+            True
+            and (current_bar.close > current_bar.open_value or is_retro)
+            and current_bar.close > current_bar.ema_9
+            and current_bar.close > current_bar.ema_20
+            and current_bar.histogram > 0
+        )
+        if not current_bar_is_valid:
+            self.logger.info(
+                msg="Bar is not valid, analyzer will wait for the next bar",
+                extra={
+                    "worker": "Analyzer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
+                    "bar_time": current_bar.bar_time,
+                    "current_index": current_bar.index,
+                }
+            )
+            return
+
+        milestones = common.objects.Milestones(
+            starting_bar=common.objects.MilestoneBar(
+                index=0,
+                bar_object=current_bar,
+                bar_type=common.objects.MilestoneType.STARTING_BAR,
+                bar_time=current_bar.bar_time,
+            ),
+            top_bar=common.objects.MilestoneBar(
+                index=0,
+                bar_object=current_bar,
+                bar_type=common.objects.MilestoneType.TOP_BAR,
+                bar_time=current_bar.bar_time,
+            ),
+            lowest_low_bar=common.objects.MilestoneBar(
+                index=0,
+                bar_object=current_bar,
+                bar_type=common.objects.MilestoneType.LOWEST_BAR,
+                bar_time=current_bar.bar_time,
+            ),
+            are_valid=True,
+        )
+
+        self._run_one_day_indicators(
+            stock=stock,
+            current_bar=current_bar,
+            milestones=milestones,
+            is_retro=is_retro,
+        )
