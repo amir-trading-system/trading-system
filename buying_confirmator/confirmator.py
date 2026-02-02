@@ -40,6 +40,7 @@ class Confirmator:
         while True:
             if not relevant_stock.one_minute_bars_queue.empty():
                 potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
+                relevant_stock.one_minute_bars_queue.task_done()
 
                 if (
                     potential_confirmation_bar.bar_time < datetime.datetime(
@@ -52,7 +53,6 @@ class Confirmator:
                     or not potential_confirmation_bar.ready_to_analyze
                     or not potential_confirmation_bar.histogram
                 ):
-                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
 
                 one_minute_bars.append(potential_confirmation_bar)
@@ -98,6 +98,7 @@ class Confirmator:
                         highest_until_now_by_one_minute,
                     ]
                 )
+                ## TODO: implement here the logic of CATX - 02.02.26 - need to think about that.
 
                 if (
                     True
@@ -170,7 +171,6 @@ class Confirmator:
                     or not potential_confirmation_bar.ready_to_analyze
                     or not potential_confirmation_bar.histogram
                 ):
-                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
 
                 if not self.is_retro:
@@ -215,7 +215,6 @@ class Confirmator:
                 )
 
                 if (potential_confirmation_bar.bar_time - original_bar_to_confirm.bar_time).seconds / 60 < original_bar_to_confirm.timeframe:
-                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
 
                 previous_bar = [
@@ -224,7 +223,6 @@ class Confirmator:
                     if bar_obj.index == potential_confirmation_bar.index+1
                 ]
                 if len(previous_bar) == 0:
-                    relevant_stock.one_minute_bars_queue.put(potential_confirmation_bar)
                     continue
                 previous_bar = previous_bar[0]
 
@@ -297,12 +295,6 @@ class Confirmator:
                 already_sent_buy_order_for_stock[original_bar_to_confirm.symbol] = True
                 if self.is_retro:
                     return
-
-                self.tws_client.place_buy_order(
-                    symbol=original_bar_to_confirm.symbol,
-                    current_price=entry_position_bar.close,
-                    transmit=False,
-                )
 
         return
 

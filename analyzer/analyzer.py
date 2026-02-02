@@ -466,12 +466,12 @@ class Analyzer:
                     current_bar=current_bar,
                     is_retro=True,
                 )
-            # else:
-            #     self._analyze_bar(
-            #         stock=new_stock_object,
-            #         current_bar=current_bar,
-            #         is_retro=True,
-            #     )
+            else:
+                self._analyze_bar(
+                    stock=new_stock_object,
+                    current_bar=current_bar,
+                    is_retro=True,
+                )
 
     def analyze_live_case(
         self,
@@ -517,12 +517,12 @@ class Analyzer:
                 current_bar=current_bar,
                 is_retro=for_specific_date,
             )
-        # else:
-        #     self._analyze_bar(
-        #         stock=stock,
-        #         current_bar=current_bar,
-        #         is_retro=for_specific_date,
-        #     )
+        else:
+            self._analyze_bar(
+                stock=stock,
+                current_bar=current_bar,
+                is_retro=for_specific_date,
+            )
 
     def analyze_data(
         self,

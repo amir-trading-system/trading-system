@@ -91,18 +91,18 @@ class Collector:
                         timeframe=1,
                         timeframe_type=common.objects.TimeframeType.MINUTE,
                     ),
-                    # common.objects.TimeframeInput(
-                    #     timeframe=5,
-                    #     timeframe_type=common.objects.TimeframeType.MINUTE,
-                    # ),
-                    # common.objects.TimeframeInput(
-                    #     timeframe=15,
-                    #     timeframe_type=common.objects.TimeframeType.MINUTE,
-                    # ),
-                    # common.objects.TimeframeInput(
-                    #     timeframe=30,
-                    #     timeframe_type=common.objects.TimeframeType.MINUTE,
-                    # ),
+                    common.objects.TimeframeInput(
+                        timeframe=5,
+                        timeframe_type=common.objects.TimeframeType.MINUTE,
+                    ),
+                    common.objects.TimeframeInput(
+                        timeframe=15,
+                        timeframe_type=common.objects.TimeframeType.MINUTE,
+                    ),
+                    common.objects.TimeframeInput(
+                        timeframe=30,
+                        timeframe_type=common.objects.TimeframeType.MINUTE,
+                    ),
                     common.objects.TimeframeInput(
                         timeframe=1,
                         timeframe_type=common.objects.TimeframeType.DAY,
