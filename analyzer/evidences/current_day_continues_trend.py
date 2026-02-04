@@ -9,15 +9,36 @@ class Evidence(
 
     def is_potential_starting_bar(
         self,
+        stock: common.objects.Stock,
         bar_object: common.objects.BarData,
     ) -> bool:
+        base_condition = True
+        previous_bar = stock.previous_bar(
+            bar_object=bar_object,
+        )
+        next_bar = stock.next_bar(
+            bar_object=bar_object,
+        )
+        if previous_bar is not None:
+            base_condition = (
+                True
+                and base_condition
+                and bar_object.high > previous_bar.high
+            )
+        if next_bar is not None and next_bar.index > 0:
+            base_condition = (
+                True
+                and base_condition
+                and bar_object.high > next_bar.high
+            )
+
         return (
             True
             and bar_object.vwap is not None
             and bar_object.ema_9 is not None
             and bar_object.ema_20 is not None
             and bar_object.volume_average is not None
-            and bar_object.close > bar_object.open_value
+            and base_condition
             and bar_object.close > bar_object.ema_9
             and bar_object.close > bar_object.ema_20
             and bar_object.volume > bar_object.volume_average
@@ -37,10 +58,12 @@ class Evidence(
             potential_starting_bar = (
                 True
                 and self.is_potential_starting_bar(
+                    stock=stock,
                     bar_object=bar_object
                 )
                 and (
                     not self.is_potential_starting_bar(
+                        stock=stock,
                         bar_object=previous_bar,
                     ) if previous_bar is not None else True
                 )
@@ -129,6 +152,16 @@ class Evidence(
         )
         if top_bar is not None:
             milestones.top_bar = top_bar
+
+        if not any(
+            bar_object
+            for bar_object in relevant_bars[:starting_bar.index]
+            if current_bar.low < bar_object.high
+        ):
+            return common.objects.EvidenceResponse(
+                result=False,
+                reason="no bars to indicate",
+            )
 
         previous_day = relevant_bars[0]
         previous_day_looks_good = (
