@@ -1,3 +1,4 @@
+import datetime
 import logging
 import queue
 
@@ -18,6 +19,7 @@ class Analyzer:
         self.alerter_object = alerter_object
 
         self.has_indications_bars: dict[str, common.objects.BarData] = {}
+        self.symbol_to_last_log_time: dict[str, datetime.datetime] = {}
 
     def _run_one_day_indicators(
         self,
@@ -26,17 +28,27 @@ class Analyzer:
         milestones: common.objects.Milestones,
         is_retro: bool,
     ):
-        self.logger.info(
-            msg="Running analyzers",
-            extra={
-                "worker": "Analyzer",
-                "symbol": stock.symbol_name,
-                "timeframe": stock.timeframe,
-                "timeframe_type": stock.timeframe_type.value,
-                "bar_time": current_bar.bar_time,
-                "current_index": current_bar.index,
-            },
-        )
+        should_write_log = False
+        last_log_time = self.symbol_to_last_log_time.get(stock.symbol_name)
+        if last_log_time is None:
+            self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
+        else:
+            if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
+                should_write_log = True
+
+        if should_write_log:
+            self.logger.info(
+                msg="Running analyzers",
+                extra={
+                    "worker": "Analyzer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
+                    "bar_time": current_bar.bar_time,
+                    "current_index": current_bar.index,
+                },
+            )
+
         for indicator in analyzer.indicators.__one_day_indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
                 milestones=milestones,
@@ -80,18 +92,21 @@ class Analyzer:
                 )
                 break
 
-        self.logger.info(
-            msg="Finished Running analyzers",
-            extra={
-                "worker": "Analyzer",
-                "symbol": stock.symbol_name,
-                "timeframe": stock.timeframe,
-                "timeframe_type": stock.timeframe_type.value,
-                "bar_time": current_bar.bar_time,
-                "current_index": current_bar.index,
-                "current_volume": current_bar.volume,
-            },
-        )
+        if should_write_log:
+            self.logger.info(
+                msg="Finished Running analyzers",
+                extra={
+                    "worker": "Analyzer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
+                    "bar_time": current_bar.bar_time,
+                    "current_index": current_bar.index,
+                    "current_volume": current_bar.volume,
+                },
+            )
+
+        should_write_log = False
 
     def analyze_day_bar(
         self,
