@@ -46,6 +46,7 @@ class Confirmator:
             if not relevant_stock.one_minute_bars_queue.empty():
                 potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
                 relevant_stock.one_minute_bars_queue.task_done()
+                date_now = datetime.datetime.now()
 
                 if (
                     potential_confirmation_bar.bar_time < datetime.datetime(
@@ -57,6 +58,13 @@ class Confirmator:
                     or potential_confirmation_bar.bar_time < most_updated_datetime
                     or not potential_confirmation_bar.ready_to_analyze
                     or not potential_confirmation_bar.histogram
+                    or (not self.is_retro and potential_confirmation_bar.bar_time < datetime.datetime(
+                        year=date_now.year,
+                        month=date_now.month,
+                        day=date_now.day,
+                        hour=date_now.hour,
+                        minute=date_now.minute,
+                    ))
                 ):
                     continue
 
@@ -72,27 +80,6 @@ class Confirmator:
 
                 most_updated_datetime = potential_confirmation_bar.bar_time
 
-                self.logger.info(
-                    msg="Trying to confirm bar",
-                    extra={
-                        "worker": "Confirmator",
-                        "symbol": original_bar_to_confirm.symbol,
-                        "timeframe": original_bar_to_confirm.timeframe,
-                        "bar_time": original_bar_to_confirm.bar_time,
-                        "last_one_minute_bar_time": most_updated_datetime,
-                    },
-                )
-
-                highest_highs_one_minute_bars = [
-                    bar_obj.high
-                    for bar_obj in one_minute_bars
-                    if bar_obj.bar_time < potential_confirmation_bar.bar_time
-                ]
-
-                if len(highest_highs_one_minute_bars) == 0:
-                    continue
-
-                highest_until_now_by_one_minute = max(highest_highs_one_minute_bars)
                 if milestones.top_bar.bar_object.index == 0:
                     milestones.top_bar.bar_object.high = 0.0
 
@@ -100,13 +87,11 @@ class Confirmator:
                     [
                         milestones.starting_bar.bar_object.high,
                         milestones.top_bar.bar_object.high,
-                        highest_until_now_by_one_minute,
                     ]
                 )
 
                 crossed_previous_day_only = (
                     True
-                    and potential_confirmation_bar.high > highest_until_now_by_one_minute
                     and potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high
                     and potential_confirmation_bar.high > relevant_stock.bars[1].high
                 )

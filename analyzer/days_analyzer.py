@@ -27,15 +27,8 @@ class Analyzer:
         current_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
         is_retro: bool,
+        should_write_log: bool,
     ):
-        should_write_log = False
-        last_log_time = self.symbol_to_last_log_time.get(stock.symbol_name)
-        if last_log_time is None:
-            self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
-        else:
-            if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
-                should_write_log = True
-
         if should_write_log:
             self.logger.info(
                 msg="Running analyzers",
@@ -125,7 +118,16 @@ class Analyzer:
             and current_bar.close > current_bar.ema_20
             and current_bar.histogram > 0
         )
-        if not current_bar_is_valid:
+        should_write_log = False
+        last_log_time = self.symbol_to_last_log_time.get(stock.symbol_name)
+        if last_log_time is None:
+            self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
+        else:
+            if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
+                should_write_log = True
+                self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
+
+        if not current_bar_is_valid and should_write_log:
             self.logger.info(
                 msg="Bar is not valid, analyzer will wait for the next bar",
                 extra={
@@ -166,4 +168,5 @@ class Analyzer:
             current_bar=current_bar,
             milestones=milestones,
             is_retro=is_retro,
+            should_write_log=should_write_log,
         )
