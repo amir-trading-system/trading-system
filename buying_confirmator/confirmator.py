@@ -103,16 +103,16 @@ class Confirmator:
                 # For breakpoint
                 # if potential_confirmation_bar.bar_time == datetime.datetime(
                 #     year=2026,
-                #     month=2,
-                #     day=5,
-                #     hour=13,
-                #     minute=57,
+                #     month=1,
+                #     day=28,
+                #     hour=14,
+                #     minute=51,
                 # ):
                 #     print("h")
 
                 crossed_previous_day_only = (
                     True
-                    and potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high
+                    and (potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high or potential_confirmation_bar.high <= milestones.top_bar.bar_object.high)
                     and potential_confirmation_bar.high > relevant_stock.bars[1].high
                     and potential_confirmation_bar.low < relevant_stock.bars[1].high
                     and potential_confirmation_bar.close > highest_high_one_minute
@@ -129,6 +129,21 @@ class Confirmator:
                     and potential_confirmation_bar.low < milestones.top_bar.bar_object.high
                     and potential_confirmation_bar.close > highest_high_one_minute
                 )
+                crossed_highest_one_minute = False
+                if (
+                    True
+                    and highest_high_one_minute > milestones.starting_bar.bar_object.high
+                    and highest_high_one_minute > milestones.top_bar.bar_object.high
+                    and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
+                    and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
+
+                ):
+                    crossed_highest_one_minute = (
+                        True
+                        and potential_confirmation_bar.low < highest_high_one_minute
+                        and potential_confirmation_bar.close > highest_high_one_minute
+                    )
+
 
                 if (
                     True
@@ -137,6 +152,7 @@ class Confirmator:
                         crossed_previous_day_only
                         or crossed_starting_point
                         or crossed_top_point
+                        or crossed_highest_one_minute
                     )
                     and potential_confirmation_bar.close > highest_high_one_minute
                     and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average

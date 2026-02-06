@@ -16,20 +16,11 @@ class Evidence(
         previous_bar = stock.previous_bar(
             bar_object=bar_object,
         )
-        next_bar = stock.next_bar(
-            bar_object=bar_object,
-        )
         if previous_bar is not None:
             base_condition = (
                 True
                 and base_condition
                 and bar_object.high > previous_bar.high
-            )
-        if next_bar is not None and next_bar.index > 0:
-            base_condition = (
-                True
-                and base_condition
-                and bar_object.high > next_bar.high
             )
 
         return (
@@ -44,6 +35,7 @@ class Evidence(
             and bar_object.volume > bar_object.volume_average
             and bar_object.volume > 500000
             and bar_object.high > bar_object.vwap
+            and bar_object.ema_9/bar_object.low >= 0.9
         )
 
     def get_starting_bar(
