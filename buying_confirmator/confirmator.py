@@ -34,6 +34,7 @@ class Confirmator:
         entry_position_confirmed: bool = False
         entry_position_bar: common.objects.BarData = None
         one_minute_bars: list[common.objects.BarData] = []
+        highest_high_one_minute: float = 0.0
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         already_sent_buy_order_for_stock: dict[str,bool] = {}
         relevant_stock.bars = sorted(
@@ -41,9 +42,23 @@ class Confirmator:
             key=lambda bar_object: bar_object.bar_time,
             reverse=True,
         )
+        potential_confirmation_bar = None
 
         while True:
             if not relevant_stock.one_minute_bars_queue.empty():
+                if (
+                    True
+                    and potential_confirmation_bar is not None
+                    and potential_confirmation_bar.high > highest_high_one_minute
+                    and potential_confirmation_bar.bar_time >= datetime.datetime(
+                        year=original_bar_to_confirm.bar_time.year,
+                        month=original_bar_to_confirm.bar_time.month,
+                        day=original_bar_to_confirm.bar_time.day,
+                        hour=4,
+                    )
+                ):
+                    highest_high_one_minute = potential_confirmation_bar.high
+
                 potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
                 relevant_stock.one_minute_bars_queue.task_done()
                 date_now = datetime.datetime.now()
@@ -58,17 +73,21 @@ class Confirmator:
                     or potential_confirmation_bar.bar_time < most_updated_datetime
                     or not potential_confirmation_bar.ready_to_analyze
                     or not potential_confirmation_bar.histogram
-                    or (not self.is_retro and potential_confirmation_bar.bar_time < datetime.datetime(
-                        year=date_now.year,
-                        month=date_now.month,
-                        day=date_now.day,
-                        hour=date_now.hour,
-                        minute=date_now.minute,
-                    ))
+                    or (
+                        not self.is_retro
+                            and potential_confirmation_bar.bar_time < datetime.datetime(
+                            year=date_now.year,
+                            month=date_now.month,
+                            day=date_now.day,
+                            hour=date_now.hour,
+                            minute=date_now.minute,
+                        )
+                    )
                 ):
                     continue
 
                 one_minute_bars.append(potential_confirmation_bar)
+                most_updated_datetime = potential_confirmation_bar.bar_time
                 if potential_confirmation_bar.bar_time < datetime.datetime(
                     year=original_bar_to_confirm.bar_time.year,
                     month=original_bar_to_confirm.bar_time.month,
@@ -78,31 +97,48 @@ class Confirmator:
                 ):
                     continue
 
-                most_updated_datetime = potential_confirmation_bar.bar_time
-
                 if milestones.top_bar.bar_object.index == 0:
                     milestones.top_bar.bar_object.high = 0.0
 
-                highest_point_to_cross = max(
-                    [
-                        milestones.starting_bar.bar_object.high,
-                        milestones.top_bar.bar_object.high,
-                    ]
-                )
+                # For breakpoint
+                # if potential_confirmation_bar.bar_time == datetime.datetime(
+                #     year=2026,
+                #     month=2,
+                #     day=5,
+                #     hour=13,
+                #     minute=57,
+                # ):
+                #     print("h")
 
                 crossed_previous_day_only = (
                     True
                     and potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high
                     and potential_confirmation_bar.high > relevant_stock.bars[1].high
+                    and potential_confirmation_bar.low < relevant_stock.bars[1].high
+                    and potential_confirmation_bar.close > highest_high_one_minute
+                )
+                crossed_starting_point = (
+                    True
+                    and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
+                    and potential_confirmation_bar.low < milestones.starting_bar.bar_object.high
+                    and potential_confirmation_bar.close > highest_high_one_minute
+                )
+                crossed_top_point = (
+                    True
+                    and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
+                    and potential_confirmation_bar.low < milestones.top_bar.bar_object.high
+                    and potential_confirmation_bar.close > highest_high_one_minute
                 )
 
                 if (
                     True
                     and potential_confirmation_bar.close > potential_confirmation_bar.open_value
                     and (
-                        potential_confirmation_bar.high > highest_point_to_cross
-                        or crossed_previous_day_only
+                        crossed_previous_day_only
+                        or crossed_starting_point
+                        or crossed_top_point
                     )
+                    and potential_confirmation_bar.close > highest_high_one_minute
                     and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
                     and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
                     and potential_confirmation_bar.close > potential_confirmation_bar.ema_20

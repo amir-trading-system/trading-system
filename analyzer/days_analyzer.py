@@ -28,6 +28,7 @@ class Analyzer:
         milestones: common.objects.Milestones,
         is_retro: bool,
         should_write_log: bool,
+        confirmator_only: bool,
     ):
         if should_write_log:
             self.logger.info(
@@ -84,6 +85,14 @@ class Analyzer:
                     },
                 )
                 break
+            elif confirmator_only:
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
+                )
+                break
 
         if should_write_log:
             self.logger.info(
@@ -106,6 +115,7 @@ class Analyzer:
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         is_retro: bool,
+        confirmator_only: bool,
     ):
         bar_unique_identifer = current_bar.generate_unique_identifier()
         if bar_unique_identifer in self.has_indications_bars:
@@ -169,4 +179,5 @@ class Analyzer:
             milestones=milestones,
             is_retro=is_retro,
             should_write_log=should_write_log,
+            confirmator_only=confirmator_only,
         )

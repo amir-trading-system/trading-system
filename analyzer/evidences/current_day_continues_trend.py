@@ -183,6 +183,7 @@ class Evidence(
             and current_bar.close > current_bar.open_value or is_retro
             and current_bar.close > current_bar.ema_9
             and current_bar.close > current_bar.ema_20
+            and current_bar.ema_9 > current_bar.ema_20
             and current_bar.histogram > 0
             and between_bounderis
         )

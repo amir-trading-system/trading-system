@@ -21,6 +21,7 @@ def run_bot(
     timeframe: common.objects.TimeframeInput = None,
     specific_bar_time: datetime.datetime = None,
     retroactive_from: datetime.datetime = None,
+    confirmator_only: bool = False,
 ):
     manual_results_for_test = []
     collector_kwargs = {}
@@ -28,6 +29,7 @@ def run_bot(
     c_obj.tws_client.data_streamer.on_specific_bar_time = specific_bar_time is not None
     c_obj.tws_client.data_streamer.is_retro = retroactive_from is not None
     co_obj.is_retro = retroactive_from is not None or specific_bar_time is not None
+    a_obj.confirmator_only = confirmator_only
 
     if symbol:
         manual_results_for_test = [str.upper(symbol)]
@@ -139,6 +141,10 @@ if __name__ == "__main__":
         "--timeframe_type",
         type=int,
     )
+    test_parser.add_argument(
+        "--confirmator_only",
+        action='store_true',
+    )
 
     args = argument_parser.parse_args()
 
@@ -165,4 +171,5 @@ if __name__ == "__main__":
             ),
             specific_bar_time=args.specific_bar_time,
             retroactive_from=args.retroactive_from,
+            confirmator_only=args.confirmator_only,
         )

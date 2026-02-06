@@ -14,6 +14,8 @@ from . import minutes_analyzer
 
 
 class Analyzer:
+    confirmator_only = False
+
     def __init__(
         self,
         bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock],
@@ -74,6 +76,7 @@ class Analyzer:
                     stock=new_stock_object,
                     current_bar=current_bar,
                     is_retro=True,
+                    confirmator_only=self.confirmator_only,
                 )
             else:
                 self.minutes_analyzer.analyze_bar(
@@ -121,6 +124,7 @@ class Analyzer:
                 stock=stock,
                 current_bar=current_bar,
                 is_retro=for_specific_date,
+                confirmator_only=self.confirmator_only,
             )
         else:
             self.minutes_analyzer.analyze_bar(
