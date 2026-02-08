@@ -137,12 +137,14 @@ class Stock:
         symbol: str,
         timeframe: int,
         timeframe_type: TimeframeType,
+        specific_bar_time: datetime.datetime = None,
     ) -> bool:
         return (
             True
             and self.symbol_name == symbol
             and self.timeframe == timeframe
             and self.timeframe_type == timeframe_type
+            and self.specific_bar_time == specific_bar_time
         )
 
 class IbAPIRequest:

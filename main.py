@@ -29,7 +29,6 @@ def run_bot(
     analyzer_kwargs = {}
     tws_client_obj.data_streamer.on_specific_bar_time = specific_bar_time is not None
     tws_client_obj.data_streamer.is_retro = retroactive_from is not None
-    co_obj.is_retro = retroactive_from is not None or specific_bar_time is not None
     a_obj.confirmator_only = confirmator_only
 
     if symbol:
@@ -68,48 +67,12 @@ def run_bot(
 
     threading.Thread(
         target=co_obj.confirm_data,
+        kwargs={
+            "stop_event": threading.Event(),
+        }
     ).start()
 
 if __name__ == "__main__":
-    configuration: config_manager.BotConfig = config_manager.ConfigManager().load_config()
-    symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
-    bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
-    waiting_for_confirmation_queue: queue.Queue[dict[str, common.objects.BarData|common.objects.Milestones]] = queue.Queue()
-    request_id_to_symbol: dict[int,common.objects.Stock] = {}
-    logger_object = logger.logger.Logger().get_logger()
-
-    alerter_object = alerter.alerter.Alerter(
-        logger=logger_object,
-        configuration=configuration.alerts,
-    )
-    tws_client = tws.client.Client(
-        host="localhost",
-        port=8081,
-        symbols_to_collect_queue=symbols_to_collect_queue,
-        bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
-        request_id_to_symbol=request_id_to_symbol,
-        logger=logger_object,
-    )
-    collector_obj = collector.collector.Collector(
-        tws_client=tws_client,
-        request_id_to_symbol=request_id_to_symbol,
-        logger=logger_object,
-    )
-    analyzer_obj = analyzer.analyzer.Analyzer(
-        bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
-        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
-        request_id_to_symbol=request_id_to_symbol,
-        alerter_object=alerter_object,
-        logger=logger_object,
-    )
-    confirmator_obj = buying_confirmator.confirmator.Confirmator(
-        tws_client=tws_client,
-        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
-        request_id_to_symbol=request_id_to_symbol,
-        alerter_object=alerter_object,
-        logger=logger_object,
-    )
-
     argument_parser = ArgumentParser()
     subparser = argument_parser.add_subparsers(
         dest="command",
@@ -148,6 +111,49 @@ if __name__ == "__main__":
     )
 
     args = argument_parser.parse_args()
+    is_retro = args.command == "test" and (args.retroactive_from is not None or args.specific_bar_time is not None)
+
+    configuration: config_manager.BotConfig = config_manager.ConfigManager().load_config()
+    symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
+    bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
+    waiting_for_confirmation_queue: queue.Queue[dict[str, common.objects.BarData|common.objects.Milestones]] = queue.Queue()
+    results_queue: queue.Queue[dict[str, any]] = queue.Queue()
+    request_id_to_symbol: dict[int,common.objects.Stock] = {}
+    logger_object = logger.logger.Logger().get_logger()
+
+    alerter_object = alerter.alerter.Alerter(
+        logger=logger_object,
+        configuration=configuration.alerts,
+    )
+    tws_client = tws.client.Client(
+        host="localhost",
+        port=8081,
+        symbols_to_collect_queue=symbols_to_collect_queue,
+        bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+        request_id_to_symbol=request_id_to_symbol,
+        logger=logger_object,
+    )
+    collector_obj = collector.collector.Collector(
+        tws_client=tws_client,
+        request_id_to_symbol=request_id_to_symbol,
+        logger=logger_object,
+    )
+    analyzer_obj = analyzer.analyzer.Analyzer(
+        bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+        request_id_to_symbol=request_id_to_symbol,
+        alerter_object=alerter_object,
+        logger=logger_object,
+    )
+    confirmator_obj = buying_confirmator.confirmator.Confirmator(
+        tws_client=tws_client,
+        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+        results_queue=results_queue,
+        request_id_to_symbol=request_id_to_symbol,
+        alerter_object=alerter_object,
+        logger=logger_object,
+        is_retro=is_retro,
+    )
 
     threading.Thread(
         target=tws_client.run
