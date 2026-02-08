@@ -14,6 +14,7 @@ import logger
 import tws
 
 def run_bot(
+    tws_client_obj: tws.client.Client,
     c_obj: collector.collector.Collector,
     a_obj: analyzer.analyzer.Analyzer,
     co_obj: buying_confirmator.confirmator.Confirmator,
@@ -26,8 +27,8 @@ def run_bot(
     manual_results_for_test = []
     collector_kwargs = {}
     analyzer_kwargs = {}
-    c_obj.tws_client.data_streamer.on_specific_bar_time = specific_bar_time is not None
-    c_obj.tws_client.data_streamer.is_retro = retroactive_from is not None
+    tws_client_obj.data_streamer.on_specific_bar_time = specific_bar_time is not None
+    tws_client_obj.data_streamer.is_retro = retroactive_from is not None
     co_obj.is_retro = retroactive_from is not None or specific_bar_time is not None
     a_obj.confirmator_only = confirmator_only
 
@@ -51,7 +52,7 @@ def run_bot(
                 "retroactive_from": retroactive_from,
             }
 
-    c_obj.tws_client.start_scanner(
+    tws_client_obj.start_scanner(
         manual_results_for_test=manual_results_for_test,
     )
 
@@ -88,7 +89,6 @@ if __name__ == "__main__":
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
-        alerter_object=alerter_object,
     )
     collector_obj = collector.collector.Collector(
         tws_client=tws_client,
@@ -98,6 +98,7 @@ if __name__ == "__main__":
     analyzer_obj = analyzer.analyzer.Analyzer(
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+        request_id_to_symbol=request_id_to_symbol,
         alerter_object=alerter_object,
         logger=logger_object,
     )
@@ -155,12 +156,14 @@ if __name__ == "__main__":
 
     if args.command == "prod":
         run_bot(
+            tws_client_obj=tws_client,
             c_obj=collector_obj,
             a_obj=analyzer_obj,
             co_obj=confirmator_obj,
         )
     else:
         run_bot(
+            tws_client_obj=tws_client,
             c_obj=collector_obj,
             a_obj=analyzer_obj,
             co_obj=confirmator_obj,

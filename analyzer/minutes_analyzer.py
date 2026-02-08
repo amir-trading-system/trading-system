@@ -12,9 +12,9 @@ class Analyzer:
     def __init__(
         self,
         helper: analyzer_helper.AnalyzerHelper,
-        alerter_object: alerter.alerter.Alerter,
         waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
         logger: logging.Logger,
+        alerter_object: alerter.alerter.Alerter = None,
     ):
         self.helper = helper
         self.alerter_object = alerter_object
@@ -179,14 +179,15 @@ class Analyzer:
                     }
                 )
 
-                self.alerter_object.send_alert(
-                    sender="Analyzer",
-                    stock=stock,
-                    current_bar=current_bar,
-                    emoji=emoji,
-                    milestones=milestones,
-                    is_retro=is_retro,
-                )
+                if self.alerter_object:
+                    self.alerter_object.send_alert(
+                        sender="Analyzer",
+                        stock=stock,
+                        current_bar=current_bar,
+                        emoji=emoji,
+                        milestones=milestones,
+                        is_retro=is_retro,
+                    )
 
         self.logger.info(
             msg="Finished Running analyzers",
@@ -251,16 +252,18 @@ class Analyzer:
                     }
                 )
 
-                self.alerter_object.send_alert(
-                    sender="Analyzer",
-                    stock=stock,
-                    current_bar=current_bar,
-                    emoji=emoji,
-                    base_except_one=base_except_one,
-                    milestones=milestones,
-                    sorted_indicators=sorted_indicators,
-                    is_retro=is_retro,
-                )
+                if self.alerter_object:
+                    self.alerter_object.send_alert(
+                        sender="Analyzer",
+                        stock=stock,
+                        current_bar=current_bar,
+                        emoji=emoji,
+                        base_except_one=base_except_one,
+                        milestones=milestones,
+                        sorted_indicators=sorted_indicators,
+                        is_retro=is_retro,
+                    )
+
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True

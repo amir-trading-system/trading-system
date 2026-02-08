@@ -6,7 +6,6 @@ import time
 
 from ibapi import client, common as ibapi_common, wrapper, order as tws_order
 
-import alerter
 import common
 from . import scanner
 from . import data_streamer
@@ -21,7 +20,6 @@ class Client(client.EClient, wrapper.EWrapper):
         request_id_to_symbol: dict[int, common.objects.Stock],
         bars_ready_to_analyze_queue: queue.Queue,
         logger: logging.Logger,
-        alerter_object: alerter.alerter.Alerter,
     ):
         self.order_id: int = 0
         self.available_funds: float = 0.0
@@ -41,7 +39,6 @@ class Client(client.EClient, wrapper.EWrapper):
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.relevant_symbols: list[str] = []
         self.logger = logger
-        self.alerter_object = alerter_object
 
         self.scanner = scanner.Scanner(
             symbols_to_collect_queue=symbols_to_collect_queue,

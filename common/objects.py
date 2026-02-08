@@ -76,17 +76,27 @@ class BarData:
 class Stock:
     def __init__(
         self,
+        request_id: int,
         symbol_name: str,
         bars: list[BarData],
         timeframe: int,
         timeframe_type: TimeframeType,
         one_minute_bars_queue: queue.Queue[BarData] = None,
+        specific_bar_time: datetime.datetime = None,
+        finished_collection: bool = False,
+        finished_analyze: bool = False,
+        finished_confirmation: bool = False,
     ):
+        self.request_id = request_id
         self.symbol_name = symbol_name
         self.bars = bars
         self.timeframe = timeframe
         self.timeframe_type = timeframe_type
         self.one_minute_bars_queue = one_minute_bars_queue
+        self.specific_bar_time = specific_bar_time
+        self.finished_collection = finished_collection
+        self.finished_analyze = finished_analyze
+        self.finished_confirmation = finished_confirmation
 
     def previous_bar(
         self,

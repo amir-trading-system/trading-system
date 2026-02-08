@@ -32,11 +32,13 @@ class Collector:
         contract.currency = "USD"
 
         self.request_id_to_symbol[request_id] = common.objects.Stock(
+            request_id=request_id,
             symbol_name=symbol,
             bars=[],
             timeframe=timeframe,
             timeframe_type=timeframe_type,
             one_minute_bars_queue=queue.Queue(),
+            specific_bar_time=specific_bar_time,
         )
         ibapi_request = common.objects.IbAPIRequest(
             request_id=request_id,
@@ -120,3 +122,30 @@ class Collector:
                     )
             else:
                 time.sleep(1)
+
+    def collect_data_retroactively(
+        self,
+        symbol: str,
+        manual_timeframe_for_tests: common.objects.TimeframeInput,
+        specific_bar_time: datetime.datetime,
+    ):
+        timeframes = [
+            common.objects.TimeframeInput(
+                timeframe=1,
+                timeframe_type=common.objects.TimeframeType.MINUTE,
+            ),
+            common.objects.TimeframeInput(
+                timeframe=manual_timeframe_for_tests.timeframe,
+                timeframe_type=manual_timeframe_for_tests.timeframe_type,
+            ),
+        ]
+        for timeframe_input in timeframes:
+            next_request_id = self.tws_client.next_id()
+
+            self.request_historical_data(
+                symbol=symbol,
+                timeframe=timeframe_input.timeframe,
+                timeframe_type=timeframe_input.timeframe_type,
+                specific_bar_time=specific_bar_time,
+                request_id=next_request_id,
+            )

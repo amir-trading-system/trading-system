@@ -1,4 +1,5 @@
 import datetime
+import threading
 import queue
 
 import copy
@@ -8,9 +9,7 @@ import logging
 import alerter
 import common
 
-from . import helper
 from . import days_analyzer
-from . import minutes_analyzer
 
 
 class Analyzer:
@@ -20,24 +19,18 @@ class Analyzer:
         self,
         bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock],
         waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
-        alerter_object: alerter.alerter.Alerter,
+        request_id_to_symbol: dict[int,common.objects.Stock],
         logger: logging.Logger,
+        alerter_object: alerter.alerter.Alerter = None,
     ):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
+        self.request_id_to_symbol = request_id_to_symbol
 
-        helper_object = helper.AnalyzerHelper(
-            logger=logger,
-        )
-        self.minutes_analyzer = minutes_analyzer.Analyzer(
-            helper=helper_object,
-            alerter_object=alerter_object,
-            waiting_for_confirmation_queue=waiting_for_confirmation_queue,
-            logger=logger,
-        )
         self.days_analyzer = days_analyzer.Analyzer(
             alerter_object=alerter_object,
             waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+            request_id_to_symbol=request_id_to_symbol,
             logger=logger,
         )
 
@@ -65,6 +58,7 @@ class Analyzer:
 
             current_bar = current_bar[0]
             new_stock_object = common.objects.Stock(
+                request_id=stock.request_id,
                 symbol_name=stock.symbol_name,
                 bars=relevant_bars,
                 timeframe=stock.timeframe,
@@ -77,12 +71,6 @@ class Analyzer:
                     current_bar=current_bar,
                     is_retro=True,
                     confirmator_only=self.confirmator_only,
-                )
-            else:
-                self.minutes_analyzer.analyze_bar(
-                    stock=stock,
-                    current_bar=current_bar,
-                    is_retro=True,
                 )
 
     def analyze_live_case(
@@ -126,12 +114,6 @@ class Analyzer:
                 is_retro=for_specific_date,
                 confirmator_only=self.confirmator_only,
             )
-        else:
-            self.minutes_analyzer.analyze_bar(
-                stock=stock,
-                current_bar=current_bar,
-                is_retro=for_specific_date,
-            )
 
     def analyze_data(
         self,
@@ -142,6 +124,7 @@ class Analyzer:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
                 stock = common.objects.Stock(
+                    request_id=stock_object.request_id,
                     symbol_name=stock_object.symbol_name,
                     timeframe=stock_object.timeframe,
                     timeframe_type=stock_object.timeframe_type,
@@ -189,3 +172,44 @@ class Analyzer:
                                 "specific_bar_time": specific_bar_time,
                             },
                         )
+
+    def analyze_data_retroactively(
+        self,
+        stop_event: threading.Event,
+    ):
+        while True:
+            if stop_event.is_set():
+                break
+
+            if not self.bars_ready_to_analyze_queue.empty():
+                stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
+                stock = common.objects.Stock(
+                    request_id=stock_object.request_id,
+                    symbol_name=stock_object.symbol_name,
+                    timeframe=stock_object.timeframe,
+                    timeframe_type=stock_object.timeframe_type,
+                    bars=copy.deepcopy(stock_object.bars),
+                    one_minute_bars_queue=stock_object.one_minute_bars_queue,
+                )
+
+                stock.bars = sorted(
+                    stock.bars,
+                    key=lambda bar: bar.bar_time,
+                    reverse=True,
+                )
+                try:
+                    self.analyze_live_case(
+                        stock=stock,
+                        specific_bar_time=stock_object.specific_bar_time,
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        msg="Exception occured while analyzing stock on live or on specific bar time",
+                        extra={
+                            "exception": e,
+                            "symbol": stock.symbol_name,
+                            "timeframe": stock.timeframe,
+                            "timeframe_type": stock.timeframe_type.value,
+                            "specific_bar_time": stock_object.specific_bar_time,
+                        },
+                    )

@@ -16,8 +16,8 @@ class Confirmator:
         tws_client: client.Client,
         waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
         request_id_to_symbol: dict[int,common.objects.Stock],
-        alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
+        alerter_object: alerter.alerter.Alerter = None,
     ):
         self.tws_client = tws_client
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
@@ -177,12 +177,13 @@ class Confirmator:
             if self.is_retro:
                 print(f"{original_bar_to_confirm.symbol} - entry_position_bar_time: {entry_position_bar.bar_time}")
 
-            self.alerter_object.send_confirmation_alert(
-                sender="Confirmator",
-                original_bar=original_bar_to_confirm,
-                entry_position_bar=entry_position_bar,
-                is_retro=self.is_retro,
-            )
+            if self.alerter_object:
+                self.alerter_object.send_confirmation_alert(
+                    sender="Confirmator",
+                    original_bar=original_bar_to_confirm,
+                    entry_position_bar=entry_position_bar,
+                    is_retro=self.is_retro,
+                )
 
             if (
                 not already_sent_buy_order_for_stock.get(original_bar_to_confirm.symbol, False)
@@ -333,12 +334,13 @@ class Confirmator:
                 },
             )
 
-            self.alerter_object.send_confirmation_alert(
-                sender="Confirmator",
-                original_bar=original_bar_to_confirm,
-                entry_position_bar=entry_position_bar,
-                is_retro=self.is_retro,
-            )
+            if self.alerter_object:
+                self.alerter_object.send_confirmation_alert(
+                    sender="Confirmator",
+                    original_bar=original_bar_to_confirm,
+                    entry_position_bar=entry_position_bar,
+                    is_retro=self.is_retro,
+                )
 
             if (
                 not already_sent_buy_order_for_stock.get(original_bar_to_confirm.symbol, False)

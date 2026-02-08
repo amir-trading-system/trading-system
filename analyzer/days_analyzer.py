@@ -10,14 +10,16 @@ import common
 class Analyzer:
     def __init__(
         self,
-        alerter_object: alerter.alerter.Alerter,
         logger: logging.Logger,
         waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
+        request_id_to_symbol: dict[int,common.objects.Stock],
+        alerter_object: alerter.alerter.Alerter = None,
     ):
         self.logger = logger
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.alerter_object = alerter_object
 
+        self.request_id_to_symbol = request_id_to_symbol
         self.has_indications_bars: dict[str, common.objects.BarData] = {}
         self.symbol_to_last_log_time: dict[str, datetime.datetime] = {}
 
@@ -67,14 +69,16 @@ class Analyzer:
                     }
                 )
 
-                self.alerter_object.send_alert(
-                    sender="Analyzer",
-                    stock=stock,
-                    current_bar=current_bar,
-                    emoji="✅",
-                    milestones=milestones,
-                    is_retro=is_retro,
-                )
+                if self.alerter_object:
+                    self.alerter_object.send_alert(
+                        sender="Analyzer",
+                        stock=stock,
+                        current_bar=current_bar,
+                        emoji="✅",
+                        milestones=milestones,
+                        is_retro=is_retro,
+                    )
+
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
@@ -84,6 +88,7 @@ class Analyzer:
                         "milestones": milestones,
                     },
                 )
+                self.request_id_to_symbol[stock.request_id].finished_analyze = True
                 break
             elif confirmator_only:
                 self.waiting_for_confirmation_queue.put(
