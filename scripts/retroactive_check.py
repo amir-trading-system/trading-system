@@ -168,6 +168,8 @@ def run_retroactive_check():
 
     stop_event.set()
 
+    ## TODO: need to complete confirmation logic.
+
     while not confirmation_finished(
         request_id_to_symbol=request_id_to_symbol,
     ):
