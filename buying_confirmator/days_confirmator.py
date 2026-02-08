@@ -170,7 +170,9 @@ class Confirmator:
                     "worker": "Confirmator",
                     "symbol": original_bar_to_confirm.symbol,
                     "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
                     "entry_position_bar_time": entry_position_bar.bar_time,
+                    "bar_time": original_bar_to_confirm.bar_time,
                 },
             )
             self.request_id_to_symbol[relevant_stock.request_id].finished_confirmation = True

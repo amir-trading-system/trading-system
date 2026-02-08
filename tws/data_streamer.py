@@ -165,6 +165,7 @@ class DataStreamer():
         self,
         one_minute_request_id: int,
         symbol: str,
+        specific_bar_time: datetime.datetime = None,
     ):
         temp_request_id_to_symbol = {
             key: value
@@ -175,6 +176,8 @@ class DataStreamer():
 
         for _, stock in temp_request_id_to_symbol.items():
             if stock.timeframe > 1 or stock.timeframe_type == common.objects.TimeframeType.DAY:
+                if specific_bar_time is not None and stock.specific_bar_time != specific_bar_time:
+                    continue
                 for one_minute_bar in one_minute_bars:
                     stock.one_minute_bars_queue.put(one_minute_bar)
 
@@ -184,6 +187,7 @@ class DataStreamer():
     ):
         relevant_symbol_bars = self.request_id_to_symbol[request_id].bars
         symbol = self.request_id_to_symbol[request_id].symbol_name
+        specific_bar_time = self.request_id_to_symbol[request_id].specific_bar_time
         bars_data = self.enrich_bars(
             bars=relevant_symbol_bars,
         )
@@ -194,6 +198,7 @@ class DataStreamer():
             self.insert_one_minute_bars_into_confirmation_queues(
                 one_minute_request_id=request_id,
                 symbol=symbol,
+                specific_bar_time=specific_bar_time,
             )
             return
 
@@ -253,6 +258,7 @@ class DataStreamer():
                 self.insert_one_minute_bars_into_confirmation_queues(
                     one_minute_request_id=request_id,
                     symbol=self.request_id_to_symbol[request_id].symbol_name,
+                    specific_bar_time=self.request_id_to_symbol[request_id].specific_bar_time,
                 )
 
             if not ibapi_request.is_day_timeframe():
@@ -269,6 +275,7 @@ class DataStreamer():
             self.insert_one_minute_bars_into_confirmation_queues(
                 one_minute_request_id=request_id,
                 symbol=self.request_id_to_symbol[request_id].symbol_name,
+                specific_bar_time=self.request_id_to_symbol[request_id].specific_bar_time,
             )
             return
 

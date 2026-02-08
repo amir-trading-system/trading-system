@@ -137,6 +137,7 @@ class Analyzer:
         last_log_time = self.symbol_to_last_log_time.get(stock.symbol_name)
         if last_log_time is None:
             self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
+            should_write_log = True
         else:
             if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
                 should_write_log = True

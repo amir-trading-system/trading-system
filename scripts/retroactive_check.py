@@ -107,7 +107,9 @@ def build_table(
         actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
         expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
 
-        if actual_confirmation_bar_time != expected_confirmation_bar_time and actual_confirmation_bar_time != "unknown":
+        if actual_confirmation_bar_time == expected_confirmation_bar_time:
+            actual_confirmation_bar_time = f"[green]{actual_confirmation_bar_time}[/green]"
+        else:
             actual_confirmation_bar_time = f"[red]{actual_confirmation_bar_time}[/red]"
 
         table.add_row(
@@ -172,6 +174,14 @@ def run_retroactive_check():
         }
     ).start()
 
+    confirmator_stop_event = threading.Event()
+    threading.Thread(
+        target=confirmator_object.confirm_data,
+        kwargs={
+            "stop_event": confirmator_stop_event,
+        }
+    ).start()
+
     symbols_data = []
     symbols = get_symbols()
     for symbol in symbols:
@@ -197,10 +207,15 @@ def run_retroactive_check():
         )
 
     with rich.live.Live(build_table(symbols_data), refresh_per_second=2) as live:
-        while not analyze_finished(
-            request_id_to_symbol=request_id_to_symbol,
+        while any(
+            symbol_data
+            for symbol_data in symbols_data
+            if symbol_data["confirmation_status"] != "done"
         ):
             for _, symbol in request_id_to_symbol.items():
+                if symbol.is_one_minute_timeframe():
+                    continue
+
                 relevant_symbol_data = [
                     symbol_data
                     for symbol_data in symbols_data
@@ -211,40 +226,27 @@ def run_retroactive_check():
                     relevant_symbol_data["collection_status"] = "done"
                 if symbol.finished_analyze and symbol.is_day_timeframe():
                     relevant_symbol_data["analysis_status"] = "done"
+                if symbol.finished_confirmation and symbol.is_day_timeframe():
+                    relevant_symbol_data["confirmation_status"] = "done"
 
                 live.update(build_table(symbols_data))
                 time.sleep(1)
 
-        analyze_stop_event.set()
+        while not results_queue.empty():
+            confirmation_result = results_queue.get()
+            relevant_symbol_data = [
+                symbol_data
+                for symbol_data in symbols_data
+                if symbol_data["symbol"] == confirmation_result["symbol"]
+                and symbol_data["original_bar_time"] == str(confirmation_result["original_bar_time"])
+            ][0]
+            relevant_symbol_data["actual_confirmation_bar_time"] = str(confirmation_result["confirmation_bar_time"])
+            live.update(build_table(symbols_data))
 
-        confirmator_stop_event = threading.Event()
-        threading.Thread(
-            target=confirmator_object.confirm_data,
-            kwargs={
-                "stop_event": confirmator_stop_event,
-            }
-        ).start()
+        time.sleep(1)
 
-        while any(
-            symbol_data
-            for symbol_data in symbols_data
-            if symbol_data["confirmation_status"] != "done"
-        ):
-            if not results_queue.empty():
-                confirmation_result = results_queue.get()
-                relevant_symbol_data = [
-                    symbol_data
-                    for symbol_data in symbols_data
-                    if symbol_data["symbol"] == confirmation_result["symbol"]
-                    and symbol_data["original_bar_time"] == str(confirmation_result["original_bar_time"])
-                ][0]
-                relevant_symbol_data["confirmation_status"] = "done"
-                relevant_symbol_data["actual_confirmation_bar_time"] = str(confirmation_result["confirmation_bar_time"])
-                live.update(build_table(symbols_data))
-
-            time.sleep(1)
-
-        confirmator_stop_event.set()
+    analyze_stop_event.set()
+    confirmator_stop_event.set()
 
 
 if __name__ == "__main__":
