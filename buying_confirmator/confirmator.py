@@ -61,7 +61,7 @@ class Confirmator:
                         symbol=bar_to_confirm.symbol,
                         timeframe=bar_to_confirm.timeframe,
                         timeframe_type=bar_to_confirm.timeframe_type,
-                        specific_bar_time=bar_to_confirm.bar_time,
+                        specific_bar_time=bar_to_confirm.bar_time.date(),
                     )
                 ][0]
 

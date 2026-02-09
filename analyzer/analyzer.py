@@ -41,7 +41,7 @@ class Analyzer:
     ):
         all_bars = copy.deepcopy(stock.bars)
         for bar_object in stock.bars:
-            if bar_object.bar_time.day != retroactive_from.day or not bar_object.ready_to_analyze:
+            if bar_object.bar_time.date() != retroactive_from or not bar_object.ready_to_analyze:
                 continue
 
             relevant_bars = all_bars[bar_object.index:]
@@ -63,6 +63,7 @@ class Analyzer:
                 bars=relevant_bars,
                 timeframe=stock.timeframe,
                 timeframe_type=stock.timeframe_type,
+                specific_bar_time=current_bar.bar_time,
             )
 
             if new_stock_object.is_day_timeframe():
@@ -130,6 +131,7 @@ class Analyzer:
                     timeframe_type=stock_object.timeframe_type,
                     bars=copy.deepcopy(stock_object.bars),
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
+                    specific_bar_time=specific_bar_time,
                 )
 
                 stock.bars = sorted(
@@ -190,6 +192,7 @@ class Analyzer:
                     timeframe_type=stock_object.timeframe_type,
                     bars=copy.deepcopy(stock_object.bars),
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
+                    specific_bar_time=stock_object.specific_bar_time,
                 )
 
                 stock.bars = sorted(
