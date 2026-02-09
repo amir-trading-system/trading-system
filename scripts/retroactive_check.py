@@ -89,8 +89,29 @@ def get_symbols() -> list[Symbol]:
 def build_table(
     data: list[dict[str, str]],
 ) -> rich.table.Table:
+    finished_collection = len(
+        [
+            symbol_data
+            for symbol_data in data
+            if symbol_data["collection_status"] == "done"
+        ]
+    )
+    finished_analysis = len(
+        [
+            symbol_data
+            for symbol_data in data
+            if symbol_data["analysis_status"] == "done"
+        ]
+    )
+    finished_confirmation = len(
+        [
+            symbol_data
+            for symbol_data in data
+            if symbol_data["confirmation_status"] == "done"
+        ]
+    )
     table = rich.table.Table(
-        "Symbol", "Original Bar Time", "Collection Status", "Analysis Status", "Confirmation Status", "Actual Confirmation Bar Time", "Expected Confirmation Bar Time"
+        "Symbol", "Original Bar Time", f"Collection Status: {finished_collection}/{len(data)}", f"Analysis Status: {finished_analysis}/{len(data)}", f"Confirmation Status: {finished_confirmation}/{len(data)}", "Actual Confirmation Bar Time", "Expected Confirmation Bar Time"
     )
 
     for symbol_data in data:
@@ -151,7 +172,6 @@ def run_retroactive_check():
     threading.Thread(
         target=tws_client.run
     ).start()
-    time.sleep(1)
 
     tws_client.data_streamer.on_specific_bar_time = True
     collector_object = collector.collector.Collector(
@@ -238,7 +258,6 @@ def run_retroactive_check():
                     relevant_symbol_data["confirmation_status"] = "done"
 
                 live.update(build_table(symbols_data))
-                time.sleep(1)
 
         while not results_queue.empty():
             confirmation_result = results_queue.get()
@@ -250,8 +269,6 @@ def run_retroactive_check():
             ][0]
             relevant_symbol_data["actual_confirmation_bar_time"] = str(confirmation_result["confirmation_bar_time"])
             live.update(build_table(symbols_data))
-
-        time.sleep(1)
 
     analyze_stop_event.set()
     confirmator_stop_event.set()
