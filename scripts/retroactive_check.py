@@ -41,6 +41,14 @@ def analyze_finished(
 def get_symbols() -> list[Symbol]:
     return [
         Symbol(
+            name="SMX",
+            datetime_str="12.04.25T12:16:00",
+        ),
+        Symbol(
+            name="INBS",
+            datetime_str="01.05.26T09:30:00",
+        ),
+        Symbol(
             name="NAMM",
             datetime_str="01.22.26T10:30:00",
         ),
@@ -206,7 +214,7 @@ def run_retroactive_check():
             },
         )
 
-    with rich.live.Live(build_table(symbols_data), refresh_per_second=2) as live:
+    with rich.live.Live(build_table(symbols_data), refresh_per_second=10) as live:
         while any(
             symbol_data
             for symbol_data in symbols_data

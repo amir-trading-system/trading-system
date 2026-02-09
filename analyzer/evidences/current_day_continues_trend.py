@@ -23,7 +23,7 @@ class Evidence(
                 and bar_object.high > previous_bar.high
             )
 
-        return (
+        first_option = (
             True
             and bar_object.vwap is not None
             and bar_object.ema_9 is not None
@@ -37,6 +37,24 @@ class Evidence(
             and bar_object.high > bar_object.vwap
             and bar_object.ema_9/bar_object.low >= 0.9
         )
+        second_option = (
+            True
+            and bar_object.vwap is not None
+            and bar_object.ema_9 is not None
+            and bar_object.ema_20 is not None
+            and bar_object.volume_average is not None
+            and base_condition
+            and bar_object.high > bar_object.vwap
+            and bar_object.close > bar_object.ema_9
+            and bar_object.histogram > 0
+            and bar_object.volume/bar_object.volume_average > 7
+            and max(
+                stock.bars[bar_object.index:],
+                key=lambda bar_obj: bar_obj.volume
+            ) == bar_object
+        )
+
+        return first_option or second_option
 
     def get_starting_bar(
         self,
