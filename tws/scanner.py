@@ -58,6 +58,6 @@ class Scanner():
                             "symbol_type": contract_details.stockType,
                         },
                     )
-                    print(symbol_name)
+                    # print(symbol_name)
                     self.relevant_symbols.append(contract_details.contract.symbol)
                     self.symbols_to_collect_queue.put(contract_details.contract.symbol)

@@ -1,6 +1,7 @@
 import logging
 
 from . import elasticsearch
+from . import stdout_handler
 
 
 class Logger:
@@ -17,6 +18,7 @@ class Logger:
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
                 elastic_handler,
+                stdout_handler.Handler(),
             ],
         )
         self.logger = logging.getLogger(

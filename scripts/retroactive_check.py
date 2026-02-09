@@ -1,6 +1,5 @@
 import datetime
 import threading
-import time
 import queue
 
 import rich
