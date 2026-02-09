@@ -202,7 +202,7 @@ class Client(client.EClient, wrapper.EWrapper):
         current_price: float,
         transmit: bool,
     ) -> int:
-        quantity = math.floor((self.available_funds / 2) / current_price)
+        quantity = math.floor(self.available_funds / current_price)
         if quantity == 0:
             self.logger.info(
                 msg="Not enough available funds to buy stock",

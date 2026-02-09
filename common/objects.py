@@ -139,13 +139,22 @@ class Stock:
         timeframe_type: TimeframeType,
         specific_bar_time: datetime.datetime = None,
     ) -> bool:
-        return (
+        res = (
             True
             and self.symbol_name == symbol
             and self.timeframe == timeframe
             and self.timeframe_type == timeframe_type
-            and self.specific_bar_time == specific_bar_time
         )
+        if self.specific_bar_time is not None:
+            res = (
+                True
+                and res
+                and self.specific_bar_time.year == specific_bar_time.year
+                and self.specific_bar_time.month == specific_bar_time.month
+                and self.specific_bar_time.day == specific_bar_time.day
+            )
+
+        return res
 
 class IbAPIRequest:
     def __init__(

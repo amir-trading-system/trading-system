@@ -131,7 +131,7 @@ class Analyzer:
                     timeframe_type=stock_object.timeframe_type,
                     bars=copy.deepcopy(stock_object.bars),
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
-                    specific_bar_time=specific_bar_time,
+                    specific_bar_time=stock_object.specific_bar_time,
                 )
 
                 stock.bars = sorted(
