@@ -27,6 +27,10 @@ class Symbol:
 def get_symbols() -> list[Symbol]:
     return [
         Symbol(
+            name="CATX",
+            datetime_str="01.29.26T10:26:00",
+        ),
+        Symbol(
             name="SEGG",
             datetime_str="01.20.26T10:05:00",
         ),
@@ -89,6 +93,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="QVCGP",
             datetime_str="02.11.26T10:22:00",
+        ),
+        Symbol(
+            name="NCI",
+            datetime_str="02.11.26T15:01:00",
         )
     ]
 
