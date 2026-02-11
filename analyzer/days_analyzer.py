@@ -23,7 +23,7 @@ class Analyzer:
         self.has_indications_bars: dict[str, common.objects.BarData] = {}
         self.symbol_to_last_log_time: dict[str, datetime.datetime] = {}
 
-    def _run_one_day_indicators(
+    def _run_indicators(
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
@@ -45,7 +45,7 @@ class Analyzer:
                 },
             )
 
-        for indicator in analyzer.indicators.__one_day_indicators__:
+        for indicator in analyzer.indicators.__indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
                 milestones=milestones,
                 logger=self.logger,
@@ -179,7 +179,7 @@ class Analyzer:
             are_valid=True,
         )
 
-        self._run_one_day_indicators(
+        self._run_indicators(
             stock=stock,
             current_bar=current_bar,
             milestones=milestones,

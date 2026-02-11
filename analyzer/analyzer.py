@@ -66,13 +66,12 @@ class Analyzer:
                 specific_bar_time=current_bar.bar_time,
             )
 
-            if new_stock_object.is_day_timeframe():
-                self.days_analyzer.analyze_day_bar(
-                    stock=new_stock_object,
-                    current_bar=current_bar,
-                    is_retro=True,
-                    confirmator_only=self.confirmator_only,
-                )
+            self.days_analyzer.analyze_day_bar(
+                stock=new_stock_object,
+                current_bar=current_bar,
+                is_retro=True,
+                confirmator_only=self.confirmator_only,
+            )
 
     def analyze_live_case(
         self,
