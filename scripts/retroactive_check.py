@@ -24,21 +24,12 @@ class Symbol:
         self.date_time = datetime.datetime.strptime(datetime_str, "%m.%d.%yT%H:%M:%S")
         self.finished = finished
 
-def analyze_finished(
-    request_id_to_symbol: dict[int,common.objects.Stock],
-) -> bool:
-    return all(
-        (
-            True
-            and symbol.finished_collection
-            and symbol.finished_analyze
-        )
-        for _, symbol in request_id_to_symbol.items()
-        if symbol.is_day_timeframe()
-    )
-
 def get_symbols() -> list[Symbol]:
     return [
+        Symbol(
+            name="SEGG",
+            datetime_str="01.20.26T10:05:00",
+        ),
         Symbol(
             name="SMX",
             datetime_str="12.04.25T12:16:00",
@@ -50,6 +41,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="NAMM",
             datetime_str="01.22.26T10:30:00",
+        ),
+        Symbol(
+            name="GITS",
+            datetime_str="01.27.26T09:39:00",
         ),
         Symbol(
             name="NAMM",
@@ -83,6 +78,14 @@ def get_symbols() -> list[Symbol]:
             name="CATX",
             datetime_str="02.02.26T10:48:00",
         ),
+        Symbol(
+            name="PLBY",
+            datetime_str="02.10.26T09:49:00",
+        ),
+        Symbol(
+            name="SUNE",
+            datetime_str="02.10.26T09:48:00",
+        ),
     ]
 
 def build_table(
@@ -112,8 +115,12 @@ def build_table(
     table = rich.table.Table(
         "Symbol", "Original Bar Time", f"Collection Status: {finished_collection}/{len(data)}", f"Analysis Status: {finished_analysis}/{len(data)}", f"Confirmation Status: {finished_confirmation}/{len(data)}", "Actual Confirmation Bar Time", "Expected Confirmation Bar Time"
     )
+    sorted_data_by_original_date = sorted(
+        data,
+        key=lambda symbol_data: symbol_data["expected_confirmation_bar_time"],
+    )
 
-    for symbol_data in data:
+    for symbol_data in sorted_data_by_original_date:
         collection_status = symbol_data["collection_status"]
         if collection_status != "done":
             collection_status = f"[red]{collection_status}[/red]"
@@ -142,12 +149,12 @@ def build_table(
 
         table.add_row(
             symbol_data["symbol"],
-            symbol_data["original_bar_time"],
+            str(symbol_data["original_bar_time"]),
             collection_status,
             analysis_status,
             confirmation_status,
-            actual_confirmation_bar_time,
-            expected_confirmation_bar_time,
+            str(actual_confirmation_bar_time),
+            str(expected_confirmation_bar_time),
         )
 
     return table
@@ -159,7 +166,9 @@ def run_retroactive_check():
     results_queue: queue.Queue[dict[str,any]] = queue.Queue()
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
 
-    logger_object = logger.logger.Logger().get_logger()
+    logger_object = logger.logger.Logger(
+        enable_stdout=False,
+    ).get_logger()
     tws_client = tws.client.Client(
         host="localhost",
         port=8081,
@@ -211,6 +220,7 @@ def run_retroactive_check():
 
     symbols_data = []
     symbols = get_symbols()
+
     for symbol in symbols:
         specific_bar_time = symbol.date_time.replace(hour=0, minute=0)
         collector_object.collect_data_retroactively(
@@ -227,13 +237,13 @@ def run_retroactive_check():
                 "collection_status": "unknown",
                 "analysis_status": "unknown",
                 "confirmation_status": "unknown",
-                "original_bar_time": str(specific_bar_time),
+                "original_bar_time": specific_bar_time,
                 "actual_confirmation_bar_time": "unknown",
-                "expected_confirmation_bar_time": str(symbol.date_time),
+                "expected_confirmation_bar_time": symbol.date_time,
             },
         )
 
-    with rich.live.Live(build_table(symbols_data), refresh_per_second=10) as live:
+    with rich.live.Live(build_table(symbols_data), refresh_per_second=1) as live:
         while any(
             symbol_data
             for symbol_data in symbols_data
@@ -247,7 +257,7 @@ def run_retroactive_check():
                     symbol_data
                     for symbol_data in symbols_data
                     if symbol_data["symbol"] == symbol.symbol_name
-                    and symbol_data["original_bar_time"] == str(symbol.specific_bar_time)
+                    and symbol_data["original_bar_time"] == symbol.specific_bar_time
                 ][0]
                 if symbol.finished_collection and symbol.is_day_timeframe():
                     relevant_symbol_data["collection_status"] = "done"
@@ -264,9 +274,9 @@ def run_retroactive_check():
                 symbol_data
                 for symbol_data in symbols_data
                 if symbol_data["symbol"] == confirmation_result["symbol"]
-                and symbol_data["original_bar_time"] == str(confirmation_result["original_bar_time"])
+                and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
             ][0]
-            relevant_symbol_data["actual_confirmation_bar_time"] = str(confirmation_result["confirmation_bar_time"])
+            relevant_symbol_data["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
             live.update(build_table(symbols_data))
 
     analyze_stop_event.set()

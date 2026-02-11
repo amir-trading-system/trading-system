@@ -119,7 +119,9 @@ if __name__ == "__main__":
     waiting_for_confirmation_queue: queue.Queue[dict[str, common.objects.BarData|common.objects.Milestones]] = queue.Queue()
     results_queue: queue.Queue[dict[str, any]] = queue.Queue()
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
-    logger_object = logger.logger.Logger().get_logger()
+    logger_object = logger.logger.Logger(
+        enable_stdout=True,
+    ).get_logger()
 
     alerter_object = alerter.alerter.Alerter(
         logger=logger_object,
