@@ -7,7 +7,7 @@ import alerter
 import common
 from tws import client
 
-from . import minutes_confirmator, days_confirmator
+from . import days_confirmator
 
 
 class Confirmator:
@@ -25,14 +25,6 @@ class Confirmator:
         self.request_id_to_symbol = request_id_to_symbol
 
         self.days_confirmator = days_confirmator.Confirmator(
-            is_retro=is_retro,
-            tws_client=tws_client,
-            request_id_to_symbol=request_id_to_symbol,
-            logger=logger,
-            results_queue=results_queue,
-            alerter_object=alerter_object,
-        )
-        self.minutes_confirmator = minutes_confirmator.Confirmator(
             is_retro=is_retro,
             tws_client=tws_client,
             request_id_to_symbol=request_id_to_symbol,
@@ -65,15 +57,7 @@ class Confirmator:
                     )
                 ][0]
 
-                if bar_to_confirm.timeframe_type == common.objects.TimeframeType.MINUTE:
-                    threading.Thread(
-                        target=self.minutes_confirmator.confirm_entry_position,
-                        kwargs={
-                            "relevant_stock": relevant_stock,
-                            "original_bar_to_confirm": bar_to_confirm,
-                        },
-                    ).start()
-                else:
+                if bar_to_confirm.timeframe_type == common.objects.TimeframeType.DAY:
                     threading.Thread(
                         target=self.days_confirmator.confirm_entry_position,
                         kwargs={
