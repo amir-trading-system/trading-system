@@ -221,3 +221,66 @@ class Evidence(
             if current_day_continues_trend
             else "Current day does not continues any trend",
         )
+
+    def confirm(
+        self,
+        relevant_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+        milestones: common.objects.Milestones,
+        highest_high_one_minute: float,
+    ) -> bool:
+        if milestones.top_bar.bar_object.index == 0:
+            milestones.top_bar.bar_object.high = 0.0
+
+        crossed_previous_day_only = (
+            True
+            and (potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high or potential_confirmation_bar.high <= milestones.top_bar.bar_object.high)
+            and potential_confirmation_bar.high > relevant_stock.bars[1].high
+            and potential_confirmation_bar.low < relevant_stock.bars[1].high
+            and potential_confirmation_bar.close > highest_high_one_minute
+        )
+        crossed_starting_point = (
+            True
+            and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
+            and potential_confirmation_bar.low < milestones.starting_bar.bar_object.high
+            and potential_confirmation_bar.close > highest_high_one_minute
+        )
+        crossed_top_point = (
+            True
+            and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
+            and potential_confirmation_bar.low < milestones.top_bar.bar_object.high
+            and potential_confirmation_bar.close > highest_high_one_minute
+        )
+        crossed_highest_one_minute = False
+        if (
+            True
+            and highest_high_one_minute > milestones.starting_bar.bar_object.high
+            and highest_high_one_minute > milestones.top_bar.bar_object.high
+            and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
+            and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
+
+        ):
+            crossed_highest_one_minute = (
+                True
+                and potential_confirmation_bar.low < highest_high_one_minute
+                and potential_confirmation_bar.close > highest_high_one_minute
+            )
+
+        if (
+            True
+            and potential_confirmation_bar.close > potential_confirmation_bar.open_value
+            and (
+                crossed_previous_day_only
+                or crossed_starting_point
+                or crossed_top_point
+                or crossed_highest_one_minute
+            )
+            and potential_confirmation_bar.close > highest_high_one_minute
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
+            and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
+            and potential_confirmation_bar.close > potential_confirmation_bar.vwap
+        ):
+            return True
+
+        return False

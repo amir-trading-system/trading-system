@@ -12,8 +12,7 @@ class Indicator:
         logger: logging.Logger,
     ):
         self.logger = logger
-        self.unique_evidences: set[type[analyzer.evidences._evidence.Evidence]] = set()
-        self.evidences: set[type[analyzer.evidences._evidence.Evidence]] = set()
+        self.evidence: type[analyzer.evidences._evidence.Evidence]
         self.must_to_have: list[bool] = []
         self.can_be_confirm_by_itself = False
         self.milestones = milestones
@@ -23,8 +22,7 @@ class Indicator:
         success_results: list[common.objects.EvidenceResponse],
         failed_base_evidences_count: int,
     ) -> common.objects.IndicatorResponse:
-        total = len(self.unique_evidences)
-        success_rate = len(success_results)/total
+        success_rate = len(success_results)/1
         result = success_rate >= 0.9
 
         return common.objects.IndicatorResponse(
@@ -76,24 +74,28 @@ class Indicator:
                 failed_base_evidences_count=0,
             )
 
-        for evidence_class in self.evidences:
-            evidence_object: analyzer.evidences._evidence.Evidence = evidence_class()
-            result = evidence_object.find_evidence(
-                stock=stock,
-                milestones=milestones,
-                current_bar=current_bar,
-                is_retro=is_retro,
+        evidence_object: analyzer.evidences._evidence.Evidence = self.evidence()
+        result = evidence_object.find_evidence(
+            stock=stock,
+            milestones=milestones,
+            current_bar=current_bar,
+            is_retro=is_retro,
+        )
+        if not result.result and evidence_object.is_base_evidence:
+            failed_base_evidences_count += 1
+
+        if not result.result and evidence_object.must_to_be_true:
+            success_results = []
+            return common.objects.IndicatorResponse(
+                success_count=0,
+                success_rate=0.0,
+                result=False,
+                failed_base_evidences_count=0,
             )
-            if not result.result and evidence_object.is_base_evidence:
-                failed_base_evidences_count += 1
 
-            if not result.result and evidence_object.must_to_be_true:
-                success_results = []
-                break
-
-            if result.result:
-                if not evidence_object.is_base_evidence or self.name == "already_has_indication":
-                    success_results.append(result)
+        if result.result:
+            if not evidence_object.is_base_evidence or self.name == "already_has_indication":
+                success_results.append(result)
 
         return self.handle_response(
             success_results=success_results,

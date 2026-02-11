@@ -86,6 +86,7 @@ class Analyzer:
                     {
                         "bar_to_confirm": current_bar,
                         "milestones": milestones,
+                        "evidence_confirmator": indicator_obj.evidence(),
                     },
                 )
                 self.request_id_to_symbol[stock.request_id].finished_analyze = True
@@ -95,6 +96,7 @@ class Analyzer:
                     {
                         "bar_to_confirm": current_bar,
                         "milestones": milestones,
+                        "evidence_confirmator": indicator_obj.evidence(),
                     },
                 )
                 break

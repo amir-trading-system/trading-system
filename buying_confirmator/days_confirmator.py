@@ -3,6 +3,7 @@ import logging
 import queue
 
 import alerter
+import analyzer.evidences
 import common
 from tws import client
 
@@ -29,6 +30,7 @@ class Confirmator:
         relevant_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         milestones: common.objects.Milestones,
+        evidence_confirmator: analyzer.evidences._evidence.Evidence,
     ):
         entry_position_confirmed: bool = False
         entry_position_bar: common.objects.BarData = None
@@ -96,68 +98,11 @@ class Confirmator:
                 ):
                     continue
 
-                if milestones.top_bar.bar_object.index == 0:
-                    milestones.top_bar.bar_object.high = 0.0
-
-                # For breakpoint
-                # if potential_confirmation_bar.bar_time == datetime.datetime(
-                #     year=2026,
-                #     month=1,
-                #     day=28,
-                #     hour=14,
-                #     minute=51,
-                # ):
-                #     print("h")
-
-                crossed_previous_day_only = (
-                    True
-                    and (potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high or potential_confirmation_bar.high <= milestones.top_bar.bar_object.high)
-                    and potential_confirmation_bar.high > relevant_stock.bars[1].high
-                    and potential_confirmation_bar.low < relevant_stock.bars[1].high
-                    and potential_confirmation_bar.close > highest_high_one_minute
-                )
-                crossed_starting_point = (
-                    True
-                    and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
-                    and potential_confirmation_bar.low < milestones.starting_bar.bar_object.high
-                    and potential_confirmation_bar.close > highest_high_one_minute
-                )
-                crossed_top_point = (
-                    True
-                    and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
-                    and potential_confirmation_bar.low < milestones.top_bar.bar_object.high
-                    and potential_confirmation_bar.close > highest_high_one_minute
-                )
-                crossed_highest_one_minute = False
-                if (
-                    True
-                    and highest_high_one_minute > milestones.starting_bar.bar_object.high
-                    and highest_high_one_minute > milestones.top_bar.bar_object.high
-                    and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
-                    and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
-
-                ):
-                    crossed_highest_one_minute = (
-                        True
-                        and potential_confirmation_bar.low < highest_high_one_minute
-                        and potential_confirmation_bar.close > highest_high_one_minute
-                    )
-
-
-                if (
-                    True
-                    and potential_confirmation_bar.close > potential_confirmation_bar.open_value
-                    and (
-                        crossed_previous_day_only
-                        or crossed_starting_point
-                        or crossed_top_point
-                        or crossed_highest_one_minute
-                    )
-                    and potential_confirmation_bar.close > highest_high_one_minute
-                    and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-                    and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
-                    and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
-                    and potential_confirmation_bar.close > potential_confirmation_bar.vwap
+                if evidence_confirmator.confirm(
+                    relevant_stock=relevant_stock,
+                    potential_confirmation_bar=potential_confirmation_bar,
+                    milestones=milestones,
+                    highest_high_one_minute=highest_high_one_minute,
                 ):
                     entry_position_confirmed = True
                     entry_position_bar = potential_confirmation_bar

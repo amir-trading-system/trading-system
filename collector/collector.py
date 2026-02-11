@@ -67,7 +67,7 @@ class Collector:
                     duration_str = "2 D"
             case common.objects.TimeframeType.DAY:
                 bar_size = f"{timeframe} day"
-                duration_str = "50 D"
+                duration_str = "100 D"
                 use_rth = 1
 
         self.tws_client.request_historical_data(

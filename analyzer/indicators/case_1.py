@@ -17,7 +17,4 @@ class Indicator(
             milestones=milestones,
             logger=logger,
         )
-        self.unique_evidences = {
-            analyzer.evidences.current_day_continues_trend.Evidence,
-        }
-        self.evidences = self.unique_evidences
+        self.evidence = analyzer.evidences.current_day_continues_trend.Evidence
