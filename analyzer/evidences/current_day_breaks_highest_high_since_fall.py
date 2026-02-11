@@ -75,4 +75,24 @@ class Evidence(
         milestones: Milestones,
         highest_high_one_minute: float,
     ) -> bool:
-        return False
+        current_bar = relevant_stock.bars[0]
+        potential_confirmation_bar_is_highest = max(
+            [
+                highest_high_one_minute,
+                milestones.top_bar.bar_object.high,
+                current_bar.ema_9,
+                current_bar.ema_20,
+            ]
+        ) < potential_confirmation_bar.close
+
+        potential_confirmation_bar_is_strong = (
+            True
+            and potential_confirmation_bar.close > potential_confirmation_bar.open_value
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+        )
+
+        return (
+            True
+            and potential_confirmation_bar_is_highest
+            and potential_confirmation_bar_is_strong
+        )

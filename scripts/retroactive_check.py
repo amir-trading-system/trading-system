@@ -86,10 +86,10 @@ def get_symbols() -> list[Symbol]:
             name="SUNE",
             datetime_str="02.10.26T09:48:00",
         ),
-        # Symbol(
-        #     name="QVCGP",
-        #     datetime_str="02.11.26T10:48:00",
-        # )
+        Symbol(
+            name="QVCGP",
+            datetime_str="02.11.26T10:22:00",
+        )
     ]
 
 def build_table(
