@@ -38,6 +38,7 @@ class Confirmator:
         highest_high_one_minute: float = 0.0
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         already_sent_buy_order_for_stock: dict[str,bool] = {}
+        evidence_name = ""
         relevant_stock.bars = sorted(
             relevant_stock.bars,
             key=lambda bar_object: bar_object.bar_time,
@@ -106,6 +107,7 @@ class Confirmator:
                 ):
                     entry_position_confirmed = True
                     entry_position_bar = potential_confirmation_bar
+                    evidence_name = evidence_confirmator.name
                     break
 
         if entry_position_confirmed:
@@ -118,6 +120,7 @@ class Confirmator:
                     "timeframe_type": original_bar_to_confirm.timeframe_type.value,
                     "entry_position_bar_time": entry_position_bar.bar_time,
                     "bar_time": original_bar_to_confirm.bar_time,
+                    "evidence_name": evidence_name,
                 },
             )
             self.request_id_to_symbol[relevant_stock.request_id].finished_confirmation = True
@@ -126,6 +129,7 @@ class Confirmator:
                     "symbol": relevant_stock.symbol_name,
                     "original_bar_time": original_bar_to_confirm.bar_time,
                     "confirmation_bar_time": entry_position_bar.bar_time,
+                    "evidence_name": evidence_name,
                 },
             )
 
@@ -134,6 +138,7 @@ class Confirmator:
                     sender="Confirmator",
                     original_bar=original_bar_to_confirm,
                     entry_position_bar=entry_position_bar,
+                    evidence_name=evidence_name,
                     is_retro=self.is_retro,
                 )
 

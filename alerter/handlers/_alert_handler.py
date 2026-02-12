@@ -26,6 +26,7 @@ class Handler:
         self,
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
+        evidence_name: str,
     ) -> str:
         raise NotImplementedError()
 

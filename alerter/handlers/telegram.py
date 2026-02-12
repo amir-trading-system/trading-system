@@ -48,12 +48,14 @@ class Handler(
 
     def design_confirmation_bar_message(
         self,
-        original_bar,
-        entry_position_bar,
+        original_bar: common.objects.BarData,
+        entry_position_bar: common.objects.BarData,
+        evidence_name: str,
     ) -> str:
         return f"""
             <b>Entry position confirmed for:</b>
             <b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
+            <b>Evidence:</b> <code>{evidence_name}</code>
             <b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
             <b>Time:</b> <code>{entry_position_bar.bar_time}</code>
             <b>Original bar to confirm Time:</b> <code>{original_bar.bar_time}</code>

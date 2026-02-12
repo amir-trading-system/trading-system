@@ -97,7 +97,7 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="NCI",
             datetime_str="02.11.26T15:01:00",
-        )
+        ),
     ]
 
 def build_table(
@@ -125,7 +125,14 @@ def build_table(
         ]
     )
     table = rich.table.Table(
-        "Symbol", "Original Bar Time", f"Collection Status: {finished_collection}/{len(data)}", f"Analysis Status: {finished_analysis}/{len(data)}", f"Confirmation Status: {finished_confirmation}/{len(data)}", "Actual Confirmation Bar Time", "Expected Confirmation Bar Time"
+        "Symbol",
+        "Original Bar Time",
+        f"Collection Status: {finished_collection}/{len(data)}",
+        f"Analysis Status: {finished_analysis}/{len(data)}",
+        f"Confirmation Status: {finished_confirmation}/{len(data)}",
+        "Actual Confirmation Bar Time",
+        "Expected Confirmation Bar Time",
+        "Evidence",
     )
     sorted_data_by_original_date = sorted(
         data,
@@ -151,6 +158,12 @@ def build_table(
         else:
             confirmation_status = f"[green]{confirmation_status}[/green]"
 
+        evidence_name = symbol_data["evidence_name"]
+        if evidence_name == "unknown":
+            evidence_name = f"[red]{evidence_name}[/red]"
+        else:
+            evidence_name = f"[green]{evidence_name}[/green]"
+
         actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
         expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
 
@@ -167,6 +180,7 @@ def build_table(
             confirmation_status,
             str(actual_confirmation_bar_time),
             str(expected_confirmation_bar_time),
+            evidence_name,
         )
 
     return table
@@ -252,6 +266,7 @@ def run_retroactive_check():
                 "original_bar_time": specific_bar_time,
                 "actual_confirmation_bar_time": "unknown",
                 "expected_confirmation_bar_time": symbol.date_time,
+                "evidence_name": "unknown",
             },
         )
 
@@ -289,6 +304,7 @@ def run_retroactive_check():
                 and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
             ][0]
             relevant_symbol_data["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
+            relevant_symbol_data["evidence_name"] = confirmation_result["evidence_name"]
             live.update(build_table(symbols_data))
 
     analyze_stop_event.set()

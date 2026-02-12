@@ -58,6 +58,7 @@ class Alerter:
         sender: str,
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
+        evidence_name: str,
         is_retro: bool,
     ):
         for handler in handlers.__handlers__:
@@ -68,6 +69,7 @@ class Alerter:
             designed_message = handler_object.design_confirmation_bar_message(
                 original_bar=original_bar,
                 entry_position_bar=entry_position_bar,
+                evidence_name=evidence_name,
             )
 
             threading.Thread(
