@@ -246,6 +246,12 @@ def run_retroactive_check():
 
     symbols_data = []
     symbols = get_symbols()
+    # symbols = [
+    #     Symbol(
+    #         name="BBGI",
+    #         datetime_str="12.10.25T10:26:00",
+    #     ),
+    # ]
 
     for symbol in symbols:
         specific_bar_time = symbol.date_time.replace(hour=0, minute=0)
