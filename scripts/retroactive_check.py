@@ -98,6 +98,10 @@ def get_symbols() -> list[Symbol]:
             name="NCI",
             datetime_str="02.11.26T15:01:00",
         ),
+        Symbol(
+            name="NCI",
+            datetime_str="02.13.26T09:30:00",
+        ),
     ]
 
 def build_table(
@@ -248,8 +252,8 @@ def run_retroactive_check():
     symbols = get_symbols()
     # symbols = [
     #     Symbol(
-    #         name="BBGI",
-    #         datetime_str="12.10.25T10:26:00",
+    #         name="NCI",
+    #         datetime_str="02.13.26T09:40:00",
     #     ),
     # ]
 
