@@ -126,8 +126,6 @@ class Evidence(
         highest_high_one_minute: float,
     ) -> bool:
         potential_confirmation_bar_is_strong = False
-        # if potential_confirmation_bar.bar_time.hour == 11 and potential_confirmation_bar.bar_time.minute == 0:
-        #     print("H")
         current_bar = relevant_stock.bars[0]
         potential_confirmation_bar_is_highest = max(
             [
