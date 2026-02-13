@@ -27,6 +27,10 @@ class Symbol:
 def get_symbols() -> list[Symbol]:
     return [
         Symbol(
+            name="INBS",
+            datetime_str="12.31.25T09:50:00",
+        ),
+        Symbol(
             name="CATX",
             datetime_str="01.29.26T10:26:00",
         ),
@@ -96,7 +100,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="NCI",
-            datetime_str="02.11.26T15:01:00",
+            datetime_str="02.11.26T11:00:00",
         ),
         Symbol(
             name="NCI",
@@ -252,8 +256,8 @@ def run_retroactive_check():
     symbols = get_symbols()
     # symbols = [
     #     Symbol(
-    #         name="NCI",
-    #         datetime_str="02.13.26T09:40:00",
+    #         name="INBS",
+    #         datetime_str="12.31.25T09:50:00",
     #     ),
     # ]
 

@@ -22,6 +22,7 @@ class Evidence(
                 reason="no bars to indicate",
             )
 
+        resistance_level_to_breaking_attempts: dict[float, int] = {}
         top_bar: common.objects.BarData = None
         for bar_object in relevant_bars[:current_bar.index+40]:
             previous_bar = stock.previous_bar(
@@ -41,9 +42,10 @@ class Evidence(
                 and previous_bar.high < bar_object.high > next_bar.high
                 and previous_bar.high > previous_bar.ema_9
                 and previous_bar.high > previous_bar.ema_20
-                and next_bar.high > next_bar.ema_9
-                and next_bar.high > next_bar.ema_20
             ):
+                if not resistance_level_to_breaking_attempts.get(bar_object.high):
+                    resistance_level_to_breaking_attempts[bar_object.high] = 0
+
                 if top_bar is None:
                     top_bar = bar_object
                     continue
@@ -59,31 +61,37 @@ class Evidence(
                 reason="top bar does not exists",
             )
 
-        breaking_high_attempts = 0
+        resistance_levels: list[float] = resistance_level_to_breaking_attempts.keys()
         for bar_object in relevant_bars[:current_bar.index+40]:
-            previous_bar = stock.previous_bar(
-                bar_object=bar_object,
-            )
-            next_bar = stock.next_bar(
-                bar_object=bar_object,
-            )
-            if (
-                True
-                and bar_object.high/top_bar.high >= 0.95
-                and bar_object.high > bar_object.ema_9
-                and bar_object.high > bar_object.ema_20
-                and previous_bar is not None
-                and previous_bar.high < bar_object.high
-                and previous_bar is not None
-                and next_bar is not None
-                and previous_bar.high > previous_bar.ema_9
-                and previous_bar.high > previous_bar.ema_20
-                and next_bar.high > next_bar.ema_9
-                and next_bar.high > next_bar.ema_20
-            ):
-                breaking_high_attempts += 1
+            for resistance_level in resistance_levels:
+                previous_bar = stock.previous_bar(
+                    bar_object=bar_object,
+                )
+                next_bar = stock.next_bar(
+                    bar_object=bar_object,
+                )
+                if (
+                    True
+                    and bar_object.high/resistance_level >= 0.95
+                    and bar_object.high > bar_object.ema_9
+                    and bar_object.high > bar_object.ema_20
+                    and previous_bar is not None
+                    and previous_bar.high < bar_object.high
+                    and previous_bar is not None
+                    and next_bar is not None
+                    and previous_bar.high > previous_bar.ema_9
+                    and previous_bar.high > previous_bar.ema_20
+                ):
+                    resistance_level_to_breaking_attempts[resistance_level] += 1
 
-        top_bar_is_valid = breaking_high_attempts >= 2
+        stock.resistance_levels = [
+            resistance_level
+            for resistance_level, attempts in resistance_level_to_breaking_attempts.items()
+            if attempts >= 2
+        ]
+
+        top_bar_is_valid = len(stock.resistance_levels) > 0
+
         if top_bar_is_valid:
             milestones.top_bar = common.objects.MilestoneBar(
                 index=top_bar.index,
@@ -117,25 +125,46 @@ class Evidence(
         milestones: Milestones,
         highest_high_one_minute: float,
     ) -> bool:
+        potential_confirmation_bar_is_strong = False
+        # if potential_confirmation_bar.bar_time.hour == 11 and potential_confirmation_bar.bar_time.minute == 0:
+        #     print("H")
         current_bar = relevant_stock.bars[0]
         potential_confirmation_bar_is_highest = max(
             [
                 round(highest_high_one_minute, 2),
-                round(milestones.top_bar.bar_object.high, 2),
                 round(current_bar.ema_9, 2),
                 round(current_bar.ema_20, 2),
             ]
         ) < potential_confirmation_bar.close
 
-        potential_bar_close_much_bigger_than_top_bar_high = potential_confirmation_bar.high - milestones.top_bar.bar_object.high > milestones.top_bar.bar_object.high - potential_confirmation_bar.low
+        resistances_crossed = [
+            level
+            for level in relevant_stock.resistance_levels
+            if level < potential_confirmation_bar.close
+        ]
+        potential_confirmation_bar_breaks_any_resistance_level = len(resistances_crossed) > 0
+        if potential_confirmation_bar_breaks_any_resistance_level:
+            highest_resistance_crossed = max(resistances_crossed)
 
-        potential_confirmation_bar_is_strong = (
-            True
-            and potential_confirmation_bar.close > potential_confirmation_bar.open_value
-            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and potential_confirmation_bar.low < milestones.top_bar.bar_object.high
-            and potential_bar_close_much_bigger_than_top_bar_high
-        )
+            potential_bar_close_much_bigger_than_top_bar_high = (
+                True
+                and potential_confirmation_bar_breaks_any_resistance_level
+                and (
+                    potential_confirmation_bar.high - highest_resistance_crossed > highest_resistance_crossed - potential_confirmation_bar.low
+                    or (
+                        potential_confirmation_bar.close > highest_resistance_crossed
+                        and (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.7
+                    )
+                )
+            )
+
+            potential_confirmation_bar_is_strong = (
+                True
+                and potential_confirmation_bar.close > potential_confirmation_bar.open_value
+                and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+                and potential_confirmation_bar.low < highest_resistance_crossed
+                and potential_bar_close_much_bigger_than_top_bar_high
+            )
 
         return (
             True
