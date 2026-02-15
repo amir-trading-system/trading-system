@@ -17,8 +17,10 @@ class Evidence:
     def confirm(
         self,
         relevant_stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
         highest_high_one_minute: float,
+        one_minute_bars: list[common.objects.BarData],
     ) -> bool:
         raise NotImplementedError()

@@ -101,9 +101,11 @@ class Confirmator:
 
                 if evidence_confirmator.confirm(
                     relevant_stock=relevant_stock,
+                    original_bar_to_confirm=original_bar_to_confirm,
                     potential_confirmation_bar=potential_confirmation_bar,
                     milestones=milestones,
                     highest_high_one_minute=highest_high_one_minute,
+                    one_minute_bars=one_minute_bars,
                 ):
                     entry_position_confirmed = True
                     entry_position_bar = potential_confirmation_bar

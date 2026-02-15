@@ -1,5 +1,4 @@
 import common
-from common.objects import BarData, Milestones, Stock
 from . import _evidence
 
 
@@ -97,6 +96,11 @@ class Evidence(
             and current_bar.high > previous_day.high
             and current_bar.histogram > 0
             and top_bar_is_valid
+            and any(
+                r_l
+                for r_l in stock.resistance_levels
+                if r_l > current_bar.low
+            )
         )
 
         return common.objects.EvidenceResponse(
@@ -108,10 +112,12 @@ class Evidence(
 
     def confirm(
         self,
-        relevant_stock: Stock,
-        potential_confirmation_bar: BarData,
-        milestones: Milestones,
+        relevant_stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
+        potential_confirmation_bar: common.objects.BarData,
+        milestones: common.objects.Milestones,
         highest_high_one_minute: float,
+        one_minute_bars: list[common.objects.BarData],
     ) -> bool:
         potential_confirmation_bar_is_strong = False
         current_bar = relevant_stock.bars[0]

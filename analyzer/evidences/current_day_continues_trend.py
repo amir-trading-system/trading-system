@@ -1,3 +1,4 @@
+import datetime
 import common
 from . import _evidence
 
@@ -225,9 +226,11 @@ class Evidence(
     def confirm(
         self,
         relevant_stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
         highest_high_one_minute: float,
+        one_minute_bars: list[common.objects.BarData],
     ) -> bool:
         if milestones.top_bar.bar_object.index == 0:
             milestones.top_bar.bar_object.high = 0.0
@@ -251,6 +254,7 @@ class Evidence(
             and potential_confirmation_bar.low < milestones.top_bar.bar_object.high
             and potential_confirmation_bar.close > highest_high_one_minute
         )
+
         crossed_highest_one_minute = False
         if (
             True
@@ -258,12 +262,32 @@ class Evidence(
             and highest_high_one_minute > milestones.top_bar.bar_object.high
             and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
             and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
-
         ):
             crossed_highest_one_minute = (
                 True
                 and potential_confirmation_bar.low < highest_high_one_minute
                 and potential_confirmation_bar.close > highest_high_one_minute
+            )
+
+        crossed_only_highest_high_today_and_after_noon = False
+        previous_bar = relevant_stock.previous_bar(
+            bar_object=original_bar_to_confirm,
+        )
+        highest_high_bar = [
+            bar_obj
+            for bar_obj in one_minute_bars
+            if bar_obj.high == highest_high_one_minute
+        ]
+        if highest_high_bar:
+            highest_high_bar = highest_high_bar[-1]
+
+            crossed_only_highest_high_today_and_after_noon = (
+                True
+                and original_bar_to_confirm.low < previous_bar.high
+                and potential_confirmation_bar.low < highest_high_one_minute
+                and potential_confirmation_bar.high > highest_high_one_minute
+                and potential_confirmation_bar.bar_time.hour >= 11
+                and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=20) < highest_high_bar.bar_time
             )
 
         if (
@@ -274,12 +298,14 @@ class Evidence(
                 or crossed_starting_point
                 or crossed_top_point
                 or crossed_highest_one_minute
+                or crossed_only_highest_high_today_and_after_noon
             )
-            and potential_confirmation_bar.close > highest_high_one_minute
+            and potential_confirmation_bar.low < highest_high_one_minute < potential_confirmation_bar.close
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
             and potential_confirmation_bar.close > potential_confirmation_bar.vwap
+            and potential_confirmation_bar.volume > 30000
         ):
             return True
 
