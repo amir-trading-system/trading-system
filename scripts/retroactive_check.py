@@ -210,9 +210,9 @@ def update_table_with_status_per_stage(
                 if symbol_data["symbol"] == symbol.symbol_name
                 and symbol_data["original_bar_time"] == symbol.specific_bar_time
             ][0]
-            if symbol.finished_collection and symbol.is_day_timeframe():
+            if symbol.finished_collection and symbol.is_day_timeframe() and relevant_symbol_data["collection_status"] != "done":
                 relevant_symbol_data["collection_status"] = "done"
-            if symbol.finished_analyze and symbol.is_day_timeframe():
+            if symbol.finished_analyze and symbol.is_day_timeframe() and relevant_symbol_data["analysis_status"] != "done":
                 relevant_symbol_data["analysis_status"] = "done"
 
             live_table.update(build_table(symbols_data))
@@ -323,7 +323,7 @@ def run_retroactive_check():
             },
         )
 
-    with rich.live.Live(build_table(symbols_data), refresh_per_second=1) as live_table:
+    with rich.live.Live(build_table(symbols_data), refresh_per_second=4) as live_table:
         threading.Thread(
             target=update_table_with_status_per_stage,
             kwargs={
@@ -338,8 +338,8 @@ def run_retroactive_check():
             kwargs={
                 "results_queue": results_queue,
                 "symbols_data": symbols_data,
-                "live_table": live_table,
                 "counter": counter,
+                "live_table": live_table,
             }
         ).start()
 

@@ -35,7 +35,8 @@ class Confirmator:
         original_bar_to_confirm: common.objects.BarData,
         highest_high_one_minute: float,
         already_sent_buy_order_for_stock: dict[str,bool],
-    ):
+    ) -> bool:
+        bar_has_confirmed: bool = False
         entry_position_bar: common.objects.BarData = None
         one_minute_bars.append(potential_confirmation_bar)
 
@@ -46,7 +47,7 @@ class Confirmator:
             hour=9,
             minute=30,
         ):
-            return
+            return bar_has_confirmed
 
         confirmation_key = f"{original_bar_to_confirm.symbol}-{original_bar_to_confirm.bar_time}"
         evidences = self.symbol_to_evidences[confirmation_key]
@@ -101,14 +102,19 @@ class Confirmator:
                 not already_sent_buy_order_for_stock.get(unique_key_for_place_order, False)
             ):
                 already_sent_buy_order_for_stock[unique_key_for_place_order] = True
+                bar_has_confirmed = True
+
                 if self.is_retro:
-                    return
+                    return bar_has_confirmed
 
                 self.tws_client.place_buy_order(
                     symbol=original_bar_to_confirm.symbol,
                     current_price=entry_position_bar.close,
                     transmit=False,
                 )
+                return bar_has_confirmed
+
+        return bar_has_confirmed
 
     def confirm_entry_position(
         self,
@@ -170,7 +176,7 @@ class Confirmator:
                     continue
 
                 most_updated_datetime = potential_confirmation_bar.bar_time
-                self._confirm(
+                if self._confirm(
                     relevant_stock=relevant_stock,
                     milestones=milestones,
                     one_minute_bars=one_minute_bars,
@@ -178,6 +184,7 @@ class Confirmator:
                     original_bar_to_confirm=original_bar_to_confirm,
                     highest_high_one_minute=highest_high_one_minute,
                     already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
-                )
+                ):
+                    break
 
         return
