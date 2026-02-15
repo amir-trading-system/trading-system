@@ -1,4 +1,5 @@
 import datetime
+import sys
 import threading
 import queue
 
@@ -37,10 +38,6 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="SEGG",
             datetime_str="01.20.26T10:05:00",
-        ),
-        Symbol(
-            name="SMX",
-            datetime_str="12.04.25T12:16:00",
         ),
         Symbol(
             name="INBS",
@@ -193,6 +190,56 @@ def build_table(
 
     return table
 
+def update_table_with_status_per_stage(
+    symbols_data: list[dict[str,any]],
+    request_id_to_symbol: dict[int,common.objects.Stock],
+    live_table: rich.live.Live,
+):
+    while any(
+        symbol_data
+        for symbol_data in symbols_data
+        if symbol_data["confirmation_status"] != "done"
+    ):
+        for _, symbol in request_id_to_symbol.items():
+            if symbol.is_one_minute_timeframe():
+                continue
+
+            relevant_symbol_data = [
+                symbol_data
+                for symbol_data in symbols_data
+                if symbol_data["symbol"] == symbol.symbol_name
+                and symbol_data["original_bar_time"] == symbol.specific_bar_time
+            ][0]
+            if symbol.finished_collection and symbol.is_day_timeframe():
+                relevant_symbol_data["collection_status"] = "done"
+            if symbol.finished_analyze and symbol.is_day_timeframe():
+                relevant_symbol_data["analysis_status"] = "done"
+            if symbol.finished_confirmation and symbol.is_day_timeframe():
+                relevant_symbol_data["confirmation_status"] = "done"
+
+            live_table.update(build_table(symbols_data))
+
+
+def update_table_with_results_queue(
+    results_queue: queue.Queue[dict[str,any]],
+    symbols_data: list[dict[str,any]],
+    live_table: rich.live.Live,
+    counter: list[int],
+):
+    while True:
+        if not results_queue.empty():
+            confirmation_result = results_queue.get()
+            counter[0] -= 1
+            relevant_symbol_data = [
+                symbol_data
+                for symbol_data in symbols_data
+                if symbol_data["symbol"] == confirmation_result["symbol"]
+                and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
+            ][0]
+            relevant_symbol_data["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
+            relevant_symbol_data["evidence_name"] = confirmation_result["evidence_name"]
+            live_table.update(build_table(symbols_data))
+
 def run_retroactive_check():
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
@@ -260,6 +307,7 @@ def run_retroactive_check():
     #         datetime_str="12.31.25T09:50:00",
     #     ),
     # ]
+    counter = [len(symbols)]
 
     for symbol in symbols:
         specific_bar_time = symbol.date_time.replace(hour=0, minute=0)
@@ -284,46 +332,29 @@ def run_retroactive_check():
             },
         )
 
-    with rich.live.Live(build_table(symbols_data), refresh_per_second=1) as live:
-        while any(
-            symbol_data
-            for symbol_data in symbols_data
-            if symbol_data["confirmation_status"] != "done"
-        ):
-            for _, symbol in request_id_to_symbol.items():
-                if symbol.is_one_minute_timeframe():
-                    continue
+    with rich.live.Live(build_table(symbols_data), refresh_per_second=1) as live_table:
+        threading.Thread(
+            target=update_table_with_status_per_stage,
+            kwargs={
+                "symbols_data": symbols_data,
+                "request_id_to_symbol": request_id_to_symbol,
+                "live_table": live_table,
+            }
+        ).start()
 
-                relevant_symbol_data = [
-                    symbol_data
-                    for symbol_data in symbols_data
-                    if symbol_data["symbol"] == symbol.symbol_name
-                    and symbol_data["original_bar_time"] == symbol.specific_bar_time
-                ][0]
-                if symbol.finished_collection and symbol.is_day_timeframe():
-                    relevant_symbol_data["collection_status"] = "done"
-                if symbol.finished_analyze and symbol.is_day_timeframe():
-                    relevant_symbol_data["analysis_status"] = "done"
-                if symbol.finished_confirmation and symbol.is_day_timeframe():
-                    relevant_symbol_data["confirmation_status"] = "done"
+        threading.Thread(
+            target=update_table_with_results_queue,
+            kwargs={
+                "results_queue": results_queue,
+                "symbols_data": symbols_data,
+                "live_table": live_table,
+                "counter": counter,
+            }
+        ).start()
 
-                live.update(build_table(symbols_data))
-
-        while not results_queue.empty():
-            confirmation_result = results_queue.get()
-            relevant_symbol_data = [
-                symbol_data
-                for symbol_data in symbols_data
-                if symbol_data["symbol"] == confirmation_result["symbol"]
-                and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
-            ][0]
-            relevant_symbol_data["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
-            relevant_symbol_data["evidence_name"] = confirmation_result["evidence_name"]
-            live.update(build_table(symbols_data))
-
-    analyze_stop_event.set()
-    confirmator_stop_event.set()
-
+        while True:
+            if counter[0] == 0:
+                sys.exit(0)
 
 if __name__ == "__main__":
     run_retroactive_check()

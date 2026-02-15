@@ -28,9 +28,6 @@ class Evidence(
             previous_bar = stock.previous_bar(
                 bar_object=bar_object,
             )
-            next_bar = stock.next_bar(
-                bar_object=bar_object,
-            )
 
             if (
                 True
@@ -38,13 +35,27 @@ class Evidence(
                 and bar_object.high > bar_object.ema_20
                 and bar_object.high > bar_object.vwap
                 and previous_bar is not None
-                and next_bar is not None
-                and previous_bar.high < bar_object.high > next_bar.high
-                and previous_bar.high > previous_bar.ema_9
-                and previous_bar.high > previous_bar.ema_20
+                and previous_bar.high < bar_object.high
+                and bar_object.close < bar_object.high
             ):
                 if not resistance_level_to_breaking_attempts.get(bar_object.high):
-                    resistance_level_to_breaking_attempts[bar_object.high] = 0
+                    closest_resistance_levels = [
+                        r_l
+                        for r_l in resistance_level_to_breaking_attempts
+                        if r_l != bar_object.high
+                        and 0.97 <= r_l/bar_object.high <= 1.05
+                    ]
+                    for closest_resistance_level in closest_resistance_levels:
+                        if closest_resistance_level < bar_object.high:
+                            attempts = resistance_level_to_breaking_attempts.pop(closest_resistance_level)
+                            resistance_level_to_breaking_attempts[bar_object.high] = attempts+1
+                        else:
+                            resistance_level_to_breaking_attempts[closest_resistance_level] += 1
+
+                    if not closest_resistance_levels:
+                        resistance_level_to_breaking_attempts[bar_object.high] = 1
+                else:
+                    resistance_level_to_breaking_attempts[bar_object.high] += 1
 
                 if top_bar is None:
                     top_bar = bar_object
@@ -60,29 +71,6 @@ class Evidence(
                 result=False,
                 reason="top bar does not exists",
             )
-
-        resistance_levels: list[float] = resistance_level_to_breaking_attempts.keys()
-        for bar_object in relevant_bars[:current_bar.index+40]:
-            for resistance_level in resistance_levels:
-                previous_bar = stock.previous_bar(
-                    bar_object=bar_object,
-                )
-                next_bar = stock.next_bar(
-                    bar_object=bar_object,
-                )
-                if (
-                    True
-                    and bar_object.high/resistance_level >= 0.95
-                    and bar_object.high > bar_object.ema_9
-                    and bar_object.high > bar_object.ema_20
-                    and previous_bar is not None
-                    and previous_bar.high < bar_object.high
-                    and previous_bar is not None
-                    and next_bar is not None
-                    and previous_bar.high > previous_bar.ema_9
-                    and previous_bar.high > previous_bar.ema_20
-                ):
-                    resistance_level_to_breaking_attempts[resistance_level] += 1
 
         stock.resistance_levels = [
             resistance_level
@@ -135,18 +123,19 @@ class Evidence(
             ]
         ) < potential_confirmation_bar.close
 
+        average_resistance_level = sum(relevant_stock.resistance_levels)/len(relevant_stock.resistance_levels)
+
         resistances_crossed = [
             level
             for level in relevant_stock.resistance_levels
-            if level < potential_confirmation_bar.close
+            if level >= average_resistance_level
+            and level < potential_confirmation_bar.close
         ]
-        potential_confirmation_bar_breaks_any_resistance_level = len(resistances_crossed) > 0
-        if potential_confirmation_bar_breaks_any_resistance_level:
+        if resistances_crossed:
             highest_resistance_crossed = max(resistances_crossed)
 
             potential_bar_close_much_bigger_than_top_bar_high = (
                 True
-                and potential_confirmation_bar_breaks_any_resistance_level
                 and (
                     potential_confirmation_bar.high - highest_resistance_crossed > highest_resistance_crossed - potential_confirmation_bar.low
                     or (
