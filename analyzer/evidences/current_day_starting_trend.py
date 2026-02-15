@@ -23,10 +23,21 @@ class Evidence(
                 reason="no bars to indicate",
             )
 
+        resistance_level_to_breaking_attempts: dict[float,int] = self.get_resistance_levels(
+            stock=stock,
+            relevant_bars=relevant_bars,
+            current_bar=current_bar,
+        )
+        stock.resistance_levels = list(resistance_level_to_breaking_attempts.keys())
+
         current_day_is_the_start_of_a_trend = not any(
             bar_object
             for bar_object in relevant_bars[:10]
             if bar_object.high > current_bar.low
+        ) or not any(
+            bar_object
+            for bar_object in relevant_bars[:20]
+            if bar_object.volume > current_bar.volume
         )
 
         current_day_starting_trend = (
@@ -66,19 +77,27 @@ class Evidence(
             since_highest_high_retracement_occurred = any(
                 bar_object
                 for bar_object in one_minute_bars
-                if potential_confirmation_bar.index < bar_object.index < highest_high_bar.index
-                and bar_object.high < potential_confirmation_bar.low
+                if (
+                    potential_confirmation_bar.index < bar_object.index < highest_high_bar.index
+                    and bar_object.high < potential_confirmation_bar.low
+                ) or (bar_object.close < bar_object.open_value and bar_object.close >= bar_object.ema_9)
+            )
+
+            crossed_resistance_level_strongly = self.crossed_resistance_level_strongly(
+                resistance_levels=relevant_stock.resistance_levels,
+                potential_confirmation_bar=potential_confirmation_bar,
             )
 
             bar_has_been_confirmed = (
                 True
-                and potential_confirmation_bar.low < highest_high_one_minute < potential_confirmation_bar.close
+                and crossed_resistance_level_strongly
                 and highest_high_bar is not None
                 and potential_confirmation_bar.volume > highest_high_bar.volume
                 and potential_confirmation_bar.bar_time - datetime.timedelta(
                     minutes=20,
                 ) < highest_high_bar.bar_time
                 and since_highest_high_retracement_occurred
+                and potential_confirmation_bar.volume > 50000
             )
 
         return bar_has_been_confirmed
