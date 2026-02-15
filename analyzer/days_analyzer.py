@@ -57,6 +57,7 @@ class Analyzer:
                 is_retro=is_retro,
             )
             if indicator_response.result and indicator_response.success_rate == 1:
+                current_bar.indicator = indicator_obj.evidence.name
                 self.logger.info(
                     msg="Bar has Indication",
                     extra={
@@ -66,7 +67,8 @@ class Analyzer:
                         "timeframe_type": stock.timeframe_type.value,
                         "bar_time": current_bar.bar_time,
                         "current_index": current_bar.index,
-                    }
+                        "evidence_name": indicator_obj.evidence.name,
+                    },
                 )
 
                 if self.alerter_object:
@@ -87,17 +89,16 @@ class Analyzer:
                     {
                         "bar_to_confirm": current_bar,
                         "milestones": milestones,
-                        "evidence_confirmator": indicator_obj.evidence(),
+                        "evidence_object": indicator_obj.evidence(),
                     },
                 )
                 self.request_id_to_symbol[stock.request_id] = stock
-                break
             elif confirmator_only:
                 self.waiting_for_confirmation_queue.put(
                     {
                         "bar_to_confirm": current_bar,
                         "milestones": milestones,
-                        "evidence_confirmator": indicator_obj.evidence(),
+                        "evidence_object": indicator_obj.evidence(),
                     },
                 )
                 break

@@ -67,9 +67,6 @@ def run_bot(
 
     threading.Thread(
         target=co_obj.confirm_data,
-        kwargs={
-            "stop_event": threading.Event(),
-        }
     ).start()
 
 if __name__ == "__main__":

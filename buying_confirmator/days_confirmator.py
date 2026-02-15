@@ -24,21 +24,108 @@ class Confirmator:
         self.alerter_object = alerter_object
         self.results_queue = results_queue
         self.request_id_to_symbol = request_id_to_symbol
+        self.symbol_to_evidences: dict[str, list[analyzer.evidences._evidence.Evidence]] = {}
+
+    def _confirm(
+        self,
+        relevant_stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        one_minute_bars: list[common.objects.BarData],
+        potential_confirmation_bar: common.objects.BarData,
+        original_bar_to_confirm: common.objects.BarData,
+        highest_high_one_minute: float,
+        already_sent_buy_order_for_stock: dict[str,bool],
+    ) -> bool:
+        bar_has_confirmed: bool = False
+        entry_position_bar: common.objects.BarData = None
+        one_minute_bars.append(potential_confirmation_bar)
+
+        if potential_confirmation_bar.bar_time < datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=9,
+            minute=30,
+        ):
+            return bar_has_confirmed
+
+        confirmation_key = f"{original_bar_to_confirm.symbol}-{original_bar_to_confirm.bar_time}"
+        evidences = self.symbol_to_evidences[confirmation_key]
+        confirmed_evidences: list[str] = []
+        for evidence in evidences:
+            if evidence.confirm(
+                relevant_stock=relevant_stock,
+                original_bar_to_confirm=original_bar_to_confirm,
+                potential_confirmation_bar=potential_confirmation_bar,
+                milestones=milestones,
+                highest_high_one_minute=highest_high_one_minute,
+                one_minute_bars=one_minute_bars,
+            ):
+                entry_position_bar = potential_confirmation_bar
+                confirmed_evidences.append(evidence.name)
+
+        for evidence_name in confirmed_evidences:
+            self.logger.info(
+                "Bar has confirmed",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "entry_position_bar_time": entry_position_bar.bar_time,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "evidence_name": evidence_name,
+                },
+            )
+            self.results_queue.put(
+                {
+                    "symbol": relevant_stock.symbol_name,
+                    "original_bar_time": original_bar_to_confirm.bar_time,
+                    "confirmation_bar_time": entry_position_bar.bar_time,
+                    "evidence_name": evidence_name,
+                },
+            )
+
+            if self.alerter_object:
+                self.alerter_object.send_confirmation_alert(
+                    sender="Confirmator",
+                    original_bar=original_bar_to_confirm,
+                    entry_position_bar=entry_position_bar,
+                    evidence_name=evidence_name,
+                    is_retro=self.is_retro,
+                )
+
+            unique_key_for_place_order = original_bar_to_confirm.symbol
+            if self.is_retro:
+                unique_key_for_place_order = f"{original_bar_to_confirm.symbol}-{relevant_stock.specific_bar_time}"
+            if (
+                not already_sent_buy_order_for_stock.get(unique_key_for_place_order, False)
+            ):
+                already_sent_buy_order_for_stock[unique_key_for_place_order] = True
+                bar_has_confirmed = True
+
+                if self.is_retro:
+                    return bar_has_confirmed
+
+                self.tws_client.place_buy_order(
+                    symbol=original_bar_to_confirm.symbol,
+                    current_price=entry_position_bar.close,
+                    transmit=False,
+                )
+                return bar_has_confirmed
+
+        return bar_has_confirmed
 
     def confirm_entry_position(
         self,
         relevant_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         milestones: common.objects.Milestones,
-        evidence_confirmator: analyzer.evidences._evidence.Evidence,
     ):
-        entry_position_confirmed: bool = False
-        entry_position_bar: common.objects.BarData = None
         one_minute_bars: list[common.objects.BarData] = []
         highest_high_one_minute: float = 0.0
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         already_sent_buy_order_for_stock: dict[str,bool] = {}
-        evidence_name = ""
         relevant_stock.bars = sorted(
             relevant_stock.bars,
             key=lambda bar_object: bar_object.bar_time,
@@ -88,76 +175,16 @@ class Confirmator:
                 ):
                     continue
 
-                one_minute_bars.append(potential_confirmation_bar)
                 most_updated_datetime = potential_confirmation_bar.bar_time
-                if potential_confirmation_bar.bar_time < datetime.datetime(
-                    year=original_bar_to_confirm.bar_time.year,
-                    month=original_bar_to_confirm.bar_time.month,
-                    day=original_bar_to_confirm.bar_time.day,
-                    hour=9,
-                    minute=30,
-                ):
-                    continue
-
-                if evidence_confirmator.confirm(
+                if self._confirm(
                     relevant_stock=relevant_stock,
-                    original_bar_to_confirm=original_bar_to_confirm,
-                    potential_confirmation_bar=potential_confirmation_bar,
                     milestones=milestones,
-                    highest_high_one_minute=highest_high_one_minute,
                     one_minute_bars=one_minute_bars,
+                    potential_confirmation_bar=potential_confirmation_bar,
+                    original_bar_to_confirm=original_bar_to_confirm,
+                    highest_high_one_minute=highest_high_one_minute,
+                    already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
                 ):
-                    entry_position_confirmed = True
-                    entry_position_bar = potential_confirmation_bar
-                    evidence_name = evidence_confirmator.name
                     break
-
-        if entry_position_confirmed:
-            self.logger.info(
-                "Bar has confirmed",
-                extra={
-                    "worker": "Confirmator",
-                    "symbol": original_bar_to_confirm.symbol,
-                    "timeframe": original_bar_to_confirm.timeframe,
-                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                    "entry_position_bar_time": entry_position_bar.bar_time,
-                    "bar_time": original_bar_to_confirm.bar_time,
-                    "evidence_name": evidence_name,
-                },
-            )
-            self.request_id_to_symbol[relevant_stock.request_id].finished_confirmation = True
-            self.results_queue.put(
-                {
-                    "symbol": relevant_stock.symbol_name,
-                    "original_bar_time": original_bar_to_confirm.bar_time,
-                    "confirmation_bar_time": entry_position_bar.bar_time,
-                    "evidence_name": evidence_name,
-                },
-            )
-
-            if self.alerter_object:
-                self.alerter_object.send_confirmation_alert(
-                    sender="Confirmator",
-                    original_bar=original_bar_to_confirm,
-                    entry_position_bar=entry_position_bar,
-                    evidence_name=evidence_name,
-                    is_retro=self.is_retro,
-                )
-
-            unique_key = original_bar_to_confirm.symbol
-            if self.is_retro:
-                unique_key = f"{original_bar_to_confirm.symbol}-{relevant_stock.specific_bar_time}"
-            if (
-                not already_sent_buy_order_for_stock.get(unique_key, False)
-            ):
-                already_sent_buy_order_for_stock[unique_key] = True
-                if self.is_retro:
-                    return
-
-                self.tws_client.place_buy_order(
-                    symbol=original_bar_to_confirm.symbol,
-                    current_price=entry_position_bar.close,
-                    transmit=False,
-                )
 
         return
