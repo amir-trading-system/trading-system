@@ -94,13 +94,13 @@ class Confirmator:
                     is_retro=self.is_retro,
                 )
 
-            unique_key = original_bar_to_confirm.symbol
+            unique_key_for_place_order = original_bar_to_confirm.symbol
             if self.is_retro:
-                unique_key = f"{original_bar_to_confirm.symbol}-{relevant_stock.specific_bar_time}"
+                unique_key_for_place_order = f"{original_bar_to_confirm.symbol}-{relevant_stock.specific_bar_time}"
             if (
-                not already_sent_buy_order_for_stock.get(unique_key, False)
+                not already_sent_buy_order_for_stock.get(unique_key_for_place_order, False)
             ):
-                already_sent_buy_order_for_stock[unique_key] = True
+                already_sent_buy_order_for_stock[unique_key_for_place_order] = True
                 if self.is_retro:
                     return
 
