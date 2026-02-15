@@ -82,6 +82,7 @@ class Analyzer:
                 bar_unique_identifier = current_bar.generate_unique_identifier()
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
+                stock.finished_analyze = True
                 self.waiting_for_confirmation_queue.put(
                     {
                         "bar_to_confirm": current_bar,
@@ -89,7 +90,7 @@ class Analyzer:
                         "evidence_confirmator": indicator_obj.evidence(),
                     },
                 )
-                self.request_id_to_symbol[stock.request_id].finished_analyze = True
+                self.request_id_to_symbol[stock.request_id] = stock
                 break
             elif confirmator_only:
                 self.waiting_for_confirmation_queue.put(

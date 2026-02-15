@@ -86,6 +86,7 @@ class Stock:
         finished_collection: bool = False,
         finished_analyze: bool = False,
         finished_confirmation: bool = False,
+        resistance_levels: list[float] = [],
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -97,6 +98,7 @@ class Stock:
         self.finished_collection = finished_collection
         self.finished_analyze = finished_analyze
         self.finished_confirmation = finished_confirmation
+        self.resistance_levels = resistance_levels
 
     def previous_bar(
         self,
