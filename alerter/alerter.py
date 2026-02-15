@@ -6,6 +6,7 @@ import common
 
 from . import handlers
 
+
 class Alerter:
     def __init__(
         self,
@@ -26,32 +27,31 @@ class Alerter:
         sorted_indicators: dict[str, float] = {},
         base_except_one: bool = None,
     ):
-        for handler in handlers.__handlers__:
-            handler_object: handlers._alert_handler.Handler = handler(
-                configuration=self.configuration,
-                logger=self.logger,
-            )
-            designed_message = handler_object.design_indicated_bar_message(
-                stock=stock,
-                current_bar=current_bar,
-                emoji=emoji,
-                base_except_one=base_except_one,
-                milestones=milestones,
-                sorted_indicators=sorted_indicators,
-            )
+        telegram_object: handlers.telegram.Handler = handlers.telegram.Handler(
+            configuration=self.configuration,
+            logger=self.logger,
+        )
+        designed_message = telegram_object.design_indicated_bar_message(
+            stock=stock,
+            current_bar=current_bar,
+            emoji=emoji,
+            base_except_one=base_except_one,
+            milestones=milestones,
+            sorted_indicators=sorted_indicators,
+        )
 
-            threading.Thread(
-                target=handler_object.alert,
-                kwargs={
-                    "sender": sender,
-                    "symbol": current_bar.symbol,
-                    "timeframe": current_bar.timeframe,
-                    "bar_date": current_bar.bar_time,
-                    "bar_index": current_bar.index,
-                    "message": designed_message,
-                    "is_retro": is_retro,
-                },
-            ).start()
+        threading.Thread(
+            target=telegram_object.alert,
+            kwargs={
+                "sender": sender,
+                "symbol": current_bar.symbol,
+                "timeframe": current_bar.timeframe,
+                "bar_date": current_bar.bar_time,
+                "bar_index": current_bar.index,
+                "message": designed_message,
+                "is_retro": is_retro,
+            },
+        ).start()
 
     def send_confirmation_alert(
         self,
@@ -61,26 +61,25 @@ class Alerter:
         evidence_name: str,
         is_retro: bool,
     ):
-        for handler in handlers.__handlers__:
-            handler_object: handlers._alert_handler.Handler = handler(
-                configuration=self.configuration,
-                logger=self.logger,
-            )
-            designed_message = handler_object.design_confirmation_bar_message(
-                original_bar=original_bar,
-                entry_position_bar=entry_position_bar,
-                evidence_name=evidence_name,
-            )
+        handler_object: handlers.telegram.Handler = handlers.telegram.Handler(
+            configuration=self.configuration,
+            logger=self.logger,
+        )
+        designed_message = handler_object.design_confirmation_bar_message(
+            original_bar=original_bar,
+            entry_position_bar=entry_position_bar,
+            evidence_name=evidence_name,
+        )
 
-            threading.Thread(
-                target=handler_object.alert,
-                kwargs={
-                    "sender": sender,
-                    "symbol": original_bar.symbol,
-                    "timeframe": original_bar.timeframe,
-                    "bar_date": original_bar.bar_time,
-                    "bar_index": original_bar.index,
-                    "message": designed_message,
-                    "is_retro": is_retro,
-                },
-            ).start()
+        threading.Thread(
+            target=handler_object.alert,
+            kwargs={
+                "sender": sender,
+                "symbol": original_bar.symbol,
+                "timeframe": original_bar.timeframe,
+                "bar_date": original_bar.bar_time,
+                "bar_index": original_bar.index,
+                "message": designed_message,
+                "is_retro": is_retro,
+            },
+        ).start()
