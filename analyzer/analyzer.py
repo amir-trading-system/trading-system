@@ -1,5 +1,4 @@
 import datetime
-import threading
 import queue
 
 import copy
@@ -176,12 +175,8 @@ class Analyzer:
 
     def analyze_data_retroactively(
         self,
-        stop_event: threading.Event,
     ):
         while True:
-            if stop_event.is_set():
-                break
-
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
                 stock = common.objects.Stock(

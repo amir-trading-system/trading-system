@@ -293,30 +293,22 @@ def run_retroactive_check():
         is_retro=True,
     )
 
-    analyze_stop_event = threading.Event()
     threading.Thread(
         target=analyzer_object.analyze_data_retroactively,
-        kwargs={
-            "stop_event": analyze_stop_event,
-        }
     ).start()
 
-    confirmator_stop_event = threading.Event()
     threading.Thread(
         target=confirmator_object.confirm_data,
-        kwargs={
-            "stop_event": confirmator_stop_event,
-        }
     ).start()
 
     symbols_data = []
     symbols = get_symbols()
-    # symbols = [
-    #     Symbol(
-    #         name="GITS",
-    #         datetime_str="01.21.26T10:02:00",
-    #     ),
-    # ]
+    symbols = [
+        Symbol(
+            name="GITS",
+            datetime_str="01.21.26T10:02:00",
+        ),
+    ]
     counter = [len(symbols)]
 
     for symbol in symbols:

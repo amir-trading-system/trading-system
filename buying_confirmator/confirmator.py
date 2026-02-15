@@ -24,6 +24,7 @@ class Confirmator:
     ):
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.request_id_to_symbol = request_id_to_symbol
+        self.already_waiting_for_confirmation: list[str] = []
 
         self.days_confirmator = days_confirmator.Confirmator(
             is_retro=is_retro,
@@ -36,18 +37,17 @@ class Confirmator:
 
     def confirm_data(
         self,
-        stop_event: threading.Event,
     ):
         while True:
-            if stop_event.is_set():
-                break
-
             if not self.waiting_for_confirmation_queue.empty():
                 bar_to_milestones: dict[str, any] = self.waiting_for_confirmation_queue.get()
 
                 bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
                 milestones: common.objects.Milestones = bar_to_milestones["milestones"]
-                evidence_confirmator: analyzer.evidences._evidence.Evidence = bar_to_milestones["evidence_confirmator"]
+                evidence_object: analyzer.evidences._evidence.Evidence = bar_to_milestones["evidence_object"]
+                if bar_to_confirm.symbol in self.already_waiting_for_confirmation:
+                    self.days_confirmator.symbol_to_evidences[bar_to_confirm.symbol].append(evidence_object)
+                    continue
 
                 relevant_stock = [
                     stock
@@ -60,15 +60,18 @@ class Confirmator:
                     )
                 ][0]
 
-                if bar_to_confirm.timeframe_type == common.objects.TimeframeType.DAY:
-                    threading.Thread(
-                        target=self.days_confirmator.confirm_entry_position,
-                        kwargs={
-                            "relevant_stock": relevant_stock,
-                            "original_bar_to_confirm": bar_to_confirm,
-                            "milestones": milestones,
-                            "evidence_confirmator": evidence_confirmator,
-                        },
-                    ).start()
+                self.already_waiting_for_confirmation.append(bar_to_confirm.symbol)
+                self.days_confirmator.symbol_to_evidences[bar_to_confirm.symbol] = [
+                    evidence_object,
+                ]
+                threading.Thread(
+                    target=self.days_confirmator.confirm_entry_position,
+                    kwargs={
+                        "relevant_stock": relevant_stock,
+                        "original_bar_to_confirm": bar_to_confirm,
+                        "milestones": milestones,
+                    },
+                ).start()
+
 
             time.sleep(1)
