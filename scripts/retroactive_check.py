@@ -134,7 +134,7 @@ def build_table(
         [
             symbol_data
             for symbol_data in data
-            if symbol_data["confirmation_status"] == "done"
+            if symbol_data["actual_confirmation_bar_time"] != "unknown"
         ]
     )
     table = rich.table.Table(
@@ -142,8 +142,7 @@ def build_table(
         "Original Bar Time",
         f"Collection Status: {finished_collection}/{len(data)}",
         f"Analysis Status: {finished_analysis}/{len(data)}",
-        f"Confirmation Status: {finished_confirmation}/{len(data)}",
-        "Actual Confirmation Bar Time",
+        f"Actual Confirmation Bar Time {finished_confirmation}/{len(data)}",
         "Expected Confirmation Bar Time",
         "Evidence",
     )
@@ -165,12 +164,6 @@ def build_table(
         else:
             analysis_status = f"[green]{analysis_status}[/green]"
 
-        confirmation_status = symbol_data["confirmation_status"]
-        if confirmation_status != "done":
-            confirmation_status = f"[red]{confirmation_status}[/red]"
-        else:
-            confirmation_status = f"[green]{confirmation_status}[/green]"
-
         evidence_name = symbol_data["evidence_name"]
         if evidence_name == "unknown":
             evidence_name = f"[red]{evidence_name}[/red]"
@@ -190,7 +183,6 @@ def build_table(
             str(symbol_data["original_bar_time"]),
             collection_status,
             analysis_status,
-            confirmation_status,
             str(actual_confirmation_bar_time),
             str(expected_confirmation_bar_time),
             evidence_name,
@@ -206,7 +198,7 @@ def update_table_with_status_per_stage(
     while any(
         symbol_data
         for symbol_data in symbols_data
-        if symbol_data["confirmation_status"] != "done"
+        if symbol_data["actual_confirmation_bar_time"] == "unknown"
     ):
         for _, symbol in request_id_to_symbol.items():
             if symbol.is_one_minute_timeframe():
@@ -222,8 +214,6 @@ def update_table_with_status_per_stage(
                 relevant_symbol_data["collection_status"] = "done"
             if symbol.finished_analyze and symbol.is_day_timeframe():
                 relevant_symbol_data["analysis_status"] = "done"
-            if symbol.finished_confirmation and symbol.is_day_timeframe():
-                relevant_symbol_data["confirmation_status"] = "done"
 
             live_table.update(build_table(symbols_data))
 
@@ -303,12 +293,12 @@ def run_retroactive_check():
 
     symbols_data = []
     symbols = get_symbols()
-    symbols = [
-        Symbol(
-            name="GITS",
-            datetime_str="01.21.26T10:02:00",
-        ),
-    ]
+    # symbols = [
+    #     Symbol(
+    #         name="GITS",
+    #         datetime_str="01.21.26T10:02:00",
+    #     ),
+    # ]
     counter = [len(symbols)]
 
     for symbol in symbols:
@@ -326,7 +316,6 @@ def run_retroactive_check():
                 "symbol": symbol.name,
                 "collection_status": "unknown",
                 "analysis_status": "unknown",
-                "confirmation_status": "unknown",
                 "original_bar_time": specific_bar_time,
                 "actual_confirmation_bar_time": "unknown",
                 "expected_confirmation_bar_time": symbol.date_time,

@@ -28,9 +28,13 @@ class Confirmator:
 
     def _confirm(
         self,
+        relevant_stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
         one_minute_bars: list[common.objects.BarData],
         potential_confirmation_bar: common.objects.BarData,
         original_bar_to_confirm: common.objects.BarData,
+        highest_high_one_minute: float,
+        already_sent_buy_order_for_stock: dict[str,bool],
     ):
         entry_position_bar: common.objects.BarData = None
         one_minute_bars.append(potential_confirmation_bar)
@@ -44,7 +48,8 @@ class Confirmator:
         ):
             return
 
-        evidences = self.symbol_to_evidences[original_bar_to_confirm.symbol]
+        confirmation_key = f"{original_bar_to_confirm.symbol}-{original_bar_to_confirm.bar_time}"
+        evidences = self.symbol_to_evidences[confirmation_key]
         confirmed_evidences: list[str] = []
         for evidence in evidences:
             if evidence.confirm(
@@ -58,7 +63,7 @@ class Confirmator:
                 entry_position_bar = potential_confirmation_bar
                 confirmed_evidences.append(evidence.name)
 
-        if confirmed_evidences:
+        for evidence_name in confirmed_evidences:
             self.logger.info(
                 "Bar has confirmed",
                 extra={
@@ -71,7 +76,6 @@ class Confirmator:
                     "evidence_name": evidence_name,
                 },
             )
-            self.request_id_to_symbol[relevant_stock.request_id].finished_confirmation = True
             self.results_queue.put(
                 {
                     "symbol": relevant_stock.symbol_name,
@@ -116,7 +120,6 @@ class Confirmator:
         highest_high_one_minute: float = 0.0
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         already_sent_buy_order_for_stock: dict[str,bool] = {}
-        evidence_name = ""
         relevant_stock.bars = sorted(
             relevant_stock.bars,
             key=lambda bar_object: bar_object.bar_time,
@@ -167,6 +170,14 @@ class Confirmator:
                     continue
 
                 most_updated_datetime = potential_confirmation_bar.bar_time
-                self._confirm()
+                self._confirm(
+                    relevant_stock=relevant_stock,
+                    milestones=milestones,
+                    one_minute_bars=one_minute_bars,
+                    potential_confirmation_bar=potential_confirmation_bar,
+                    original_bar_to_confirm=original_bar_to_confirm,
+                    highest_high_one_minute=highest_high_one_minute,
+                    already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
+                )
 
         return

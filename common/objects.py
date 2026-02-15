@@ -87,7 +87,6 @@ class Stock:
         one_minute_bars_queue: queue.Queue[BarData] = None,
         finished_collection: bool = False,
         finished_analyze: bool = False,
-        finished_confirmation: bool = False,
         resistance_levels: list[float] = [],
     ):
         self.request_id = request_id
@@ -99,7 +98,6 @@ class Stock:
         self.specific_bar_time = specific_bar_time
         self.finished_collection = finished_collection
         self.finished_analyze = finished_analyze
-        self.finished_confirmation = finished_confirmation
         self.resistance_levels = resistance_levels
 
     def previous_bar(

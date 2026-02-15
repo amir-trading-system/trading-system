@@ -45,8 +45,9 @@ class Confirmator:
                 bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
                 milestones: common.objects.Milestones = bar_to_milestones["milestones"]
                 evidence_object: analyzer.evidences._evidence.Evidence = bar_to_milestones["evidence_object"]
-                if bar_to_confirm.symbol in self.already_waiting_for_confirmation:
-                    self.days_confirmator.symbol_to_evidences[bar_to_confirm.symbol].append(evidence_object)
+                waiting_for_confirmation_key = f"{bar_to_confirm.symbol}-{bar_to_confirm.bar_time}"
+                if waiting_for_confirmation_key in self.already_waiting_for_confirmation:
+                    self.days_confirmator.symbol_to_evidences[waiting_for_confirmation_key].append(evidence_object)
                     continue
 
                 relevant_stock = [
@@ -60,8 +61,8 @@ class Confirmator:
                     )
                 ][0]
 
-                self.already_waiting_for_confirmation.append(bar_to_confirm.symbol)
-                self.days_confirmator.symbol_to_evidences[bar_to_confirm.symbol] = [
+                self.already_waiting_for_confirmation.append(waiting_for_confirmation_key)
+                self.days_confirmator.symbol_to_evidences[waiting_for_confirmation_key] = [
                     evidence_object,
                 ]
                 threading.Thread(
