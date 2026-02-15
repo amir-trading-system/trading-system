@@ -53,7 +53,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="GITS",
-            datetime_str="01.21.26T10:02:00",
+            datetime_str="01.21.26T09:42:00",
         ),
         Symbol(
             name="GITS",
@@ -94,6 +94,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="PLBY",
             datetime_str="02.10.26T09:49:00",
+        ),
+        Symbol(
+            name="MLEC",
+            datetime_str="01.15.26T11:28:00",
         ),
         Symbol(
             name="SUNE",
@@ -227,7 +231,6 @@ def update_table_with_results_queue(
     while True:
         if not results_queue.empty():
             confirmation_result = results_queue.get()
-            counter[0] -= 1
             relevant_symbol_data = [
                 symbol_data
                 for symbol_data in symbols_data
@@ -239,6 +242,8 @@ def update_table_with_results_queue(
                 relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
                 relevant_symbol_data[0]["evidence_name"] = confirmation_result["evidence_name"]
                 live_table.update(build_table(symbols_data))
+
+            counter[0] -= 1
 
 def run_retroactive_check():
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
@@ -295,8 +300,8 @@ def run_retroactive_check():
     symbols = get_symbols()
     # symbols = [
     #     Symbol(
-    #         name="GITS",
-    #         datetime_str="01.21.26T10:02:00",
+    #         name="MLEC",
+    #         datetime_str="01.15.26T11:28:00",
     #     ),
     # ]
     counter = [len(symbols)]
