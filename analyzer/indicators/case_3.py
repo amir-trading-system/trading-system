@@ -17,4 +17,4 @@ class Indicator(
             milestones=milestones,
             logger=logger,
         )
-        self.evidence = analyzer.evidences.current_day_starting_trend.Evidence
+        self.evidence = analyzer.evidences.current_day_continues_without_touching_previous.Evidence

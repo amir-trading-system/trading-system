@@ -14,22 +14,10 @@ class Evidence(
         current_bar: common.objects.BarData,
         is_retro: bool,
     ) -> common.objects.EvidenceResponse:
-        relevant_bars = stock.bars[1:]
-        if len(relevant_bars) == 0:
-            return common.objects.EvidenceResponse(
-                result=False,
-                reason="no bars to indicate",
-            )
-
-        resistance_level_to_breaking_attempts: dict[float,int] = self.get_resistance_levels(
-            stock=stock,
-            relevant_bars=relevant_bars,
-            current_bar=current_bar,
-        )
         top_bar = [
             bar_object
             for bar_object in stock.bars
-            if bar_object.high == max(resistance_level_to_breaking_attempts)
+            if bar_object.high == max(self.resistance_level_to_breaking_attempts)
         ][0]
 
         if top_bar is None:
@@ -38,7 +26,6 @@ class Evidence(
                 reason="top bar does not exists",
             )
 
-        stock.resistance_levels = list(resistance_level_to_breaking_attempts.keys())
         top_bar_is_valid = len(stock.resistance_levels) > 0
 
         if top_bar_is_valid:
@@ -50,7 +37,7 @@ class Evidence(
                 timeframe=top_bar.timeframe,
             )
 
-        previous_day = relevant_bars[0]
+        previous_day = self.relevant_bars[0]
         current_day_breaks_highest_high_since_fall = (
             True
             and current_bar.close > current_bar.open_value

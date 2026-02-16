@@ -75,6 +75,17 @@ class Indicator:
             )
 
         evidence_object: analyzer.evidences._evidence.Evidence = self.evidence()
+        if not evidence_object.pre_evidence(
+            stock=stock,
+            current_bar=current_bar,
+        ):
+            return common.objects.IndicatorResponse(
+                success_count=0,
+                success_rate=0.0,
+                result=False,
+                failed_base_evidences_count=0,
+            )
+
         result = evidence_object.find_evidence(
             stock=stock,
             milestones=milestones,

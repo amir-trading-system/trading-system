@@ -28,6 +28,10 @@ class Symbol:
 def get_symbols() -> list[Symbol]:
     return [
         Symbol(
+            name="AFJK",
+            datetime_str="12.09.25T14:14:00",
+        ),
+        Symbol(
             name="QCLS",
             datetime_str="12.04.25T09:43:00",
         ),
@@ -247,9 +251,22 @@ def update_table_with_results_queue(
                 and symbol_data["evidence_name"] == "in_progress"
             ]
             if relevant_symbol_data:
-                relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
-                relevant_symbol_data[0]["evidence_name"] = confirmation_result["evidence_name"]
-                live_table.update(build_table(symbols_data))
+                if relevant_symbol_data[0]["evidence_name"] != "in_progress":
+                    symbols_data.append(
+                        {
+                            "symbol": relevant_symbol_data[0]["symbol"],
+                            "collection_status": relevant_symbol_data[0]["collection_status"],
+                            "analysis_status": relevant_symbol_data[0]["analysis_status"],
+                            "original_bar_time": relevant_symbol_data[0]["original_bar_time"],
+                            "actual_confirmation_bar_time": confirmation_result[0]["confirmation_bar_time"],
+                            "expected_confirmation_bar_time": "not_exists_yet",
+                            "evidence_name": confirmation_result["evidence_name"],
+                        },
+                    )
+                else:
+                    relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
+                    relevant_symbol_data[0]["evidence_name"] = confirmation_result["evidence_name"]
+                    live_table.update(build_table(symbols_data))
 
             counter[0] -= 1
 
@@ -308,8 +325,8 @@ def run_retroactive_check():
     symbols = get_symbols()
     # symbols = [
     #     Symbol(
-    #         name="CYCU",
-    #         datetime_str="11.14.25T11:00:00",
+    #         name="AFJK",
+    #         datetime_str="12.09.25T14:14:00",
     #     ),
     # ]
     counter = [len(symbols)]

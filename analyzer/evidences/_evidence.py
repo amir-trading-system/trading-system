@@ -4,6 +4,145 @@ class Evidence:
     name: str = ""
     must_to_be_true: bool = False
     is_base_evidence: bool = False
+    resistance_level_to_breaking_attempts: dict[float,int] = {}
+    relevant_bars: list[common.objects.BarData] = []
+
+    def is_potential_starting_bar(
+        self,
+        stock: common.objects.Stock,
+        bar_object: common.objects.BarData,
+    ) -> bool:
+        base_condition = True
+        previous_bar = stock.previous_bar(
+            bar_object=bar_object,
+        )
+        if previous_bar is not None:
+            base_condition = (
+                True
+                and base_condition
+                and bar_object.high > previous_bar.high
+            )
+
+        first_option = (
+            True
+            and bar_object.vwap is not None
+            and bar_object.ema_9 is not None
+            and bar_object.ema_20 is not None
+            and bar_object.volume_average is not None
+            and base_condition
+            and bar_object.close > bar_object.ema_9
+            and bar_object.close > bar_object.ema_20
+            and bar_object.volume > bar_object.volume_average
+            and bar_object.volume > 500000
+            and bar_object.high > bar_object.vwap
+            and bar_object.ema_9/bar_object.low >= 0.9
+        )
+        second_option = (
+            True
+            and bar_object.vwap is not None
+            and bar_object.ema_9 is not None
+            and bar_object.ema_20 is not None
+            and bar_object.volume_average is not None
+            and base_condition
+            and bar_object.high > bar_object.vwap
+            and bar_object.close > bar_object.ema_9
+            and bar_object.histogram > 0
+            and bar_object.volume/bar_object.volume_average > 7
+            and max(
+                stock.bars[bar_object.index:],
+                key=lambda bar_obj: bar_obj.volume
+            ) == bar_object
+        )
+
+        return first_option or second_option
+
+    def get_starting_bar(
+        self,
+        stock: common.objects.Stock,
+    ) -> common.objects.MilestoneBar | None:
+        for bar_object in self.relevant_bars:
+            previous_bar = stock.previous_bar(
+                bar_object=bar_object,
+            )
+            potential_starting_bar = (
+                True
+                and self.is_potential_starting_bar(
+                    stock=stock,
+                    bar_object=bar_object
+                )
+                and (
+                    not self.is_potential_starting_bar(
+                        stock=stock,
+                        bar_object=previous_bar,
+                    ) if previous_bar is not None else True
+                )
+            )
+            if potential_starting_bar:
+                if len(self.relevant_bars[:10]) > 0:
+                    potential_starting_bar = max(
+                        [
+                            bar_obj.high
+                            for bar_obj in self.relevant_bars[:10]
+                        ]
+                    ) == bar_object.high
+
+                return common.objects.MilestoneBar(
+                    index=bar_object.index,
+                    bar_object=bar_object,
+                    bar_type=common.objects.MilestoneType.STARTING_BAR,
+                    bar_time=bar_object.bar_time,
+                    timeframe=bar_object.timeframe,
+                )
+
+    def get_top_bar(
+        self,
+        starting_bar: common.objects.BarData,
+        current_bar: common.objects.BarData,
+    ) -> common.objects.MilestoneBar | None:
+        top_bar_options = [
+            bar_object
+            for bar_object in self.relevant_bars[:starting_bar.index]
+            if (
+                True
+                and bar_object.index > current_bar.index
+                and bar_object.high > starting_bar.high
+                and len(self.relevant_bars[1:starting_bar.index]) > 0
+                and bar_object.high == max(
+                    [
+                        bar_obj.high
+                        for bar_obj in self.relevant_bars[:starting_bar.index]
+                        if bar_obj.index > current_bar.index
+                    ]
+                )
+            )
+        ]
+        if len(top_bar_options) > 0:
+            top_bar = top_bar_options[0]
+            return common.objects.MilestoneBar(
+                index=top_bar.index,
+                bar_object=top_bar,
+                bar_type=common.objects.MilestoneType.TOP_BAR,
+                bar_time=top_bar.bar_time,
+                timeframe=top_bar.timeframe,
+            )
+
+    def pre_evidence(
+        self,
+        stock: common.objects.Stock,
+        current_bar: common.objects.BarData,
+    ) -> bool:
+        self.relevant_bars = stock.bars[1:]
+        if len(self.relevant_bars) == 0:
+            return False
+
+        self.resistance_level_to_breaking_attempts = self.get_resistance_levels(
+            stock=stock,
+            relevant_bars=self.relevant_bars,
+            current_bar=current_bar,
+        )
+        stock.resistance_levels = list(self.resistance_level_to_breaking_attempts.keys())
+
+        return True
 
     def find_evidence(
         self,
