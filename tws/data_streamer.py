@@ -167,6 +167,20 @@ class DataStreamer():
         symbol: str,
         specific_bar_time: datetime.datetime = None,
     ):
+        current_session_date = datetime.datetime.fromtimestamp(0)
+        previous_session_date = datetime.datetime.fromtimestamp(0)
+        if specific_bar_time is not None:
+            current_session_date = specific_bar_time
+            previous_session_date = specific_bar_time - datetime.timedelta(days=1)
+        else:
+            date_now = datetime.datetime.now()
+            current_session_date = datetime.datetime(
+                year=date_now.year,
+                month=date_now.month,
+                day=date_now.day,
+            )
+            previous_session_date = current_session_date - datetime.timedelta(days=1)
+
         temp_request_id_to_symbol = {
             key: value
             for key, value in self.request_id_to_symbol.items()
@@ -175,10 +189,32 @@ class DataStreamer():
         one_minute_bars = temp_request_id_to_symbol[one_minute_request_id].bars
 
         for _, stock in temp_request_id_to_symbol.items():
-            if stock.timeframe > 1 or stock.timeframe_type == common.objects.TimeframeType.DAY:
+            if stock.timeframe_type == common.objects.TimeframeType.DAY:
                 if specific_bar_time is not None and stock.specific_bar_time != specific_bar_time:
                     continue
                 for one_minute_bar in one_minute_bars:
+                    if (
+                        True
+                        and one_minute_bar.bar_time >= datetime.datetime(
+                            year=previous_session_date.year,
+                            month=previous_session_date.month,
+                            day=previous_session_date.day,
+                            hour=16,
+                            minute=0,
+                        )
+                        and one_minute_bar.bar_time < datetime.datetime(
+                            year=current_session_date.year,
+                            month=current_session_date.month,
+                            day=current_session_date.day,
+                            hour=9,
+                            minute=30,
+                        )
+                    ):
+                        stock.last_post_pre_one_minute_highest_high = max(
+                            stock.last_post_pre_one_minute_highest_high,
+                            one_minute_bar.high,
+                        )
+
                     stock.one_minute_bars_queue.put(one_minute_bar)
 
     def on_historical_data_end(
