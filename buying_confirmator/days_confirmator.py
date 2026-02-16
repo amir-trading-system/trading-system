@@ -24,7 +24,6 @@ class Confirmator:
         self.alerter_object = alerter_object
         self.results_queue = results_queue
         self.request_id_to_symbol = request_id_to_symbol
-        self.symbol_to_evidences: dict[str, list[analyzer.evidences._evidence.Evidence]] = {}
 
     def _confirm(
         self,
@@ -35,6 +34,7 @@ class Confirmator:
         original_bar_to_confirm: common.objects.BarData,
         highest_high_one_minute: float,
         already_sent_buy_order_for_stock: dict[str,bool],
+        evidences: list[analyzer.evidences._evidence.Evidence],
     ) -> bool:
         bar_has_confirmed: bool = False
         entry_position_bar: common.objects.BarData = None
@@ -49,8 +49,6 @@ class Confirmator:
         ):
             return bar_has_confirmed
 
-        confirmation_key = f"{original_bar_to_confirm.symbol}-{original_bar_to_confirm.bar_time}"
-        evidences = self.symbol_to_evidences[confirmation_key]
         confirmed_evidences: list[str] = []
         for evidence in evidences:
             if evidence.confirm(
@@ -121,6 +119,7 @@ class Confirmator:
         relevant_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         milestones: common.objects.Milestones,
+        evidences: list[analyzer.evidences._evidence.Evidence],
     ):
         one_minute_bars: list[common.objects.BarData] = []
         highest_high_one_minute: float = 0.0
@@ -184,6 +183,7 @@ class Confirmator:
                     original_bar_to_confirm=original_bar_to_confirm,
                     highest_high_one_minute=highest_high_one_minute,
                     already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
+                    evidences=evidences,
                 ):
                     break
 

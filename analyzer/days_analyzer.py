@@ -4,6 +4,7 @@ import queue
 
 import alerter
 import analyzer.indicators
+import analyzer.evidences
 import common
 
 
@@ -45,6 +46,7 @@ class Analyzer:
                 },
             )
 
+        evidences_to_confirm: list[analyzer.evidences._evidence.Evidence] = []
         for indicator in analyzer.indicators.__indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
                 milestones=milestones,
@@ -85,23 +87,19 @@ class Analyzer:
                 self.has_indications_bars[bar_unique_identifier] = current_bar
                 stock.bars[current_bar.index].has_indication = True
                 stock.finished_analyze = True
-                self.waiting_for_confirmation_queue.put(
-                    {
-                        "bar_to_confirm": current_bar,
-                        "milestones": milestones,
-                        "evidence_object": indicator_obj.evidence(),
-                    },
-                )
+                evidences_to_confirm.append(indicator_obj.evidence())
                 self.request_id_to_symbol[stock.request_id] = stock
             elif confirmator_only:
-                self.waiting_for_confirmation_queue.put(
-                    {
-                        "bar_to_confirm": current_bar,
-                        "milestones": milestones,
-                        "evidence_object": indicator_obj.evidence(),
-                    },
-                )
+                evidences_to_confirm.append(indicator_obj.evidence())
                 break
+
+        self.waiting_for_confirmation_queue.put(
+            {
+                "bar_to_confirm": current_bar,
+                "milestones": milestones,
+                "evidences": evidences_to_confirm,
+            },
+        )
 
         if should_write_log:
             self.logger.info(
