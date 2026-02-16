@@ -88,6 +88,7 @@ class Stock:
         finished_collection: bool = False,
         finished_analyze: bool = False,
         resistance_levels: list[float] = [],
+        last_post_pre_one_minute_highest_high: float = 0.0,
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -99,6 +100,7 @@ class Stock:
         self.finished_collection = finished_collection
         self.finished_analyze = finished_analyze
         self.resistance_levels = resistance_levels
+        self.last_post_pre_one_minute_highest_high = last_post_pre_one_minute_highest_high
 
     def previous_bar(
         self,
@@ -157,6 +159,15 @@ class Stock:
             )
 
         return res
+
+    def arrange_data_for_analysis(
+        self,
+    ):
+        self.bars = sorted(
+            self.bars,
+            key=lambda bar: bar.bar_time,
+            reverse=True,
+        )
 
 class IbAPIRequest:
     def __init__(

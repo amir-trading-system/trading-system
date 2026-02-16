@@ -63,6 +63,7 @@ class Analyzer:
                 timeframe=stock.timeframe,
                 timeframe_type=stock.timeframe_type,
                 specific_bar_time=current_bar.bar_time,
+                last_post_pre_one_minute_highest_high=stock.last_post_pre_one_minute_highest_high,
             )
 
             self.days_analyzer.analyze_day_bar(
@@ -130,13 +131,9 @@ class Analyzer:
                     bars=copy.deepcopy(stock_object.bars),
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
                     specific_bar_time=stock_object.specific_bar_time,
+                    last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
                 )
-
-                stock.bars = sorted(
-                    stock.bars,
-                    key=lambda bar: bar.bar_time,
-                    reverse=True,
-                )
+                stock.arrange_data_for_analysis()
 
                 if retroactive_from:
                     try:
@@ -187,13 +184,10 @@ class Analyzer:
                     bars=copy.deepcopy(stock_object.bars),
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
                     specific_bar_time=stock_object.specific_bar_time,
+                    last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
                 )
+                stock.arrange_data_for_analysis()
 
-                stock.bars = sorted(
-                    stock.bars,
-                    key=lambda bar: bar.bar_time,
-                    reverse=True,
-                )
                 try:
                     self.analyze_live_case(
                         stock=stock,
