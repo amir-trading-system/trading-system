@@ -142,7 +142,7 @@ def build_table(
         [
             symbol_data
             for symbol_data in data
-            if symbol_data["actual_confirmation_bar_time"] != "unknown"
+            if symbol_data["actual_confirmation_bar_time"] != "in_progress"
         ]
     )
     table = rich.table.Table(
@@ -173,7 +173,7 @@ def build_table(
             analysis_status = f"[green]{analysis_status}[/green]"
 
         evidence_name = symbol_data["evidence_name"]
-        if evidence_name == "unknown":
+        if evidence_name == "in_progress":
             evidence_name = f"[red]{evidence_name}[/red]"
         else:
             evidence_name = f"[green]{evidence_name}[/green]"
@@ -206,7 +206,7 @@ def update_table_with_status_per_stage(
     while any(
         symbol_data
         for symbol_data in symbols_data
-        if symbol_data["actual_confirmation_bar_time"] == "unknown"
+        if symbol_data["actual_confirmation_bar_time"] == "in_progress"
     ):
         for _, symbol in request_id_to_symbol.items():
             if symbol.is_one_minute_timeframe():
@@ -240,7 +240,7 @@ def update_table_with_results_queue(
                 for symbol_data in symbols_data
                 if symbol_data["symbol"] == confirmation_result["symbol"]
                 and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
-                and symbol_data["evidence_name"] == "unknown"
+                and symbol_data["evidence_name"] == "in_progress"
             ]
             if relevant_symbol_data:
                 relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
@@ -304,8 +304,8 @@ def run_retroactive_check():
     symbols = get_symbols()
     # symbols = [
     #     Symbol(
-    #         name="BBGI",
-    #         datetime_str="12.10.25T09:45:00",
+    #         name="NCI",
+    #         datetime_str="02.11.26T11:00:00",
     #     ),
     # ]
     counter = [len(symbols)]
@@ -323,12 +323,12 @@ def run_retroactive_check():
         symbols_data.append(
             {
                 "symbol": symbol.name,
-                "collection_status": "unknown",
-                "analysis_status": "unknown",
+                "collection_status": "in_progress",
+                "analysis_status": "in_progress",
                 "original_bar_time": specific_bar_time,
-                "actual_confirmation_bar_time": "unknown",
+                "actual_confirmation_bar_time": "in_progress",
                 "expected_confirmation_bar_time": symbol.date_time,
-                "evidence_name": "unknown",
+                "evidence_name": "in_progress",
             },
         )
 
