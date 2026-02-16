@@ -76,9 +76,10 @@ class Evidence:
         return any(
             resistance_level
             for resistance_level in resistance_levels
-            if resistance_level < potential_confirmation_bar.close
-            and resistance_level > potential_confirmation_bar.open_value
-            and (potential_confirmation_bar.close - resistance_level)/(resistance_level - potential_confirmation_bar.open_value) >= 0.25
+            if potential_confirmation_bar.low < resistance_level < potential_confirmation_bar.close
+            and (potential_confirmation_bar.close - resistance_level)/abs(resistance_level - potential_confirmation_bar.open_value) >= 0.25
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and potential_confirmation_bar.volume > 10000
         ) and not any(
             resistance_level
             for resistance_level in resistance_levels

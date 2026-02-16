@@ -38,12 +38,7 @@ class Evidence(
                 reason="top bar does not exists",
             )
 
-        stock.resistance_levels = [
-            resistance_level
-            for resistance_level, attempts in resistance_level_to_breaking_attempts.items()
-            if attempts >= 2
-        ]
-
+        stock.resistance_levels = list(resistance_level_to_breaking_attempts.keys())
         top_bar_is_valid = len(stock.resistance_levels) > 0
 
         if top_bar_is_valid:
