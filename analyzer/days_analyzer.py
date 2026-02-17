@@ -52,6 +52,12 @@ class Analyzer:
                 milestones=milestones,
                 logger=self.logger,
             )
+            bar_unique_identifer = current_bar.generate_unique_identifier(
+                evidence_name=indicator_obj.evidence.name,
+            )
+            if bar_unique_identifer in self.has_indications_bars:
+                continue
+
             indicator_response: common.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestones,
@@ -59,9 +65,22 @@ class Analyzer:
                 is_retro=is_retro,
             )
             if indicator_response.result and indicator_response.success_rate == 1:
-                current_bar.indicator = indicator_obj.evidence.name
+                bar_unique_identifier = current_bar.generate_unique_identifier(
+                    evidence_name=indicator_obj.evidence.name,
+                )
+                self.has_indications_bars[bar_unique_identifier] = current_bar
+                evidences_to_confirm.append(indicator_obj.evidence())
+            elif confirmator_only:
+                evidences_to_confirm.append(indicator_obj.evidence())
+                break
+
+        if evidences_to_confirm:
+            self.request_id_to_symbol[stock.request_id] = stock
+
+            if self.alerter_object:
+                evidence_names = [evidence.name for evidence in evidences_to_confirm]
                 self.logger.info(
-                    msg="Bar has Indication",
+                    msg="Bar has Indication, waiting for confirmation",
                     extra={
                         "worker": "Analyzer",
                         "symbol": stock.symbol_name,
@@ -69,38 +88,27 @@ class Analyzer:
                         "timeframe_type": stock.timeframe_type.value,
                         "bar_time": current_bar.bar_time,
                         "current_index": current_bar.index,
-                        "evidence_name": indicator_obj.evidence.name,
+                        "evidences": evidence_names,
                     },
                 )
+                # self.alerter_object.send_alert(
+                #     sender="Analyzer",
+                #     stock=stock,
+                #     current_bar=current_bar,
+                #     emoji="✅",
+                #     milestones=milestones,
+                #     is_retro=is_retro,
+                #     evidences=evidence_names,
+                # )
 
-                if self.alerter_object:
-                    self.alerter_object.send_alert(
-                        sender="Analyzer",
-                        stock=stock,
-                        current_bar=current_bar,
-                        emoji="✅",
-                        milestones=milestones,
-                        is_retro=is_retro,
-                        evidence_name=indicator_obj.evidence.name,
-                    )
-
-                bar_unique_identifier = current_bar.generate_unique_identifier()
-                self.has_indications_bars[bar_unique_identifier] = current_bar
-                stock.bars[current_bar.index].has_indication = True
-                stock.finished_analyze = True
-                evidences_to_confirm.append(indicator_obj.evidence())
-                self.request_id_to_symbol[stock.request_id] = stock
-            elif confirmator_only:
-                evidences_to_confirm.append(indicator_obj.evidence())
-                break
-
-        self.waiting_for_confirmation_queue.put(
-            {
-                "bar_to_confirm": current_bar,
-                "milestones": milestones,
-                "evidences": evidences_to_confirm,
-            },
-        )
+            self.waiting_for_confirmation_queue.put(
+                {
+                    "bar_to_confirm": current_bar,
+                    "milestones": milestones,
+                    "evidences": evidences_to_confirm,
+                },
+            )
+            self.request_id_to_symbol[stock.request_id].finished_analyze = True
 
         if should_write_log:
             self.logger.info(
@@ -125,10 +133,6 @@ class Analyzer:
         is_retro: bool,
         confirmator_only: bool,
     ):
-        bar_unique_identifer = current_bar.generate_unique_identifier()
-        if bar_unique_identifer in self.has_indications_bars:
-            return
-
         current_bar_is_valid = (
             True
             and (current_bar.close > current_bar.open_value or is_retro)

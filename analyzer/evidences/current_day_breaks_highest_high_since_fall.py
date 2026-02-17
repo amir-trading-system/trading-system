@@ -14,28 +14,7 @@ class Evidence(
         current_bar: common.objects.BarData,
         is_retro: bool,
     ) -> common.objects.EvidenceResponse:
-        top_bar = [
-            bar_object
-            for bar_object in stock.bars
-            if bar_object.high == max(self.resistance_level_to_breaking_attempts)
-        ][0]
-
-        if top_bar is None:
-            return common.objects.EvidenceResponse(
-                result=False,
-                reason="top bar does not exists",
-            )
-
         top_bar_is_valid = len(stock.resistance_levels) > 0
-
-        if top_bar_is_valid:
-            milestones.top_bar = common.objects.MilestoneBar(
-                index=top_bar.index,
-                bar_object=top_bar,
-                bar_type=common.objects.MilestoneType.TOP_BAR,
-                bar_time=top_bar.bar_time,
-                timeframe=top_bar.timeframe,
-            )
 
         previous_day = self.relevant_bars[0]
         current_day_breaks_highest_high_since_fall = (
@@ -89,7 +68,6 @@ class Evidence(
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and crossed_resistance_level_strongly
         )
-
 
         return (
             True

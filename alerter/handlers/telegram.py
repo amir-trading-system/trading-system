@@ -28,7 +28,7 @@ class Handler(
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         emoji: str,
-        evidence_name: str,
+        evidences: list[str],
         milestones: common.objects.Milestones,
     ) -> str:
         return f"""
@@ -39,7 +39,8 @@ class Handler(
             <b>Time:</b> <code>{current_bar.bar_time}</code>
             <b>Starting Time:</b> <code>{milestones.starting_bar.bar_time}</code>
             <b>Top Time:</b> <code>{milestones.top_bar.bar_time}</code>
-            <b>Evidence:</b> <code>{evidence_name}</code>
+            <b>{len(evidences)} Indications:</b>
+            {chr(10).join(f"• <i>{evidence}</i>" for evidence in evidences)}
             """
 
     def design_confirmation_bar_message(

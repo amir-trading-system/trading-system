@@ -238,8 +238,8 @@ class DataStreamer():
             )
             return
 
-        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
         self.request_id_to_symbol[request_id].finished_collection = True
+        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
         self.logger.info(
             msg="Finished to collect data for symbol",
             extra={

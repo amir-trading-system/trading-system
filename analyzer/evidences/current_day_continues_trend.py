@@ -153,6 +153,7 @@ class Evidence(
 
             crossed_only_highest_high_today_and_after_noon = (
                 True
+                and previous_bar is not None
                 and original_bar_to_confirm.low < previous_bar.high
                 and potential_confirmation_bar.low < highest_high_one_minute
                 and potential_confirmation_bar.high > highest_high_one_minute

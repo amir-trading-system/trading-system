@@ -24,7 +24,7 @@ class Alerter:
         emoji: str,
         milestones: common.objects.Milestones,
         is_retro: bool,
-        evidence_name: str,
+        evidences: list[str],
     ):
         telegram_object: handlers.telegram.Handler = handlers.telegram.Handler(
             configuration=self.configuration,
@@ -35,7 +35,7 @@ class Alerter:
             current_bar=current_bar,
             emoji=emoji,
             milestones=milestones,
-            evidence_name=evidence_name,
+            evidences=evidences,
         )
 
         threading.Thread(

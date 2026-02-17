@@ -63,6 +63,8 @@ class Analyzer:
                 timeframe=stock.timeframe,
                 timeframe_type=stock.timeframe_type,
                 specific_bar_time=current_bar.bar_time,
+                finished_collection=stock.finished_collection,
+                finished_analyze=stock.finished_analyze,
                 last_post_pre_one_minute_highest_high=stock.last_post_pre_one_minute_highest_high,
             )
 
@@ -132,6 +134,8 @@ class Analyzer:
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
                     specific_bar_time=stock_object.specific_bar_time,
                     last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
+                    finished_collection=stock_object.finished_collection,
+                    finished_analyze=stock_object.finished_analyze,
                 )
                 stock.arrange_data_for_analysis()
 
@@ -185,6 +189,8 @@ class Analyzer:
                     one_minute_bars_queue=stock_object.one_minute_bars_queue,
                     specific_bar_time=stock_object.specific_bar_time,
                     last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
+                    finished_collection=stock_object.finished_collection,
+                    finished_analyze=stock_object.finished_analyze,
                 )
                 stock.arrange_data_for_analysis()
 
