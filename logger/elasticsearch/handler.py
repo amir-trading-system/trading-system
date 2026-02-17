@@ -48,6 +48,7 @@ class Handler(
             "lowest_low_index",
             "quantity",
             "evidence_name",
+            "evidences",
         ]
 
         for field in fields:

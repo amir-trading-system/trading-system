@@ -1,5 +1,4 @@
 import csv
-import datetime
 import tqdm
 import yfinance
 import requests

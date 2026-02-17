@@ -66,5 +66,4 @@ class Confirmator:
                     },
                 ).start()
 
-
             time.sleep(1)

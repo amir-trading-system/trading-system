@@ -62,6 +62,16 @@ class Confirmator:
                 entry_position_bar = potential_confirmation_bar
                 confirmed_evidences.append(evidence.name)
 
+        if confirmed_evidences:
+            self.results_queue.put(
+                {
+                    "symbol": relevant_stock.symbol_name,
+                    "original_bar_time": original_bar_to_confirm.bar_time,
+                    "confirmation_bar_time": entry_position_bar.bar_time,
+                    "evidences": confirmed_evidences,
+                },
+            )
+
         for evidence_name in confirmed_evidences:
             self.logger.info(
                 "Bar has confirmed",
@@ -72,14 +82,6 @@ class Confirmator:
                     "timeframe_type": original_bar_to_confirm.timeframe_type.value,
                     "entry_position_bar_time": entry_position_bar.bar_time,
                     "bar_time": original_bar_to_confirm.bar_time,
-                    "evidence_name": evidence_name,
-                },
-            )
-            self.results_queue.put(
-                {
-                    "symbol": relevant_stock.symbol_name,
-                    "original_bar_time": original_bar_to_confirm.bar_time,
-                    "confirmation_bar_time": entry_position_bar.bar_time,
                     "evidence_name": evidence_name,
                 },
             )

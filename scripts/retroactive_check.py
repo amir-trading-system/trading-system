@@ -135,6 +135,10 @@ def get_symbols() -> list[Symbol]:
             name="NCI",
             datetime_str="02.11.26T11:00:00",
         ),
+        Symbol(
+            name="ATOM",
+            datetime_str="02.17.26T09:30:00",
+        ),
     ]
 
 def build_table(
@@ -172,10 +176,13 @@ def build_table(
     )
     sorted_data_by_original_date = sorted(
         data,
-        key=lambda symbol_data: symbol_data["expected_confirmation_bar_time"],
+        key=lambda symbol_data: symbol_data["symbol"],
     )
 
     for symbol_data in sorted_data_by_original_date:
+        symbol = symbol_data["symbol"]
+        original_bar_time = symbol_data["original_bar_time"]
+
         collection_status = symbol_data["collection_status"]
         if collection_status != "done":
             collection_status = f"[red]{collection_status}[/red]"
@@ -191,6 +198,8 @@ def build_table(
         evidence_name = symbol_data["evidence_name"]
         if evidence_name == "in_progress":
             evidence_name = f"[red]{evidence_name}[/red]"
+        elif symbol_data["is_new"]:
+            evidence_name = f"[bold yellow]{evidence_name}[/bold yellow]"
         else:
             evidence_name = f"[green]{evidence_name}[/green]"
 
@@ -202,9 +211,13 @@ def build_table(
         else:
             actual_confirmation_bar_time = f"[red]{actual_confirmation_bar_time}[/red]"
 
+        if symbol_data["is_new"]:
+            row_style = "bold yellow"
+            symbol = f"[{row_style}]{symbol}[/{row_style}]"
+
         table.add_row(
-            symbol_data["symbol"],
-            str(symbol_data["original_bar_time"]),
+            symbol,
+            str(original_bar_time),
             collection_status,
             analysis_status,
             str(actual_confirmation_bar_time),
@@ -239,8 +252,7 @@ def update_table_with_status_per_stage(
             if symbol.finished_analyze and symbol.is_day_timeframe() and relevant_symbol_data["analysis_status"] != "done":
                 relevant_symbol_data["analysis_status"] = "done"
 
-            live_table.update(build_table(symbols_data))
-
+            live_table.update(build_table(symbols_data), refresh=True)
 
 def update_table_with_results_queue(
     results_queue: queue.Queue[dict[str,any]],
@@ -258,24 +270,31 @@ def update_table_with_results_queue(
                 and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
                 and symbol_data["evidence_name"] == "in_progress"
             ]
-            if relevant_symbol_data:
-                if relevant_symbol_data[0]["evidence_name"] != "in_progress":
-                    symbols_data.append(
-                        {
-                            "symbol": relevant_symbol_data[0]["symbol"],
-                            "collection_status": relevant_symbol_data[0]["collection_status"],
-                            "analysis_status": relevant_symbol_data[0]["analysis_status"],
-                            "original_bar_time": relevant_symbol_data[0]["original_bar_time"],
-                            "actual_confirmation_bar_time": confirmation_result[0]["confirmation_bar_time"],
-                            "expected_confirmation_bar_time": "not_exists_yet",
-                            "evidence_name": confirmation_result["evidence_name"],
-                        },
-                    )
-                else:
-                    relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
-                    relevant_symbol_data[0]["evidence_name"] = confirmation_result["evidence_name"]
-                    live_table.update(build_table(symbols_data))
+            should_update_first_default = True
 
+            for evidence_name in confirmation_result["evidences"]:
+                if should_update_first_default and relevant_symbol_data:
+                    relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
+                    relevant_symbol_data[0]["evidence_name"] = evidence_name
+                    relevant_symbol_data[0]["collection_status"] = "done"
+                    relevant_symbol_data[0]["analysis_status"] = "done"
+                    should_update_first_default = False
+                    continue
+
+                symbols_data.append(
+                    {
+                        "symbol": confirmation_result["symbol"],
+                        "collection_status": "done",
+                        "analysis_status": "done",
+                        "original_bar_time": confirmation_result["original_bar_time"],
+                        "actual_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
+                        "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
+                        "evidence_name": evidence_name,
+                        "is_new": True,
+                    },
+                )
+
+            live_table.update(build_table(symbols_data), refresh=True)
             counter[0] -= 1
 
 def run_retroactive_check():
@@ -340,8 +359,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="AUST",
-    #         datetime_str="01.23.26T12:45:00",
+    #         name="ATOM",
+    #         datetime_str="02.17.26T09:43:00",
     #     ),
     # ]
     counter = [len(symbols)]
@@ -365,6 +384,7 @@ def run_retroactive_check():
                 "actual_confirmation_bar_time": "in_progress",
                 "expected_confirmation_bar_time": symbol.date_time,
                 "evidence_name": "in_progress",
+                "is_new": False,
             },
         )
 
@@ -385,7 +405,7 @@ def run_retroactive_check():
                 "symbols_data": symbols_data,
                 "counter": counter,
                 "live_table": live_table,
-            }
+            },
         ).start()
 
         while True:

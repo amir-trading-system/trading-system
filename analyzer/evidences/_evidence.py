@@ -20,6 +20,7 @@ class Evidence:
             base_condition = (
                 True
                 and base_condition
+                and previous_bar is not None
                 and bar_object.high > previous_bar.high
             )
 
@@ -161,6 +162,13 @@ class Evidence:
     ) -> dict[float, int]:
         resistance_level_to_breaking_attempts: dict[float, int] = {}
         for bar_object in relevant_bars[:current_bar.index+40]:
+            if (
+                bar_object.vwap is None
+                or bar_object.ema_9 is None
+                or bar_object.ema_20 is None
+            ):
+                continue
+
             previous_bar = stock.previous_bar(
                 bar_object=bar_object,
             )
@@ -215,6 +223,7 @@ class Evidence:
             resistance_level
             for resistance_level in resistance_levels
             if potential_confirmation_bar.low < resistance_level < potential_confirmation_bar.close
+            and abs(resistance_level - potential_confirmation_bar.open_value) > 0
             and (potential_confirmation_bar.close - resistance_level)/abs(resistance_level - potential_confirmation_bar.open_value) >= 0.25
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.volume > 10000

@@ -25,6 +25,7 @@ class DataStreamer():
         self.request_id_to_symbol = request_id_to_symbol
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
+        self.for_tomorrow_list: list[str] = []
 
     def _filter_ignored_bars(
         self,
@@ -238,8 +239,8 @@ class DataStreamer():
             )
             return
 
-        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
         self.request_id_to_symbol[request_id].finished_collection = True
+        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
         self.logger.info(
             msg="Finished to collect data for symbol",
             extra={
@@ -249,6 +250,10 @@ class DataStreamer():
                 "timeframe_type": self.request_id_to_symbol[request_id].timeframe_type.value,
             }
         )
+        if bars_data[-1].symbol not in self.for_tomorrow_list:
+            self.insert_for_tomorrow_list(
+                current_bar=bars_data[-1],
+            )
 
     def on_historical_data_update(
         self,
@@ -316,3 +321,44 @@ class DataStreamer():
             return
 
         self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
+
+        if current_bar.symbol not in self.for_tomorrow_list:
+            self.insert_for_tomorrow_list(
+                current_bar=current_bar,
+            )
+
+    #pylint:disable=unspecified-encoding
+    def insert_for_tomorrow_list(
+        self,
+        current_bar: common.objects.BarData,
+    ):
+        now = datetime.datetime.now()
+        if (
+            True
+            and not self.is_retro
+            and now >= datetime.datetime(
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                hour=16,
+                minute=1
+            )
+        ):
+            current_day_is_potential_for_tomorrow = (
+                True
+                and current_bar.close > current_bar.open_value
+                and current_bar.symbol == "ATOM"
+                and (current_bar.high - current_bar.close)/(current_bar.high - current_bar.low) <= 0.8
+                and current_bar.low/current_bar.open_value > 0.99
+                and current_bar.volume > current_bar.volume_average
+                and current_bar.close > current_bar.ema_9
+                and current_bar.close > current_bar.ema_20
+                and current_bar.close > current_bar.vwap
+                and (current_bar.close - current_bar.open_value)/current_bar.close >= 0.2
+            )
+
+            if current_day_is_potential_for_tomorrow:
+                with open("potential_stocks_for_tomorrow.txt", "a") as f:
+                    f.write(f"{current_bar.symbol}\n")
+
+                self.for_tomorrow_list.append(current_bar.symbol)

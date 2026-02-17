@@ -20,6 +20,7 @@ class Evidence(
 
         current_bar_crossed_any_resistance = (
             True
+            and previous_bar is not None
             and current_bar.close > current_bar.open_value
             and current_bar.high > current_bar.vwap
             and any(
@@ -55,7 +56,12 @@ class Evidence(
             bar_object
             for bar_object in one_minute_bars
             if bar_object.high == highest_high_one_minute
-        ][0]
+        ]
+        if not highest_high_bar:
+            return False
+
+        highest_high_bar = highest_high_bar[0]
+
         if (
             True
             and highest_high_bar.close < highest_high_bar.open_value
@@ -67,6 +73,7 @@ class Evidence(
 
         crossed_highest_high = (
             True
+            and previous_bar is not None
             and previous_bar.high < highest_high_one_minute
             and potential_confirmation_bar.low < highest_high_one_minute <= potential_confirmation_bar.close
             and (

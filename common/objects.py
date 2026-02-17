@@ -39,8 +39,6 @@ class BarData:
         index: int = 0,
         is_after_market_open: bool = None,
         ready_to_analyze: bool = False,
-        has_indication: bool = False,
-        indicator: str = None,
     ):
         self.symbol = symbol
         self.timeframe = timeframe
@@ -67,13 +65,12 @@ class BarData:
             minute=30,
         ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
-        self.has_indication = has_indication
-        self.indicator = indicator
 
     def generate_unique_identifier(
         self,
+        evidence_name: str,
     ) -> str:
-        return f"{self.symbol}-{self.timeframe}-{self.timeframe_type}-{self.bar_time}-{self.indicator}"
+        return f"{self.symbol}-{self.timeframe}-{self.timeframe_type}-{self.bar_time}-{evidence_name}"
 
 class Stock:
     def __init__(

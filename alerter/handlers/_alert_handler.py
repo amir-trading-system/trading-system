@@ -35,9 +35,8 @@ class Handler:
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         emoji: str,
-        base_except_one: bool,
+        evidences: list[str],
         milestones: common.objects.Milestones,
-        sorted_indicators: dict[str,float],
     ) -> str:
         raise NotImplementedError()
 
@@ -81,16 +80,29 @@ class Handler:
             )
             return
 
-        self._send_message(
-            message=message,
-        )
-        self.logger.info(
-            msg=f"Alert has been sent successfully to {self.name}",
-            extra={
-                "worker": sender,
-                "symbol": symbol,
-                "timeframe": timeframe,
-                "bar_time": bar_date,
-                "current_index": bar_index,
-            },
-        )
+        try:
+            self._send_message(
+                message=message,
+            )
+            self.logger.info(
+                msg=f"Alert has been sent successfully to {self.name}",
+                extra={
+                    "worker": sender,
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "bar_time": bar_date,
+                    "current_index": bar_index,
+                },
+            )
+        except Exception as e:
+            self.logger.error(
+                msg="An error occurred while sending message via alerter",
+                extra={
+                    "exception": e,
+                    "worker": sender,
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "bar_time": bar_date,
+                    "current_index": bar_index,
+                },
+            )
