@@ -28,6 +28,10 @@ class Symbol:
 def get_symbols() -> list[Symbol]:
     return [
         Symbol(
+            name="EPSM",
+            datetime_str="11.20.25T11:06:00",
+        ),
+        Symbol(
             name="CYCU",
             datetime_str="11.14.25T12:42:00",
         ),
@@ -333,8 +337,8 @@ def run_retroactive_check():
     symbols = get_symbols()
     # symbols = [
     #     Symbol(
-    #         name="CYCU",
-    #         datetime_str="11.14.25T12:42:00",
+    #         name="EPSM",
+    #         datetime_str="11.20.25T11:06:00",
     #     ),
     # ]
     counter = [len(symbols)]

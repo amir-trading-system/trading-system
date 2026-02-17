@@ -21,8 +21,6 @@ class Evidence(
         current_bar_crossed_any_resistance = (
             True
             and current_bar.close > current_bar.open_value
-            and current_bar.close > current_bar.ema_9
-            and current_bar.close > current_bar.ema_20
             and current_bar.close > current_bar.vwap
             and any(
                 resistance_level
@@ -49,22 +47,21 @@ class Evidence(
         one_minute_bars: list[common.objects.BarData],
     ) -> bool:
         current_bar = relevant_stock.bars[0]
-        potential_confirmation_bar_is_today_highest = max(
-            [
-                round(highest_high_one_minute, 2),
-                round(current_bar.ema_9, 2),
-                round(current_bar.ema_20, 2),
-            ]
-        ) < potential_confirmation_bar.close
-
         previous_bar = relevant_stock.previous_bar(
             bar_object=current_bar,
         )
+
+        highest_high_bar = [
+            bar_object
+            for bar_object in one_minute_bars
+            if bar_object.high == highest_high_one_minute
+        ][0]
 
         crossed_highest_high = (
             True
             and previous_bar.high < highest_high_one_minute
             and potential_confirmation_bar.low < highest_high_one_minute < potential_confirmation_bar.close
+            and potential_confirmation_bar.index+1 < highest_high_bar.index
         )
 
         highest_than_any_resistance_level = any(
@@ -77,7 +74,6 @@ class Evidence(
             True
             and potential_confirmation_bar.close > potential_confirmation_bar.open_value
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and potential_confirmation_bar_is_today_highest
             and crossed_highest_high
             and highest_than_any_resistance_level
         )
