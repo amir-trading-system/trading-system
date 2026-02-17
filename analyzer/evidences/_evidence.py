@@ -184,7 +184,6 @@ class Evidence:
                 and previous_bar is not None
                 and next_bar is not None
                 and previous_bar.high < bar_object.high > next_bar.high
-                and bar_object.volume > bar_object.volume_average
             )
 
             if (

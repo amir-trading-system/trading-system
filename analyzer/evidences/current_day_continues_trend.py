@@ -175,7 +175,7 @@ class Evidence(
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
             and potential_confirmation_bar.close > potential_confirmation_bar.vwap
-            and potential_confirmation_bar.volume > 30000
+            and potential_confirmation_bar.volume > 50000
         ):
             return True
 

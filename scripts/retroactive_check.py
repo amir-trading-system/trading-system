@@ -53,11 +53,11 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="ASPC",
-            datetime_str="12.26.25T12:31:00",
+            datetime_str="12.26.25T12:25:00",
         ),
         Symbol(
             name="INBS",
-            datetime_str="12.31.25T09:50:00",
+            datetime_str="12.31.25T12:52:00",
         ),
         Symbol(
             name="CATX",
@@ -337,8 +337,15 @@ def run_retroactive_check():
     symbols = get_symbols()
     # symbols = [
     #     Symbol(
-    #         name="EPSM",
-    #         datetime_str="11.20.25T11:06:00",
+    #         name=symbol,
+    #         datetime_str=date,
+    #     )
+    #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
+    # ]
+    # symbols = [
+    #     Symbol(
+    #         name="AUST",
+    #         datetime_str="01.23.26T12:45:00",
     #     ),
     # ]
     counter = [len(symbols)]
