@@ -81,6 +81,7 @@ class Analyzer:
                         emoji="✅",
                         milestones=milestones,
                         is_retro=is_retro,
+                        evidence_name=indicator_obj.evidence.name,
                     )
 
                 bar_unique_identifier = current_bar.generate_unique_identifier()

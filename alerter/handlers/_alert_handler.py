@@ -35,9 +35,8 @@ class Handler:
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         emoji: str,
-        base_except_one: bool,
+        evidence_name: str,
         milestones: common.objects.Milestones,
-        sorted_indicators: dict[str,float],
     ) -> str:
         raise NotImplementedError()
 

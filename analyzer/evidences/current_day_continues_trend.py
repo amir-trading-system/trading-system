@@ -160,16 +160,9 @@ class Evidence(
                 and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=20) < highest_high_bar.bar_time
             )
 
-        crossed_any_resistance_level = any(
-            resistance_level
-            for resistance_level in relevant_stock.resistance_levels
-            if potential_confirmation_bar.low < resistance_level <= potential_confirmation_bar.close
-        )
-
         if (
             True
             and potential_confirmation_bar.close > potential_confirmation_bar.open_value
-            and crossed_any_resistance_level
             and (
                 crossed_previous_day_only
                 or crossed_starting_point
@@ -182,7 +175,7 @@ class Evidence(
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
             and potential_confirmation_bar.close > potential_confirmation_bar.vwap
-            and potential_confirmation_bar.volume > 30000
+            and potential_confirmation_bar.volume > 50000
         ):
             return True
 

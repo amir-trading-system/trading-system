@@ -55,7 +55,12 @@ class Evidence(
             bar_object
             for bar_object in one_minute_bars
             if bar_object.high == highest_high_one_minute
-        ][0]
+        ]
+        if not highest_high_bar:
+            return False
+
+        highest_high_bar = highest_high_bar[0]
+
         if (
             True
             and highest_high_bar.close < highest_high_bar.open_value

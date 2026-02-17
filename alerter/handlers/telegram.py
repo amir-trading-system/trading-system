@@ -28,22 +28,18 @@ class Handler(
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         emoji: str,
-        base_except_one: bool,
+        evidence_name: str,
         milestones: common.objects.Milestones,
-        sorted_indicators: dict[str,float],
     ) -> str:
         return f"""
             <b>{emoji} Congrats! {emoji}</b>
-            {"<b>BASE EXCEPT ONE!</b>" if base_except_one else ""}
 
             <b>Symbol:</b> <u>{stock.symbol_name}</u>
             <b>Timeframe:</b> <code>{stock.timeframe}</code>
             <b>Time:</b> <code>{current_bar.bar_time}</code>
             <b>Starting Time:</b> <code>{milestones.starting_bar.bar_time}</code>
             <b>Top Time:</b> <code>{milestones.top_bar.bar_time}</code>
-
-            <b>{len(sorted_indicators)} Indications:</b>
-            {chr(10).join(f"• <i>{indicator_name}: {rate}</i>" for indicator_name, rate in sorted_indicators.items())}
+            <b>Evidence:</b> <code>{evidence_name}</code>
             """
 
     def design_confirmation_bar_message(
