@@ -135,10 +135,6 @@ def get_symbols() -> list[Symbol]:
             name="NCI",
             datetime_str="02.11.26T11:00:00",
         ),
-        Symbol(
-            name="NCI",
-            datetime_str="02.13.26T09:30:00",
-        ),
     ]
 
 def build_table(
