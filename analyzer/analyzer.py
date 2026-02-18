@@ -125,6 +125,16 @@ class Analyzer:
         while True:
             if not self.bars_ready_to_analyze_queue.empty():
                 stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
+                most_recent_bar = stock_object.bars[-1]
+                today = datetime.datetime.now().day
+                if (
+                    True
+                    and not specific_bar_time
+                    and not retroactive_from
+                    and today != most_recent_bar.bar_time.day
+                ):
+                    continue
+
                 stock = common.objects.Stock(
                     request_id=stock_object.request_id,
                     symbol_name=stock_object.symbol_name,
