@@ -32,12 +32,12 @@ class Evidence(
         if top_bar is not None:
             milestones.top_bar = top_bar
 
+        ema_for_check = current_bar.ema_9 if current_bar.ema_9 < current_bar.ema_20 else current_bar.ema_20
         current_day_continues_trend = (
             True
             and current_bar.high > starting_bar.bar_object.high
             and current_bar.close > current_bar.open_value
-            and current_bar.close > current_bar.ema_9
-            and current_bar.close > current_bar.ema_20
+            and current_bar.close > ema_for_check
         )
 
         return common.objects.EvidenceResponse(

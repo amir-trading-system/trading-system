@@ -41,7 +41,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="AFJK",
-            datetime_str="12.09.25T14:14:00",
+            datetime_str="12.09.25T10:35:00",
         ),
         Symbol(
             name="QCLS",
@@ -138,6 +138,14 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="ATOM",
             datetime_str="02.17.26T09:30:00",
+        ),
+        Symbol(
+            name="MLEC",
+            datetime_str="02.18.26T09:47:00",
+        ),
+        Symbol(
+            name="FJET",
+            datetime_str="02.18.26T09:34:00",
         ),
     ]
 
@@ -359,8 +367,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="ATOM",
-    #         datetime_str="02.17.26T09:43:00",
+    #         name="FJET",
+    #         datetime_str="02.18.26T09:34:00",
     #     ),
     # ]
     counter = [len(symbols)]

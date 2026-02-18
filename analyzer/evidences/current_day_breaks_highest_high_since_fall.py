@@ -49,11 +49,11 @@ class Evidence(
     ) -> bool:
         potential_confirmation_bar_is_strong = False
         current_bar = relevant_stock.bars[0]
+        ema_for_check = current_bar.ema_9 if current_bar.ema_9 < current_bar.ema_20 else current_bar.ema_20
         potential_confirmation_bar_is_highest = max(
             [
                 round(highest_high_one_minute, 2),
-                round(current_bar.ema_9, 2),
-                round(current_bar.ema_20, 2),
+                round(ema_for_check, 2),
             ]
         ) < potential_confirmation_bar.close
 

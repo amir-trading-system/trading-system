@@ -59,12 +59,11 @@ class Evidence(
 
         between_bounderis = starting_bar.bar_object.low < current_bar.low < boundries_bar.high
 
+        ema_for_check = current_bar.ema_9 if current_bar.ema_9 < current_bar.ema_20 else current_bar.ema_20
         current_bar_is_strong = (
             True
             and current_bar.close > current_bar.open_value or is_retro
-            and current_bar.close > current_bar.ema_9
-            and current_bar.close > current_bar.ema_20
-            and current_bar.ema_9 > current_bar.ema_20
+            and current_bar.close > ema_for_check
             and current_bar.histogram > 0
             and between_bounderis
         )
