@@ -20,12 +20,14 @@ class DataStreamer():
         bars_ready_to_analyze_queue: queue.Queue,
         ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
+        potential_symbols_file_path: str = None,
     ):
         self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
         self.for_tomorrow_list: list[str] = []
+        self.potential_symbols_file_path = potential_symbols_file_path
 
     def _filter_ignored_bars(
         self,
@@ -347,7 +349,6 @@ class DataStreamer():
             current_day_is_potential_for_tomorrow = (
                 True
                 and current_bar.close > current_bar.open_value
-                and current_bar.symbol == "ATOM"
                 and (current_bar.high - current_bar.close)/(current_bar.high - current_bar.low) <= 0.8
                 and current_bar.low/current_bar.open_value > 0.99
                 and current_bar.volume > current_bar.volume_average
@@ -357,8 +358,8 @@ class DataStreamer():
                 and (current_bar.close - current_bar.open_value)/current_bar.close >= 0.2
             )
 
-            if current_day_is_potential_for_tomorrow:
-                with open("potential_stocks_for_tomorrow.txt", "a") as f:
-                    f.write(f"{current_bar.symbol}\n")
+            if current_day_is_potential_for_tomorrow and self.potential_symbols_file_path is not None:
+                with open(self.potential_symbols_file_path, "a") as f:
+                    f.write(f"{current_bar.symbol}--{current_bar.bar_time}\n")
 
                 self.for_tomorrow_list.append(current_bar.symbol)

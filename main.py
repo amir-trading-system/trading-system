@@ -1,5 +1,7 @@
-from  argparse import ArgumentParser
+from argparse import ArgumentParser
 import datetime
+import logging
+import os
 import threading
 import time
 import queue
@@ -12,6 +14,41 @@ import common
 import collector
 import logger
 import tws
+
+#pylint:disable=unspecified-encoding
+def initiate_potential_symbols_from_yesterday(
+    file_path: str,
+    logger_obj: logging.Logger,
+    symbols_queue: queue.Queue[str],
+):
+    lines_to_save: list[str] = []
+
+    if not os.path.exists(file_path):
+        with open(file_path, "w") as f:
+            return
+
+    with open(file_path, "r") as f:
+        try:
+            lines = f.readlines()
+            for line in lines:
+                [symbol, date] = line.split("--")
+                formatted_date = datetime.datetime.fromisoformat(date.replace("\n", ""))
+                if (formatted_date + datetime.timedelta(
+                    days=1,
+                )).day == datetime.datetime.now().day:
+                    lines_to_save.append(f"{symbol}--{date}")
+                    symbols_queue.put(symbol)
+        except FileNotFoundError as e:
+            logger_obj.error(
+                msg="potential stocks file does not exists",
+                extra={
+                    "exception": e,
+                },
+            )
+
+    if lines_to_save:
+        with open(file_path, "w") as f:
+            f.writelines(lines_to_save)
 
 def run_bot(
     tws_client_obj: tws.client.Client,
@@ -120,6 +157,11 @@ if __name__ == "__main__":
         enable_stdout=True,
     ).get_logger()
 
+    initiate_potential_symbols_from_yesterday(
+        file_path=configuration.potential_symbols_file_path,
+        logger_obj=logger_object,
+        symbols_queue=symbols_to_collect_queue,
+    )
     alerter_object = alerter.alerter.Alerter(
         logger=logger_object,
         configuration=configuration.alerts,
@@ -131,6 +173,7 @@ if __name__ == "__main__":
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
+        potential_symbols_file_path=configuration.potential_symbols_file_path,
     )
     collector_obj = collector.collector.Collector(
         tws_client=tws_client,

@@ -9,4 +9,4 @@ stocks_by*.csv
 .Ds_Store
 .env
 .vscode/
-potential_stocks_for_tomorrow.txt
+potential_symbols_for_tomorrow.txt

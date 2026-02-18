@@ -26,8 +26,11 @@ class BotConfig:
     def __init__(
         self,
         alerts: Alerts,
+        potential_symbols_file_path: str,
     ):
         self.alerts = alerts
+        self.potential_symbols_file_path = potential_symbols_file_path
+
 
 
 class ConfigManager:
@@ -44,4 +47,5 @@ class ConfigManager:
                     enabled=True if os.getenv("TELEGRAM_ENABLED") == 'true' else False,
                 ),
             ),
+            potential_symbols_file_path=os.getenv("POTENTIAL_SYMBOLS_FILE", ""),
         )
