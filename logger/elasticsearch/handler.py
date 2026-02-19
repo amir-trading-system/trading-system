@@ -49,15 +49,15 @@ class Handler(
             "quantity",
             "evidence_name",
             "evidences",
-            "high",
             "low",
-            "histogram",
+            "open",
+            "close",
+            "high",
+            "body_percentage",
             "request_id",
         ]
 
         for field in fields:
-            if record_as_dict.get("histogram") and not float.is_integer(record_as_dict.get("histogram")):
-                continue
             if record_as_dict.get(field):
                 document[field] = record_as_dict[field]
 

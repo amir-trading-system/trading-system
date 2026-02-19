@@ -148,8 +148,11 @@ class Analyzer:
                     "timeframe_type": stock.timeframe_type.value,
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
-                    "high": current_bar.high,
                     "low": current_bar.low,
+                    "open": current_bar.open_value,
+                    "close": current_bar.close,
+                    "high": current_bar.high,
+                    "body_percentage": (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low),
                     "histogram": current_bar.histogram,
                     "request_id": stock.request_id,
                 }
