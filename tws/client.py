@@ -129,6 +129,7 @@ class Client(client.EClient, wrapper.EWrapper):
         contractDetails,
     ):
         self.scanner.get_contract_details(
+            request_id=reqId,
             contract_details=contractDetails,
         )
         return super().contractDetails(reqId, contractDetails)
@@ -286,6 +287,7 @@ class Client(client.EClient, wrapper.EWrapper):
                 "order_action": execution.side,
                 "quantity": int(execution.shares),
                 "symbol": contract.symbol,
+                "request_id": reqId,
             },
         )
         if execution.side == "BOT":

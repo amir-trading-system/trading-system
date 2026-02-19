@@ -83,6 +83,7 @@ class Confirmator:
                     "entry_position_bar_time": entry_position_bar.bar_time,
                     "bar_time": original_bar_to_confirm.bar_time,
                     "evidence_name": evidence_name,
+                    "request_id": relevant_stock.request_id,
                 },
             )
 
@@ -93,6 +94,7 @@ class Confirmator:
                     entry_position_bar=entry_position_bar,
                     evidence_name=evidence_name,
                     is_retro=self.is_retro,
+                    request_id=relevant_stock.request_id,
                 )
 
             unique_key_for_place_order = original_bar_to_confirm.symbol

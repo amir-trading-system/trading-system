@@ -250,6 +250,7 @@ class DataStreamer():
                 "symbol": symbol,
                 "timeframe": self.request_id_to_symbol[request_id].timeframe,
                 "timeframe_type": self.request_id_to_symbol[request_id].timeframe_type.value,
+                "request_id": request_id,
             }
         )
         if bars_data[-1].symbol not in self.for_tomorrow_list:

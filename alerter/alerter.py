@@ -16,41 +16,6 @@ class Alerter:
         self.logger = logger
         self.configuration = configuration
 
-    def send_alert(
-        self,
-        sender: str,
-        stock: common.objects.Stock,
-        current_bar: common.objects.BarData,
-        emoji: str,
-        milestones: common.objects.Milestones,
-        is_retro: bool,
-        evidences: list[str],
-    ):
-        telegram_object: handlers.telegram.Handler = handlers.telegram.Handler(
-            configuration=self.configuration,
-            logger=self.logger,
-        )
-        designed_message = telegram_object.design_indicated_bar_message(
-            stock=stock,
-            current_bar=current_bar,
-            emoji=emoji,
-            milestones=milestones,
-            evidences=evidences,
-        )
-
-        threading.Thread(
-            target=telegram_object.alert,
-            kwargs={
-                "sender": sender,
-                "symbol": current_bar.symbol,
-                "timeframe": current_bar.timeframe,
-                "bar_date": current_bar.bar_time,
-                "bar_index": current_bar.index,
-                "message": designed_message,
-                "is_retro": is_retro,
-            },
-        ).start()
-
     def send_confirmation_alert(
         self,
         sender: str,
@@ -58,6 +23,7 @@ class Alerter:
         entry_position_bar: common.objects.BarData,
         evidence_name: str,
         is_retro: bool,
+        request_id: int,
     ):
         handler_object: handlers.telegram.Handler = handlers.telegram.Handler(
             configuration=self.configuration,
@@ -79,5 +45,6 @@ class Alerter:
                 "bar_index": original_bar.index,
                 "message": designed_message,
                 "is_retro": is_retro,
+                "request_id": request_id,
             },
         ).start()

@@ -49,6 +49,7 @@ class Handler:
         bar_index: int,
         message: str,
         is_retro: bool,
+        request_id: int,
     ):
         if not self.is_enabled:
             self.logger.warning(
@@ -59,6 +60,7 @@ class Handler:
                     "timeframe": timeframe,
                     "bar_time": bar_date,
                     "current_index": bar_index,
+                    "request_id": request_id,
                 },
             )
             return
@@ -76,6 +78,7 @@ class Handler:
                     "symbol": symbol,
                     "timeframe": timeframe,
                     "bar_time": bar_date,
+                    "request_id": request_id,
                 },
             )
             return
@@ -92,6 +95,7 @@ class Handler:
                     "timeframe": timeframe,
                     "bar_time": bar_date,
                     "current_index": bar_index,
+                    "request_id": request_id,
                 },
             )
         except Exception as e:
@@ -104,5 +108,6 @@ class Handler:
                     "timeframe": timeframe,
                     "bar_time": bar_date,
                     "current_index": bar_index,
+                    "request_id": request_id,
                 },
             )

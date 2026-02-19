@@ -22,7 +22,7 @@ class Scanner():
         scanner_subscription.numberOfRows = 50
         scanner_subscription.instrument = "STK"
         scanner_subscription.locationCode = "STK.US.MAJOR"
-        scanner_subscription.scanCode = "TOP_OPEN_PERC_GAIN"
+        scanner_subscription.scanCode = "TOP_PERC_GAIN"
 
 
         return scanner_subscription
@@ -35,11 +35,12 @@ class Scanner():
             tag_value.TagValue("priceAbove", "1"),
             tag_value.TagValue("priceBelow", "100"),
             tag_value.TagValue("marketCapBelow1e6", "500000000"),
-            tag_value.TagValue("changeOpenPercAbove", "3")
+            tag_value.TagValue("changePercAbove", "5")
         ]
 
     def get_contract_details(
         self,
+        request_id: int,
         contract_details: contract.ContractDetails,
     ):
         no_opening_trades = False
@@ -56,6 +57,7 @@ class Scanner():
                             "worker": "Scanner",
                             "symbol": contract_details.contract.symbol,
                             "symbol_type": contract_details.stockType,
+                            "request_id": request_id,
                         },
                     )
                     # print(symbol_name)

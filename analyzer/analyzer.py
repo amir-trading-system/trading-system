@@ -164,6 +164,7 @@ class Analyzer:
                                 "timeframe": stock.timeframe,
                                 "timeframe_type": stock.timeframe_type.value,
                                 "retroactive_from": retroactive_from,
+                                "request_id": stock.request_id,
                             },
                         )
                 else:
@@ -181,6 +182,7 @@ class Analyzer:
                                 "timeframe": stock.timeframe,
                                 "timeframe_type": stock.timeframe_type.value,
                                 "specific_bar_time": specific_bar_time,
+                                "request_id": stock.request_id,
                             },
                         )
 
@@ -218,5 +220,6 @@ class Analyzer:
                             "timeframe": stock.timeframe,
                             "timeframe_type": stock.timeframe_type.value,
                             "specific_bar_time": stock_object.specific_bar_time,
+                            "request_id": stock_object.request_id,
                         },
                     )

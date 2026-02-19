@@ -43,6 +43,7 @@ class Analyzer:
                     "timeframe_type": stock.timeframe_type.value,
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
+                    "request_id": stock.request_id,
                 },
             )
 
@@ -89,17 +90,9 @@ class Analyzer:
                         "bar_time": current_bar.bar_time,
                         "current_index": current_bar.index,
                         "evidences": evidence_names,
+                        "request_id": stock.request_id,
                     },
                 )
-                # self.alerter_object.send_alert(
-                #     sender="Analyzer",
-                #     stock=stock,
-                #     current_bar=current_bar,
-                #     emoji="✅",
-                #     milestones=milestones,
-                #     is_retro=is_retro,
-                #     evidences=evidence_names,
-                # )
 
             self.waiting_for_confirmation_queue.put(
                 {
@@ -121,6 +114,7 @@ class Analyzer:
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
                     "current_volume": current_bar.volume,
+                    "request_id": stock.request_id,
                 },
             )
 
@@ -158,6 +152,10 @@ class Analyzer:
                     "timeframe_type": stock.timeframe_type.value,
                     "bar_time": current_bar.bar_time,
                     "current_index": current_bar.index,
+                    "high": current_bar.high,
+                    "low": current_bar.low,
+                    "histogram": current_bar.histogram,
+                    "request_id": stock.request_id,
                 }
             )
             return

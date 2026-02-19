@@ -13,7 +13,6 @@ class Indicator:
     ):
         self.logger = logger
         self.evidence: type[analyzer.evidences._evidence.Evidence]
-        self.must_to_have: list[bool] = []
         self.can_be_confirm_by_itself = False
         self.milestones = milestones
 
@@ -41,38 +40,6 @@ class Indicator:
     ) -> common.objects.IndicatorResponse:
         success_results: list[common.objects.EvidenceResponse] = []
         failed_base_evidences_count = 0
-
-        if not all(
-            boolean
-            for boolean in self.must_to_have
-            if boolean is True
-        ):
-            self.logger.error(
-                msg="Not all must_to_have terms are true for indicator",
-                extra={
-                    "worker": "Indicator",
-                    "indicator_name": self.name,
-                    "symbol": stock.symbol_name,
-                    "timeframe": stock.timeframe,
-                    "timeframe_type": stock.timeframe_type.value,
-                    "bar_time": current_bar.bar_time,
-                    "bar_index": current_bar.index,
-                    "current_bar": current_bar,
-                    "starting_index": milestones.starting_bar.index,
-                    "starting_index_time": milestones.starting_bar.bar_time,
-                    "top_index": milestones.top_bar.index,
-                    "top_index_time": milestones.top_bar.bar_time,
-                    "lowest_low_index": milestones.lowest_low_bar.index,
-                    "lowest_low_time": milestones.lowest_low_bar.bar_time,
-                },
-            )
-            print(f"Not all must_to_have terms are true for {self.name} indicator")
-            return common.objects.IndicatorResponse(
-                success_count=0,
-                success_rate=0.0,
-                result=False,
-                failed_base_evidences_count=0,
-            )
 
         evidence_object: analyzer.evidences._evidence.Evidence = self.evidence()
         if not evidence_object.pre_evidence(
