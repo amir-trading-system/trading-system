@@ -22,7 +22,6 @@ class Evidence(
             True
             and previous_bar is not None
             and current_bar.close > current_bar.open_value
-            and current_bar.high > current_bar.vwap
             and any(
                 resistance_level
                 for resistance_level in stock.resistance_levels

@@ -20,9 +20,7 @@ class Evidence(
         current_day_breaks_highest_high_since_fall = (
             True
             and current_bar.close > current_bar.open_value
-            and current_bar.close > current_bar.ema_20
             and current_bar.high > previous_day.high
-            and current_bar.histogram > 0
             and top_bar_is_valid
             and any(
                 r_l
