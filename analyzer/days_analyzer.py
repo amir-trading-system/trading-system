@@ -127,11 +127,6 @@ class Analyzer:
         is_retro: bool,
         confirmator_only: bool,
     ):
-        current_bar_is_valid = (
-            True
-            and (current_bar.close > current_bar.open_value or is_retro)
-            and current_bar.histogram > 0
-        )
         should_write_log = False
         last_log_time = self.symbol_to_last_log_time.get(stock.symbol_name)
         if last_log_time is None:
@@ -142,6 +137,7 @@ class Analyzer:
                 should_write_log = True
                 self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
 
+        current_bar_is_valid = current_bar.close > current_bar.open_value or is_retro
         if not current_bar_is_valid and should_write_log:
             self.logger.info(
                 msg="Bar is not valid, analyzer will wait for the next bar",

@@ -147,6 +147,10 @@ def get_symbols() -> list[Symbol]:
             name="FJET",
             datetime_str="02.18.26T09:34:00",
         ),
+        Symbol(
+            name="FJET",
+            datetime_str="02.19.26T10:18:00",
+        ),
     ]
 
 def build_table(
@@ -368,7 +372,7 @@ def run_retroactive_check():
     # symbols = [
     #     Symbol(
     #         name="FJET",
-    #         datetime_str="02.18.26T09:34:00",
+    #         datetime_str="02.19.26T10:18:00",
     #     ),
     # ]
     counter = [len(symbols)]
