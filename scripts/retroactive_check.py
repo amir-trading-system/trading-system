@@ -379,17 +379,17 @@ def run_retroactive_check():
 
     symbols_data = []
     symbols = get_symbols()
-    symbols = [
-        Symbol(
-            name=symbol,
-            datetime_str=date,
-        )
-        for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
-    ]
     # symbols = [
     #     Symbol(
-    #         name="FJET",
-    #         datetime_str="02.19.26T10:18:00",
+    #         name=symbol,
+    #         datetime_str=date,
+    #     )
+    #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
+    # ]
+    # symbols = [
+    #     Symbol(
+    #         name="MLEC",
+    #         datetime_str="02.19.26T09:59:00",
     #     ),
     # ]
     counter = [len(symbols)]

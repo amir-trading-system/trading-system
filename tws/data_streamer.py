@@ -347,16 +347,16 @@ class DataStreamer():
                 minute=1
             )
         ):
+            ## TODO: need to look for all stocks to see the common use case for starting movememnt bar
             current_day_is_potential_for_tomorrow = (
                 True
-                and current_bar.close > current_bar.open_value
-                and (current_bar.high - current_bar.close)/(current_bar.high - current_bar.low) <= 0.8
-                and current_bar.low/current_bar.open_value > 0.99
+                # and current_bar.close > current_bar.open_value
+                # and (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low) >= 0.4
+                and current_bar.low/current_bar.open_value > 0.9
                 and current_bar.volume > current_bar.volume_average
                 and current_bar.close > current_bar.ema_9
                 and current_bar.close > current_bar.ema_20
                 and current_bar.close > current_bar.vwap
-                and (current_bar.close - current_bar.open_value)/current_bar.close >= 0.2
             )
 
             if current_day_is_potential_for_tomorrow and self.potential_symbols_file_path is not None:

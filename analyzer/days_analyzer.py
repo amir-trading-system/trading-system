@@ -139,6 +139,9 @@ class Analyzer:
 
         current_bar_is_valid = current_bar.close > current_bar.open_value or is_retro
         if not current_bar_is_valid and should_write_log:
+            body_percentage = 0.0
+            if current_bar.high - current_bar.low > 0:
+                body_percentage = (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low)
             self.logger.info(
                 msg="Bar is not valid, analyzer will wait for the next bar",
                 extra={
@@ -152,7 +155,7 @@ class Analyzer:
                     "open": current_bar.open_value,
                     "close": current_bar.close,
                     "high": current_bar.high,
-                    "body_percentage": (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low),
+                    "body_percentage": body_percentage,
                     "histogram": current_bar.histogram,
                     "request_id": stock.request_id,
                 }

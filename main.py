@@ -22,6 +22,7 @@ def initiate_potential_symbols_from_yesterday(
     symbols_queue: queue.Queue[str],
 ):
     lines_to_save: list[str] = []
+    unique_symbols: set[str] = set()
 
     if not os.path.exists(file_path):
         with open(file_path, "w") as f:
@@ -34,10 +35,12 @@ def initiate_potential_symbols_from_yesterday(
                 [symbol, date] = line.split("--")
                 formatted_date = datetime.datetime.fromisoformat(date.replace("\n", ""))
                 if (formatted_date + datetime.timedelta(
-                    days=1,
-                )).day == datetime.datetime.now().day:
+                    days=20,
+                )).day >= datetime.datetime.now().day:
                     lines_to_save.append(f"{symbol}--{date}")
-                    symbols_queue.put(symbol)
+                    if symbol not in unique_symbols:
+                        symbols_queue.put(symbol)
+                        unique_symbols.add(symbol)
         except FileNotFoundError as e:
             logger_obj.error(
                 msg="potential stocks file does not exists",

@@ -27,7 +27,7 @@ class Evidence(
                 for resistance_level in stock.resistance_levels
                 if current_bar.low < resistance_level < current_bar.high
             )
-            and current_bar.low < previous_bar.high < current_bar.high
+            and current_bar.low < previous_bar.high
         )
 
         return common.objects.EvidenceResponse(

@@ -16,11 +16,9 @@ class Evidence(
     ) -> common.objects.EvidenceResponse:
         top_bar_is_valid = len(stock.resistance_levels) > 0
 
-        previous_day = self.relevant_bars[0]
         current_day_breaks_highest_high_since_fall = (
             True
             and current_bar.close > current_bar.open_value
-            and current_bar.high > previous_day.high
             and top_bar_is_valid
             and any(
                 r_l
