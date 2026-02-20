@@ -101,8 +101,8 @@ class Analyzer:
                     "evidences": evidences_to_confirm,
                 },
             )
-            self.request_id_to_symbol[stock.request_id].finished_analyze = True
 
+        self.request_id_to_symbol[stock.request_id].finished_analyze = True
         if should_write_log:
             self.logger.info(
                 msg="Finished Running analyzers",

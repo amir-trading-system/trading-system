@@ -42,7 +42,9 @@ def get_stocks_list_from_nasdaq():
 def get_dynamic_symbols_from_last_month() -> dict[str, str]:
     symbol_to_date: dict[str,str] = {}
     all_stocks = get_stocks_list_from_nasdaq()
+    t = tqdm.tqdm(all_stocks, leave=False)
     for stock in all_stocks:
+        t.update(1)
         if stock["market_cap"] == '':
             continue
         is_valid_symbol = True
@@ -59,11 +61,7 @@ def get_dynamic_symbols_from_last_month() -> dict[str, str]:
         market_cap = int(float(stock["market_cap"]))
         price = float(stock["price"].replace('$', ''))
 
-        if market_cap > 0 and market_cap < 100000000 and price > 1:
-            stock_float = int(market_cap/price)
-            if stock_float > FLOAT_THRESHOLD:
-                continue
-
+        if market_cap > 0 and market_cap < 500000000 and price > 1:
             historical_data = yfinance.download(
                 symbol,
                 period="1mo",
@@ -74,8 +72,9 @@ def get_dynamic_symbols_from_last_month() -> dict[str, str]:
                 threads=40,
                 timeout=5,
             )
-            filtered_data_by_price = historical_data.Low[symbol][
-                (historical_data.Low[symbol] > 1)
+            positive_data = historical_data[historical_data["Close"] > historical_data["Open"]] # type: ignore
+            filtered_data_by_price = positive_data.Low[symbol][
+                (positive_data.Low[symbol] > 1)
             ]
 
             for date, stock_low_price in filtered_data_by_price.items():
@@ -93,7 +92,7 @@ def get_dynamic_symbols_from_last_month() -> dict[str, str]:
                     else:
                         low_to_high[symbol][date]["low"] = stock_low_price
 
-            filtered_data_by_price = historical_data.High[symbol][historical_data.High[symbol] > 1]
+            filtered_data_by_price = positive_data.High[symbol][positive_data.High[symbol] > 1]
             for date, stock_high_price in filtered_data_by_price.items():
                 if not low_to_high.get(symbol, None):
                     low_to_high[symbol] = {
@@ -118,6 +117,7 @@ def get_dynamic_symbols_from_last_month() -> dict[str, str]:
                         continue
                     symbol_to_date[symbol] = date.strftime("%m.%d.%yT%H:%M:%S")
 
+    t.close()
     return symbol_to_date
 
 #pylint:disable=unspecified-encoding,too-many-locals

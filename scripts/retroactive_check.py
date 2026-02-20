@@ -12,6 +12,7 @@ import buying_confirmator
 import common
 import collector
 import logger
+from scripts import stock_finder
 import tws
 
 class Symbol:
@@ -68,6 +69,10 @@ def get_symbols() -> list[Symbol]:
             datetime_str="01.20.26T10:05:00",
         ),
         Symbol(
+            name="MBAI",
+            datetime_str="01.26.26T10:22:00",
+        ),
+        Symbol(
             name="INBS",
             datetime_str="01.05.26T09:30:00",
         ),
@@ -80,12 +85,24 @@ def get_symbols() -> list[Symbol]:
             datetime_str="01.21.26T09:42:00",
         ),
         Symbol(
+            name="AUST",
+            datetime_str="01.23.26T09:42:00",
+        ),
+        Symbol(
             name="GITS",
             datetime_str="01.27.26T10:05:00",
         ),
         Symbol(
             name="NAMM",
             datetime_str="01.28.26T14:51:00",
+        ),
+        Symbol(
+            name="DRMA",
+            datetime_str="01.26.26T12:18:00",
+        ),
+        Symbol(
+            name="RIME",
+            datetime_str="02.13.26T14:11:00",
         ),
         Symbol(
             name="BNAI",
@@ -362,13 +379,13 @@ def run_retroactive_check():
 
     symbols_data = []
     symbols = get_symbols()
-    # symbols = [
-    #     Symbol(
-    #         name=symbol,
-    #         datetime_str=date,
-    #     )
-    #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
-    # ]
+    symbols = [
+        Symbol(
+            name=symbol,
+            datetime_str=date,
+        )
+        for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
+    ]
     # symbols = [
     #     Symbol(
     #         name="FJET",
