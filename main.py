@@ -46,9 +46,8 @@ def initiate_potential_symbols_from_yesterday(
                 },
             )
 
-    if lines_to_save:
-        with open(file_path, "w") as f:
-            f.writelines(lines_to_save)
+    with open(file_path, "w") as f:
+        f.writelines(lines_to_save)
 
 def run_bot(
     tws_client_obj: tws.client.Client,
