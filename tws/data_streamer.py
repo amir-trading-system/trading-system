@@ -244,7 +244,8 @@ class DataStreamer():
 
         stock.finished_collection = True
 
-        self.bars_ready_to_analyze_queue.put(stock)
+        if stock.should_monitor:
+            self.bars_ready_to_analyze_queue.put(stock)
         self.logger.info(
             msg="Finished to collect data for symbol",
             extra={
@@ -321,7 +322,8 @@ class DataStreamer():
             )
             return
 
-        self.bars_ready_to_analyze_queue.put(stock)
+        if stock.should_monitor:
+            self.bars_ready_to_analyze_queue.put(stock)
 
         self.insert_symbol_to_future_list(
             stock=stock,

@@ -12,7 +12,7 @@ import buying_confirmator
 import common
 import collector
 import logger
-from scripts import stock_finder
+# from scripts import stock_finder
 import tws
 
 class Symbol:
@@ -358,6 +358,7 @@ def run_retroactive_check():
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
         request_id_to_symbol=request_id_to_symbol,
+        tws_client=tws_client,
         logger=logger_object,
     )
     confirmator_object = buying_confirmator.confirmator.Confirmator(

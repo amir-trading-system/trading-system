@@ -6,6 +6,7 @@ import alerter
 import analyzer.indicators
 import analyzer.evidences
 import common
+from tws import client
 
 
 class Analyzer:
@@ -14,11 +15,13 @@ class Analyzer:
         logger: logging.Logger,
         waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
         request_id_to_symbol: dict[int,common.objects.Stock],
+        tws_client: client.Client,
         alerter_object: alerter.alerter.Alerter = None,
     ):
         self.logger = logger
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.alerter_object = alerter_object
+        self.tws_client = tws_client
 
         self.request_id_to_symbol = request_id_to_symbol
         self.has_indications_bars: dict[str, common.objects.BarData] = {}
@@ -140,17 +143,23 @@ class Analyzer:
         previous_bar_is_valid = stock.previous_bar_is_valid(
             bar_object=current_bar,
         )
-        if not previous_bar_is_valid and should_write_log:
-            self.logger.warning(
-                msg="Previous day is not valid, current day wont be analyzed",
-                extra={
-                    "worker": "DataStreamer",
-                    "symbol": stock.symbol_name,
-                    "timeframe": stock.timeframe,
-                    "timeframe_type": stock.timeframe_type.value,
-                    "request_id": stock.request_id,
-                },
+        if not previous_bar_is_valid:
+            if should_write_log:
+                self.logger.warning(
+                    msg="Previous day is not valid, current day wont be analyzed",
+                    extra={
+                        "worker": "DataStreamer",
+                        "symbol": stock.symbol_name,
+                        "timeframe": stock.timeframe,
+                        "timeframe_type": stock.timeframe_type.value,
+                        "request_id": stock.request_id,
+                    },
+                )
+
+            self.tws_client.cancelHistoricalData(
+                reqId=stock.request_id,
             )
+            stock.should_monitor = False
             return
 
         current_bar_is_valid = current_bar.close > current_bar.open_value or is_retro
@@ -158,6 +167,7 @@ class Analyzer:
             body_percentage = 0.0
             if current_bar.high - current_bar.low > 0:
                 body_percentage = (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low)
+
             self.logger.info(
                 msg="Bar is not valid, analyzer will wait for the next bar",
                 extra={

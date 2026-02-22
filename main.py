@@ -21,6 +21,7 @@ def initiate_potential_symbols_from_yesterday(
     logger_obj: logging.Logger,
     symbols_queue: queue.Queue[str],
 ):
+    symbol_to_date: dict[str, datetime.datetime] = {}
     lines_to_save: list[str] = []
     unique_symbols: set[str] = set()
 
@@ -37,10 +38,7 @@ def initiate_potential_symbols_from_yesterday(
                 if (formatted_date + datetime.timedelta(
                     days=60,
                 )) >= datetime.datetime.now():
-                    lines_to_save.append(f"{symbol}--{date}")
-                    if symbol not in unique_symbols:
-                        symbols_queue.put(symbol)
-                        unique_symbols.add(symbol)
+                    symbol_to_date[symbol] = formatted_date
         except FileNotFoundError as e:
             logger_obj.error(
                 msg="potential stocks file does not exists",
@@ -48,6 +46,17 @@ def initiate_potential_symbols_from_yesterday(
                     "exception": e,
                 },
             )
+
+    symbols = sorted(
+        symbol_to_date.items(),
+        key=lambda item: item[1]
+    )
+    for symbol_object in symbols:
+        symbol, formatted_date = symbol_object
+        lines_to_save.append(f"{symbol}--{str(formatted_date)}\n")
+        if symbol not in unique_symbols:
+            symbols_queue.put(symbol)
+            unique_symbols.add(symbol)
 
     with open(file_path, "w") as f:
         f.writelines(lines_to_save)
@@ -187,6 +196,7 @@ if __name__ == "__main__":
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
         request_id_to_symbol=request_id_to_symbol,
         alerter_object=alerter_object,
+        tws_client=tws_client,
         logger=logger_object,
     )
     confirmator_obj = buying_confirmator.confirmator.Confirmator(

@@ -137,6 +137,20 @@ class Confirmator:
         potential_confirmation_bar = None
 
         while True:
+            if not relevant_stock.should_monitor:
+                self.logger.info(
+                    msg="Stock should not be monitored anymore",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "request_id": relevant_stock.request_id,
+                    }
+                )
+                break
+
             if not relevant_stock.one_minute_bars_queue.empty():
                 if (
                     True
