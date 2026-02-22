@@ -149,7 +149,6 @@ class Analyzer:
                     "timeframe": stock.timeframe,
                     "timeframe_type": stock.timeframe_type.value,
                     "request_id": stock.request_id,
-                    "function": "on_historical_data_end",
                 },
             )
             return
