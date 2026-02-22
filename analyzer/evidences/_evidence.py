@@ -4,7 +4,6 @@ class Evidence:
     name: str = ""
     must_to_be_true: bool = False
     is_base_evidence: bool = False
-    resistance_level_to_breaking_attempts: dict[float,int] = {}
     relevant_bars: list[common.objects.BarData] = []
 
     def is_potential_starting_bar(
@@ -136,12 +135,11 @@ class Evidence:
         if len(self.relevant_bars) == 0:
             return False
 
-        self.resistance_level_to_breaking_attempts = self.get_resistance_levels(
+        stock.resistance_levels = self.get_resistance_levels(
             stock=stock,
             relevant_bars=self.relevant_bars,
             current_bar=current_bar,
         )
-        stock.resistance_levels = list(self.resistance_level_to_breaking_attempts.keys())
 
         return True
 
@@ -159,8 +157,8 @@ class Evidence:
         stock: common.objects.Stock,
         relevant_bars: list[common.objects.BarData],
         current_bar: common.objects.BarData,
-    ) -> dict[float, int]:
-        resistance_level_to_breaking_attempts: dict[float, int] = {}
+    ) -> list[common.objects.BarData]:
+        resistance_levels: list[common.objects.BarData] = []
         for bar_object in relevant_bars[:current_bar.index+40]:
             if (
                 bar_object.vwap is None
@@ -198,41 +196,53 @@ class Evidence:
                 True
                 and (high_pattern_one or high_pattern_two)
             ):
-                if not resistance_level_to_breaking_attempts.get(bar_object.high):
-                    resistance_level_to_breaking_attempts[bar_object.high] = 1
-                else:
-                    resistance_level_to_breaking_attempts[bar_object.high] += 1
+                resistance_level = [
+                    r_l
+                    for r_l in resistance_levels
+                    if bar_object.high == r_l.high
+                ]
+                if not resistance_level:
+                    resistance_levels.append(bar_object)
 
-        resistance_levels = sorted(resistance_level_to_breaking_attempts.keys())
-        for i, resistance_level in enumerate(resistance_levels):
+        resistance_levels = sorted(
+            resistance_levels,
+            key=lambda r_l: r_l.high,
+        )
+        temp_resistance_levels = [temp_r_l for temp_r_l in resistance_levels]
+        for i, resistance_level in enumerate(temp_resistance_levels):
             if i+1 > len(resistance_levels) - 1:
                 continue
 
-            if  resistance_level/resistance_levels[i+1] >= 0.95:
-                attempts = resistance_level_to_breaking_attempts.pop(resistance_level)
-                resistance_level_to_breaking_attempts[resistance_levels[i+1]] += attempts
+            if resistance_level.high/resistance_levels[i+1].high >= 0.95:
+                resistance_levels = [
+                    r_l
+                    for r_l in resistance_levels
+                    if r_l.bar_time != resistance_level.bar_time
+                ]
 
-        return resistance_level_to_breaking_attempts
+        return resistance_levels
 
     def crossed_resistance_level_strongly(
         self,
-        resistance_levels: list[float],
+        resistance_levels: list[common.objects.BarData],
         potential_confirmation_bar: common.objects.BarData,
     ) -> bool:
-        return any(
-            resistance_level
-            for resistance_level in resistance_levels
-            if potential_confirmation_bar.low < resistance_level < potential_confirmation_bar.close
-            and abs(resistance_level - potential_confirmation_bar.open_value) > 0
-            and (potential_confirmation_bar.close - resistance_level)/abs(resistance_level - potential_confirmation_bar.open_value) >= 0.25
-            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and potential_confirmation_bar.volume > 10000
-        ) and not any(
-            resistance_level
-            for resistance_level in resistance_levels
-            if resistance_level > potential_confirmation_bar.high
-            and potential_confirmation_bar.high/resistance_level >= 0.8
-        )
+        for resistance_level in resistance_levels:
+            if (
+                potential_confirmation_bar.low < resistance_level.high < potential_confirmation_bar.close
+                and abs(resistance_level.high - potential_confirmation_bar.open_value) > 0
+                and (potential_confirmation_bar.close - resistance_level.high)/abs(resistance_level.high - potential_confirmation_bar.open_value) >= 0.25
+                and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+                and potential_confirmation_bar.volume > 10000
+            ) and not any(
+                resistance_level
+                for resistance_level in resistance_levels
+                if resistance_level.high >= potential_confirmation_bar.high
+                and potential_confirmation_bar.high/resistance_level.high >= 0.8
+            ):
+                return True
+
+        return False
 
     def confirm(
         self,

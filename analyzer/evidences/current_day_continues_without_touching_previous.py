@@ -67,8 +67,8 @@ class Evidence(
             and not any(
                 r_l
                 for r_l in relevant_stock.resistance_levels
-                if r_l > potential_confirmation_bar.high
-                and potential_confirmation_bar.high/r_l >= 0.95
+                if r_l.high > potential_confirmation_bar.high
+                and potential_confirmation_bar.high/r_l.high >= 0.95
             )
         )
 
