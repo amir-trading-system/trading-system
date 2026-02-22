@@ -127,7 +127,7 @@ class Evidence:
                 timeframe=top_bar.timeframe,
             )
 
-    def pre_evidence(
+    def stock_is_valid_for_evidence(
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,

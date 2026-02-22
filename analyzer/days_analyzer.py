@@ -137,6 +137,22 @@ class Analyzer:
                 should_write_log = True
                 self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
 
+        previous_bar_is_valid = stock.previous_bar_is_valid(
+            bar_object=current_bar,
+        )
+        if not previous_bar_is_valid and should_write_log:
+            self.logger.warning(
+                msg="Previous day is not valid, current day wont be analyzed",
+                extra={
+                    "worker": "DataStreamer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
+                    "request_id": stock.request_id,
+                },
+            )
+            return
+
         current_bar_is_valid = current_bar.close > current_bar.open_value or is_retro
         if not current_bar_is_valid and should_write_log:
             body_percentage = 0.0

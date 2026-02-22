@@ -166,6 +166,60 @@ class Stock:
             reverse=True,
         )
 
+    def previous_bar_is_valid(
+        self,
+        bar_object: BarData,
+    ) -> bool:
+        previous_bar = self.previous_bar(
+            bar_object=bar_object,
+        )
+        if not previous_bar:
+            return True
+
+        if (
+            True
+            and previous_bar.close > previous_bar.open_value
+            and previous_bar.volume > previous_bar.volume_average
+            and previous_bar.high > previous_bar.ema_9
+            and previous_bar.high > previous_bar.ema_20
+            and previous_bar.volume > 2000000
+            and (previous_bar.close - previous_bar.open_value)/(previous_bar.high - previous_bar.low) < 0.5
+            and previous_bar.high - previous_bar.low > 1
+            and not self.bar_is_the_first_one_in_trend(
+                bar_object=previous_bar,
+            )
+        ):
+            return False
+
+        return True
+
+    def bar_is_the_first_one_in_trend(
+        self,
+        bar_object: BarData,
+    ):
+        last_10_bars = self.bars[bar_object.index+1:bar_object.index+11]
+        last_5_bars = self.bars[bar_object.index+1:bar_object.index+6]
+        return (
+            True
+            and bar_object.volume_average/bar_object.volume < 0.2
+            and bar_object.high > bar_object.ema_9
+            and bar_object.high > bar_object.ema_20
+            and bar_object.high > bar_object.vwap
+            and max(
+                bar_obj.high
+                for bar_obj in last_10_bars
+            ) < bar_object.high
+            and max(
+                bar_obj.volume
+                for bar_obj in last_10_bars
+            ) < bar_object.volume
+            and not any(
+                bar_obj.volume
+                for bar_obj in last_5_bars
+                if bar_obj.volume/bar_object.volume > 0.2
+            )
+        )
+
 class IbAPIRequest:
     def __init__(
         self,
