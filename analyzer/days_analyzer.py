@@ -140,7 +140,7 @@ class Analyzer:
         previous_bar_is_valid = stock.previous_bar_is_valid(
             bar_object=current_bar,
         )
-        if not previous_bar_is_valid:
+        if not previous_bar_is_valid and should_write_log:
             self.logger.warning(
                 msg="Previous day is not valid, current day wont be analyzed",
                 extra={
