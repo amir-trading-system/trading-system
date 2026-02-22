@@ -227,21 +227,22 @@ class Evidence:
         resistance_levels: list[common.objects.BarData],
         potential_confirmation_bar: common.objects.BarData,
     ) -> bool:
-        return any(
-            resistance_level
-            for resistance_level in resistance_levels
-            if potential_confirmation_bar.low < resistance_level.high < potential_confirmation_bar.close
-            and abs(resistance_level.high - potential_confirmation_bar.open_value) > 0
-            and (potential_confirmation_bar.close - resistance_level.high)/abs(resistance_level.high - potential_confirmation_bar.open_value) >= 0.25
-            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and potential_confirmation_bar.volume > 10000
-            and not resistance_level.has_strong_rejection()
-        ) and not any(
-            resistance_level
-            for resistance_level in resistance_levels
-            if resistance_level.high > potential_confirmation_bar.high
-        and potential_confirmation_bar.high/resistance_level.high >= 0.8
-        )
+        for resistance_level in resistance_levels:
+            if (
+                potential_confirmation_bar.low < resistance_level.high < potential_confirmation_bar.close
+                and abs(resistance_level.high - potential_confirmation_bar.open_value) > 0
+                and (potential_confirmation_bar.close - resistance_level.high)/abs(resistance_level.high - potential_confirmation_bar.open_value) >= 0.25
+                and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+                and potential_confirmation_bar.volume > 10000
+            ) and not any(
+                resistance_level
+                for resistance_level in resistance_levels
+                if resistance_level.high >= potential_confirmation_bar.high
+                and potential_confirmation_bar.high/resistance_level.high >= 0.8
+            ):
+                return True
+
+        return False
 
     def confirm(
         self,

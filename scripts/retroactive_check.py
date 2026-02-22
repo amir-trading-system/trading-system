@@ -393,8 +393,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="RXT",
-    #         datetime_str="02.20.26T09:34:00",
+    #         name="QVCGP",
+    #         datetime_str="02.11.26T10:22:00",
     #     ),
     # ]
     counter = [len(symbols)]
