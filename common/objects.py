@@ -83,7 +83,6 @@ class BarData:
             and self.high > self.ema_20
             and self.volume > 2000000
             and (self.close - self.open_value)/(self.high - self.low) < 0.5
-            # and self.high - self.low > 1
         )
 
 class Stock:
