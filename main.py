@@ -35,8 +35,8 @@ def initiate_potential_symbols_from_yesterday(
                 [symbol, date] = line.split("--")
                 formatted_date = datetime.datetime.fromisoformat(date.replace("\n", ""))
                 if (formatted_date + datetime.timedelta(
-                    days=20,
-                )).day >= datetime.datetime.now().day:
+                    days=60,
+                )) >= datetime.datetime.now():
                     lines_to_save.append(f"{symbol}--{date}")
                     if symbol not in unique_symbols:
                         symbols_queue.put(symbol)

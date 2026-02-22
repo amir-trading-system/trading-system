@@ -55,6 +55,7 @@ class Handler(
             "high",
             "body_percentage",
             "request_id",
+            "function",
         ]
 
         for field in fields:

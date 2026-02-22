@@ -26,7 +26,7 @@ class DataStreamer():
         self.request_id_to_symbol = request_id_to_symbol
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
-        self.for_tomorrow_list: list[str] = []
+        self.potential_future_symbols: list[str] = []
         self.potential_symbols_file_path = potential_symbols_file_path
 
     def _filter_ignored_bars(
@@ -224,16 +224,17 @@ class DataStreamer():
         self,
         request_id: int,
     ):
-        relevant_symbol_bars = self.request_id_to_symbol[request_id].bars
-        symbol = self.request_id_to_symbol[request_id].symbol_name
-        specific_bar_time = self.request_id_to_symbol[request_id].specific_bar_time
+        stock = self.request_id_to_symbol[request_id]
+        relevant_symbol_bars = stock.bars
+        symbol = stock.symbol_name
+        specific_bar_time = stock.specific_bar_time
         bars_data = self.enrich_bars(
             bars=relevant_symbol_bars,
         )
         for bar_object in bars_data:
             bar_object.ready_to_analyze = True
-        self.request_id_to_symbol[request_id].bars = bars_data
-        if self.request_id_to_symbol[request_id].is_one_minute_timeframe():
+        stock.bars = bars_data
+        if stock.is_one_minute_timeframe():
             self.insert_one_minute_bars_into_confirmation_queues(
                 one_minute_request_id=request_id,
                 symbol=symbol,
@@ -241,22 +242,19 @@ class DataStreamer():
             )
             return
 
-        self.request_id_to_symbol[request_id].finished_collection = True
-        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
+        stock.finished_collection = True
+
+        self.bars_ready_to_analyze_queue.put(stock)
         self.logger.info(
             msg="Finished to collect data for symbol",
             extra={
                 "worker": "DataStreamer",
                 "symbol": symbol,
-                "timeframe": self.request_id_to_symbol[request_id].timeframe,
-                "timeframe_type": self.request_id_to_symbol[request_id].timeframe_type.value,
+                "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
                 "request_id": request_id,
             }
         )
-        if bars_data[-1].symbol not in self.for_tomorrow_list:
-            self.insert_for_tomorrow_list(
-                current_bar=bars_data[-1],
-            )
 
     def on_historical_data_update(
         self,
@@ -266,7 +264,9 @@ class DataStreamer():
         if tws_bar.volume == 0.0:
             return
 
-        relevant_symbol_bars = self.request_id_to_symbol[request_id].bars
+        stock = self.request_id_to_symbol[request_id]
+
+        relevant_symbol_bars = stock.bars
         current_bar_time = datetime.datetime.fromtimestamp(float(tws_bar.date))
 
         ibapi_request = self.ibapi_requests.get(request_id, None)
@@ -298,14 +298,12 @@ class DataStreamer():
 
             if ibapi_request.is_one_minute_timeframe():
                 bars_data[-1].ready_to_analyze = True
-                self.request_id_to_symbol[request_id].bars = bars_data
+                stock.bars = bars_data
                 self.insert_one_minute_bars_into_confirmation_queues(
                     one_minute_request_id=request_id,
-                    symbol=self.request_id_to_symbol[request_id].symbol_name,
-                    specific_bar_time=self.request_id_to_symbol[request_id].specific_bar_time,
+                    symbol=stock.symbol_name,
+                    specific_bar_time=stock.specific_bar_time,
                 )
-
-            if not ibapi_request.is_day_timeframe():
                 return
 
         relevant_symbol_bars[-1].ready_to_analyze = True
@@ -313,54 +311,47 @@ class DataStreamer():
         bars_data = self.enrich_bars(
             bars=relevant_symbol_bars,
         )
-        self.request_id_to_symbol[request_id].bars = bars_data
+        stock.bars = bars_data
 
-        if self.request_id_to_symbol[request_id].is_one_minute_timeframe():
+        if stock.is_one_minute_timeframe():
             self.insert_one_minute_bars_into_confirmation_queues(
                 one_minute_request_id=request_id,
-                symbol=self.request_id_to_symbol[request_id].symbol_name,
-                specific_bar_time=self.request_id_to_symbol[request_id].specific_bar_time,
+                symbol=stock.symbol_name,
+                specific_bar_time=stock.specific_bar_time,
             )
             return
 
-        self.bars_ready_to_analyze_queue.put(self.request_id_to_symbol[request_id])
+        self.bars_ready_to_analyze_queue.put(stock)
 
-        if current_bar.symbol not in self.for_tomorrow_list:
-            self.insert_for_tomorrow_list(
-                current_bar=current_bar,
-            )
+        self.insert_symbol_to_future_list(
+            stock=stock,
+            current_bar=current_bar,
+        )
 
     #pylint:disable=unspecified-encoding
-    def insert_for_tomorrow_list(
+    def insert_symbol_to_future_list(
         self,
+        stock: common.objects.Stock,
         current_bar: common.objects.BarData,
     ):
         now = datetime.datetime.now()
         if (
             True
             and not self.is_retro
+            and current_bar.symbol not in self.potential_future_symbols
+            and self.potential_symbols_file_path is not None
             and now >= datetime.datetime(
                 year=now.year,
                 month=now.month,
                 day=now.day,
                 hour=16,
-                minute=1
+                minute=1,
             )
         ):
-            ## TODO: need to look for all stocks to see the common use case for starting movememnt bar
-            current_day_is_potential_for_tomorrow = (
-                True
-                # and current_bar.close > current_bar.open_value
-                # and (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low) >= 0.4
-                and current_bar.low/current_bar.open_value > 0.9
-                and current_bar.volume > current_bar.volume_average
-                and current_bar.close > current_bar.ema_9
-                and current_bar.close > current_bar.ema_20
-                and current_bar.close > current_bar.vwap
-            )
-
-            if current_day_is_potential_for_tomorrow and self.potential_symbols_file_path is not None:
+            if stock.bar_is_the_first_one_in_trend(
+                bar_object=current_bar,
+            ):
                 with open(self.potential_symbols_file_path, "a") as f:
                     f.write(f"{current_bar.symbol}--{current_bar.bar_time}\n")
 
-                self.for_tomorrow_list.append(current_bar.symbol)
+                self.potential_future_symbols.append(current_bar.symbol)
