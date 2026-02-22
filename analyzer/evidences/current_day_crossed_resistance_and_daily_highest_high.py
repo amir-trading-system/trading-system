@@ -25,7 +25,8 @@ class Evidence(
             and any(
                 resistance_level
                 for resistance_level in stock.resistance_levels
-                if current_bar.low < resistance_level < current_bar.high
+                if current_bar.low < resistance_level.high < current_bar.high
+                and not resistance_level.has_strong_rejection()
             )
             and current_bar.low < previous_bar.high
         )
@@ -85,12 +86,13 @@ class Evidence(
         highest_than_any_resistance_level = any(
             resistance_level
             for resistance_level in relevant_stock.resistance_levels
-            if resistance_level < potential_confirmation_bar.close
+            if resistance_level.high < potential_confirmation_bar.close
+            and not resistance_level.has_strong_rejection()
         ) and not any(
             resistance_level
             for resistance_level in relevant_stock.resistance_levels
-            if resistance_level > potential_confirmation_bar.high
-            and potential_confirmation_bar.high/resistance_level >= 0.9
+            if resistance_level.high > potential_confirmation_bar.high
+            and potential_confirmation_bar.high/resistance_level.high >= 0.9
         )
 
         return (

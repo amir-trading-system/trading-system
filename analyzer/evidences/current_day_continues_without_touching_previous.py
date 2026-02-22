@@ -67,8 +67,8 @@ class Evidence(
             and not any(
                 r_l
                 for r_l in relevant_stock.resistance_levels
-                if r_l > potential_confirmation_bar.high
-                and potential_confirmation_bar.high/r_l >= 0.95
+                if r_l.high > potential_confirmation_bar.high
+                and potential_confirmation_bar.high/r_l.high >= 0.95
             )
         )
 
@@ -76,11 +76,13 @@ class Evidence(
             True
             and potential_confirmation_bar.low <= milestones.starting_bar.bar_object.high < potential_confirmation_bar.close
             and (potential_confirmation_bar.high - milestones.starting_bar.bar_object.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.25
+            and not milestones.starting_bar.bar_object.has_strong_rejection()
         )
         crossed_scenario_2 = (
             True
             and milestones.starting_bar.bar_object.high < potential_confirmation_bar.low
             and milestones.starting_bar.bar_object.high/potential_confirmation_bar.low >= 0.97
+            and not milestones.starting_bar.bar_object.has_strong_rejection()
         )
         return (
             True

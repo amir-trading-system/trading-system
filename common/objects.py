@@ -72,6 +72,20 @@ class BarData:
     ) -> str:
         return f"{self.symbol}-{self.timeframe}-{self.timeframe_type}-{self.bar_time}-{evidence_name}"
 
+    def has_strong_rejection(
+        self,
+    ) -> bool:
+        return (
+            True
+            and self.close > self.open_value
+            and self.volume > self.volume_average
+            and self.high > self.ema_9
+            and self.high > self.ema_20
+            and self.volume > 2000000
+            and (self.close - self.open_value)/(self.high - self.low) < 0.5
+            # and self.high - self.low > 1
+        )
+
 class Stock:
     def __init__(
         self,
@@ -84,7 +98,7 @@ class Stock:
         one_minute_bars_queue: queue.Queue[BarData] = None,
         finished_collection: bool = False,
         finished_analyze: bool = False,
-        resistance_levels: list[float] = [],
+        resistance_levels: list[BarData] = [],
         last_post_pre_one_minute_highest_high: float = 0.0,
         should_monitor: bool = True,
     ):
@@ -180,13 +194,7 @@ class Stock:
 
         if (
             True
-            and previous_bar.close > previous_bar.open_value
-            and previous_bar.volume > previous_bar.volume_average
-            and previous_bar.high > previous_bar.ema_9
-            and previous_bar.high > previous_bar.ema_20
-            and previous_bar.volume > 2000000
-            and (previous_bar.close - previous_bar.open_value)/(previous_bar.high - previous_bar.low) < 0.5
-            and previous_bar.high - previous_bar.low > 1
+            and previous_bar.has_strong_rejection()
             and not self.bar_is_the_first_one_in_trend(
                 bar_object=previous_bar,
             )

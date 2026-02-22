@@ -23,7 +23,7 @@ class Evidence(
             and any(
                 r_l
                 for r_l in stock.resistance_levels
-                if r_l > current_bar.low
+                if r_l.high > current_bar.low
             )
         )
 
