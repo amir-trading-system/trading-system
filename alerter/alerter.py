@@ -4,7 +4,7 @@ import threading
 import config_manager
 import common
 
-from . import handlers
+from . import telegram
 
 
 class Alerter:
@@ -18,6 +18,7 @@ class Alerter:
 
     def send_confirmation_alert(
         self,
+        stock: common.objects.Stock,
         sender: str,
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
@@ -25,18 +26,19 @@ class Alerter:
         is_retro: bool,
         request_id: int,
     ):
-        handler_object: handlers.telegram.Handler = handlers.telegram.Handler(
+        telegram_handler: telegram.Handler = telegram.Handler(
             configuration=self.configuration,
             logger=self.logger,
         )
-        designed_message = handler_object.design_confirmation_bar_message(
+        designed_message = telegram_handler.design_confirmation_bar_message(
+            stock=stock,
             original_bar=original_bar,
             entry_position_bar=entry_position_bar,
             evidence_name=evidence_name,
         )
 
         threading.Thread(
-            target=handler_object.alert,
+            target=telegram_handler.alert,
             kwargs={
                 "sender": sender,
                 "symbol": original_bar.symbol,

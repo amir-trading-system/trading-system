@@ -90,6 +90,7 @@ class Confirmator:
             if self.alerter_object:
                 self.alerter_object.send_confirmation_alert(
                     sender="Confirmator",
+                    stock=relevant_stock,
                     original_bar=original_bar_to_confirm,
                     entry_position_bar=entry_position_bar,
                     evidence_name=evidence_name,

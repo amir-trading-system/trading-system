@@ -1,12 +1,14 @@
 import datetime
 import logging
+import requests
 
 import config_manager
 import common
 
+
 class Handler:
-    name = ""
-    is_enabled = False
+    name = "Telegram"
+    is_enabled = True
 
     def __init__(
         self,
@@ -16,20 +18,6 @@ class Handler:
         self.configuration = configuration
         self.logger = logger
 
-    def _send_message(
-        self,
-        message: str,
-    ):
-        raise NotImplementedError()
-
-    def design_confirmation_bar_message(
-        self,
-        original_bar: common.objects.BarData,
-        entry_position_bar: common.objects.BarData,
-        evidence_name: str,
-    ) -> str:
-        raise NotImplementedError()
-
     def design_indicated_bar_message(
         self,
         stock: common.objects.Stock,
@@ -38,7 +26,58 @@ class Handler:
         evidences: list[str],
         milestones: common.objects.Milestones,
     ) -> str:
-        raise NotImplementedError()
+        return f"""
+            <b>{emoji} Congrats! {emoji}</b>
+
+            <b>Symbol:</b> <u>{stock.symbol_name}</u>
+            <b>Timeframe:</b> <code>{stock.timeframe}</code>
+            <b>Time:</b> <code>{current_bar.bar_time}</code>
+            <b>Starting Time:</b> <code>{milestones.starting_bar.bar_time}</code>
+            <b>Top Time:</b> <code>{milestones.top_bar.bar_time}</code>
+            <b>{len(evidences)} Indications:</b>
+            {chr(10).join(f"• <i>{evidence}</i>" for evidence in evidences)}
+            """
+
+    def design_confirmation_bar_message(
+        self,
+        stock: common.objects.Stock,
+        original_bar: common.objects.BarData,
+        entry_position_bar: common.objects.BarData,
+        evidence_name: str,
+    ) -> str:
+        crossed_resistance_bar_time = None
+        for resistance_level in stock.resistance_levels:
+            if entry_position_bar.low < resistance_level.high < entry_position_bar.high:
+                crossed_resistance_bar_time = resistance_level.bar_time
+
+        return f"""
+            <b>Entry position confirmed for:</b>
+            <b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
+            <b>Evidence:</b> <code>{evidence_name}</code>
+            <b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
+            <b>Time:</b> <code>{entry_position_bar.bar_time}</code>
+            <b>Original bar to confirm Time:</b> <code>{original_bar.bar_time}</code>
+            <b>Original bar to confirm Timeframe:</b> <code>{original_bar.timeframe}</code>
+            <b>Resistance Crossed bar time:</b> <code>{crossed_resistance_bar_time if crossed_resistance_bar_time is not None else ""}</code>
+        """
+
+    def _send_message(
+        self,
+        message: str,
+    ):
+        payload = {
+            "chat_id": self.configuration.telegram.chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        url = f"https://api.telegram.org/bot{self.configuration.telegram.bot_token}/sendMessage"
+
+        response = requests.post(
+            url=url,
+            json=payload,
+            timeout=10,
+        )
+        response.raise_for_status()
 
     def alert(
         self,

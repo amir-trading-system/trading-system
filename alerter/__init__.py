@@ -1,2 +1,2 @@
 from . import alerter
-from . import handlers
+from . import telegram

@@ -21,6 +21,7 @@ def initiate_potential_symbols_from_yesterday(
     logger_obj: logging.Logger,
     symbols_queue: queue.Queue[str],
 ):
+    ## TODO: return list of monitored_symbols and each symbol we get from scanner, if it in this list keep analyzing it. if not, wait for the end of the day and add it here.
     symbol_to_date: dict[str, datetime.datetime] = {}
     lines_to_save: list[str] = []
     unique_symbols: set[str] = set()
