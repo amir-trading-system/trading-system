@@ -16,19 +16,18 @@ import logger
 import tws
 
 #pylint:disable=unspecified-encoding
-def initiate_potential_symbols_from_yesterday(
+def initiate_potential_symbols(
     file_path: str,
     logger_obj: logging.Logger,
     symbols_queue: queue.Queue[str],
-):
-    ## TODO: return list of monitored_symbols and each symbol we get from scanner, if it in this list keep analyzing it. if not, wait for the end of the day and add it here.
+) -> list[str]:
     symbol_to_date: dict[str, datetime.datetime] = {}
     lines_to_save: list[str] = []
     unique_symbols: set[str] = set()
 
     if not os.path.exists(file_path):
         with open(file_path, "w") as f:
-            return
+            return []
 
     with open(file_path, "r") as f:
         try:
@@ -61,6 +60,8 @@ def initiate_potential_symbols_from_yesterday(
 
     with open(file_path, "w") as f:
         f.writelines(lines_to_save)
+
+    return list(unique_symbols)
 
 def run_bot(
     tws_client_obj: tws.client.Client,
@@ -169,7 +170,7 @@ if __name__ == "__main__":
         enable_stdout=True,
     ).get_logger()
 
-    initiate_potential_symbols_from_yesterday(
+    monitored_symbols = initiate_potential_symbols(
         file_path=configuration.potential_symbols_file_path,
         logger_obj=logger_object,
         symbols_queue=symbols_to_collect_queue,
@@ -186,6 +187,7 @@ if __name__ == "__main__":
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
         potential_symbols_file_path=configuration.potential_symbols_file_path,
+        monitored_symbols=monitored_symbols,
     )
     collector_obj = collector.collector.Collector(
         tws_client=tws_client,

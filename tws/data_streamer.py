@@ -20,14 +20,15 @@ class DataStreamer():
         bars_ready_to_analyze_queue: queue.Queue,
         ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
+        monitored_symbols: list[str],
         potential_symbols_file_path: str = None,
     ):
         self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
-        self.potential_future_symbols: list[str] = []
         self.potential_symbols_file_path = potential_symbols_file_path
+        self.monitored_symbols = monitored_symbols
 
     def _filter_ignored_bars(
         self,
@@ -244,7 +245,11 @@ class DataStreamer():
 
         stock.finished_collection = True
 
-        if stock.should_monitor:
+        if (
+            True
+            and stock.should_monitor
+            and stock.symbol_name in self.monitored_symbols
+        ):
             self.bars_ready_to_analyze_queue.put(stock)
         self.logger.info(
             msg="Finished to collect data for symbol",
@@ -266,6 +271,42 @@ class DataStreamer():
             return
 
         stock = self.request_id_to_symbol[request_id]
+        now = datetime.datetime.now()
+
+        if (
+            True
+            and not self.is_retro
+            and stock.symbol_name not in self.monitored_symbols
+            and now < datetime.datetime(
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                hour=16,
+                minute=1,
+            )
+        ):
+            return
+
+        day_timeframe_stock = [
+            stock_obj
+            for stock_obj in self.request_id_to_symbol.values()
+            if stock_obj.symbol_name == stock.symbol_name
+            and stock_obj.timeframe_type == common.objects.TimeframeType.DAY
+        ][0]
+
+        if day_timeframe_stock.bars:
+            relevant_bars = sorted(
+                day_timeframe_stock.bars,
+                key=lambda bar_obj: bar_obj.bar_time,
+                reverse=True,
+            )
+            current_bar = relevant_bars[0]
+
+            self.insert_symbol_to_future_list(
+                stock=day_timeframe_stock,
+                current_bar=current_bar,
+                relevant_bars=relevant_bars,
+            )
 
         relevant_symbol_bars = stock.bars
         current_bar_time = datetime.datetime.fromtimestamp(float(tws_bar.date))
@@ -325,22 +366,19 @@ class DataStreamer():
         if stock.should_monitor:
             self.bars_ready_to_analyze_queue.put(stock)
 
-        self.insert_symbol_to_future_list(
-            stock=stock,
-            current_bar=current_bar,
-        )
-
     #pylint:disable=unspecified-encoding
     def insert_symbol_to_future_list(
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
+        relevant_bars: list[common.objects.BarData],
     ):
         now = datetime.datetime.now()
         if (
             True
+            and stock.timeframe_type == common.objects.TimeframeType.DAY
             and not self.is_retro
-            and current_bar.symbol not in self.potential_future_symbols
+            and current_bar.symbol not in self.monitored_symbols
             and self.potential_symbols_file_path is not None
             and now >= datetime.datetime(
                 year=now.year,
@@ -352,8 +390,13 @@ class DataStreamer():
         ):
             if stock.bar_is_the_first_one_in_trend(
                 bar_object=current_bar,
+                relevant_bars=relevant_bars,
             ):
                 with open(self.potential_symbols_file_path, "a") as f:
-                    f.write(f"{current_bar.symbol}--{current_bar.bar_time}\n")
+                    f.write(f"{current_bar.symbol}--{datetime.datetime(
+                        year=now.year,
+                        month=now.month,
+                        day=now.day,
+                    )}\n")
 
-                self.potential_future_symbols.append(current_bar.symbol)
+                self.monitored_symbols.append(current_bar.symbol)

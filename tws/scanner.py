@@ -31,11 +31,11 @@ class Scanner():
         self,
     ) -> list[tag_value.TagValue]:
         return [
-            tag_value.TagValue("volumeAbove", "20000"),
+            tag_value.TagValue("volumeAbove", "200000"),
             tag_value.TagValue("priceAbove", "1"),
             tag_value.TagValue("priceBelow", "100"),
             tag_value.TagValue("marketCapBelow1e6", "500000000"),
-            tag_value.TagValue("changePercAbove", "5")
+            tag_value.TagValue("changePercAbove", "20")
         ]
 
     def get_contract_details(

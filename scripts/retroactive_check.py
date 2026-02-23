@@ -331,6 +331,22 @@ def update_table_with_results_queue(
             counter[0] -= 1
 
 def run_retroactive_check():
+    symbols_data = []
+    symbols = get_symbols()
+    # symbols = [
+    #     Symbol(
+    #         name=symbol,
+    #         datetime_str=date,
+    #     )
+    #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
+    # ]
+    # symbols = [
+    #     Symbol(
+    #         name="QVCGP",
+    #         datetime_str="02.11.26T10:22:00",
+    #     ),
+    # ]
+
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
     waiting_for_confirmation_queue: queue.Queue[dict[str, common.objects.BarData|common.objects.Milestones]] = queue.Queue()
@@ -346,6 +362,7 @@ def run_retroactive_check():
         symbols_to_collect_queue=symbols_to_collect_queue,
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
+        monitored_symbols=[s.name for s in symbols],
         logger=logger_object,
     )
     threading.Thread(
@@ -382,21 +399,6 @@ def run_retroactive_check():
         target=confirmator_object.confirm_data,
     ).start()
 
-    symbols_data = []
-    symbols = get_symbols()
-    # symbols = [
-    #     Symbol(
-    #         name=symbol,
-    #         datetime_str=date,
-    #     )
-    #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
-    # ]
-    # symbols = [
-    #     Symbol(
-    #         name="QVCGP",
-    #         datetime_str="02.11.26T10:22:00",
-    #     ),
-    # ]
     counter = [len(symbols)]
 
     for symbol in symbols:

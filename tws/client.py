@@ -20,6 +20,7 @@ class Client(client.EClient, wrapper.EWrapper):
         request_id_to_symbol: dict[int, common.objects.Stock],
         bars_ready_to_analyze_queue: queue.Queue,
         logger: logging.Logger,
+        monitored_symbols: list[str],
         potential_symbols_file_path: str = None,
     ):
         self.order_id: int = 0
@@ -50,6 +51,7 @@ class Client(client.EClient, wrapper.EWrapper):
             bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
             ibapi_requests=self.ibapi_requests,
             logger=logger,
+            monitored_symbols=monitored_symbols,
             potential_symbols_file_path=potential_symbols_file_path,
         )
 

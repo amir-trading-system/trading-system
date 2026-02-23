@@ -196,6 +196,7 @@ class Stock:
             and previous_bar.has_strong_rejection()
             and not self.bar_is_the_first_one_in_trend(
                 bar_object=previous_bar,
+                relevant_bars=self.bars,
             )
         ):
             return False
@@ -205,9 +206,10 @@ class Stock:
     def bar_is_the_first_one_in_trend(
         self,
         bar_object: BarData,
+        relevant_bars: list[BarData],
     ):
-        last_10_bars = self.bars[bar_object.index+1:bar_object.index+11]
-        last_5_bars = self.bars[bar_object.index+1:bar_object.index+6]
+        last_10_bars = relevant_bars[bar_object.index+1:bar_object.index+11]
+        last_5_bars = relevant_bars[bar_object.index+1:bar_object.index+6]
         return (
             True
             and bar_object.volume_average/bar_object.volume < 0.2
