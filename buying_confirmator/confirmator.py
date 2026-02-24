@@ -4,7 +4,6 @@ import threading
 import queue
 
 import alerter
-import analyzer.evidences
 import common
 from tws import client
 
@@ -43,7 +42,6 @@ class Confirmator:
 
                 bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
                 milestones: common.objects.Milestones = bar_to_milestones["milestones"]
-                evidences: list[analyzer.evidences._evidence.Evidence] = bar_to_milestones["evidences"]
 
                 relevant_stock = [
                     stock
@@ -62,7 +60,6 @@ class Confirmator:
                         "relevant_stock": relevant_stock,
                         "original_bar_to_confirm": bar_to_confirm,
                         "milestones": milestones,
-                        "evidences": evidences,
                     },
                 ).start()
 

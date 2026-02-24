@@ -34,7 +34,6 @@ class Confirmator:
         original_bar_to_confirm: common.objects.BarData,
         highest_high_one_minute: float,
         already_sent_buy_order_for_stock: dict[str,bool],
-        evidences: list[analyzer.evidences._evidence.Evidence],
     ) -> bool:
         bar_has_confirmed: bool = False
         entry_position_bar: common.objects.BarData = None
@@ -50,8 +49,9 @@ class Confirmator:
             return bar_has_confirmed
 
         confirmed_evidences: list[str] = []
-        for evidence in evidences:
-            if evidence.confirm(
+        for evidence in analyzer.evidences.__evidences__:
+            evidence_obj = evidence()
+            if evidence_obj.confirm(
                 relevant_stock=relevant_stock,
                 original_bar_to_confirm=original_bar_to_confirm,
                 potential_confirmation_bar=potential_confirmation_bar,
@@ -124,7 +124,6 @@ class Confirmator:
         relevant_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         milestones: common.objects.Milestones,
-        evidences: list[analyzer.evidences._evidence.Evidence],
     ):
         one_minute_bars: list[common.objects.BarData] = []
         highest_high_one_minute: float = 0.0
@@ -193,7 +192,23 @@ class Confirmator:
                 ):
                     continue
 
-                most_updated_datetime = potential_confirmation_bar.bar_time
+                if most_updated_datetime + datetime.timedelta(
+                    minutes=1,
+                ) == potential_confirmation_bar.bar_time:
+                    most_updated_datetime = potential_confirmation_bar.bar_time
+                    self.logger.info(
+                        msg="Got Another one minute bar to confirm",
+                        extra={
+                            "worker": "Confirmator",
+                            "symbol": original_bar_to_confirm.symbol,
+                            "timeframe": original_bar_to_confirm.timeframe,
+                            "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                            "last_one_minute_bar_time": most_updated_datetime,
+                            "bar_time": original_bar_to_confirm.bar_time,
+                            "request_id": relevant_stock.request_id,
+                        },
+                    )
+
                 if self._confirm(
                     relevant_stock=relevant_stock,
                     milestones=milestones,
@@ -202,7 +217,6 @@ class Confirmator:
                     original_bar_to_confirm=original_bar_to_confirm,
                     highest_high_one_minute=highest_high_one_minute,
                     already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
-                    evidences=evidences,
                 ):
                     break
 

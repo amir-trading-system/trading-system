@@ -66,12 +66,6 @@ class BarData:
         ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
 
-    def generate_unique_identifier(
-        self,
-        evidence_name: str,
-    ) -> str:
-        return f"{self.symbol}-{self.timeframe}-{self.timeframe_type}-{self.bar_time}-{evidence_name}"
-
     def has_strong_rejection(
         self,
     ) -> bool:
