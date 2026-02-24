@@ -49,8 +49,19 @@ class Confirmator:
             return bar_has_confirmed
 
         confirmed_evidences: list[str] = []
+        stock_is_valid_for_evidence = False
         for evidence in analyzer.evidences.__evidences__:
             evidence_obj = evidence()
+            if (
+                not stock_is_valid_for_evidence
+                and not evidence_obj.stock_is_valid_for_evidence(
+                    stock=relevant_stock,
+                    current_bar=original_bar_to_confirm,
+                )
+            ):
+                break
+
+            stock_is_valid_for_evidence = True
             evidence_response = evidence_obj.find_evidence(
                 stock=relevant_stock,
                 milestones=milestones,

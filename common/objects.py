@@ -79,6 +79,11 @@ class BarData:
             and (self.close - self.open_value)/(self.high - self.low) < 0.5
         )
 
+    def generate_unique_key(
+        self,
+    ) -> str:
+        return f"{self.symbol}-{self.bar_time}"
+
 class Stock:
     def __init__(
         self,

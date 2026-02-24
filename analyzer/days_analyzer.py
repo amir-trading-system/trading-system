@@ -81,7 +81,8 @@ class Analyzer:
                         "milestones": milestones,
                     },
                 )
-                self.has_indication.append(current_bar.symbol)
+                unique_key = current_bar.generate_unique_key()
+                self.has_indication.append(unique_key)
                 break
             if confirmator_only:
                 self.waiting_for_confirmation_queue.put(
@@ -117,7 +118,8 @@ class Analyzer:
         is_retro: bool,
         confirmator_only: bool,
     ):
-        if current_bar.symbol in self.has_indication:
+        unique_key = current_bar.generate_unique_key()
+        if unique_key in self.has_indication:
             return
 
         should_write_log = False

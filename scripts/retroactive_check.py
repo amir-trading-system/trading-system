@@ -57,28 +57,16 @@ def get_symbols() -> list[Symbol]:
             datetime_str="12.26.25T12:25:00",
         ),
         Symbol(
-            name="INBS",
-            datetime_str="12.31.25T12:52:00",
-        ),
-        Symbol(
-            name="CATX",
-            datetime_str="01.29.26T10:26:00",
-        ),
-        Symbol(
             name="MBAI",
             datetime_str="01.26.26T10:22:00",
         ),
         Symbol(
             name="INBS",
+            datetime_str="12.31.25T12:52:00",
+        ),
+        Symbol(
+            name="INBS",
             datetime_str="01.05.26T09:30:00",
-        ),
-        Symbol(
-            name="NAMM",
-            datetime_str="01.22.26T10:30:00",
-        ),
-        Symbol(
-            name="GITS",
-            datetime_str="01.21.26T09:42:00",
         ),
         Symbol(
             name="AUST",
@@ -90,7 +78,15 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="GITS",
+            datetime_str="01.21.26T09:42:00",
+        ),
+        Symbol(
+            name="GITS",
             datetime_str="01.27.26T10:05:00",
+        ),
+        Symbol(
+            name="NAMM",
+            datetime_str="01.22.26T10:30:00",
         ),
         Symbol(
             name="NAMM",
@@ -130,15 +126,15 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="CATX",
+            datetime_str="01.29.26T10:26:00",
+        ),
+        Symbol(
+            name="CATX",
             datetime_str="02.02.26T10:48:00",
         ),
         Symbol(
             name="PLBY",
             datetime_str="02.10.26T09:49:00",
-        ),
-        Symbol(
-            name="MLEC",
-            datetime_str="01.15.26T11:28:00",
         ),
         Symbol(
             name="SUNE",
@@ -155,6 +151,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="ATOM",
             datetime_str="02.17.26T09:30:00",
+        ),
+        Symbol(
+            name="MLEC",
+            datetime_str="01.15.26T11:28:00",
         ),
         Symbol(
             name="MLEC",
@@ -338,8 +338,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="QVCGP",
-    #         datetime_str="02.11.26T10:22:00",
+    #         name="GITS",
+    #         datetime_str="01.27.26T10:05:00",
     #     ),
     # ]
 
