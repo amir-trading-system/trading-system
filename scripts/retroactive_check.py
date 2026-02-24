@@ -65,10 +65,6 @@ def get_symbols() -> list[Symbol]:
             datetime_str="01.29.26T10:26:00",
         ),
         Symbol(
-            name="SEGG",
-            datetime_str="01.20.26T10:05:00",
-        ),
-        Symbol(
             name="MBAI",
             datetime_str="01.26.26T10:22:00",
         ),

@@ -51,6 +51,15 @@ class Confirmator:
         confirmed_evidences: list[str] = []
         for evidence in analyzer.evidences.__evidences__:
             evidence_obj = evidence()
+            evidence_response = evidence_obj.find_evidence(
+                stock=relevant_stock,
+                milestones=milestones,
+                current_bar=original_bar_to_confirm,
+                is_retro=self.is_retro,
+            )
+            if not evidence_response.result:
+                continue
+
             if evidence_obj.confirm(
                 relevant_stock=relevant_stock,
                 original_bar_to_confirm=original_bar_to_confirm,
@@ -192,23 +201,7 @@ class Confirmator:
                 ):
                     continue
 
-                if most_updated_datetime + datetime.timedelta(
-                    minutes=1,
-                ) == potential_confirmation_bar.bar_time:
-                    most_updated_datetime = potential_confirmation_bar.bar_time
-                    self.logger.info(
-                        msg="Got Another one minute bar to confirm",
-                        extra={
-                            "worker": "Confirmator",
-                            "symbol": original_bar_to_confirm.symbol,
-                            "timeframe": original_bar_to_confirm.timeframe,
-                            "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                            "last_one_minute_bar_time": most_updated_datetime,
-                            "bar_time": original_bar_to_confirm.bar_time,
-                            "request_id": relevant_stock.request_id,
-                        },
-                    )
-
+                most_updated_datetime = potential_confirmation_bar.bar_time
                 if self._confirm(
                     relevant_stock=relevant_stock,
                     milestones=milestones,
