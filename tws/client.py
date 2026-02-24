@@ -85,21 +85,27 @@ class Client(client.EClient, wrapper.EWrapper):
     def start_scanner(
         self,
         manual_results_for_test: list[str] = None,
+        for_upside_potential: bool = False,
     ):
-        self.reqAccountSummary(
-            reqId=self.next_id(),
-            groupName="All",
-            tags="AvailableFunds",
-        )
-        while not self.available_funds:
-            time.sleep(1)
+        if not for_upside_potential:
+            self.reqAccountSummary(
+                reqId=self.next_id(),
+                groupName="All",
+                tags="AvailableFunds",
+            )
+            while not self.available_funds:
+                time.sleep(1)
 
         if manual_results_for_test:
             for test_symbol in manual_results_for_test:
                 self.symbols_to_collect_queue.put(test_symbol)
         else:
-            scanner_subscription = self.scanner.get_scanner_subscription()
-            filters = self.scanner.get_scanner_filters()
+            scanner_subscription = self.scanner.get_scanner_subscription(
+                for_upside_potential=for_upside_potential,
+            )
+            filters = self.scanner.get_scanner_filters(
+                for_upside_potential=for_upside_potential,
+            )
             request_id = self.next_id()
 
             self.reqScannerSubscription(

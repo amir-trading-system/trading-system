@@ -17,19 +17,30 @@ class Scanner():
 
     def get_scanner_subscription(
         self,
+        for_upside_potential: bool = False
     ) -> client.ScannerSubscription:
         scanner_subscription = client.ScannerSubscription()
         scanner_subscription.numberOfRows = 50
         scanner_subscription.instrument = "STK"
         scanner_subscription.locationCode = "STK.US.MAJOR"
         scanner_subscription.scanCode = "TOP_PERC_GAIN"
-
+        if for_upside_potential:
+            scanner_subscription.scanCode = "HOT_BY_VOLUME"
 
         return scanner_subscription
 
     def get_scanner_filters(
         self,
+        for_upside_potential: bool = False,
     ) -> list[tag_value.TagValue]:
+        if for_upside_potential:
+            return [
+                tag_value.TagValue("volumeAbove", "1000000"),
+                tag_value.TagValue("priceAbove", "0.5"),
+                tag_value.TagValue("priceBelow", "10"),
+                tag_value.TagValue("marketCapBelow1e6", "500000000"),
+            ]
+
         return [
             tag_value.TagValue("volumeAbove", "200000"),
             tag_value.TagValue("priceAbove", "1"),
@@ -60,6 +71,5 @@ class Scanner():
                             "request_id": request_id,
                         },
                     )
-                    # print(symbol_name)
                     self.relevant_symbols.append(contract_details.contract.symbol)
                     self.symbols_to_collect_queue.put(contract_details.contract.symbol)

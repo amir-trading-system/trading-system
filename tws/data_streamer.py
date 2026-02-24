@@ -247,8 +247,12 @@ class DataStreamer():
 
         if (
             True
-            and stock.should_monitor
-            and stock.symbol_name in self.monitored_symbols
+            and (
+                (
+                    stock.should_monitor
+                    and stock.symbol_name in self.monitored_symbols
+                ) or self.is_retro
+            )
         ):
             self.bars_ready_to_analyze_queue.put(stock)
         self.logger.info(
