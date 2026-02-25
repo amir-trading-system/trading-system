@@ -40,6 +40,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.relevant_symbols: list[str] = []
+        self.monitored_symbols = monitored_symbols
         self.logger = logger
 
         self.scanner = scanner.Scanner(
@@ -126,6 +127,9 @@ class Client(client.EClient, wrapper.EWrapper):
         projection,
         legsStr,
     ):
+        if contractDetails.contract.symbol in self.monitored_symbols:
+            return
+
         self.reqContractDetails(
             reqId=reqId,
             contract=contractDetails.contract,
