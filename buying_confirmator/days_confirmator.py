@@ -34,7 +34,6 @@ class Confirmator:
         original_bar_to_confirm: common.objects.BarData,
         highest_high_one_minute: float,
         already_sent_buy_order_for_stock: dict[str,bool],
-        evidences: list[analyzer.evidences._evidence.Evidence],
     ) -> bool:
         bar_has_confirmed: bool = False
         entry_position_bar: common.objects.BarData = None
@@ -50,8 +49,29 @@ class Confirmator:
             return bar_has_confirmed
 
         confirmed_evidences: list[str] = []
-        for evidence in evidences:
-            if evidence.confirm(
+        stock_is_valid_for_evidence = False
+        for evidence in analyzer.evidences.__evidences__:
+            evidence_obj = evidence()
+            if (
+                not stock_is_valid_for_evidence
+                and not evidence_obj.stock_is_valid_for_evidence(
+                    stock=relevant_stock,
+                    current_bar=original_bar_to_confirm,
+                )
+            ):
+                break
+
+            stock_is_valid_for_evidence = True
+            evidence_response = evidence_obj.find_evidence(
+                stock=relevant_stock,
+                milestones=milestones,
+                current_bar=original_bar_to_confirm,
+                is_retro=self.is_retro,
+            )
+            if not evidence_response.result:
+                continue
+
+            if evidence_obj.confirm(
                 relevant_stock=relevant_stock,
                 original_bar_to_confirm=original_bar_to_confirm,
                 potential_confirmation_bar=potential_confirmation_bar,
@@ -124,7 +144,6 @@ class Confirmator:
         relevant_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         milestones: common.objects.Milestones,
-        evidences: list[analyzer.evidences._evidence.Evidence],
     ):
         one_minute_bars: list[common.objects.BarData] = []
         highest_high_one_minute: float = 0.0
@@ -202,7 +221,6 @@ class Confirmator:
                     original_bar_to_confirm=original_bar_to_confirm,
                     highest_high_one_minute=highest_high_one_minute,
                     already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
-                    evidences=evidences,
                 ):
                     break
 

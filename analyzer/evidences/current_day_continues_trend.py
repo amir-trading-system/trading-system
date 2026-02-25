@@ -98,9 +98,6 @@ class Evidence(
         highest_high_one_minute: float,
         one_minute_bars: list[common.objects.BarData],
     ) -> bool:
-        if milestones.top_bar.bar_object.index == 0:
-            milestones.top_bar.bar_object.high = 0.0
-
         crossed_previous_day_only = (
             True
             and (potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high or potential_confirmation_bar.high <= milestones.top_bar.bar_object.high)
@@ -125,9 +122,15 @@ class Evidence(
         if (
             True
             and highest_high_one_minute > milestones.starting_bar.bar_object.high
-            and highest_high_one_minute > milestones.top_bar.bar_object.high
+            and (
+                highest_high_one_minute > milestones.top_bar.bar_object.high
+                if milestones.top_bar.bar_object.index > 0 else True
+            )
             and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
-            and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
+            and (
+                potential_confirmation_bar.high > milestones.top_bar.bar_object.high
+                if milestones.top_bar.bar_object.index > 0 else True
+            )
         ):
             crossed_highest_one_minute = (
                 True

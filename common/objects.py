@@ -66,12 +66,6 @@ class BarData:
         ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
 
-    def generate_unique_identifier(
-        self,
-        evidence_name: str,
-    ) -> str:
-        return f"{self.symbol}-{self.timeframe}-{self.timeframe_type}-{self.bar_time}-{evidence_name}"
-
     def has_strong_rejection(
         self,
     ) -> bool:
@@ -84,6 +78,11 @@ class BarData:
             and self.volume > 2000000
             and (self.close - self.open_value)/(self.high - self.low) < 0.5
         )
+
+    def generate_unique_key(
+        self,
+    ) -> str:
+        return f"{self.symbol}-{self.bar_time}"
 
 class Stock:
     def __init__(

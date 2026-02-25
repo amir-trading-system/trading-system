@@ -24,7 +24,7 @@ class Analyzer:
         self.tws_client = tws_client
 
         self.request_id_to_symbol = request_id_to_symbol
-        self.has_indications_bars: dict[str, common.objects.BarData] = {}
+        self.has_indication: list[str] = []
         self.symbol_to_last_log_time: dict[str, datetime.datetime] = {}
 
     def _run_indicators(
@@ -50,39 +50,19 @@ class Analyzer:
                 },
             )
 
-        evidences_to_confirm: list[analyzer.evidences._evidence.Evidence] = []
         for indicator in analyzer.indicators.__indicators__:
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
                 milestones=milestones,
                 logger=self.logger,
             )
-            bar_unique_identifer = current_bar.generate_unique_identifier(
-                evidence_name=indicator_obj.evidence.name,
-            )
-            if bar_unique_identifer in self.has_indications_bars:
-                continue
-
             indicator_response: common.objects.IndicatorResponse = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
                 is_retro=is_retro,
             )
-            if indicator_response.result and indicator_response.success_rate == 1:
-                bar_unique_identifier = current_bar.generate_unique_identifier(
-                    evidence_name=indicator_obj.evidence.name,
-                )
-                self.has_indications_bars[bar_unique_identifier] = current_bar
-                evidences_to_confirm.append(indicator_obj.evidence())
-            elif confirmator_only:
-                evidences_to_confirm.append(indicator_obj.evidence())
-                break
-
-        if evidences_to_confirm:
-            self.request_id_to_symbol[stock.request_id] = stock
-
-            if self.alerter_object:
-                evidence_names = [evidence.name for evidence in evidences_to_confirm]
+            if indicator_response.result:
+                self.request_id_to_symbol[stock.request_id] = stock
                 self.logger.info(
                     msg="Bar has Indication, waiting for confirmation",
                     extra={
@@ -92,18 +72,26 @@ class Analyzer:
                         "timeframe_type": stock.timeframe_type.value,
                         "bar_time": current_bar.bar_time,
                         "current_index": current_bar.index,
-                        "evidences": evidence_names,
                         "request_id": stock.request_id,
                     },
                 )
-
-            self.waiting_for_confirmation_queue.put(
-                {
-                    "bar_to_confirm": current_bar,
-                    "milestones": milestones,
-                    "evidences": evidences_to_confirm,
-                },
-            )
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
+                )
+                unique_key = current_bar.generate_unique_key()
+                self.has_indication.append(unique_key)
+                break
+            if confirmator_only:
+                self.waiting_for_confirmation_queue.put(
+                    {
+                        "bar_to_confirm": current_bar,
+                        "milestones": milestones,
+                    },
+                )
+                break
 
         self.request_id_to_symbol[stock.request_id].finished_analyze = True
         if should_write_log:
@@ -130,13 +118,17 @@ class Analyzer:
         is_retro: bool,
         confirmator_only: bool,
     ):
+        unique_key = current_bar.generate_unique_key()
+        if unique_key in self.has_indication:
+            return
+
         should_write_log = False
         last_log_time = self.symbol_to_last_log_time.get(stock.symbol_name)
         if last_log_time is None:
             self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
             should_write_log = True
         else:
-            if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=1):
+            if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
                 should_write_log = True
                 self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
 
@@ -160,32 +152,6 @@ class Analyzer:
                 reqId=stock.request_id,
             )
             stock.should_monitor = False
-            return
-
-        current_bar_is_valid = current_bar.close > current_bar.open_value or is_retro
-        if not current_bar_is_valid and should_write_log:
-            body_percentage = 0.0
-            if current_bar.high - current_bar.low > 0:
-                body_percentage = (current_bar.close - current_bar.open_value)/(current_bar.high - current_bar.low)
-
-            self.logger.info(
-                msg="Bar is not valid, analyzer will wait for the next bar",
-                extra={
-                    "worker": "Analyzer",
-                    "symbol": stock.symbol_name,
-                    "timeframe": stock.timeframe,
-                    "timeframe_type": stock.timeframe_type.value,
-                    "bar_time": current_bar.bar_time,
-                    "current_index": current_bar.index,
-                    "low": current_bar.low,
-                    "open": current_bar.open_value,
-                    "close": current_bar.close,
-                    "high": current_bar.high,
-                    "body_percentage": body_percentage,
-                    "histogram": current_bar.histogram,
-                    "request_id": stock.request_id,
-                }
-            )
             return
 
         milestones = common.objects.Milestones(
