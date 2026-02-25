@@ -36,6 +36,7 @@ if __name__ == '__main__':
     threading.Thread(
         target=tws_client.run
     ).start()
+    time.sleep(1)
 
     tws_client.start_scanner(
         for_upside_potential=True,
@@ -51,33 +52,27 @@ if __name__ == '__main__':
             stock: common.objects.Stock = bars_ready_to_analyze_queue.get()
             stock.arrange_data_for_analysis()
 
-            current_bar = stock.bars[0]
-            now = datetime.datetime.now()
-
-            if (
-                True
-                and current_bar.close < current_bar.open_value
-                and current_bar.volume > current_bar.volume_average
-                and current_bar.close < current_bar.ema_9
-                and current_bar.close < current_bar.ema_20
-                and current_bar.close < current_bar.vwap
-                and min(
-                    bar_obj.close
-                    for bar_obj in stock.bars[:50]
-                ) == current_bar.close
-                and min(
-                    bar_obj.low
-                    for bar_obj in stock.bars[1:50]
-                ) > current_bar.close
-                and max(
-                    bar_obj.volume
-                    for bar_obj in stock.bars[:10]
-                ) == current_bar.volume
-            ):
-                print(f"{current_bar.symbol}--{datetime.datetime(
-                    year=now.year,
-                    month=now.month,
-                    day=now.day,
-                )}")
-
-        time.sleep(1)
+            for bar_object in stock.bars[:5]:
+                if (
+                    True
+                    and bar_object.close < bar_object.open_value
+                    and bar_object.volume > bar_object.volume_average
+                    and bar_object.close < bar_object.ema_9
+                    and bar_object.close < bar_object.ema_20
+                    and bar_object.close < bar_object.vwap
+                    and min(
+                        bar_obj.close
+                        for bar_obj in stock.bars[:50]
+                    ) == bar_object.close
+                    and min(
+                        bar_obj.low
+                        for bar_obj in stock.bars[1:50]
+                    ) > bar_object.close
+                    and max(
+                        bar_obj.volume
+                        for bar_obj in stock.bars[:10]
+                    ) == bar_object.volume
+                ):
+                    print(f"{bar_object.symbol}--{bar_object.bar_time}")
+        else:
+            time.sleep(1)

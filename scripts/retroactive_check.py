@@ -168,6 +168,10 @@ def get_symbols() -> list[Symbol]:
             name="FJET",
             datetime_str="02.19.26T10:18:00",
         ),
+        Symbol(
+            name="LRMR",
+            datetime_str="02.25.26T09:32:00",
+        ),
     ]
 
 def build_table(
@@ -338,8 +342,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="GITS",
-    #         datetime_str="01.27.26T10:05:00",
+    #         name="CDIO",
+    #         datetime_str="02.25.26T10:05:00",
     #     ),
     # ]
 

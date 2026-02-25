@@ -25,7 +25,7 @@ class Scanner():
         scanner_subscription.locationCode = "STK.US.MAJOR"
         scanner_subscription.scanCode = "TOP_PERC_GAIN"
         if for_upside_potential:
-            scanner_subscription.scanCode = "HOT_BY_VOLUME"
+            scanner_subscription.scanCode = "TOP_PERC_LOSE"
 
         return scanner_subscription
 
