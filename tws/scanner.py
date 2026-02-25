@@ -37,7 +37,7 @@ class Scanner():
             return [
                 tag_value.TagValue("volumeAbove", "1000000"),
                 tag_value.TagValue("priceAbove", "0.5"),
-                tag_value.TagValue("priceBelow", "10"),
+                tag_value.TagValue("priceBelow", "30"),
                 tag_value.TagValue("marketCapBelow1e6", "500000000"),
             ]
 

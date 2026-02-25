@@ -9,9 +9,6 @@ import collector
 import common
 import tws
 
-def get_potenial_upside_stocks_for_tomorrow():
-    pass
-
 if __name__ == '__main__':
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
