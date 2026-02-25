@@ -382,7 +382,6 @@ class DataStreamer():
             True
             and stock.timeframe_type == common.objects.TimeframeType.DAY
             and not self.is_retro
-            and current_bar.symbol not in self.monitored_symbols
             and self.potential_symbols_file_path is not None
             and now >= datetime.datetime(
                 year=now.year,
