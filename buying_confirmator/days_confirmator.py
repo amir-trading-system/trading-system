@@ -71,16 +71,28 @@ class Confirmator:
             if not evidence_response.result:
                 continue
 
-            if evidence_obj.confirm(
-                relevant_stock=relevant_stock,
-                original_bar_to_confirm=original_bar_to_confirm,
-                potential_confirmation_bar=potential_confirmation_bar,
-                milestones=milestones,
-                highest_high_one_minute=highest_high_one_minute,
-                one_minute_bars=one_minute_bars,
-            ):
-                entry_position_bar = potential_confirmation_bar
-                confirmed_evidences.append(evidence.name)
+            potential_confirmation_bars = [
+                one_minute_bar
+                for one_minute_bar in one_minute_bars
+                if one_minute_bar.index < potential_confirmation_bar.index+2
+            ]
+
+            for potential_confirmation_bar in potential_confirmation_bars:
+                one_minute_bars = [
+                    one_minute_bar
+                    for one_minute_bar in one_minute_bars
+                    if one_minute_bar.index <= potential_confirmation_bar.index
+                ]
+                if evidence_obj.confirm(
+                    relevant_stock=relevant_stock,
+                    original_bar_to_confirm=original_bar_to_confirm,
+                    potential_confirmation_bar=potential_confirmation_bar,
+                    milestones=milestones,
+                    highest_high_one_minute=highest_high_one_minute,
+                    one_minute_bars=one_minute_bars,
+                ):
+                    entry_position_bar = potential_confirmation_bar
+                    confirmed_evidences.append(evidence.name)
 
         if confirmed_evidences:
             self.results_queue.put(

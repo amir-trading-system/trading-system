@@ -172,6 +172,10 @@ def get_symbols() -> list[Symbol]:
             name="LRMR",
             datetime_str="02.25.26T09:32:00",
         ),
+        Symbol(
+            name="RXT",
+            datetime_str="02.26.26T14:06:00",
+        ),
     ]
 
 def build_table(
@@ -342,8 +346,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="CDIO",
-    #         datetime_str="02.25.26T10:05:00",
+    #         name="RXT",
+    #         datetime_str="02.26.26T10:05:00",
     #     ),
     # ]
 
