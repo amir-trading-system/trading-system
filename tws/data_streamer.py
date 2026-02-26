@@ -29,6 +29,7 @@ class DataStreamer():
         self.logger = logger
         self.potential_symbols_file_path = potential_symbols_file_path
         self.monitored_symbols = monitored_symbols
+        self.today_monitored_symbols: list[str] = []
 
     def _filter_ignored_bars(
         self,
@@ -292,25 +293,9 @@ class DataStreamer():
         ):
             return
 
-        day_timeframe_stock = [
-            stock_obj
-            for stock_obj in self.request_id_to_symbol.values()
-            if stock_obj.symbol_name == stock.symbol_name
-            and stock_obj.timeframe_type == common.objects.TimeframeType.DAY
-        ][0]
-
-        if day_timeframe_stock.bars:
-            relevant_bars = sorted(
-                day_timeframe_stock.bars,
-                key=lambda bar_obj: bar_obj.bar_time,
-                reverse=True,
-            )
-            current_bar = relevant_bars[0]
-
+        if stock.symbol_name not in self.today_monitored_symbols:
             self.insert_symbol_to_future_list(
-                stock=day_timeframe_stock,
-                current_bar=current_bar,
-                relevant_bars=relevant_bars,
+                symbol=stock.symbol_name,
             )
 
         relevant_symbol_bars = stock.bars
@@ -374,14 +359,31 @@ class DataStreamer():
     #pylint:disable=unspecified-encoding
     def insert_symbol_to_future_list(
         self,
-        stock: common.objects.Stock,
-        current_bar: common.objects.BarData,
-        relevant_bars: list[common.objects.BarData],
+        symbol: str,
     ):
+        current_bar: common.objects.BarData = None
+        relevant_bars: list[common.objects.BarData] = []
+
+        day_timeframe_stock = [
+            stock_obj
+            for stock_obj in self.request_id_to_symbol.values()
+            if stock_obj.symbol_name == symbol
+            and stock_obj.timeframe_type == common.objects.TimeframeType.DAY
+        ][0]
+
+        if day_timeframe_stock.bars:
+            relevant_bars = sorted(
+                day_timeframe_stock.bars,
+                key=lambda bar_obj: bar_obj.bar_time,
+                reverse=True,
+            )
+            current_bar = relevant_bars[0]
+        else:
+            return
+
         now = datetime.datetime.now()
         if (
             True
-            and stock.timeframe_type == common.objects.TimeframeType.DAY
             and not self.is_retro
             and self.potential_symbols_file_path is not None
             and now >= datetime.datetime(
@@ -392,7 +394,7 @@ class DataStreamer():
                 minute=1,
             )
         ):
-            if stock.bar_is_the_first_one_in_trend(
+            if day_timeframe_stock.bar_is_the_first_one_in_trend(
                 bar_object=current_bar,
                 relevant_bars=relevant_bars,
             ):
@@ -404,3 +406,4 @@ class DataStreamer():
                     )}\n")
 
                 self.monitored_symbols.append(current_bar.symbol)
+                self.today_monitored_symbols.append(current_bar.symbol)
