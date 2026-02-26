@@ -98,6 +98,7 @@ class Stock:
         finished_analyze: bool = False,
         resistance_levels: list[BarData] = [],
         last_post_pre_one_minute_highest_high: float = 0.0,
+        post_pre_market_volume_sum: float = 0.0,
         should_monitor: bool = True,
     ):
         self.request_id = request_id
@@ -111,6 +112,7 @@ class Stock:
         self.finished_analyze = finished_analyze
         self.resistance_levels = resistance_levels
         self.last_post_pre_one_minute_highest_high = last_post_pre_one_minute_highest_high
+        self.post_pre_market_volume_sum = post_pre_market_volume_sum
         self.should_monitor = should_monitor
 
     def previous_bar(
