@@ -177,6 +177,10 @@ def get_symbols() -> list[Symbol]:
             name="RXT",
             datetime_str="02.26.26T14:06:00",
         ),
+        Symbol(
+            name="XWEL",
+            datetime_str="02.27.26T09:32:00",
+        ),
     ]
 
 def build_table(
@@ -346,8 +350,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="BATL",
-    #         datetime_str="02.27.26T09:41:00",
+    #         name="XWEL",
+    #         datetime_str="02.27.26T09:32:00",
     #     ),
     # ]
 

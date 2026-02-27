@@ -115,15 +115,17 @@ class DataStreamer():
         bar_data_df["signal_line"] = signal_line
         bar_data_df["histogram"] = histogram
 
-        results_dict = bar_data_df.to_dict(orient="records")
-        bars = sorted(
-            [common.objects.BarData(**kwargs) for kwargs in results_dict], # pyright: ignore[reportCallIssue]
-            key=lambda bar: bar.bar_time,
-        )
-        for i, bar_object in enumerate(bars):
-            bar_object.index = len(bars) - i-1
+        bar_data_df = bar_data_df.sort_values("bar_time")
+        columns = common.objects.BarData.field_names()
+        formatted_bars = [
+            common.objects.BarData(*row)
+            for row in bar_data_df[columns].itertuples(index=False, name=None)
+        ]
 
-        return bars
+        for i, bar_object in enumerate(formatted_bars):
+            bar_object.index = len(formatted_bars) - i-1
+
+        return formatted_bars
 
     def get_historical_data(
         self,

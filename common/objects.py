@@ -1,5 +1,6 @@
 import datetime
 import enum
+import inspect
 import queue
 
 
@@ -83,6 +84,12 @@ class BarData:
         self,
     ) -> str:
         return f"{self.symbol}-{self.bar_time}"
+
+    @classmethod
+    def field_names(
+        cls,
+    ):
+        return list(inspect.signature(cls).parameters.keys())
 
 class Stock:
     def __init__(
