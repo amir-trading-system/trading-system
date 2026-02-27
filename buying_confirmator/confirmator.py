@@ -37,30 +37,27 @@ class Confirmator:
         self,
     ):
         while True:
-            if not self.waiting_for_confirmation_queue.empty():
-                bar_to_milestones: dict[str, any] = self.waiting_for_confirmation_queue.get()
+            bar_to_milestones: dict[str, any] = self.waiting_for_confirmation_queue.get()
 
-                bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
-                milestones: common.objects.Milestones = bar_to_milestones["milestones"]
+            bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
+            milestones: common.objects.Milestones = bar_to_milestones["milestones"]
 
-                relevant_stock = [
-                    stock
-                    for _, stock in self.request_id_to_symbol.items()
-                    if stock.is_same(
-                        symbol=bar_to_confirm.symbol,
-                        timeframe=bar_to_confirm.timeframe,
-                        timeframe_type=bar_to_confirm.timeframe_type,
-                        specific_bar_time=bar_to_confirm.bar_time,
-                    )
-                ][0]
+            relevant_stock = [
+                stock
+                for _, stock in self.request_id_to_symbol.items()
+                if stock.is_same(
+                    symbol=bar_to_confirm.symbol,
+                    timeframe=bar_to_confirm.timeframe,
+                    timeframe_type=bar_to_confirm.timeframe_type,
+                    specific_bar_time=bar_to_confirm.bar_time,
+                )
+            ][0]
 
-                threading.Thread(
-                    target=self.days_confirmator.confirm_entry_position,
-                    kwargs={
-                        "relevant_stock": relevant_stock,
-                        "original_bar_to_confirm": bar_to_confirm,
-                        "milestones": milestones,
-                    },
-                ).start()
-
-            time.sleep(1)
+            threading.Thread(
+                target=self.days_confirmator.confirm_entry_position,
+                kwargs={
+                    "relevant_stock": relevant_stock,
+                    "original_bar_to_confirm": bar_to_confirm,
+                    "milestones": milestones,
+                },
+            ).start()

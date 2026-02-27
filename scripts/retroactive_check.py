@@ -1,6 +1,7 @@
 import datetime
 import sys
 import threading
+import time
 import queue
 
 import rich
@@ -298,41 +299,40 @@ def update_table_with_results_queue(
     counter: list[int],
 ):
     while True:
-        if not results_queue.empty():
-            confirmation_result = results_queue.get()
-            relevant_symbol_data = [
-                symbol_data
-                for symbol_data in symbols_data
-                if symbol_data["symbol"] == confirmation_result["symbol"]
-                and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
-                and symbol_data["evidence_name"] == "in_progress"
-            ]
-            should_update_first_default = True
+        confirmation_result = results_queue.get()
+        relevant_symbol_data = [
+            symbol_data
+            for symbol_data in symbols_data
+            if symbol_data["symbol"] == confirmation_result["symbol"]
+            and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
+            and symbol_data["evidence_name"] == "in_progress"
+        ]
+        should_update_first_default = True
 
-            for evidence_name in confirmation_result["evidences"]:
-                if should_update_first_default and relevant_symbol_data:
-                    relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
-                    relevant_symbol_data[0]["evidence_name"] = evidence_name
-                    relevant_symbol_data[0]["collection_status"] = "done"
-                    relevant_symbol_data[0]["analysis_status"] = "done"
-                    should_update_first_default = False
-                    continue
+        for evidence_name in confirmation_result["evidences"]:
+            if should_update_first_default and relevant_symbol_data:
+                relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
+                relevant_symbol_data[0]["evidence_name"] = evidence_name
+                relevant_symbol_data[0]["collection_status"] = "done"
+                relevant_symbol_data[0]["analysis_status"] = "done"
+                should_update_first_default = False
+                continue
 
-                symbols_data.append(
-                    {
-                        "symbol": confirmation_result["symbol"],
-                        "collection_status": "done",
-                        "analysis_status": "done",
-                        "original_bar_time": confirmation_result["original_bar_time"],
-                        "actual_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
-                        "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
-                        "evidence_name": evidence_name,
-                        "is_new": True,
-                    },
-                )
+            symbols_data.append(
+                {
+                    "symbol": confirmation_result["symbol"],
+                    "collection_status": "done",
+                    "analysis_status": "done",
+                    "original_bar_time": confirmation_result["original_bar_time"],
+                    "actual_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
+                    "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
+                    "evidence_name": evidence_name,
+                    "is_new": True,
+                },
+            )
 
-            live_table.update(build_table(symbols_data), refresh=True)
-            counter[0] -= 1
+        live_table.update(build_table(symbols_data), refresh=True)
+        counter[0] -= 1
 
 def run_retroactive_check():
     symbols_data = []
@@ -347,7 +347,7 @@ def run_retroactive_check():
     # symbols = [
     #     Symbol(
     #         name="RXT",
-    #         datetime_str="02.26.26T10:05:00",
+    #         datetime_str="02.26.26T14:06:00",
     #     ),
     # ]
 
@@ -369,9 +369,11 @@ def run_retroactive_check():
         monitored_symbols=[s.name for s in symbols],
         logger=logger_object,
     )
+
     threading.Thread(
         target=tws_client.run
     ).start()
+    time.sleep(2)
 
     tws_client.data_streamer.on_specific_bar_time = True
     collector_object = collector.collector.Collector(

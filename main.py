@@ -143,7 +143,7 @@ if __name__ == "__main__":
     threading.Thread(
         target=tws_client.run
     ).start()
-    time.sleep(1)
+    time.sleep(2)
 
     run_bot(
         tws_client_obj=tws_client,

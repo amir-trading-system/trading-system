@@ -126,93 +126,54 @@ class Analyzer:
         retroactive_from: datetime.datetime = None,
     ):
         while True:
-            if not self.bars_ready_to_analyze_queue.empty():
-                stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
-                most_recent_bar = stock_object.bars[-1]
-                today = datetime.datetime.now().day
-                if (
-                    True
-                    and not specific_bar_time
-                    and not retroactive_from
-                    and today != most_recent_bar.bar_time.day
-                ):
-                    continue
+            stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
+            most_recent_bar = stock_object.bars[-1]
+            today = datetime.datetime.now().day
+            if (
+                True
+                and not specific_bar_time
+                and not retroactive_from
+                and today != most_recent_bar.bar_time.day
+            ):
+                continue
 
-                stock = common.objects.Stock(
-                    request_id=stock_object.request_id,
-                    symbol_name=stock_object.symbol_name,
-                    timeframe=stock_object.timeframe,
-                    timeframe_type=stock_object.timeframe_type,
-                    bars=copy.deepcopy(stock_object.bars),
-                    one_minute_bars_queue=stock_object.one_minute_bars_queue,
-                    specific_bar_time=stock_object.specific_bar_time,
-                    last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
-                    finished_collection=stock_object.finished_collection,
-                    finished_analyze=stock_object.finished_analyze,
-                )
-                stock.arrange_data_for_analysis()
+            stock = common.objects.Stock(
+                request_id=stock_object.request_id,
+                symbol_name=stock_object.symbol_name,
+                timeframe=stock_object.timeframe,
+                timeframe_type=stock_object.timeframe_type,
+                bars=copy.deepcopy(stock_object.bars),
+                one_minute_bars_queue=stock_object.one_minute_bars_queue,
+                specific_bar_time=stock_object.specific_bar_time,
+                last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
+                finished_collection=stock_object.finished_collection,
+                finished_analyze=stock_object.finished_analyze,
+            )
+            stock.arrange_data_for_analysis()
 
-                if retroactive_from:
-                    try:
-                        self.analyze_retroactive_case(
-                            stock=stock,
-                            retroactive_from=retroactive_from,
-                        )
-                    except Exception as e:
-                        self.logger.error(
-                            msg="Exception occured while analyzing stock retroactively",
-                            extra={
-                                "exception": e,
-                                "symbol": stock.symbol_name,
-                                "timeframe": stock.timeframe,
-                                "timeframe_type": stock.timeframe_type.value,
-                                "retroactive_from": retroactive_from,
-                                "request_id": stock.request_id,
-                            },
-                        )
-                else:
-                    try:
-                        self.analyze_live_case(
-                            stock=stock,
-                            specific_bar_time=specific_bar_time,
-                        )
-                    except Exception as e:
-                        self.logger.error(
-                            msg="Exception occured while analyzing stock on live or on specific bar time",
-                            extra={
-                                "exception": e,
-                                "symbol": stock.symbol_name,
-                                "timeframe": stock.timeframe,
-                                "timeframe_type": stock.timeframe_type.value,
-                                "specific_bar_time": specific_bar_time,
-                                "request_id": stock.request_id,
-                            },
-                        )
-
-    def analyze_data_retroactively(
-        self,
-    ):
-        while True:
-            if not self.bars_ready_to_analyze_queue.empty():
-                stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
-                stock = common.objects.Stock(
-                    request_id=stock_object.request_id,
-                    symbol_name=stock_object.symbol_name,
-                    timeframe=stock_object.timeframe,
-                    timeframe_type=stock_object.timeframe_type,
-                    bars=copy.deepcopy(stock_object.bars),
-                    one_minute_bars_queue=stock_object.one_minute_bars_queue,
-                    specific_bar_time=stock_object.specific_bar_time,
-                    last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
-                    finished_collection=stock_object.finished_collection,
-                    finished_analyze=stock_object.finished_analyze,
-                )
-                stock.arrange_data_for_analysis()
-
+            if retroactive_from:
+                try:
+                    self.analyze_retroactive_case(
+                        stock=stock,
+                        retroactive_from=retroactive_from,
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        msg="Exception occured while analyzing stock retroactively",
+                        extra={
+                            "exception": e,
+                            "symbol": stock.symbol_name,
+                            "timeframe": stock.timeframe,
+                            "timeframe_type": stock.timeframe_type.value,
+                            "retroactive_from": retroactive_from,
+                            "request_id": stock.request_id,
+                        },
+                    )
+            else:
                 try:
                     self.analyze_live_case(
                         stock=stock,
-                        specific_bar_time=stock_object.specific_bar_time,
+                        specific_bar_time=specific_bar_time,
                     )
                 except Exception as e:
                     self.logger.error(
@@ -222,7 +183,44 @@ class Analyzer:
                             "symbol": stock.symbol_name,
                             "timeframe": stock.timeframe,
                             "timeframe_type": stock.timeframe_type.value,
-                            "specific_bar_time": stock_object.specific_bar_time,
-                            "request_id": stock_object.request_id,
+                            "specific_bar_time": specific_bar_time,
+                            "request_id": stock.request_id,
                         },
                     )
+
+    def analyze_data_retroactively(
+        self,
+    ):
+        while True:
+            stock_object: common.objects.Stock = self.bars_ready_to_analyze_queue.get()
+            stock = common.objects.Stock(
+                request_id=stock_object.request_id,
+                symbol_name=stock_object.symbol_name,
+                timeframe=stock_object.timeframe,
+                timeframe_type=stock_object.timeframe_type,
+                bars=copy.deepcopy(stock_object.bars),
+                one_minute_bars_queue=stock_object.one_minute_bars_queue,
+                specific_bar_time=stock_object.specific_bar_time,
+                last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
+                finished_collection=stock_object.finished_collection,
+                finished_analyze=stock_object.finished_analyze,
+            )
+            stock.arrange_data_for_analysis()
+
+            try:
+                self.analyze_live_case(
+                    stock=stock,
+                    specific_bar_time=stock_object.specific_bar_time,
+                )
+            except Exception as e:
+                self.logger.error(
+                    msg="Exception occured while analyzing stock on live or on specific bar time",
+                    extra={
+                        "exception": e,
+                        "symbol": stock.symbol_name,
+                        "timeframe": stock.timeframe,
+                        "timeframe_type": stock.timeframe_type.value,
+                        "specific_bar_time": stock_object.specific_bar_time,
+                        "request_id": stock_object.request_id,
+                    },
+                )

@@ -78,10 +78,10 @@ class Confirmator:
             ]
 
             for potential_confirmation_bar in potential_confirmation_bars:
-                one_minute_bars = [
+                temp_one_minute_bars = [
                     one_minute_bar
                     for one_minute_bar in one_minute_bars
-                    if one_minute_bar.index <= potential_confirmation_bar.index
+                    if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
                 ]
                 if evidence_obj.confirm(
                     relevant_stock=relevant_stock,
@@ -89,7 +89,7 @@ class Confirmator:
                     potential_confirmation_bar=potential_confirmation_bar,
                     milestones=milestones,
                     highest_high_one_minute=highest_high_one_minute,
-                    one_minute_bars=one_minute_bars,
+                    one_minute_bars=temp_one_minute_bars,
                 ):
                     entry_position_bar = potential_confirmation_bar
                     confirmed_evidences.append(evidence.name)
@@ -183,57 +183,56 @@ class Confirmator:
                 )
                 break
 
-            if not relevant_stock.one_minute_bars_queue.empty():
-                if (
-                    True
-                    and potential_confirmation_bar is not None
-                    and potential_confirmation_bar.high > highest_high_one_minute
-                    and potential_confirmation_bar.bar_time >= datetime.datetime(
-                        year=original_bar_to_confirm.bar_time.year,
-                        month=original_bar_to_confirm.bar_time.month,
-                        day=original_bar_to_confirm.bar_time.day,
-                        hour=4,
-                    )
-                ):
-                    highest_high_one_minute = potential_confirmation_bar.high
+            if (
+                True
+                and potential_confirmation_bar is not None
+                and potential_confirmation_bar.high > highest_high_one_minute
+                and potential_confirmation_bar.bar_time >= datetime.datetime(
+                    year=original_bar_to_confirm.bar_time.year,
+                    month=original_bar_to_confirm.bar_time.month,
+                    day=original_bar_to_confirm.bar_time.day,
+                    hour=4,
+                )
+            ):
+                highest_high_one_minute = potential_confirmation_bar.high
 
-                potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
-                relevant_stock.one_minute_bars_queue.task_done()
-                date_now = datetime.datetime.now()
+            potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
+            relevant_stock.one_minute_bars_queue.task_done()
+            date_now = datetime.datetime.now()
 
-                if (
-                    potential_confirmation_bar.bar_time < datetime.datetime(
-                        year=original_bar_to_confirm.bar_time.year,
-                        month=original_bar_to_confirm.bar_time.month,
-                        day=original_bar_to_confirm.bar_time.day,
-                        hour=4,
+            if (
+                potential_confirmation_bar.bar_time < datetime.datetime(
+                    year=original_bar_to_confirm.bar_time.year,
+                    month=original_bar_to_confirm.bar_time.month,
+                    day=original_bar_to_confirm.bar_time.day,
+                    hour=4,
+                )
+                or potential_confirmation_bar.bar_time < most_updated_datetime
+                or not potential_confirmation_bar.ready_to_analyze
+                or not potential_confirmation_bar.histogram
+                or (
+                    not self.is_retro
+                        and potential_confirmation_bar.bar_time < datetime.datetime(
+                        year=date_now.year,
+                        month=date_now.month,
+                        day=date_now.day,
+                        hour=date_now.hour,
+                        minute=date_now.minute,
                     )
-                    or potential_confirmation_bar.bar_time < most_updated_datetime
-                    or not potential_confirmation_bar.ready_to_analyze
-                    or not potential_confirmation_bar.histogram
-                    or (
-                        not self.is_retro
-                            and potential_confirmation_bar.bar_time < datetime.datetime(
-                            year=date_now.year,
-                            month=date_now.month,
-                            day=date_now.day,
-                            hour=date_now.hour,
-                            minute=date_now.minute,
-                        )
-                    )
-                ):
-                    continue
+                )
+            ):
+                continue
 
-                most_updated_datetime = potential_confirmation_bar.bar_time
-                if self._confirm(
-                    relevant_stock=relevant_stock,
-                    milestones=milestones,
-                    one_minute_bars=one_minute_bars,
-                    potential_confirmation_bar=potential_confirmation_bar,
-                    original_bar_to_confirm=original_bar_to_confirm,
-                    highest_high_one_minute=highest_high_one_minute,
-                    already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
-                ):
-                    break
+            most_updated_datetime = potential_confirmation_bar.bar_time
+            if self._confirm(
+                relevant_stock=relevant_stock,
+                milestones=milestones,
+                one_minute_bars=one_minute_bars,
+                potential_confirmation_bar=potential_confirmation_bar,
+                original_bar_to_confirm=original_bar_to_confirm,
+                highest_high_one_minute=highest_high_one_minute,
+                already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
+            ):
+                break
 
         return
