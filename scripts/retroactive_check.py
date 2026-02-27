@@ -346,8 +346,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="RXT",
-    #         datetime_str="02.26.26T14:06:00",
+    #         name="BATL",
+    #         datetime_str="02.27.26T09:41:00",
     #     ),
     # ]
 
@@ -373,7 +373,7 @@ def run_retroactive_check():
     threading.Thread(
         target=tws_client.run
     ).start()
-    time.sleep(2)
+    time.sleep(1)
 
     tws_client.data_streamer.on_specific_bar_time = True
     collector_object = collector.collector.Collector(

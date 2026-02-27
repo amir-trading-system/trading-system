@@ -35,7 +35,7 @@ def initiate_potential_symbols(
                 [symbol, date] = line.split("--")
                 formatted_date = datetime.datetime.fromisoformat(date.replace("\n", ""))
                 if (formatted_date + datetime.timedelta(
-                    days=60,
+                    days=40,
                 )) >= datetime.datetime.now():
                     symbol_to_date[symbol] = formatted_date
         except FileNotFoundError as e:
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     threading.Thread(
         target=tws_client.run
     ).start()
-    time.sleep(2)
+    time.sleep(1)
 
     run_bot(
         tws_client_obj=tws_client,
