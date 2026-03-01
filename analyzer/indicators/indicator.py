@@ -18,7 +18,7 @@ class Indicator:
 
     def handle_response(
         self,
-        success_results: list[common.objects.EvidenceResponse],
+        success_results: list[bool],
         failed_base_evidences_count: int,
     ) -> common.objects.IndicatorResponse:
         success_rate = len(success_results)/1
@@ -38,7 +38,7 @@ class Indicator:
         current_bar: common.objects.BarData,
         is_retro: bool,
     ) -> common.objects.IndicatorResponse:
-        success_results: list[common.objects.EvidenceResponse] = []
+        success_results: list[bool] = []
         failed_base_evidences_count = 0
 
         evidence_object: analyzer.evidences._evidence.Evidence = self.evidence()
@@ -59,10 +59,10 @@ class Indicator:
             current_bar=current_bar,
             is_retro=is_retro,
         )
-        if not result.result and evidence_object.is_base_evidence:
+        if not result and evidence_object.is_base_evidence:
             failed_base_evidences_count += 1
 
-        if not result.result and evidence_object.must_to_be_true:
+        if not result and evidence_object.must_to_be_true:
             success_results = []
             return common.objects.IndicatorResponse(
                 success_count=0,
@@ -71,7 +71,7 @@ class Indicator:
                 failed_base_evidences_count=0,
             )
 
-        if result.result:
+        if result:
             if not evidence_object.is_base_evidence or self.name == "already_has_indication":
                 success_results.append(result)
 

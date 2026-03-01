@@ -13,7 +13,7 @@ class Evidence(
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
         is_retro: bool,
-    ) -> common.objects.EvidenceResponse:
+    ) -> bool:
         previous_bar = stock.previous_bar(
             bar_object=current_bar,
         )
@@ -31,12 +31,7 @@ class Evidence(
             and current_bar.low < previous_bar.high
         )
 
-        return common.objects.EvidenceResponse(
-            result=current_bar_crossed_any_resistance,
-            reason=""
-            if current_bar_crossed_any_resistance
-            else "Current day does not continues any trend",
-        )
+        return current_bar_crossed_any_resistance
 
     def confirm(
         self,

@@ -13,7 +13,7 @@ class Evidence(
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
         is_retro: bool,
-    ) -> common.objects.EvidenceResponse:
+    ) -> bool:
         current_bar_is_strong = (
             True
             and current_bar.close > current_bar.open_value
@@ -24,12 +24,7 @@ class Evidence(
             )
         )
 
-        return common.objects.EvidenceResponse(
-            result=current_bar_is_strong,
-            reason=""
-            if current_bar_is_strong
-            else "Current day does not continues any trend",
-        )
+        return current_bar_is_strong
 
     def confirm(
         self,

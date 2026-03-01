@@ -149,7 +149,7 @@ class Evidence:
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
         is_retro: bool,
-    ) -> common.objects.EvidenceResponse:
+    ) -> bool:
         raise NotImplementedError()
 
     def get_resistance_levels(

@@ -62,13 +62,13 @@ class Confirmator:
                 break
 
             stock_is_valid_for_evidence = True
-            evidence_response = evidence_obj.find_evidence(
+            evidence_result = evidence_obj.find_evidence(
                 stock=relevant_stock,
                 milestones=milestones,
                 current_bar=original_bar_to_confirm,
                 is_retro=self.is_retro,
             )
-            if not evidence_response.result:
+            if not evidence_result:
                 continue
 
             potential_confirmation_bars = [

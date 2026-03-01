@@ -252,6 +252,21 @@ class Client(client.EClient, wrapper.EWrapper):
             transmit=True,
         )
 
+    def place_stop_loss_order(
+        self,
+        symbol: str,
+        quantity: int,
+        filled_price: float,
+    ):
+        self.place_order(
+            symbol=symbol,
+            order_action="SELL",
+            order_type="STP",
+            quantity=quantity,
+            price=filled_price,
+            transmit=True,
+        )
+
     def place_order(
         self,
         symbol: str,
@@ -288,8 +303,11 @@ class Client(client.EClient, wrapper.EWrapper):
         execution,
     ):
         super().execDetails(reqId, contract, execution)
+        symbol = contract.symbol
+        quantity = int(execution.shares)
+
         self.order_id_to_symbol[execution.orderId] = common.objects.Order(
-            symbol=contract.symbol,
+            symbol=symbol,
             action=execution.side,
             status="Filled",
         )
@@ -297,14 +315,21 @@ class Client(client.EClient, wrapper.EWrapper):
             msg="Order has been filled for symbol",
             extra={
                 "order_action": execution.side,
-                "quantity": int(execution.shares),
-                "symbol": contract.symbol,
+                "quantity": quantity,
+                "symbol": symbol,
                 "request_id": reqId,
             },
         )
         if execution.side == "BOT":
+            take_profit_price = round(execution.price * 1.15, 2)
+            stop_loss_price = round(execution.price * 0.9, 2)
             self.place_take_profit_order(
+                symbol=symbol,
+                quantity=quantity,
+                filled_price=take_profit_price,
+            )
+            self.place_stop_loss_order(
                 symbol=contract.symbol,
-                quantity=int(execution.shares),
-                filled_price=round(execution.price * 1.15, 2),
+                quantity=quantity,
+                filled_price=stop_loss_price,
             )

@@ -1,4 +1,3 @@
-import datetime
 import threading
 import queue
 import time
@@ -46,33 +45,46 @@ if __name__ == '__main__':
     threading.Thread(
         target=collector_obj.collect_data,
     ).start()
+    relevant_symbols: list[str] = []
 
     while True:
-        if not bars_ready_to_analyze_queue.empty():
-            stock: common.objects.Stock = bars_ready_to_analyze_queue.get()
-            stock.arrange_data_for_analysis()
+        try:
+            stock: common.objects.Stock = bars_ready_to_analyze_queue.get(
+                timeout=10,
+            )
+        except queue.Empty as e:
+            print("No more data from scanner")
+            if relevant_symbols:
+                #pylint:disable=unspecified-encoding
+                with open("potential_upside_for_tomorrow.txt", "w") as f:
+                    f.writelines(relevant_symbols)
+            break
 
-            for bar_object in stock.bars[:5]:
-                if (
-                    True
-                    and bar_object.close < bar_object.open_value
-                    and bar_object.volume > bar_object.volume_average
-                    and bar_object.close < bar_object.ema_9
-                    and bar_object.close < bar_object.ema_20
-                    and bar_object.close < bar_object.vwap
-                    and min(
-                        bar_obj.close
-                        for bar_obj in stock.bars[:50]
-                    ) == bar_object.close
-                    and min(
-                        bar_obj.low
-                        for bar_obj in stock.bars[1:50]
-                    ) > bar_object.close
-                    and max(
-                        bar_obj.volume
-                        for bar_obj in stock.bars[:10]
-                    ) == bar_object.volume
-                ):
-                    print(f"{bar_object.symbol}--{bar_object.bar_time}")
-        else:
-            time.sleep(1)
+        stock.arrange_data_for_analysis()
+
+        for bar_object in stock.bars[:5]:
+            previous_bar = stock.previous_bar(
+                bar_object=bar_object,
+            )
+            if (
+                True
+                and previous_bar is not None
+                and bar_object.close < bar_object.open_value
+                and bar_object.volume > bar_object.volume_average
+                and bar_object.close < bar_object.ema_9
+                and bar_object.close < bar_object.ema_20
+                and bar_object.close < bar_object.vwap
+                and min(
+                    bar_obj.close
+                    for bar_obj in stock.bars[:50]
+                ) == bar_object.close
+                and min(
+                    bar_obj.low
+                    for bar_obj in stock.bars[1:50]
+                ) > bar_object.close
+                and bar_object.volume > previous_bar.volume
+                and bar_object.low/bar_object.close >= 0.9
+            ):
+                SYMBOL = f"{bar_object.symbol}--{bar_object.bar_time}"
+                relevant_symbols.append(f"{SYMBOL}\n")
+                print(SYMBOL)

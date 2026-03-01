@@ -13,7 +13,7 @@ class Evidence(
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
         is_retro: bool,
-    ) -> common.objects.EvidenceResponse:
+    ) -> bool:
         top_bar_is_valid = len(stock.resistance_levels) > 0
 
         current_day_breaks_highest_high_since_fall = (
@@ -27,12 +27,7 @@ class Evidence(
             )
         )
 
-        return common.objects.EvidenceResponse(
-            result=current_day_breaks_highest_high_since_fall,
-            reason=""
-            if current_day_breaks_highest_high_since_fall
-            else "Current day does not continues any trend",
-        )
+        return current_day_breaks_highest_high_since_fall
 
     def confirm(
         self,

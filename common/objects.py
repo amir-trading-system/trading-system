@@ -331,17 +331,6 @@ class Milestones:
         self.fibonacci_retracement = fibonacci_retracement
         self.retracement_indexes = retracement_indexes
 
-class EvidenceResponse:
-    def __init__(
-        self,
-        result: bool,
-        reason: str | None = None,
-        value: any = None,
-    ):
-        self.result = result
-        self.reason = reason
-        self.value = value
-
 class IndicatorResponse:
     def __init__(
         self,

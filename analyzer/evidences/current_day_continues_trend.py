@@ -14,16 +14,13 @@ class Evidence(
         milestones: common.objects.Milestones,
         current_bar: common.objects.BarData,
         is_retro: bool,
-    ) -> common.objects.EvidenceResponse:
+    ) -> bool:
         starting_bar = self.get_starting_bar(
             stock=stock,
         )
 
         if starting_bar is None:
-            return common.objects.EvidenceResponse(
-                result=False,
-                reason="No strating bar for this day trend",
-            )
+            return False
 
         milestones.starting_bar = starting_bar
 
@@ -39,10 +36,7 @@ class Evidence(
             for bar_object in self.relevant_bars[:starting_bar.index]
             if current_bar.low < bar_object.high
         ):
-            return common.objects.EvidenceResponse(
-                result=False,
-                reason="no bars to indicate",
-            )
+            return False
 
         previous_day = self.relevant_bars[0]
         previous_day_looks_good = (
@@ -82,12 +76,7 @@ class Evidence(
             and current_bar_is_strong
         )
 
-        return common.objects.EvidenceResponse(
-            result=current_day_continues_trend,
-            reason=""
-            if current_day_continues_trend
-            else "Current day does not continues any trend",
-        )
+        return current_day_continues_trend
 
     def confirm(
         self,
