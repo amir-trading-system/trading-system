@@ -220,6 +220,7 @@ class Stock:
         last_5_bars = relevant_bars[bar_object.index+1:bar_object.index+6]
         return (
             True
+            and bar_object.volume > 0.0
             and bar_object.volume_average/bar_object.volume < 0.2
             and bar_object.high > bar_object.ema_9
             and bar_object.high > bar_object.ema_20

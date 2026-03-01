@@ -239,6 +239,11 @@ class Evidence:
                 for resistance_level in resistance_levels
                 if resistance_level.high >= potential_confirmation_bar.high
                 and potential_confirmation_bar.high/resistance_level.high >= 0.8
+            ) and not any(
+                r_l
+                for r_l in resistance_levels
+                if resistance_level.high < r_l.high
+                and resistance_level.index > r_l.index
             ):
                 return True
 
