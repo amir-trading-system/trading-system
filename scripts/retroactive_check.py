@@ -348,16 +348,16 @@ def run_retroactive_check():
     #     )
     #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
     # ]
-    symbols = [
-        Symbol(
-            name="CYCU",
-            datetime_str="11.13.25T09:41:00",
-        ),
-        Symbol(
-            name="EPSM",
-            datetime_str="11.18.25T12:07:00",
-        ),
-    ]
+    # symbols = [
+    #     Symbol(
+    #         name="CYCU",
+    #         datetime_str="11.13.25T09:41:00",
+    #     ),
+    #     Symbol(
+    #         name="EPSM",
+    #         datetime_str="11.18.25T12:07:00",
+    #     ),
+    # ]
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
