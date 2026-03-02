@@ -217,7 +217,7 @@ class DataStreamer():
                             minute=30,
                         )
                     ):
-                        stock.post_pre_market_volume_sum += stock.post_pre_market_volume_sum + one_minute_bar.volume
+                        stock.post_pre_market_volume_sum += one_minute_bar.volume
                         stock.last_post_pre_one_minute_highest_high = max(
                             stock.last_post_pre_one_minute_highest_high,
                             one_minute_bar.high,

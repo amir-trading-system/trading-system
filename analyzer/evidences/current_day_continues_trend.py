@@ -86,6 +86,7 @@ class Evidence(
         milestones: common.objects.Milestones,
         highest_high_one_minute: float,
         one_minute_bars: list[common.objects.BarData],
+        volume_sum_since_market_open: float,
     ) -> bool:
         crossed_previous_day_only = (
             True

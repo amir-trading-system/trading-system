@@ -350,8 +350,12 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="XWEL",
-    #         datetime_str="02.27.26T09:32:00",
+    #         name="CYCU",
+    #         datetime_str="11.13.25T09:41:00",
+    #     ),
+    #     Symbol(
+    #         name="EPSM",
+    #         datetime_str="11.18.25T09:52:00",
     #     ),
     # ]
 

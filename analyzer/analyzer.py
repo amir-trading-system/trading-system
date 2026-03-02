@@ -70,6 +70,7 @@ class Analyzer:
                 finished_analyze=stock.finished_analyze,
                 last_post_pre_one_minute_highest_high=stock.last_post_pre_one_minute_highest_high,
                 post_pre_market_volume_sum=stock.post_pre_market_volume_sum,
+                last_lowest_low_bar=stock.last_lowest_low_bar,
             )
 
             self.days_analyzer.analyze_day_bar(
@@ -148,6 +149,7 @@ class Analyzer:
                 specific_bar_time=stock_object.specific_bar_time,
                 last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
                 post_pre_market_volume_sum=stock_object.post_pre_market_volume_sum,
+                last_lowest_low_bar=stock_object.last_lowest_low_bar,
                 finished_collection=stock_object.finished_collection,
                 finished_analyze=stock_object.finished_analyze,
             )
@@ -205,6 +207,7 @@ class Analyzer:
                 specific_bar_time=stock_object.specific_bar_time,
                 last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
                 post_pre_market_volume_sum=stock_object.post_pre_market_volume_sum,
+                last_lowest_low_bar=stock_object.last_lowest_low_bar,
                 finished_collection=stock_object.finished_collection,
                 finished_analyze=stock_object.finished_analyze,
             )

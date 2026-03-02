@@ -45,7 +45,7 @@ class Confirmator:
             day=original_bar_to_confirm.bar_time.day,
             hour=9,
             minute=30,
-        ):
+        ) or potential_confirmation_bar.volume < 20000:
             return bar_has_confirmed
 
         confirmed_evidences: list[str] = []
@@ -54,7 +54,7 @@ class Confirmator:
             evidence_obj = evidence()
             if (
                 not stock_is_valid_for_evidence
-                and not evidence_obj.stock_is_valid_for_evidence(
+                and not evidence_obj.pre_process(
                     stock=relevant_stock,
                     current_bar=original_bar_to_confirm,
                 )
@@ -83,6 +83,18 @@ class Confirmator:
                     for one_minute_bar in one_minute_bars
                     if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
                 ]
+                market_open = datetime.datetime(
+                    year=original_bar_to_confirm.bar_time.year,
+                    month=original_bar_to_confirm.bar_time.month,
+                    day=original_bar_to_confirm.bar_time.day,
+                    hour=9,
+                    minute=30,
+                )
+                volume_sum_since_market_open = sum(
+                    one_minute_bar.volume
+                    for one_minute_bar in one_minute_bars
+                    if market_open <= one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
+                )
                 if evidence_obj.confirm(
                     relevant_stock=relevant_stock,
                     original_bar_to_confirm=original_bar_to_confirm,
@@ -90,6 +102,7 @@ class Confirmator:
                     milestones=milestones,
                     highest_high_one_minute=highest_high_one_minute,
                     one_minute_bars=temp_one_minute_bars,
+                    volume_sum_since_market_open=volume_sum_since_market_open,
                 ):
                     entry_position_bar = potential_confirmation_bar
                     confirmed_evidences.append(evidence.name)

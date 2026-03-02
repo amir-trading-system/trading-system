@@ -126,7 +126,7 @@ class Evidence:
                 timeframe=top_bar.timeframe,
             )
 
-    def stock_is_valid_for_evidence(
+    def pre_process(
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
@@ -257,5 +257,6 @@ class Evidence:
         milestones: common.objects.Milestones,
         highest_high_one_minute: float,
         one_minute_bars: list[common.objects.BarData],
+        volume_sum_since_market_open: float,
     ) -> bool:
         raise NotImplementedError()

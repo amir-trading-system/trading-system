@@ -37,6 +37,7 @@ class Evidence(
         milestones: common.objects.Milestones,
         highest_high_one_minute: float,
         one_minute_bars: list[common.objects.BarData],
+        volume_sum_since_market_open: float,
     ) -> bool:
         potential_confirmation_bar_is_strong = False
         current_bar = relevant_stock.bars[0]

@@ -42,7 +42,7 @@ class Indicator:
         failed_base_evidences_count = 0
 
         evidence_object: analyzer.evidences._evidence.Evidence = self.evidence()
-        if not evidence_object.stock_is_valid_for_evidence(
+        if not evidence_object.pre_process(
             stock=stock,
             current_bar=current_bar,
         ):
