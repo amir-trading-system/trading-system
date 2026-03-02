@@ -350,12 +350,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="CYCU",
-    #         datetime_str="11.13.25T09:41:00",
-    #     ),
-    #     Symbol(
-    #         name="EPSM",
-    #         datetime_str="11.18.25T12:07:00",
+    #         name="TWG",
+    #         datetime_str="12.08.25T13:10:00",
     #     ),
     # ]
 
@@ -396,6 +392,8 @@ def run_retroactive_check():
         tws_client=tws_client,
         logger=logger_object,
     )
+    # analyzer_object.confirmator_only = True
+
     confirmator_object = buying_confirmator.confirmator.Confirmator(
         tws_client=tws_client,
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
@@ -403,6 +401,7 @@ def run_retroactive_check():
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
         is_retro=True,
+        # confirmation_only=True,
     )
 
     threading.Thread(
@@ -460,7 +459,9 @@ def run_retroactive_check():
 
         while True:
             if counter[0] == 0:
-                sys.exit(0)
+                break
+
+    sys.exit(0)
 
 if __name__ == "__main__":
     run_retroactive_check()

@@ -178,7 +178,9 @@ class DataStreamer():
         previous_session_date = datetime.datetime.fromtimestamp(0)
         if specific_bar_time is not None:
             current_session_date = specific_bar_time
-            previous_session_date = specific_bar_time - datetime.timedelta(days=1)
+            previous_session_date = current_session_date - datetime.timedelta(
+                days=1,
+            )
         else:
             date_now = datetime.datetime.now()
             current_session_date = datetime.datetime(
@@ -186,7 +188,14 @@ class DataStreamer():
                 month=date_now.month,
                 day=date_now.day,
             )
-            previous_session_date = current_session_date - datetime.timedelta(days=1)
+            previous_session_date = current_session_date - datetime.timedelta(
+                days=1,
+            )
+
+        while previous_session_date.weekday() > 4:
+            previous_session_date -= datetime.timedelta(
+                days=1,
+            )
 
         temp_request_id_to_symbol = {
             key: value

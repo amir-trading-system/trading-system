@@ -154,6 +154,12 @@ class Analyzer:
             stock.should_monitor = False
             return
 
+        previous_bar = stock.previous_bar(
+            bar_object=current_bar,
+        )
+        if not previous_bar:
+            return
+
         milestones = common.objects.Milestones(
             starting_bar=common.objects.MilestoneBar(
                 index=0,
@@ -172,6 +178,14 @@ class Analyzer:
                 bar_object=current_bar,
                 bar_type=common.objects.MilestoneType.LOWEST_BAR,
                 bar_time=current_bar.bar_time,
+            ),
+            previous_bar=common.objects.MilestoneBar(
+                index=0,
+                bar_object=stock.previous_bar(
+                    bar_object=current_bar,
+                ),
+                bar_type=common.objects.MilestoneType.PREVIOUS_BAR,
+                bar_time=previous_bar.bar_time,
             ),
             are_valid=True,
         )

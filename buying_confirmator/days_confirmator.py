@@ -17,6 +17,7 @@ class Confirmator:
         request_id_to_symbol: dict[int,common.objects.Stock],
         results_queue: queue.Queue[dict[str,any]],
         alerter_object: alerter.alerter.Alerter = None,
+        confirmation_only: bool = False,
     ):
         self.tws_client = tws_client
         self.is_retro = is_retro
@@ -24,6 +25,7 @@ class Confirmator:
         self.alerter_object = alerter_object
         self.results_queue = results_queue
         self.request_id_to_symbol = request_id_to_symbol
+        self.confirmation_only = confirmation_only
 
     def _confirm(
         self,
@@ -62,14 +64,14 @@ class Confirmator:
                 break
 
             stock_is_valid_for_evidence = True
-            evidence_result = evidence_obj.find_evidence(
-                stock=relevant_stock,
-                milestones=milestones,
-                current_bar=original_bar_to_confirm,
-                is_retro=self.is_retro,
-            )
-            if not evidence_result:
-                continue
+            if not self.confirmation_only:
+                if not evidence_obj.find_evidence(
+                    stock=relevant_stock,
+                    milestones=milestones,
+                    current_bar=original_bar_to_confirm,
+                    is_retro=self.is_retro,
+                ):
+                    continue
 
             potential_confirmation_bars = [
                 one_minute_bar
