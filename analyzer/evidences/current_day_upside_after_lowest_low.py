@@ -48,6 +48,7 @@ class Evidence(
                 ) > bar_object.close
                 and bar_object.volume > previous_bar.volume
                 and bar_object.low/bar_object.close >= 0.9
+                and bar_object.volume > 200000
             ):
                 stock.last_lowest_low_bar = bar_object
                 current_day_upside_after_lowest_low = True
@@ -72,6 +73,7 @@ class Evidence(
         base_condition = (
             True
             and relevant_stock.last_lowest_low_bar is not None
+            and volume_sum_since_market_open > 1000000
             and potential_confirmation_bar.close > potential_confirmation_bar.open_value
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.volume > 20000

@@ -95,6 +95,9 @@ class Confirmator:
                     for one_minute_bar in one_minute_bars
                     if market_open <= one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
                 )
+                if volume_sum_since_market_open < 100000:
+                    continue
+
                 if evidence_obj.confirm(
                     relevant_stock=relevant_stock,
                     original_bar_to_confirm=original_bar_to_confirm,
