@@ -239,6 +239,17 @@ class DataStreamer():
         request_id: int,
     ):
         stock = self.request_id_to_symbol[request_id]
+
+        if stock.is_day_timeframe() and self.is_retro:
+            while not [
+                stock_obj
+                for stock_obj in self.request_id_to_symbol.values()
+                if stock_obj.symbol_name == stock.symbol_name
+                and stock_obj.is_one_minute_timeframe()
+                and stock_obj.specific_bar_time == stock.specific_bar_time
+            ][0].finished_collection:
+                continue
+
         relevant_symbol_bars = stock.bars
         symbol = stock.symbol_name
         specific_bar_time = stock.specific_bar_time
@@ -254,6 +265,7 @@ class DataStreamer():
                 symbol=symbol,
                 specific_bar_time=specific_bar_time,
             )
+            stock.finished_collection = True
             return
 
         stock.finished_collection = True
