@@ -67,7 +67,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="INBS",
-            datetime_str="01.05.26T09:36:00",
+            datetime_str="01.05.26T12:22:00",
         ),
         Symbol(
             name="AUST",

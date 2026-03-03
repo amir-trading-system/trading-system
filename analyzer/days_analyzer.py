@@ -4,7 +4,6 @@ import queue
 
 import alerter
 import analyzer.indicators
-import analyzer.evidences
 import common
 from tws import client
 
@@ -180,10 +179,8 @@ class Analyzer:
                 bar_time=current_bar.bar_time,
             ),
             previous_bar=common.objects.MilestoneBar(
-                index=0,
-                bar_object=stock.previous_bar(
-                    bar_object=current_bar,
-                ),
+                index=previous_bar.index,
+                bar_object=previous_bar,
                 bar_type=common.objects.MilestoneType.PREVIOUS_BAR,
                 bar_time=previous_bar.bar_time,
             ),

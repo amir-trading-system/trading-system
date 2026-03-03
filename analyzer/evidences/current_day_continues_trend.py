@@ -166,6 +166,7 @@ class Evidence(
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
             and potential_confirmation_bar.close > potential_confirmation_bar.vwap
             and potential_confirmation_bar.volume > 50000
+            and (potential_confirmation_bar.close-potential_confirmation_bar.open_value)/(potential_confirmation_bar.high-potential_confirmation_bar.low) > 0.4
         ):
             return True
 
