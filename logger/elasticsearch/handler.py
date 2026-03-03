@@ -76,7 +76,6 @@ class Handler(
             "bar_time",
             "last_one_minute_bar_time",
             "entry_position_bar_time",
-            "retroactive_from",
         ]
 
         for field in date_fields:

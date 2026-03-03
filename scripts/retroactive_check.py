@@ -350,8 +350,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="TWG",
-    #         datetime_str="12.08.25T13:10:00",
+    #         name="XWEL",
+    #         datetime_str="02.27.26T09:32:00",
     #     ),
     # ]
 
@@ -405,7 +405,10 @@ def run_retroactive_check():
     )
 
     threading.Thread(
-        target=analyzer_object.analyze_data_retroactively,
+        target=analyzer_object.analyze_data,
+        kwargs={
+            "is_retro": True,
+        },
     ).start()
 
     threading.Thread(

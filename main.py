@@ -68,10 +68,7 @@ def run_bot(
     a_obj: analyzer.analyzer.Analyzer,
     co_obj: buying_confirmator.confirmator.Confirmator,
 ):
-    manual_results_for_test = []
-
     tws_client_obj.start_scanner(
-        manual_results_for_test=manual_results_for_test,
         for_upside_potential=False,
     )
 
@@ -81,6 +78,9 @@ def run_bot(
 
     threading.Thread(
         target=a_obj.analyze_data,
+        kwargs={
+            "is_retro": False,
+        },
     ).start()
 
     threading.Thread(

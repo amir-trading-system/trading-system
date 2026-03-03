@@ -1,6 +1,7 @@
 import datetime
 import logging
 import queue
+import time
 
 import pandas as pd
 import talib
@@ -12,7 +13,6 @@ import common
 
 class DataStreamer():
     on_specific_bar_time: bool = False
-    is_retro: bool = False
 
     def __init__(
         self,
@@ -144,7 +144,7 @@ class DataStreamer():
         if (
             is_timestamp
             and (
-                (now.day != bar_time.day and bar_time.hour < 16 and not self.on_specific_bar_time and not self.is_retro)
+                (now.day != bar_time.day and bar_time.hour < 16 and not self.on_specific_bar_time)
                 or tws_bar.volume == 0.0
             )
         ):
@@ -197,42 +197,48 @@ class DataStreamer():
                 days=1,
             )
 
-        temp_request_id_to_symbol = {
-            key: value
-            for key, value in self.request_id_to_symbol.items()
-            if value.symbol_name == symbol
-        }
-        one_minute_bars = temp_request_id_to_symbol[one_minute_request_id].bars
+        day_timeframe_stock = [
+            stock
+            for stock in self.request_id_to_symbol.values()
+            if stock.symbol_name == symbol
+            and stock.is_day_timeframe()
+            and (
+                not self.on_specific_bar_time
+                or (
+                    stock.specific_bar_time is not None
+                    and stock.specific_bar_time == specific_bar_time
+                )
+            )
+        ][0]
+        one_minute_bars = self.request_id_to_symbol[one_minute_request_id].bars
+        if specific_bar_time is not None and day_timeframe_stock.specific_bar_time != specific_bar_time:
+            return
 
-        for _, stock in temp_request_id_to_symbol.items():
-            if stock.timeframe_type == common.objects.TimeframeType.DAY:
-                if specific_bar_time is not None and stock.specific_bar_time != specific_bar_time:
-                    continue
-                for one_minute_bar in one_minute_bars:
-                    if (
-                        True
-                        and one_minute_bar.bar_time >= datetime.datetime(
-                            year=previous_session_date.year,
-                            month=previous_session_date.month,
-                            day=previous_session_date.day,
-                            hour=16,
-                            minute=0,
-                        )
-                        and one_minute_bar.bar_time < datetime.datetime(
-                            year=current_session_date.year,
-                            month=current_session_date.month,
-                            day=current_session_date.day,
-                            hour=9,
-                            minute=30,
-                        )
-                    ):
-                        stock.post_pre_market_volume_sum += one_minute_bar.volume
-                        stock.last_post_pre_one_minute_highest_high = max(
-                            stock.last_post_pre_one_minute_highest_high,
-                            one_minute_bar.high,
-                        )
+        for one_minute_bar in one_minute_bars:
+            if (
+                True
+                and one_minute_bar.bar_time >= datetime.datetime(
+                    year=previous_session_date.year,
+                    month=previous_session_date.month,
+                    day=previous_session_date.day,
+                    hour=16,
+                    minute=0,
+                )
+                and one_minute_bar.bar_time < datetime.datetime(
+                    year=current_session_date.year,
+                    month=current_session_date.month,
+                    day=current_session_date.day,
+                    hour=9,
+                    minute=30,
+                )
+            ):
+                day_timeframe_stock.post_pre_market_volume_sum += one_minute_bar.volume
+                day_timeframe_stock.last_post_pre_one_minute_highest_high = max(
+                    day_timeframe_stock.last_post_pre_one_minute_highest_high,
+                    one_minute_bar.high,
+                )
 
-                    stock.one_minute_bars_queue.put(one_minute_bar)
+            day_timeframe_stock.one_minute_bars_queue.put(one_minute_bar)
 
     def on_historical_data_end(
         self,
@@ -240,15 +246,16 @@ class DataStreamer():
     ):
         stock = self.request_id_to_symbol[request_id]
 
-        if stock.is_day_timeframe() and self.is_retro:
+        if stock.is_day_timeframe() and self.on_specific_bar_time:
             while not [
                 stock_obj
                 for stock_obj in self.request_id_to_symbol.values()
                 if stock_obj.symbol_name == stock.symbol_name
                 and stock_obj.is_one_minute_timeframe()
                 and stock_obj.specific_bar_time == stock.specific_bar_time
-            ][0].finished_collection:
-                continue
+                and stock_obj.finished_collection
+            ]:
+                time.sleep(0.5)
 
         relevant_symbol_bars = stock.bars
         symbol = stock.symbol_name
@@ -276,7 +283,7 @@ class DataStreamer():
                 (
                     stock.should_monitor
                     and stock.symbol_name in self.monitored_symbols
-                ) or self.is_retro
+                ) or self.on_specific_bar_time
             )
         ):
             self.bars_ready_to_analyze_queue.put(stock)
@@ -304,7 +311,7 @@ class DataStreamer():
 
         if (
             True
-            and not self.is_retro
+            and not self.on_specific_bar_time
             and stock.symbol_name not in self.monitored_symbols
             and now < datetime.datetime(
                 year=now.year,
@@ -407,7 +414,7 @@ class DataStreamer():
         now = datetime.datetime.now()
         if (
             True
-            and not self.is_retro
+            and not self.on_specific_bar_time
             and self.potential_symbols_file_path is not None
             and now >= datetime.datetime(
                 year=now.year,
