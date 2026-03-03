@@ -2,6 +2,7 @@ import decimal
 import logging
 import math
 import queue
+import threading
 import time
 
 from ibapi import client, common as ibapi_common, wrapper, order as tws_order
@@ -185,9 +186,12 @@ class Client(client.EClient, wrapper.EWrapper):
         start: str,
         end: str,
     ):
-        self.data_streamer.on_historical_data_end(
-            request_id=reqId,
-        )
+        threading.Thread(
+            target=self.data_streamer.on_historical_data_end,
+            kwargs={
+                "request_id": reqId,
+            },
+        ).start()
 
     def historicalDataUpdate(
         self,
