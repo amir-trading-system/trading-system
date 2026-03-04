@@ -1,7 +1,6 @@
 import datetime
 import logging
 import queue
-import time
 
 import pandas as pd
 import talib

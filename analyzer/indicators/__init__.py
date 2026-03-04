@@ -13,5 +13,5 @@ __indicators__ : list[type[indicator.Indicator]] = [
     case_3.Indicator,
     case_4.Indicator,
     case_5.Indicator,
-    # case_6.Indicator,
+    case_6.Indicator,
 ]

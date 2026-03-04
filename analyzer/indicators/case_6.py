@@ -17,4 +17,4 @@ class Indicator(
             milestones=milestones,
             logger=logger,
         )
-        self.evidence = analyzer.evidences.current_day_upside_after_lowest_low.Evidence
+        self.evidence = analyzer.evidences.current_day_is_after_healty_retracement.Evidence

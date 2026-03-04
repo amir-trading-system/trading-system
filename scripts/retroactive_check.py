@@ -175,6 +175,10 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="RXT",
+            datetime_str="02.19.26T15:12:00",
+        ),
+        Symbol(
+            name="RXT",
             datetime_str="02.26.26T14:06:00",
         ),
         Symbol(
@@ -184,6 +188,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="EDSA",
             datetime_str="03.03.26T09:30:00",
+        ),
+        Symbol(
+            name="BATL",
+            datetime_str="03.04.26T11:27:00",
         ),
     ]
 
@@ -354,8 +362,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="EDSA",
-    #         datetime_str="03.03.26T09:32:00",
+    #         name="BATL",
+    #         datetime_str="03.04.26T11:27:00",
     #     ),
     # ]
 
