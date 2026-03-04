@@ -15,12 +15,9 @@ class Evidence(
         is_retro: bool,
     ) -> bool:
         current_day_upside_after_lowest_low = False
-        previous_bar = stock.previous_bar(
-            bar_object=current_bar,
-        )
+        previous_bar = milestones.previous_bar.bar_object
         if (
             True
-            and previous_bar is not None
             and previous_bar.close > previous_bar.open_value
             and previous_bar.volume > previous_bar.volume_average * 3
         ):

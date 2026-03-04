@@ -14,13 +14,8 @@ class Evidence(
         current_bar: common.objects.BarData,
         is_retro: bool,
     ) -> bool:
-        previous_bar = stock.previous_bar(
-            bar_object=current_bar,
-        )
-
         current_bar_crossed_any_resistance = (
             True
-            and previous_bar is not None
             and (current_bar.close > current_bar.open_value or is_retro)
             and any(
                 resistance_level
@@ -28,7 +23,7 @@ class Evidence(
                 if current_bar.low < resistance_level.high < current_bar.high
                 and not resistance_level.has_strong_rejection()
             )
-            and current_bar.low < previous_bar.high
+            and current_bar.low < milestones.previous_bar.bar_object.high
         )
 
         return current_bar_crossed_any_resistance
@@ -43,11 +38,6 @@ class Evidence(
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
-        current_bar = relevant_stock.bars[0]
-        previous_bar = relevant_stock.previous_bar(
-            bar_object=current_bar,
-        )
-
         highest_high_bar = [
             bar_object
             for bar_object in one_minute_bars
@@ -67,6 +57,7 @@ class Evidence(
         ):
             return False
 
+        previous_bar = milestones.previous_bar.bar_object
         crossed_highest_high = (
             True
             and previous_bar is not None

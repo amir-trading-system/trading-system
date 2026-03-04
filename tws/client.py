@@ -333,7 +333,7 @@ class Client(client.EClient, wrapper.EWrapper):
                 filled_price=take_profit_price,
             )
             self.place_stop_loss_order(
-                symbol=contract.symbol,
+                symbol=symbol,
                 quantity=quantity,
                 filled_price=stop_loss_price,
             )

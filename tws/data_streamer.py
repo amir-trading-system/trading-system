@@ -255,7 +255,7 @@ class DataStreamer():
                 and stock_obj.specific_bar_time == stock.specific_bar_time
                 and stock_obj.finished_collection
             ]:
-                time.sleep(0.5)
+                continue
 
         relevant_symbol_bars = stock.bars
         symbol = stock.symbol_name
