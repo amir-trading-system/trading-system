@@ -281,7 +281,7 @@ class DataStreamer():
             True
             and (
                 (
-                    stock.should_monitor
+                    stock.is_worth_to_monitor()
                     and stock.symbol_name in self.monitored_symbols
                 ) or self.on_specific_bar_time
             )
@@ -383,7 +383,7 @@ class DataStreamer():
             )
             return
 
-        if stock.should_monitor:
+        if stock.is_worth_to_monitor():
             self.bars_ready_to_analyze_queue.put(stock)
 
     #pylint:disable=unspecified-encoding

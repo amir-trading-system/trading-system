@@ -191,28 +191,6 @@ class Stock:
             reverse=True,
         )
 
-    def previous_bar_is_valid(
-        self,
-        bar_object: BarData,
-    ) -> bool:
-        previous_bar = self.previous_bar(
-            bar_object=bar_object,
-        )
-        if not previous_bar:
-            return True
-
-        if (
-            True
-            and previous_bar.has_strong_rejection()
-            and not self.bar_is_the_first_one_in_trend(
-                bar_object=previous_bar,
-                relevant_bars=self.bars,
-            )
-        ):
-            return False
-
-        return True
-
     def bar_is_the_first_one_in_trend(
         self,
         bar_object: BarData,
@@ -240,6 +218,16 @@ class Stock:
                 for bar_obj in last_5_bars
                 if bar_obj.volume/bar_object.volume > 0.2
             )
+        )
+
+    def is_worth_to_monitor(
+        self,
+    ):
+        self.arrange_data_for_analysis()
+        return (
+            True
+            and self.is_day_timeframe()
+            and self.bars[0].volume >= 1000000
         )
 
 class IbAPIRequest:

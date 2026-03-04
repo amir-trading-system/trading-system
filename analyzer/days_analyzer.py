@@ -50,6 +50,10 @@ class Analyzer:
             )
 
         for indicator in analyzer.indicators.__indicators__:
+            unique_key = current_bar.generate_unique_key()
+            if unique_key in self.has_indication:
+                break
+
             indicator_obj: analyzer.indicators.indicator.Indicator = indicator(
                 milestones=milestones,
                 logger=self.logger,
@@ -80,7 +84,6 @@ class Analyzer:
                         "milestones": milestones,
                     },
                 )
-                unique_key = current_bar.generate_unique_key()
                 self.has_indication.append(unique_key)
                 break
             if confirmator_only:
@@ -130,28 +133,6 @@ class Analyzer:
             if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
                 should_write_log = True
                 self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
-
-        previous_bar_is_valid = stock.previous_bar_is_valid(
-            bar_object=current_bar,
-        )
-        if not previous_bar_is_valid:
-            if should_write_log:
-                self.logger.warning(
-                    msg="Previous day is not valid, current day wont be analyzed",
-                    extra={
-                        "worker": "DataStreamer",
-                        "symbol": stock.symbol_name,
-                        "timeframe": stock.timeframe,
-                        "timeframe_type": stock.timeframe_type.value,
-                        "request_id": stock.request_id,
-                    },
-                )
-
-            self.tws_client.cancelHistoricalData(
-                reqId=stock.request_id,
-            )
-            stock.should_monitor = False
-            return
 
         previous_bar = stock.previous_bar(
             bar_object=current_bar,
