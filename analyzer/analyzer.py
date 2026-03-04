@@ -100,7 +100,7 @@ class Analyzer:
             )
             stock.arrange_data_for_analysis()
 
-            most_recent_bar = stock_object.bars[0]
+            most_recent_bar = stock.bars[0]
             today = datetime.datetime.now().day
             if (
                 True

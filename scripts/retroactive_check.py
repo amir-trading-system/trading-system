@@ -181,6 +181,10 @@ def get_symbols() -> list[Symbol]:
             name="XWEL",
             datetime_str="02.27.26T09:32:00",
         ),
+        Symbol(
+            name="EDSA",
+            datetime_str="03.03.26T09:30:00",
+        ),
     ]
 
 def build_table(
@@ -348,12 +352,12 @@ def run_retroactive_check():
     #     )
     #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
     # ]
-    # symbols = [
-    #     Symbol(
-    #         name="XWEL",
-    #         datetime_str="02.27.26T09:32:00",
-    #     ),
-    # ]
+    symbols = [
+        Symbol(
+            name="EDSA",
+            datetime_str="03.03.26T09:32:00",
+        ),
+    ]
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
