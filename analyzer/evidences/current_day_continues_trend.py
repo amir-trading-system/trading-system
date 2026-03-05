@@ -80,7 +80,7 @@ class Evidence(
 
     def confirm(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
@@ -91,8 +91,8 @@ class Evidence(
         crossed_previous_day_only = (
             True
             and (potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high or potential_confirmation_bar.high <= milestones.top_bar.bar_object.high)
-            and potential_confirmation_bar.high > relevant_stock.bars[1].high
-            and potential_confirmation_bar.low < relevant_stock.bars[1].high
+            and potential_confirmation_bar.high > stock.bars[1].high
+            and potential_confirmation_bar.low < stock.bars[1].high
             and potential_confirmation_bar.close > highest_high_one_minute
         )
         crossed_starting_point = (
@@ -129,7 +129,7 @@ class Evidence(
             )
 
         crossed_only_highest_high_today_and_after_noon = False
-        previous_bar = relevant_stock.previous_bar(
+        previous_bar = stock.previous_bar(
             bar_object=original_bar_to_confirm,
         )
         highest_high_bar = [

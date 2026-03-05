@@ -43,10 +43,10 @@ class Confirmator:
             bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
             milestones: common.objects.Milestones = bar_to_milestones["milestones"]
 
-            relevant_stock = [
-                stock
-                for _, stock in self.request_id_to_symbol.items()
-                if stock.is_same(
+            stock = [
+                stock_object
+                for _, stock_object in self.request_id_to_symbol.items()
+                if stock_object.is_same(
                     symbol=bar_to_confirm.symbol,
                     timeframe=bar_to_confirm.timeframe,
                     timeframe_type=bar_to_confirm.timeframe_type,
@@ -57,7 +57,7 @@ class Confirmator:
             threading.Thread(
                 target=self.days_confirmator.confirm_entry_position,
                 kwargs={
-                    "relevant_stock": relevant_stock,
+                    "stock": stock,
                     "original_bar_to_confirm": bar_to_confirm,
                     "milestones": milestones,
                 },

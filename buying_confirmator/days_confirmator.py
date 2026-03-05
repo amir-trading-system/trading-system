@@ -29,7 +29,7 @@ class Confirmator:
 
     def _confirm(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         milestones: common.objects.Milestones,
         one_minute_bars: list[common.objects.BarData],
         potential_confirmation_bar: common.objects.BarData,
@@ -57,7 +57,7 @@ class Confirmator:
             if (
                 not stock_is_valid_for_evidence
                 and not evidence_obj.pre_process(
-                    stock=relevant_stock,
+                    stock=stock,
                     current_bar=original_bar_to_confirm,
                 )
             ):
@@ -66,7 +66,7 @@ class Confirmator:
             stock_is_valid_for_evidence = True
             if not self.confirmation_only:
                 if not evidence_obj.find_evidence(
-                    stock=relevant_stock,
+                    stock=stock,
                     milestones=milestones,
                     current_bar=original_bar_to_confirm,
                     is_retro=self.is_retro,
@@ -78,6 +78,27 @@ class Confirmator:
                 for one_minute_bar in one_minute_bars
                 if one_minute_bar.index < potential_confirmation_bar.index+2
             ]
+            if potential_confirmation_bar.bar_time - datetime.timedelta(
+                minutes=15,
+            ) <= datetime.datetime(
+                year=potential_confirmation_bar.bar_time.year,
+                month=potential_confirmation_bar.bar_time.month,
+                day=potential_confirmation_bar.bar_time.day,
+                hour=9,
+                minute=30,
+            ):
+                potential_confirmation_bars = [
+                    one_minute_bar
+                    for one_minute_bar in one_minute_bars
+                    if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
+                    and one_minute_bar.bar_time >= datetime.datetime(
+                        year=potential_confirmation_bar.bar_time.year,
+                        month=potential_confirmation_bar.bar_time.month,
+                        day=potential_confirmation_bar.bar_time.day,
+                        hour=9,
+                        minute=30,
+                    )
+                ]
 
             for potential_confirmation_bar in potential_confirmation_bars:
                 temp_one_minute_bars = [
@@ -101,7 +122,7 @@ class Confirmator:
                     continue
 
                 if evidence_obj.confirm(
-                    relevant_stock=relevant_stock,
+                    stock=stock,
                     original_bar_to_confirm=original_bar_to_confirm,
                     potential_confirmation_bar=potential_confirmation_bar,
                     milestones=milestones,
@@ -115,7 +136,7 @@ class Confirmator:
         if confirmed_evidences:
             self.results_queue.put(
                 {
-                    "symbol": relevant_stock.symbol_name,
+                    "symbol": stock.symbol_name,
                     "original_bar_time": original_bar_to_confirm.bar_time,
                     "confirmation_bar_time": entry_position_bar.bar_time,
                     "evidences": confirmed_evidences,
@@ -133,24 +154,24 @@ class Confirmator:
                     "entry_position_bar_time": entry_position_bar.bar_time,
                     "bar_time": original_bar_to_confirm.bar_time,
                     "evidence_name": evidence_name,
-                    "request_id": relevant_stock.request_id,
+                    "request_id": stock.request_id,
                 },
             )
 
             if self.alerter_object:
                 self.alerter_object.send_confirmation_alert(
                     sender="Confirmator",
-                    stock=relevant_stock,
+                    stock=stock,
                     original_bar=original_bar_to_confirm,
                     entry_position_bar=entry_position_bar,
                     evidence_name=evidence_name,
                     is_retro=self.is_retro,
-                    request_id=relevant_stock.request_id,
+                    request_id=stock.request_id,
                 )
 
             unique_key_for_place_order = original_bar_to_confirm.symbol
             if self.is_retro:
-                unique_key_for_place_order = f"{original_bar_to_confirm.symbol}-{relevant_stock.specific_bar_time}"
+                unique_key_for_place_order = f"{original_bar_to_confirm.symbol}-{stock.specific_bar_time}"
             if (
                 not already_sent_buy_order_for_stock.get(unique_key_for_place_order, False)
             ):
@@ -171,7 +192,7 @@ class Confirmator:
 
     def confirm_entry_position(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         milestones: common.objects.Milestones,
     ):
@@ -179,15 +200,15 @@ class Confirmator:
         highest_high_one_minute: float = 0.0
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         already_sent_buy_order_for_stock: dict[str,bool] = {}
-        relevant_stock.bars = sorted(
-            relevant_stock.bars,
+        stock.bars = sorted(
+            stock.bars,
             key=lambda bar_object: bar_object.bar_time,
             reverse=True,
         )
         potential_confirmation_bar = None
 
         while True:
-            if not relevant_stock.should_monitor:
+            if not stock.should_monitor:
                 self.logger.info(
                     msg="Stock should not be monitored anymore",
                     extra={
@@ -196,7 +217,7 @@ class Confirmator:
                         "timeframe": original_bar_to_confirm.timeframe,
                         "timeframe_type": original_bar_to_confirm.timeframe_type.value,
                         "bar_time": original_bar_to_confirm.bar_time,
-                        "request_id": relevant_stock.request_id,
+                        "request_id": stock.request_id,
                     }
                 )
                 break
@@ -214,8 +235,8 @@ class Confirmator:
             ):
                 highest_high_one_minute = potential_confirmation_bar.high
 
-            potential_confirmation_bar = relevant_stock.one_minute_bars_queue.get()
-            relevant_stock.one_minute_bars_queue.task_done()
+            potential_confirmation_bar = stock.one_minute_bars_queue.get()
+            stock.one_minute_bars_queue.task_done()
             date_now = datetime.datetime.now()
 
             if (
@@ -243,7 +264,7 @@ class Confirmator:
 
             most_updated_datetime = potential_confirmation_bar.bar_time
             if self._confirm(
-                relevant_stock=relevant_stock,
+                stock=stock,
                 milestones=milestones,
                 one_minute_bars=one_minute_bars,
                 potential_confirmation_bar=potential_confirmation_bar,

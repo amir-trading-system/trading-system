@@ -30,7 +30,7 @@ class Evidence(
 
     def confirm(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
@@ -72,12 +72,12 @@ class Evidence(
 
         highest_than_any_resistance_level = any(
             resistance_level
-            for resistance_level in relevant_stock.resistance_levels
+            for resistance_level in stock.resistance_levels
             if resistance_level.high < potential_confirmation_bar.close
             and not resistance_level.has_strong_rejection()
         ) and not any(
             resistance_level
-            for resistance_level in relevant_stock.resistance_levels
+            for resistance_level in stock.resistance_levels
             if resistance_level.high > potential_confirmation_bar.high
             and potential_confirmation_bar.high/resistance_level.high >= 0.9
         )

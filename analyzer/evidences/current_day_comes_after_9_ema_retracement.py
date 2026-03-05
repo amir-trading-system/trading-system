@@ -5,7 +5,7 @@ from . import _evidence
 class Evidence(
     _evidence.Evidence,
 ):
-    name = "current_day_is_after_healty_retracement"
+    name = "current_day_comes_after_9_ema_retracement"
 
     def find_evidence(
         self,
@@ -15,30 +15,31 @@ class Evidence(
         is_retro: bool,
     ) -> bool:
         previous_day = milestones.previous_bar.bar_object
-        previous_day_is_strong = (
+        two_days_ago_bar = stock.bars[2]
+        three_days_ago_bar = stock.bars[3]
+
+        day_before_previous_day_is_strong_day = (
             True
-            and previous_day.close > previous_day.open_value
-            and previous_day.volume > previous_day.volume_average
-            and (previous_day.close-previous_day.open_value)/(previous_day.high-previous_day.low) > 0.3
-            and previous_day.high > current_bar.high
+            and three_days_ago_bar.high < two_days_ago_bar.high > previous_day.high
+            and two_days_ago_bar.close > two_days_ago_bar.open_value
+            and two_days_ago_bar.volume > two_days_ago_bar.volume_average
+            and two_days_ago_bar.volume > previous_day.volume
+            and (two_days_ago_bar.low-two_days_ago_bar.ema_9)/(previous_day.high-previous_day.low) >= 0.5
         )
 
-        current_day_is_potential = (
+        previous_day_is_after_9_ema_retracement = previous_day.ema_9/previous_day.low >= 0.8
+
+        current_day_comes_after_9_ema_retracement = (
             True
-            and (current_bar.open_value-current_bar.low)/(current_bar.high-current_bar.low) >= 0.2
-            and current_bar.open_value-current_bar.low > abs(current_bar.close-current_bar.open_value)
+            and day_before_previous_day_is_strong_day
+            and previous_day_is_after_9_ema_retracement
         )
 
-        current_day_is_after_healty_retracement = (
-            True
-            and previous_day_is_strong
-            and current_day_is_potential
-        )
-        return current_day_is_after_healty_retracement
+        return current_day_comes_after_9_ema_retracement
 
     def confirm(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
@@ -78,7 +79,7 @@ class Evidence(
             True
             and potential_confirmation_bar.close > potential_confirmation_bar.open_value
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and potential_confirmation_bar.low > potential_confirmation_bar.vwap
+            and potential_confirmation_bar.low/potential_confirmation_bar.vwap > 0.95
             and potential_confirmation_bar.ema_9 > potential_confirmation_bar.vwap
             and potential_confirmation_bar.ema_9 > potential_confirmation_bar.ema_20
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_9

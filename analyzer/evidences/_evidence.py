@@ -251,7 +251,7 @@ class Evidence:
 
     def confirm(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,

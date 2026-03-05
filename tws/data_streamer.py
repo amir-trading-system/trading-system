@@ -92,6 +92,11 @@ class DataStreamer():
         is_one_day_bars = fitered_bars[0].timeframe_type == common.objects.TimeframeType.DAY
         if is_one_day_bars:
             since_open_bar_df = bar_data_df.copy()
+        else:
+            since_open_bar_df = bar_data_df.where(
+                (bar_data_df["bar_time"].dt.time >= pd.to_datetime("04:00").time()) & # type: ignore
+                (bar_data_df["bar_time"].dt.time <= pd.to_datetime("19:59").time()) # type: ignore
+            )
 
         since_open_bar_df["session"] = since_open_bar_df["bar_time"].dt.date # type: ignore
 

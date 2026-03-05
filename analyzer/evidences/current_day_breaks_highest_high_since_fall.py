@@ -31,7 +31,7 @@ class Evidence(
 
     def confirm(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
@@ -40,7 +40,7 @@ class Evidence(
         volume_sum_since_market_open: float,
     ) -> bool:
         potential_confirmation_bar_is_strong = False
-        current_bar = relevant_stock.bars[0]
+        current_bar = stock.bars[0]
         ema_for_check = current_bar.ema_9 if current_bar.ema_9 < current_bar.ema_20 else current_bar.ema_20
         potential_confirmation_bar_is_highest = max(
             [
@@ -50,7 +50,7 @@ class Evidence(
         ) < potential_confirmation_bar.close
 
         crossed_resistance_level_strongly = self.crossed_resistance_level_strongly(
-            resistance_levels=relevant_stock.resistance_levels,
+            resistance_levels=stock.resistance_levels,
             potential_confirmation_bar=potential_confirmation_bar,
         )
 

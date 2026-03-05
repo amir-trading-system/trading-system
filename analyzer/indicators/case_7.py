@@ -6,7 +6,7 @@ from . import indicator
 class Indicator(
     indicator.Indicator,
 ):
-    name = "case_6"
+    name = "case_7"
 
     def __init__(
         self,
@@ -17,4 +17,4 @@ class Indicator(
             milestones=milestones,
             logger=logger,
         )
-        self.evidence = analyzer.evidences.current_day_is_after_healthy_retracement.Evidence
+        self.evidence = analyzer.evidences.current_day_comes_after_9_ema_retracement.Evidence

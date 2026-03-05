@@ -39,7 +39,7 @@ class Evidence(
 
     def confirm(
         self,
-        relevant_stock: common.objects.Stock,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
@@ -59,7 +59,7 @@ class Evidence(
             and potential_confirmation_bar.low < highest_high_one_minute < potential_confirmation_bar.high
             and not any(
                 r_l
-                for r_l in relevant_stock.resistance_levels
+                for r_l in stock.resistance_levels
                 if r_l.high > potential_confirmation_bar.high
                 and potential_confirmation_bar.high/r_l.high >= 0.95
             )

@@ -227,7 +227,7 @@ class Stock:
         return (
             True
             and self.is_day_timeframe()
-            and self.bars[0].volume >= 1000000
+            and self.bars[0].volume >= 500000
         )
 
 class IbAPIRequest:
