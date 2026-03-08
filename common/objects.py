@@ -107,7 +107,7 @@ class Stock:
         last_post_pre_one_minute_highest_high: float = 0.0,
         post_pre_market_volume_sum: float = 0.0,
         last_lowest_low_bar: BarData = None,
-        should_monitor: bool = True,
+        one_minute_request_id: int = None,
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -122,7 +122,7 @@ class Stock:
         self.last_post_pre_one_minute_highest_high = last_post_pre_one_minute_highest_high
         self.post_pre_market_volume_sum = post_pre_market_volume_sum
         self.last_lowest_low_bar = last_lowest_low_bar
-        self.should_monitor = should_monitor
+        self.one_minute_request_id = one_minute_request_id
 
     def previous_bar(
         self,

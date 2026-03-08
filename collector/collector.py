@@ -30,15 +30,6 @@ class Collector:
         contract.exchange = "SMART"
         contract.currency = "USD"
 
-        self.request_id_to_symbol[request_id] = common.objects.Stock(
-            request_id=request_id,
-            symbol_name=symbol,
-            bars=[],
-            timeframe=timeframe,
-            timeframe_type=timeframe_type,
-            one_minute_bars_queue=queue.Queue(),
-            specific_bar_time=specific_bar_time,
-        )
         ibapi_request = common.objects.IbAPIRequest(
             request_id=request_id,
             symbol=symbol,
@@ -135,8 +126,23 @@ class Collector:
                 timeframe_type=manual_timeframe_for_tests.timeframe_type,
             ),
         ]
+        day_timeframe_request_id = None
+        one_minute_timeframe_request_id = 0
         for timeframe_input in timeframes:
             next_request_id = self.tws_client.next_id()
+            self.request_id_to_symbol[next_request_id] = common.objects.Stock(
+                request_id=next_request_id,
+                symbol_name=symbol,
+                bars=[],
+                timeframe=timeframe_input.timeframe,
+                timeframe_type=timeframe_input.timeframe_type,
+                one_minute_bars_queue=queue.Queue(),
+                specific_bar_time=specific_bar_time,
+            )
+            if timeframe_input.timeframe_type == common.objects.TimeframeType.DAY:
+                day_timeframe_request_id = next_request_id
+            else:
+                one_minute_timeframe_request_id = next_request_id
 
             self.request_historical_data(
                 symbol=symbol,
@@ -145,3 +151,5 @@ class Collector:
                 specific_bar_time=specific_bar_time,
                 request_id=next_request_id,
             )
+
+        self.request_id_to_symbol[day_timeframe_request_id].one_minute_request_id = one_minute_timeframe_request_id

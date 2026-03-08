@@ -37,7 +37,7 @@ class Analyzer:
             logger=logger,
         )
 
-    def analyze_live_case(
+    def analyze(
         self,
         stock: common.objects.Stock,
     ):
@@ -71,7 +71,7 @@ class Analyzer:
             return
 
         if stock.is_day_timeframe():
-            self.days_analyzer.analyze_day_bar(
+            self.days_analyzer.analyze_bar(
                 stock=stock,
                 current_bar=current_bar,
                 is_retro=for_specific_date,
@@ -110,7 +110,7 @@ class Analyzer:
                 continue
 
             threading.Thread(
-                target=self.analyze_live_case,
+                target=self.analyze,
                 kwargs={
                     "stock": stock,
                 },

@@ -14,6 +14,22 @@ import collector
 import logger
 import tws
 
+app_logger = logger.logger.Logger(
+    enable_stdout=True,
+)
+
+def flush_logs():
+    last_time_flushed = datetime.datetime.now()
+
+    while True:
+        now = datetime.datetime.now()
+        if now - datetime.timedelta(
+            minutes=1,
+        ) > last_time_flushed:
+            app_logger.elastic_handler.flush_logs()
+        else:
+            time.sleep(10)
+
 #pylint:disable=unspecified-encoding
 def initiate_potential_symbols(
     file_path: str,
@@ -88,15 +104,17 @@ def run_bot(
     ).start()
 
 if __name__ == "__main__":
+    logs_path = "logs/app.log"
+    if os.path.exists(logs_path):
+        os.remove(logs_path)
+
     configuration: config_manager.BotConfig = config_manager.ConfigManager().load_config()
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
     waiting_for_confirmation_queue: queue.Queue[dict[str, common.objects.BarData|common.objects.Milestones]] = queue.Queue()
     results_queue: queue.Queue[dict[str, any]] = queue.Queue()
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
-    logger_object = logger.logger.Logger(
-        enable_stdout=True,
-    ).get_logger()
+    logger_object = app_logger.get_logger()
 
     monitored_symbols = initiate_potential_symbols(
         file_path=configuration.potential_symbols_file_path,
@@ -139,6 +157,10 @@ if __name__ == "__main__":
         logger=logger_object,
         is_retro=False,
     )
+
+    threading.Thread(
+        target=flush_logs,
+    ).start()
 
     threading.Thread(
         target=tws_client.run

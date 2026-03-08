@@ -1,0 +1,34 @@
+filebeat.inputs:
+  - type: log
+    id: python-app-logs
+    enabled: true
+    paths:
+      - /logs/*.log
+    tail_files: true
+    close_inactive: 1s
+    scan_frequency: 1s
+    close_eof: false
+    ignore_older: 0
+
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.message_key: message
+
+    multiline.pattern: '^\s*\{'
+    multiline.negate: false
+    multiline.match: after
+
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "day_trading-%{+yyyy.MM.dd}"
+  bulk_max_size: 1
+  flush_interval: 1s
+
+setup.ilm.enabled: false   # disable ILM if you want full control
+setup.template.enabled: true
+setup.template.name: "day_trading"
+setup.template.pattern: "day_trading-*"
+
+logging.level: info
+logging.to_stderr: true

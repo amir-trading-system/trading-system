@@ -16,6 +16,10 @@ import logger
 from scripts import stock_finder
 import tws
 
+app_logger = logger.logger.Logger(
+    enable_stdout=False,
+)
+
 class Symbol:
     def __init__(
         self,
@@ -362,6 +366,19 @@ def update_table_with_results_queue(
         live_table.update(build_table(symbols_data), refresh=True)
         counter[0] -= 1
 
+def flush_logs():
+    last_time_flushed = datetime.datetime.now()
+
+    while True:
+        now = datetime.datetime.now()
+        if now - datetime.timedelta(
+            minutes=1,
+        ) > last_time_flushed:
+            app_logger.elastic_handler.flush_logs()
+            last_time_flushed = datetime.datetime.now()
+        else:
+            time.sleep(1)
+
 def run_retroactive_check():
     symbols_data = []
     symbols = get_symbols()
@@ -375,7 +392,7 @@ def run_retroactive_check():
     # symbols = [
     #     Symbol(
     #         name="TPET",
-    #         datetime_str="03.05.26T09:35:00",
+    #         datetime_str="03.06.26T09:59:00",
     #     ),
     # ]
 
@@ -385,9 +402,7 @@ def run_retroactive_check():
     results_queue: queue.Queue[dict[str,any]] = queue.Queue()
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
 
-    logger_object = logger.logger.Logger(
-        enable_stdout=False,
-    ).get_logger()
+    logger_object = app_logger.get_logger()
     tws_client = tws.client.Client(
         host="localhost",
         port=8081,
@@ -397,6 +412,10 @@ def run_retroactive_check():
         monitored_symbols=[s.name for s in symbols],
         logger=logger_object,
     )
+
+    threading.Thread(
+        target=flush_logs,
+    ).start()
 
     threading.Thread(
         target=tws_client.run

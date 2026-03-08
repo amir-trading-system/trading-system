@@ -1,6 +1,7 @@
 import datetime
 import logging
 import queue
+import time
 
 import pandas as pd
 import talib
@@ -85,26 +86,13 @@ class DataStreamer():
             pd.to_datetime(bar_data_df["bar_time"])
         )
 
-        since_open_bar_df = bar_data_df.where(
-            (bar_data_df["bar_time"].dt.time >= pd.to_datetime("09:30").time()) & # type: ignore
-            (bar_data_df["bar_time"].dt.time <= pd.to_datetime("16:00").time()) # type: ignore
-        )
-        is_one_day_bars = fitered_bars[0].timeframe_type == common.objects.TimeframeType.DAY
-        if is_one_day_bars:
-            since_open_bar_df = bar_data_df.copy()
-        else:
-            since_open_bar_df = bar_data_df.where(
-                (bar_data_df["bar_time"].dt.time >= pd.to_datetime("04:00").time()) & # type: ignore
-                (bar_data_df["bar_time"].dt.time <= pd.to_datetime("19:59").time()) # type: ignore
-            )
+        bar_data_df["session"] = bar_data_df["bar_time"].dt.date # type: ignore
 
-        since_open_bar_df["session"] = since_open_bar_df["bar_time"].dt.date # type: ignore
+        bar_data_df["volume"] = bar_data_df["volume"].astype(float)
+        bar_data_df["hlc3"] = (bar_data_df["high"] + bar_data_df["low"] + bar_data_df["close"]) / 3
+        bar_data_df["pv"] = bar_data_df["hlc3"] * bar_data_df["volume"]
 
-        since_open_bar_df["volume"] = since_open_bar_df["volume"].astype(float)
-        since_open_bar_df["hlc3"] = (since_open_bar_df["high"] + since_open_bar_df["low"] + since_open_bar_df["close"]) / 3
-        since_open_bar_df["pv"] = since_open_bar_df["hlc3"] * since_open_bar_df["volume"]
-
-        bar_data_df["vwap"] = since_open_bar_df.groupby("session")["pv"].cumsum() / since_open_bar_df.groupby("session")["volume"].cumsum()
+        bar_data_df["vwap"] = bar_data_df.groupby("session")["pv"].cumsum() / bar_data_df.groupby("session")["volume"].cumsum()
 
         [macd, signal_line, histogram] = talib.MACDEXT(
             real=bar_data_df["close"],
@@ -251,15 +239,9 @@ class DataStreamer():
         stock = self.request_id_to_symbol[request_id]
 
         if stock.is_day_timeframe() and self.on_specific_bar_time:
-            while not [
-                stock_obj
-                for stock_obj in self.request_id_to_symbol.values()
-                if stock_obj.symbol_name == stock.symbol_name
-                and stock_obj.is_one_minute_timeframe()
-                and stock_obj.specific_bar_time == stock.specific_bar_time
-                and stock_obj.finished_collection
-            ]:
-                continue
+            one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
+            while not one_minute_timeframe_stock.finished_collection:
+                time.sleep(2)
 
         relevant_symbol_bars = stock.bars
         symbol = stock.symbol_name

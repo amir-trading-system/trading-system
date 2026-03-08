@@ -25,6 +25,20 @@ class Analyzer:
         self.request_id_to_symbol = request_id_to_symbol
         self.has_indication: list[str] = []
         self.symbol_to_last_log_time: dict[str, datetime.datetime] = {}
+        self.should_write_log: bool = False
+
+    def _should_write_log(
+        self,
+        symbol: str,
+    ):
+        last_log_time = self.symbol_to_last_log_time.get(symbol)
+        if last_log_time is None:
+            self.symbol_to_last_log_time[symbol] = datetime.datetime.now()
+            self.should_write_log = True
+        else:
+            if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
+                self.should_write_log = True
+                self.symbol_to_last_log_time[symbol] = datetime.datetime.now()
 
     def _run_indicators(
         self,
@@ -32,10 +46,9 @@ class Analyzer:
         current_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
         is_retro: bool,
-        should_write_log: bool,
         confirmator_only: bool,
     ):
-        if should_write_log:
+        if self.should_write_log:
             self.logger.info(
                 msg="Running analyzers",
                 extra={
@@ -96,7 +109,7 @@ class Analyzer:
                 break
 
         self.request_id_to_symbol[stock.request_id].finished_analyze = True
-        if should_write_log:
+        if self.should_write_log:
             self.logger.info(
                 msg="Finished Running analyzers",
                 extra={
@@ -111,9 +124,9 @@ class Analyzer:
                 },
             )
 
-        should_write_log = False
+        self.should_write_log = False
 
-    def analyze_day_bar(
+    def analyze_bar(
         self,
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
@@ -124,15 +137,9 @@ class Analyzer:
         if unique_key in self.has_indication:
             return
 
-        should_write_log = False
-        last_log_time = self.symbol_to_last_log_time.get(stock.symbol_name)
-        if last_log_time is None:
-            self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
-            should_write_log = True
-        else:
-            if last_log_time <= datetime.datetime.now() - datetime.timedelta(minutes=5):
-                should_write_log = True
-                self.symbol_to_last_log_time[stock.symbol_name] = datetime.datetime.now()
+        self._should_write_log(
+            symbol=stock.symbol_name,
+        )
 
         previous_bar = stock.previous_bar(
             bar_object=current_bar,
@@ -173,6 +180,5 @@ class Analyzer:
             current_bar=current_bar,
             milestones=milestones,
             is_retro=is_retro,
-            should_write_log=should_write_log,
             confirmator_only=confirmator_only,
         )

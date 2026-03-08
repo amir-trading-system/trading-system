@@ -1,27 +1,30 @@
 import datetime
+import json
 import logging
 import traceback
-
-from . import client
 
 
 class Handler(
     logging.Handler
 ):
+    file_path: str = "logs/app.log"
+
     def __init__(
         self,
-        index: str,
     ):
         super().__init__()
-        elastic_client_object = client.Client()
-        self.index = index
-        self.elastic_client = elastic_client_object.connect()
+        self.lines_to_save: list[str] = []
 
     def emit(
         self,
         record,
     ):
         record_as_dict = record.__dict__
+
+        should_write_log = record_as_dict.get("should_write_log", True)
+        if not should_write_log:
+            return
+
         document = {
             "@timestamp": datetime.datetime.now(datetime.timezone.utc),
             "message": record.getMessage(),
@@ -55,6 +58,12 @@ class Handler(
             "high",
             "body_percentage",
             "request_id",
+            "starting_index_time",
+            "top_index_time",
+            "lowest_low_time",
+            "bar_time",
+            "last_one_minute_bar_time",
+            "entry_position_bar_time",
         ]
 
         for field in fields:
@@ -69,27 +78,23 @@ class Handler(
                 "stack_trace": traceback.format_exc(),
             }
 
-        date_fields = [
-            "starting_index_time",
-            "top_index_time",
-            "lowest_low_time",
-            "bar_time",
-            "last_one_minute_bar_time",
-            "entry_position_bar_time",
-        ]
+        self.lines_to_save.append(json.dumps(document, default=str) + "\n")
 
-        for field in date_fields:
-            datetime_value = record_as_dict.get(field)
-            if datetime_value:
-                document[field] = datetime_value + datetime.timedelta(
-                    hours=5,
-                )
+        if len(self.lines_to_save) >= 50:
+            try:
+                #pylint:disable=unspecified-encoding
+                with open(self.file_path, "a", buffering=1) as f:
+                    f.writelines(self.lines_to_save)
+                    self.lines_to_save = []
+            except Exception as e:
+                exception_message = f"An exception has been thrown while trying to write log into file: {e}"
+                print(exception_message)
 
-        try:
-            self.elastic_client.index(
-                index=self.index,
-                document=document,
-            )
-        except Exception as e:
-            exception_message = f"An exception has been thrown from elasticsearch: {e}"
-            print(exception_message)
+    def flush_logs(
+        self,
+    ):
+        if self.lines_to_save:
+            #pylint:disable=unspecified-encoding
+            with open(self.file_path, "a", buffering=1) as f:
+                f.writelines(self.lines_to_save)
+                self.lines_to_save = []

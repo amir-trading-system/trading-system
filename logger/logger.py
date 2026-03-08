@@ -9,13 +9,11 @@ class Logger:
         self,
         enable_stdout: bool,
     ):
-        name = "day_trading"
-        elastic_handler = elasticsearch.handler.Handler(
-            index=name,
-        )
+        name: str = "day_trading"
+        self.elastic_handler = elasticsearch.handler.Handler()
 
         handlers = [
-            elastic_handler,
+            self.elastic_handler,
         ]
         if enable_stdout:
             handlers.append(stdout_handler.Handler())

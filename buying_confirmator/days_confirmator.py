@@ -74,9 +74,7 @@ class Confirmator:
                     continue
 
             potential_confirmation_bars = [
-                one_minute_bar
-                for one_minute_bar in one_minute_bars
-                if one_minute_bar.index < potential_confirmation_bar.index+2
+                potential_confirmation_bar,
             ]
             if potential_confirmation_bar.bar_time - datetime.timedelta(
                 minutes=15,
@@ -190,6 +188,29 @@ class Confirmator:
 
         return bar_has_confirmed
 
+    def should_write_log(
+        self,
+        most_updated_datetime: datetime.datetime,
+        potential_confirmation_bar: common.objects.BarData,
+        original_bar_to_confirm: common.objects.BarData,
+    ) -> bool:
+        return (
+            True
+            and most_updated_datetime < potential_confirmation_bar.bar_time
+            and potential_confirmation_bar.close > potential_confirmation_bar.open_value
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and potential_confirmation_bar.high > potential_confirmation_bar.ema_9
+            and potential_confirmation_bar.high > potential_confirmation_bar.ema_20
+            and potential_confirmation_bar.high > potential_confirmation_bar.vwap
+            and potential_confirmation_bar.bar_time >= datetime.datetime(
+                year=original_bar_to_confirm.bar_time.year,
+                month=original_bar_to_confirm.bar_time.month,
+                day=original_bar_to_confirm.bar_time.day,
+                hour=9,
+                minute=30,
+            )
+        )
+
     def confirm_entry_position(
         self,
         stock: common.objects.Stock,
@@ -208,20 +229,6 @@ class Confirmator:
         potential_confirmation_bar = None
 
         while True:
-            if not stock.should_monitor:
-                self.logger.info(
-                    msg="Stock should not be monitored anymore",
-                    extra={
-                        "worker": "Confirmator",
-                        "symbol": original_bar_to_confirm.symbol,
-                        "timeframe": original_bar_to_confirm.timeframe,
-                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                        "bar_time": original_bar_to_confirm.bar_time,
-                        "request_id": stock.request_id,
-                    }
-                )
-                break
-
             if (
                 True
                 and potential_confirmation_bar is not None
@@ -251,7 +258,7 @@ class Confirmator:
                 or not potential_confirmation_bar.histogram
                 or (
                     not self.is_retro
-                        and potential_confirmation_bar.bar_time < datetime.datetime(
+                    and potential_confirmation_bar.bar_time < datetime.datetime(
                         year=date_now.year,
                         month=date_now.month,
                         day=date_now.day,
@@ -262,7 +269,25 @@ class Confirmator:
             ):
                 continue
 
-            most_updated_datetime = potential_confirmation_bar.bar_time
+            should_write_log = self.should_write_log(
+                most_updated_datetime=most_updated_datetime,
+                potential_confirmation_bar=potential_confirmation_bar,
+                original_bar_to_confirm=original_bar_to_confirm,
+            )
+            if should_write_log:
+                self.logger.info(
+                    msg="Starting to confirm one minute bar for entry point",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "request_id": stock.request_id,
+                    },
+                )
+
             if self._confirm(
                 stock=stock,
                 milestones=milestones,
@@ -273,5 +298,20 @@ class Confirmator:
                 already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
             ):
                 break
+
+            most_updated_datetime = potential_confirmation_bar.bar_time
+            if should_write_log:
+                self.logger.info(
+                    msg="Entry point does not confirmed yet, waiting for next one",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "request_id": stock.request_id,
+                    },
+                )
 
         return

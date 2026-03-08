@@ -32,6 +32,19 @@ services:
     networks:
       - elastic-network
 
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.19.12
+    container_name: filebeat
+    user: root
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./logger/elasticsearch/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./logs:/logs
+    command: [ "--strict.perms=false" ]
+    networks:
+      - elastic-network
+
   python-container:
     build: .
     depends_on:
