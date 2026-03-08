@@ -2,7 +2,6 @@ import decimal
 import logging
 import math
 import queue
-import threading
 import time
 
 from ibapi import client, common as ibapi_common, wrapper, order as tws_order
@@ -175,7 +174,7 @@ class Client(client.EClient, wrapper.EWrapper):
         reqId: int,
         bar: ibapi_common.BarData,
     ):
-        self.data_streamer.get_historical_data(
+        self.data_streamer.on_historical_data(
             request_id=reqId,
             tws_bar=bar,
         )
@@ -186,19 +185,30 @@ class Client(client.EClient, wrapper.EWrapper):
         start: str,
         end: str,
     ):
-        threading.Thread(
-            target=self.data_streamer.on_historical_data_end,
-            kwargs={
-                "request_id": reqId,
-            },
-        ).start()
+        stock = self.request_id_to_symbol[reqId]
+        self.logger.info(
+            msg="Finished to collect data for symbol",
+            extra={
+                "worker": "DataStreamer",
+                "symbol": stock.symbol_name,
+                "timeframe": stock.timeframe,
+                "timeframe_type": stock.timeframe_type.value,
+                "request_id": stock.request_id,
+            }
+        )
+
+        stock.arrange_data_for_analysis()
+        stock.finished_collection = True
+        if stock.is_worth_to_monitor():
+            self.bars_ready_to_analyze_queue.put(stock)
+
 
     def historicalDataUpdate(
         self,
         reqId: int,
         bar: ibapi_common.BarData,
     ):
-        self.data_streamer.on_historical_data_update(
+        self.data_streamer.on_historical_data(
             request_id=reqId,
             tws_bar=bar,
         )

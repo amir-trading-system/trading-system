@@ -97,6 +97,10 @@ class Analyzer:
                 last_lowest_low_bar=stock_object.last_lowest_low_bar,
                 finished_collection=stock_object.finished_collection,
                 finished_analyze=stock_object.finished_analyze,
+                one_minute_request_id=stock_object.one_minute_request_id,
+                day_request_id=stock_object.day_request_id,
+                total_volume=stock_object.total_volume,
+                total_price_volume=stock_object.total_price_volume,
             )
             stock.arrange_data_for_analysis()
 

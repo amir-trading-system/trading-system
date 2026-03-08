@@ -391,12 +391,12 @@ def run_retroactive_check():
     #     )
     #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
     # ]
-    # symbols = [
-    #     Symbol(
-    #         name="TPET",
-    #         datetime_str="03.06.26T09:59:00",
-    #     ),
-    # ]
+    symbols = [
+        Symbol(
+            name="TMDE",
+            datetime_str="03.05.26T09:59:00",
+        ),
+    ]
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()

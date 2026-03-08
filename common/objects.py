@@ -34,6 +34,8 @@ class BarData:
         volume_average: float = 0.0,
         ema_9: float = 0.0,
         ema_20: float = 0.0,
+        ema_12: float = 0.0,
+        ema_26: float = 0.0,
         histogram: float = 0.0,
         macd: float = 0.0,
         signal_line: float = 0.0,
@@ -53,6 +55,8 @@ class BarData:
         self.vwap = vwap
         self.ema_9 = ema_9
         self.ema_20 = ema_20
+        self.ema_12 = ema_12
+        self.ema_26 = ema_26
         self.histogram = histogram
         self.macd = macd
         self.signal_line = signal_line
@@ -109,6 +113,8 @@ class Stock:
         last_lowest_low_bar: BarData = None,
         one_minute_request_id: int = None,
         day_request_id: int = None,
+        total_volume: float = 0.0,
+        total_price_volume: float = 0.0,
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -125,6 +131,8 @@ class Stock:
         self.last_lowest_low_bar = last_lowest_low_bar
         self.one_minute_request_id = one_minute_request_id
         self.day_request_id = day_request_id
+        self.total_volume = total_volume
+        self.total_price_volume = total_price_volume
 
     def previous_bar(
         self,
@@ -192,6 +200,8 @@ class Stock:
             key=lambda bar: bar.bar_time,
             reverse=True,
         )
+        for i, bar_object in enumerate(self.bars):
+            bar_object.index = i
 
     def bar_is_the_first_one_in_trend(
         self,
@@ -228,9 +238,180 @@ class Stock:
         self.arrange_data_for_analysis()
         return (
             True
+            and len(self.bars) > 0
             and self.is_day_timeframe()
             and self.bars[0].volume >= 500000
         )
+
+    def _filter_ignored_bars(
+        self,
+        bars: list[BarData],
+    ):
+        relevant_bars: list[BarData] = []
+        for i, bar_object in enumerate(bars):
+            if (
+                bar_object.bar_time.hour == 8
+                and bar_object.bar_time.minute == 0
+                and i+1 < len(bars)-1
+            ):
+                bar_before = bars[i-1]
+                bar_after = bars[i+1]
+                if (
+                    bar_object.volume > bar_before.volume * 10
+                    and bar_object.volume > bar_after.volume * 10
+                    and bar_object.high - bar_object.low > (bar_before.high - bar_before.low) * 10
+                    and bar_object.high - bar_object.low > (bar_after.high - bar_after.low) * 10
+                ):
+                    continue
+
+            relevant_bars.append(bar_object)
+
+        return relevant_bars
+
+    def enrich_bar(
+        self,
+        current_bar: BarData,
+    ) -> BarData | None:
+        fitered_bars = self._filter_ignored_bars(
+            bars=self.bars if len(self.bars) > 0 else [],
+        )
+        self.bars = fitered_bars
+        current_bar.index = len(self.bars) if len(self.bars) > 0 else 0
+
+        if len(self.bars) == 0:
+            previous_ema_9 = 0.0
+            previous_ema_12 = 0.0
+            previous_ema_20 = 0.0
+            previous_ema_26 = 0.0
+        else:
+            previous_bar_index = current_bar.index-1 if current_bar.index > 0 else 0
+            previous_bar = [
+                bar_object
+                for bar_object in self.bars
+                if bar_object.index == previous_bar_index
+            ][0]
+
+            previous_ema_9 = previous_bar.ema_9
+            previous_ema_20 = previous_bar.ema_20
+            previous_ema_12 = previous_bar.ema_12
+            previous_ema_26 = previous_bar.ema_26
+
+        current_bar.ema_9 = self.calculate_ema(
+            period=9,
+            close=current_bar.close,
+            previous_ema=previous_ema_9,
+            current_index=current_bar.index,
+        )
+        current_bar.ema_20 = self.calculate_ema(
+            period=20,
+            close=current_bar.close,
+            previous_ema=previous_ema_20,
+            current_index=current_bar.index,
+        )
+        current_bar.ema_12 = self.calculate_ema(
+            period=12,
+            close=current_bar.close,
+            previous_ema=previous_ema_12,
+            current_index=current_bar.index,
+        )
+        current_bar.ema_26 = self.calculate_ema(
+            period=26,
+            close=current_bar.close,
+            previous_ema=previous_ema_26,
+            current_index=current_bar.index,
+        )
+        self.calculate_volume_average(
+            current_bar=current_bar,
+            period=20,
+        )
+        self.calculate_vwap(
+            current_bar=current_bar,
+        )
+        self.calculate_macd(
+            current_bar=current_bar,
+            previous_ema_12=previous_ema_12,
+            previous_ema_26=previous_ema_26,
+        )
+
+        return current_bar
+
+    def calculate_ema(
+        self,
+        period: int,
+        close: float,
+        previous_ema: float,
+        current_index: int,
+    ):
+        ema_result = 0.0
+        if current_index < period:
+            return ema_result
+        if current_index == period:
+            return sum(
+                bar_object.close
+                for bar_object in self.bars
+                if bar_object.index <= period
+            ) / period
+
+        alpha = 2/(period+1)
+        ema_result = alpha * close + (1-alpha) * previous_ema
+
+        return ema_result
+
+    # TODO: fix this
+    def calculate_volume_average(
+        self,
+        current_bar: BarData,
+        period: int = 20,
+    ):
+        volume_sum = sum(
+            bar_object.volume
+            for bar_object in self.bars
+            if current_bar.bar_time - datetime.timedelta(minutes=period) < bar_object.bar_time
+        )
+
+        current_bar.volume_average = volume_sum/period
+
+    def calculate_vwap(
+        self,
+        current_bar: BarData,
+    ):
+        hlc3 = (current_bar.high + current_bar.low + current_bar.close) / 3
+        if current_bar.timeframe_type == TimeframeType.DAY:
+            self.total_volume = current_bar.volume
+            self.total_price_volume = hlc3 * current_bar.volume
+        else:
+            self.total_volume += current_bar.volume
+            self.total_price_volume += hlc3 * current_bar.volume
+
+        current_bar.vwap = self.total_price_volume / self.total_volume
+
+    def calculate_macd(
+        self,
+        current_bar: BarData,
+        previous_ema_12: float,
+        previous_ema_26: float,
+    ):
+        ema_12 = self.calculate_ema(
+            period=12,
+            close=current_bar.close,
+            previous_ema=previous_ema_12,
+            current_index=current_bar.index,
+        )
+        ema_26 = self.calculate_ema(
+            period=26,
+            close=current_bar.close,
+            previous_ema=previous_ema_26,
+            current_index=current_bar.index,
+        )
+
+        current_bar.macd = ema_12 - ema_26
+        current_bar.signal_line = self.calculate_ema(
+            period=9,
+            close=current_bar.macd,
+            previous_ema=previous_ema_12-previous_ema_26,
+            current_index=current_bar.index,
+        )
+        current_bar.histogram = current_bar.macd - current_bar.signal_line
 
 class IbAPIRequest:
     def __init__(

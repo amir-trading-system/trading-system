@@ -72,7 +72,6 @@ class Collector:
 
     def collect_data(
         self,
-        manual_timeframe_for_tests: common.objects.TimeframeInput = None,
         specific_bar_time: datetime.datetime = None,
     ):
         while True:
@@ -87,17 +86,6 @@ class Collector:
                     timeframe_type=common.objects.TimeframeType.DAY,
                 ),
             ]
-            if manual_timeframe_for_tests:
-                timeframes = [
-                    common.objects.TimeframeInput(
-                        timeframe=1,
-                        timeframe_type=common.objects.TimeframeType.MINUTE,
-                    ),
-                    common.objects.TimeframeInput(
-                        timeframe=manual_timeframe_for_tests.timeframe,
-                        timeframe_type=manual_timeframe_for_tests.timeframe_type,
-                    ),
-                ]
 
             for timeframe_input in timeframes:
                 next_request_id = self.tws_client.next_id()
