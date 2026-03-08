@@ -1,4 +1,5 @@
 import datetime
+import os
 import sys
 import threading
 import time
@@ -16,6 +17,7 @@ import logger
 from scripts import stock_finder
 import tws
 
+LOGS_PATH = "logs/app.log"
 app_logger = logger.logger.Logger(
     enable_stdout=False,
 )
@@ -510,4 +512,6 @@ def run_retroactive_check():
     sys.exit(0)
 
 if __name__ == "__main__":
+    if os.path.exists(LOGS_PATH):
+        os.remove(LOGS_PATH)
     run_retroactive_check()

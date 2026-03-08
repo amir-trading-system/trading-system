@@ -162,10 +162,10 @@ class DataStreamer():
 
     def insert_one_minute_bars_into_confirmation_queues(
         self,
-        one_minute_request_id: int,
-        symbol: str,
-        specific_bar_time: datetime.datetime = None,
+        one_minute_stock: common.objects.Stock,
     ):
+        specific_bar_time = one_minute_stock.specific_bar_time
+
         current_session_date = datetime.datetime.fromtimestamp(0)
         previous_session_date = datetime.datetime.fromtimestamp(0)
         if specific_bar_time is not None:
@@ -189,24 +189,12 @@ class DataStreamer():
                 days=1,
             )
 
-        day_timeframe_stock = [
-            stock
-            for stock in self.request_id_to_symbol.values()
-            if stock.symbol_name == symbol
-            and stock.is_day_timeframe()
-            and (
-                not self.on_specific_bar_time
-                or (
-                    stock.specific_bar_time is not None
-                    and stock.specific_bar_time == specific_bar_time
-                )
-            )
-        ][0]
-        one_minute_bars = self.request_id_to_symbol[one_minute_request_id].bars
+        day_timeframe_stock = self.request_id_to_symbol[one_minute_stock.day_request_id]
+
         if specific_bar_time is not None and day_timeframe_stock.specific_bar_time != specific_bar_time:
             return
 
-        for one_minute_bar in one_minute_bars:
+        for one_minute_bar in one_minute_stock.bars:
             if (
                 True
                 and one_minute_bar.bar_time >= datetime.datetime(
@@ -245,7 +233,6 @@ class DataStreamer():
 
         relevant_symbol_bars = stock.bars
         symbol = stock.symbol_name
-        specific_bar_time = stock.specific_bar_time
         bars_data = self.enrich_bars(
             bars=relevant_symbol_bars,
         )
@@ -254,9 +241,7 @@ class DataStreamer():
         stock.bars = bars_data
         if stock.is_one_minute_timeframe():
             self.insert_one_minute_bars_into_confirmation_queues(
-                one_minute_request_id=request_id,
-                symbol=symbol,
-                specific_bar_time=specific_bar_time,
+                one_minute_stock=stock,
             )
             stock.finished_collection = True
             return
@@ -348,9 +333,7 @@ class DataStreamer():
                 bars_data[-1].ready_to_analyze = True
                 stock.bars = bars_data
                 self.insert_one_minute_bars_into_confirmation_queues(
-                    one_minute_request_id=request_id,
-                    symbol=stock.symbol_name,
-                    specific_bar_time=stock.specific_bar_time,
+                    one_minute_stock=stock,
                 )
                 return
 
@@ -363,9 +346,7 @@ class DataStreamer():
 
         if stock.is_one_minute_timeframe():
             self.insert_one_minute_bars_into_confirmation_queues(
-                one_minute_request_id=request_id,
-                symbol=stock.symbol_name,
-                specific_bar_time=stock.specific_bar_time,
+                one_minute_stock=stock,
             )
             return
 

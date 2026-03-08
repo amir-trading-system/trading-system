@@ -108,6 +108,7 @@ class Stock:
         post_pre_market_volume_sum: float = 0.0,
         last_lowest_low_bar: BarData = None,
         one_minute_request_id: int = None,
+        day_request_id: int = None,
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -123,6 +124,7 @@ class Stock:
         self.post_pre_market_volume_sum = post_pre_market_volume_sum
         self.last_lowest_low_bar = last_lowest_low_bar
         self.one_minute_request_id = one_minute_request_id
+        self.day_request_id = day_request_id
 
     def previous_bar(
         self,

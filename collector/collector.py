@@ -126,7 +126,7 @@ class Collector:
                 timeframe_type=manual_timeframe_for_tests.timeframe_type,
             ),
         ]
-        day_timeframe_request_id = None
+        day_timeframe_request_id = 0
         one_minute_timeframe_request_id = 0
         for timeframe_input in timeframes:
             next_request_id = self.tws_client.next_id()
@@ -153,3 +153,4 @@ class Collector:
             )
 
         self.request_id_to_symbol[day_timeframe_request_id].one_minute_request_id = one_minute_timeframe_request_id
+        self.request_id_to_symbol[one_minute_timeframe_request_id].day_request_id = day_timeframe_request_id

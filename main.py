@@ -14,6 +14,7 @@ import collector
 import logger
 import tws
 
+LOGS_PATH = "logs/app.log"
 app_logger = logger.logger.Logger(
     enable_stdout=True,
 )
@@ -104,9 +105,8 @@ def run_bot(
     ).start()
 
 if __name__ == "__main__":
-    logs_path = "logs/app.log"
-    if os.path.exists(logs_path):
-        os.remove(logs_path)
+    if os.path.exists(LOGS_PATH):
+        os.remove(LOGS_PATH)
 
     configuration: config_manager.BotConfig = config_manager.ConfigManager().load_config()
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
