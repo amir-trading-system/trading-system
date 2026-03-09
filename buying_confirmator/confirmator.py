@@ -23,6 +23,7 @@ class Confirmator:
     ):
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.request_id_to_symbol = request_id_to_symbol
+        self.logger = logger
 
         self.days_confirmator = days_confirmator.Confirmator(
             is_retro=is_retro,
@@ -42,6 +43,17 @@ class Confirmator:
 
             bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
             milestones: common.objects.Milestones = bar_to_milestones["milestones"]
+
+            self.logger.info(
+                msg="Got bar to confirm",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": bar_to_confirm.symbol,
+                    "timeframe": bar_to_confirm.timeframe,
+                    "timeframe_type": bar_to_confirm.timeframe_type.value,
+                    "bar_time": bar_to_confirm.bar_time,
+                },
+            )
 
             stock = [
                 stock_object

@@ -243,6 +243,18 @@ class Confirmator:
                 highest_high_one_minute = potential_confirmation_bar.high
 
             potential_confirmation_bar = stock.one_minute_bars_queue.get()
+            self.logger.info(
+                msg="Got potential bar for confirmation",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "request_id": stock.request_id,
+                },
+            )
             stock.one_minute_bars_queue.task_done()
             date_now = datetime.datetime.now()
 
@@ -287,6 +299,15 @@ class Confirmator:
                         "request_id": stock.request_id,
                     },
                 )
+
+            if potential_confirmation_bar.bar_time == datetime.datetime(
+                year=original_bar_to_confirm.bar_time.year,
+                month=original_bar_to_confirm.bar_time.month,
+                day=original_bar_to_confirm.bar_time.day,
+                hour=9,
+                minute=30,
+            ):
+                highest_high_one_minute = potential_confirmation_bar.high
 
             if self._confirm(
                 stock=stock,

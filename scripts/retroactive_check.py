@@ -109,7 +109,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.02.26T09:30:00",
+            datetime_str="01.02.26T09:38:00",
         ),
         Symbol(
             name="BNAI",
@@ -117,11 +117,11 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.23.26T10:32:00",
+            datetime_str="01.23.26T09:37:00",
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.28.26T09:45:00",
+            datetime_str="01.28.26T09:39:00",
         ),
         Symbol(
             name="FEED",
@@ -129,7 +129,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="FEED",
-            datetime_str="01.30.26T10:14:00",
+            datetime_str="01.30.26T09:57:00",
         ),
         Symbol(
             name="CATX",
@@ -157,7 +157,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="ATOM",
-            datetime_str="02.17.26T09:30:00",
+            datetime_str="02.17.26T09:31:00",
         ),
         Symbol(
             name="MLEC",
@@ -185,7 +185,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="RXT",
-            datetime_str="02.26.26T14:06:00",
+            datetime_str="02.26.26T10:55:00",
         ),
         Symbol(
             name="XWEL",
@@ -193,7 +193,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="EDSA",
-            datetime_str="03.03.26T09:30:00",
+            datetime_str="03.03.26T09:31:00",
         ),
         Symbol(
             name="BATL",
@@ -391,12 +391,12 @@ def run_retroactive_check():
     #     )
     #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
     # ]
-    symbols = [
-        Symbol(
-            name="TMDE",
-            datetime_str="03.05.26T09:59:00",
-        ),
-    ]
+    # symbols = [
+    #     Symbol(
+    #         name="BATL",
+    #         datetime_str="03.04.26T11:27:00",
+    #     ),
+    # ]
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()

@@ -271,11 +271,10 @@ class Stock:
     def enrich_bar(
         self,
         current_bar: BarData,
-    ) -> BarData | None:
-        fitered_bars = self._filter_ignored_bars(
+    ) -> BarData:
+        self.bars = self._filter_ignored_bars(
             bars=self.bars if len(self.bars) > 0 else [],
         )
-        self.bars = fitered_bars
         current_bar.index = len(self.bars) if len(self.bars) > 0 else 0
 
         if len(self.bars) == 0:
@@ -363,11 +362,14 @@ class Stock:
         current_bar: BarData,
         period: int = 20,
     ):
-        volume_sum = sum(
-            bar_object.volume
-            for bar_object in self.bars
-            if current_bar.bar_time - datetime.timedelta(minutes=period) < bar_object.bar_time
+        sorted_bars = sorted(
+            self.bars,
+            key=lambda bar_object: bar_object.bar_time,
+            reverse=True,
         )
+        volume_sum = current_bar.volume
+        for bar_object in sorted_bars[:19]:
+            volume_sum += bar_object.volume
 
         current_bar.volume_average = volume_sum/period
 
@@ -383,7 +385,8 @@ class Stock:
             self.total_volume += current_bar.volume
             self.total_price_volume += hlc3 * current_bar.volume
 
-        current_bar.vwap = self.total_price_volume / self.total_volume
+        if self.total_volume > 0:
+            current_bar.vwap = self.total_price_volume / self.total_volume
 
     def calculate_macd(
         self,

@@ -54,7 +54,7 @@ class Collector:
                 bar_size = f"{timeframe} mins"
                 if timeframe == 1:
                     bar_size = f"{timeframe} min"
-                    duration_str = "2 D"
+                    duration_str = "1 D"
             case common.objects.TimeframeType.DAY:
                 bar_size = f"{timeframe} day"
                 duration_str = "100 D"
