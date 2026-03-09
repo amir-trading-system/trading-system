@@ -200,9 +200,10 @@ class Client(client.EClient, wrapper.EWrapper):
 
         stock.arrange_data_for_analysis()
         stock.finished_collection = True
-        if stock.is_worth_to_monitor() and not stock.symbol_name in self.already_monitored:
+        unique_key = f"{stock.symbol_name}-{stock.specific_bar_time}"
+        if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
             self.bars_ready_to_analyze_queue.put(stock)
-            self.already_monitored.add(stock.symbol_name)
+            self.already_monitored.add(unique_key)
 
     def historicalDataUpdate(
         self,
@@ -215,9 +216,10 @@ class Client(client.EClient, wrapper.EWrapper):
         )
         stock = self.request_id_to_symbol[reqId]
 
-        if stock.is_worth_to_monitor() and not stock.symbol_name in self.already_monitored:
+        unique_key = f"{stock.symbol_name}-{stock.specific_bar_time}"
+        if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
             self.bars_ready_to_analyze_queue.put(stock)
-            self.already_monitored.add(stock.symbol_name)
+            self.already_monitored.add(unique_key)
 
     def accountSummary(
         self,
