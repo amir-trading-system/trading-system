@@ -24,6 +24,7 @@ if __name__ == '__main__':
         request_id_to_symbol=request_id_to_symbol,
         monitored_symbols=[],
         logger=logger_object,
+        client_id=1,
     )
 
     collector_obj = collector.collector.Collector(

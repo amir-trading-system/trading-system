@@ -16,60 +16,6 @@ class Collector:
         self.request_id_to_symbol = request_id_to_symbol
         self.tws_client = tws_client
 
-    def request_historical_data(
-        self,
-        symbol: str,
-        timeframe: int,
-        timeframe_type: common.objects.TimeframeType,
-        specific_bar_time: datetime.datetime,
-        request_id: int,
-    ):
-        contract = client.client.Contract()
-        contract.symbol = symbol
-        contract.secType = "STK"
-        contract.exchange = "SMART"
-        contract.currency = "USD"
-
-        ibapi_request = common.objects.IbAPIRequest(
-            request_id=request_id,
-            symbol=symbol,
-            timeframe=timeframe,
-            timeframe_type=timeframe_type,
-        )
-        if request_id not in self.tws_client.ibapi_requests:
-            self.tws_client.ibapi_requests[request_id] = ibapi_request
-
-        end_time_str = ""
-        keep_up_to_date = True
-        bar_size = ""
-        duration_str = "1 W"
-        use_rth = 0
-        if specific_bar_time is not None:
-            end_time = (specific_bar_time + datetime.timedelta(days=1)).strftime("%Y%m%d %H:%M:%S")
-            end_time_str = f"{end_time} US/Eastern"
-            keep_up_to_date = False
-
-        match timeframe_type:
-            case common.objects.TimeframeType.MINUTE:
-                bar_size = f"{timeframe} mins"
-                if timeframe == 1:
-                    bar_size = f"{timeframe} min"
-                    duration_str = "1 D"
-            case common.objects.TimeframeType.DAY:
-                bar_size = f"{timeframe} day"
-                duration_str = "100 D"
-                use_rth = 1
-
-        self.tws_client.request_historical_data(
-            request_id=request_id,
-            contract=contract,
-            end_time_str=end_time_str,
-            duration_str=duration_str,
-            bar_size=bar_size,
-            use_rth=use_rth,
-            keep_up_to_date=keep_up_to_date,
-        )
-
     def collect_data(
         self,
         specific_bar_time: datetime.datetime = None,
@@ -86,9 +32,24 @@ class Collector:
                     timeframe_type=common.objects.TimeframeType.DAY,
                 ),
             ]
+            day_timeframe_request_id = 0
+            one_minute_timeframe_request_id = 0
 
             for timeframe_input in timeframes:
                 next_request_id = self.tws_client.next_id()
+                self.request_id_to_symbol[next_request_id] = common.objects.Stock(
+                    request_id=next_request_id,
+                    symbol_name=symbol,
+                    bars=[],
+                    timeframe=timeframe_input.timeframe,
+                    timeframe_type=timeframe_input.timeframe_type,
+                    one_minute_bars_queue=queue.Queue(),
+                    specific_bar_time=specific_bar_time,
+                )
+                if timeframe_input.timeframe_type == common.objects.TimeframeType.DAY:
+                    day_timeframe_request_id = next_request_id
+                else:
+                    one_minute_timeframe_request_id = next_request_id
 
                 self.request_historical_data(
                     symbol=symbol,
@@ -97,6 +58,10 @@ class Collector:
                     specific_bar_time=specific_bar_time,
                     request_id=next_request_id,
                 )
+
+            self.request_id_to_symbol[day_timeframe_request_id].one_minute_request_id = one_minute_timeframe_request_id
+            self.request_id_to_symbol[one_minute_timeframe_request_id].day_request_id = day_timeframe_request_id
+
 
     def collect_data_retroactively(
         self,
@@ -142,3 +107,57 @@ class Collector:
 
         self.request_id_to_symbol[day_timeframe_request_id].one_minute_request_id = one_minute_timeframe_request_id
         self.request_id_to_symbol[one_minute_timeframe_request_id].day_request_id = day_timeframe_request_id
+
+    def request_historical_data(
+        self,
+        symbol: str,
+        timeframe: int,
+        timeframe_type: common.objects.TimeframeType,
+        specific_bar_time: datetime.datetime,
+        request_id: int,
+    ):
+        contract = client.client.Contract()
+        contract.symbol = symbol
+        contract.secType = "STK"
+        contract.exchange = "SMART"
+        contract.currency = "USD"
+
+        ibapi_request = common.objects.IbAPIRequest(
+            request_id=request_id,
+            symbol=symbol,
+            timeframe=timeframe,
+            timeframe_type=timeframe_type,
+        )
+        if request_id not in self.tws_client.ibapi_requests:
+            self.tws_client.ibapi_requests[request_id] = ibapi_request
+
+        end_time_str = ""
+        keep_up_to_date = True
+        bar_size = ""
+        duration_str = "1 W"
+        use_rth = 0
+        if specific_bar_time is not None:
+            end_time = (specific_bar_time + datetime.timedelta(days=1)).strftime("%Y%m%d %H:%M:%S")
+            end_time_str = f"{end_time} US/Eastern"
+            keep_up_to_date = False
+
+        match timeframe_type:
+            case common.objects.TimeframeType.MINUTE:
+                bar_size = f"{timeframe} mins"
+                if timeframe == 1:
+                    bar_size = f"{timeframe} min"
+                    duration_str = "1 D"
+            case common.objects.TimeframeType.DAY:
+                bar_size = f"{timeframe} day"
+                duration_str = "50 D"
+                use_rth = 1
+
+        self.tws_client.request_historical_data(
+            request_id=request_id,
+            contract=contract,
+            end_time_str=end_time_str,
+            duration_str=duration_str,
+            bar_size=bar_size,
+            use_rth=use_rth,
+            keep_up_to_date=keep_up_to_date,
+        )

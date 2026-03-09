@@ -1,6 +1,5 @@
 import datetime
 import logging
-import queue
 
 from ibapi import common as ibapi_common
 
@@ -13,7 +12,6 @@ class DataStreamer():
     def __init__(
         self,
         request_id_to_symbol: dict[int, common.objects.Stock],
-        bars_ready_to_analyze_queue: queue.Queue,
         ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
         monitored_symbols: list[str],
@@ -21,7 +19,6 @@ class DataStreamer():
     ):
         self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
-        self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
         self.potential_symbols_file_path = potential_symbols_file_path
         self.monitored_symbols = monitored_symbols
@@ -165,6 +162,8 @@ class DataStreamer():
                 symbol=stock.symbol_name,
             )
 
+        stock.arrange_data_for_analysis()
+
         relevant_symbol_bars = stock.bars
 
         ibapi_request = self.ibapi_requests.get(request_id, None)
@@ -173,23 +172,22 @@ class DataStreamer():
 
         if (
             len(relevant_symbol_bars) > 0
-            and relevant_symbol_bars[-1].bar_time == current_bar.bar_time
+            and relevant_symbol_bars[0].bar_time == current_bar.bar_time
         ):
-            relevant_symbol_bars[-1].close = current_bar.close
-            relevant_symbol_bars[-1].open_value = current_bar.open_value
-            relevant_symbol_bars[-1].high = current_bar.high
-            relevant_symbol_bars[-1].low = current_bar.low
-            relevant_symbol_bars[-1].volume = float(current_bar.volume)
+            relevant_symbol_bars[0].close = current_bar.close
+            relevant_symbol_bars[0].open_value = current_bar.open_value
+            relevant_symbol_bars[0].high = current_bar.high
+            relevant_symbol_bars[0].low = current_bar.low
+            relevant_symbol_bars[0].volume = float(current_bar.volume)
             enriched_bar = stock.enrich_bar(
-                current_bar=relevant_symbol_bars[-1],
+                current_bar=relevant_symbol_bars[0],
             )
 
             if ibapi_request.is_one_minute_timeframe() and enriched_bar:
-                enriched_bar.ready_to_analyze = True
-                stock.bars.append(enriched_bar)
+                relevant_symbol_bars[0].ready_to_analyze = True
                 self.insert_one_minute_bars_into_confirmation_queues(
                     one_minute_stock=stock,
-                    enriched_bar=enriched_bar,
+                    enriched_bar=relevant_symbol_bars[0],
                 )
                 return
         else:
@@ -199,6 +197,7 @@ class DataStreamer():
             if enriched_bar:
                 enriched_bar.ready_to_analyze = True
                 stock.bars.append(enriched_bar)
+                stock.arrange_data_for_analysis()
 
         if stock.is_one_minute_timeframe() and enriched_bar is not None:
             self.insert_one_minute_bars_into_confirmation_queues(

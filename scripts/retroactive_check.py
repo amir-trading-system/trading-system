@@ -211,6 +211,18 @@ def get_symbols() -> list[Symbol]:
             name="TMDE",
             datetime_str="03.05.26T09:59:00",
         ),
+        Symbol(
+            name="EDSA",
+            datetime_str="03.06.26T11:12:00",
+        ),
+        Symbol(
+            name="TURB",
+            datetime_str="03.09.26T09:46:00",
+        ),
+        Symbol(
+            name="EDSA",
+            datetime_str="03.09.26T11:08:00",
+        ),
     ]
 
 def build_table(
@@ -413,6 +425,7 @@ def run_retroactive_check():
         request_id_to_symbol=request_id_to_symbol,
         monitored_symbols=[s.name for s in symbols],
         logger=logger_object,
+        client_id=1,
     )
 
     threading.Thread(

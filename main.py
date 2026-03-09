@@ -134,6 +134,7 @@ if __name__ == "__main__":
         logger=logger_object,
         potential_symbols_file_path=configuration.potential_symbols_file_path,
         monitored_symbols=monitored_symbols,
+        client_id=0,
     )
     collector_obj = collector.collector.Collector(
         tws_client=tws_client,

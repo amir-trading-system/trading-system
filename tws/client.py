@@ -21,6 +21,7 @@ class Client(client.EClient, wrapper.EWrapper):
         bars_ready_to_analyze_queue: queue.Queue,
         logger: logging.Logger,
         monitored_symbols: list[str],
+        client_id: int,
         potential_symbols_file_path: str = None,
     ):
         self.order_id: int = 0
@@ -32,7 +33,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self.connect(
             host=host,
             port=port,
-            clientId=0,
+            clientId=client_id,
         )
         self.ibapi_requests: dict[int,common.objects.IbAPIRequest] = {}
         self.request_id_to_symbol = request_id_to_symbol
@@ -41,6 +42,7 @@ class Client(client.EClient, wrapper.EWrapper):
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.relevant_symbols: list[str] = []
         self.monitored_symbols = monitored_symbols
+        self.already_monitored: set[str] = set()
         self.logger = logger
 
         self.scanner = scanner.Scanner(
@@ -49,7 +51,6 @@ class Client(client.EClient, wrapper.EWrapper):
         )
         self.data_streamer = data_streamer.DataStreamer(
             request_id_to_symbol=request_id_to_symbol,
-            bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
             ibapi_requests=self.ibapi_requests,
             logger=logger,
             monitored_symbols=monitored_symbols,
@@ -199,9 +200,9 @@ class Client(client.EClient, wrapper.EWrapper):
 
         stock.arrange_data_for_analysis()
         stock.finished_collection = True
-        if stock.is_worth_to_monitor():
+        if stock.is_worth_to_monitor() and not stock.symbol_name in self.already_monitored:
             self.bars_ready_to_analyze_queue.put(stock)
-
+            self.already_monitored.add(stock.symbol_name)
 
     def historicalDataUpdate(
         self,
@@ -212,6 +213,11 @@ class Client(client.EClient, wrapper.EWrapper):
             request_id=reqId,
             tws_bar=bar,
         )
+        stock = self.request_id_to_symbol[reqId]
+
+        if stock.is_worth_to_monitor() and not stock.symbol_name in self.already_monitored:
+            self.bars_ready_to_analyze_queue.put(stock)
+            self.already_monitored.add(stock.symbol_name)
 
     def accountSummary(
         self,

@@ -275,7 +275,7 @@ class Stock:
         self.bars = self._filter_ignored_bars(
             bars=self.bars if len(self.bars) > 0 else [],
         )
-        current_bar.index = len(self.bars) if len(self.bars) > 0 else 0
+        current_bar.index = 0
 
         if len(self.bars) == 0:
             previous_ema_9 = 0.0
@@ -283,41 +283,41 @@ class Stock:
             previous_ema_20 = 0.0
             previous_ema_26 = 0.0
         else:
-            previous_bar_index = current_bar.index-1 if current_bar.index > 0 else 0
-            previous_bar = [
-                bar_object
-                for bar_object in self.bars
-                if bar_object.index == previous_bar_index
-            ][0]
+            previous_bar = None
+            if self.bars[0].bar_time < current_bar.bar_time:
+                previous_bar = self.bars[0]
+            else:
+                previous_bar = self.bars[1]
 
             previous_ema_9 = previous_bar.ema_9
             previous_ema_20 = previous_bar.ema_20
             previous_ema_12 = previous_bar.ema_12
             previous_ema_26 = previous_bar.ema_26
 
+        current_length = len(self.bars)
         current_bar.ema_9 = self.calculate_ema(
             period=9,
             close=current_bar.close,
             previous_ema=previous_ema_9,
-            current_index=current_bar.index,
+            current_length=current_length,
         )
         current_bar.ema_20 = self.calculate_ema(
             period=20,
             close=current_bar.close,
             previous_ema=previous_ema_20,
-            current_index=current_bar.index,
+            current_length=current_length,
         )
         current_bar.ema_12 = self.calculate_ema(
             period=12,
             close=current_bar.close,
             previous_ema=previous_ema_12,
-            current_index=current_bar.index,
+            current_length=current_length,
         )
         current_bar.ema_26 = self.calculate_ema(
             period=26,
             close=current_bar.close,
             previous_ema=previous_ema_26,
-            current_index=current_bar.index,
+            current_length=current_length,
         )
         self.calculate_volume_average(
             current_bar=current_bar,
@@ -330,6 +330,7 @@ class Stock:
             current_bar=current_bar,
             previous_ema_12=previous_ema_12,
             previous_ema_26=previous_ema_26,
+            current_length=current_length,
         )
 
         return current_bar
@@ -339,24 +340,25 @@ class Stock:
         period: int,
         close: float,
         previous_ema: float,
-        current_index: int,
+        current_length: int,
     ):
         ema_result = 0.0
-        if current_index < period:
+        if current_length+1 < period:
             return ema_result
-        if current_index == period:
-            return sum(
+        if current_length+1 == period:
+            sum_close = sum(
                 bar_object.close
                 for bar_object in self.bars
                 if bar_object.index <= period
-            ) / period
+            ) + close
+
+            return sum_close / period
 
         alpha = 2/(period+1)
         ema_result = alpha * close + (1-alpha) * previous_ema
 
         return ema_result
 
-    # TODO: fix this
     def calculate_volume_average(
         self,
         current_bar: BarData,
@@ -393,18 +395,19 @@ class Stock:
         current_bar: BarData,
         previous_ema_12: float,
         previous_ema_26: float,
+        current_length: int,
     ):
         ema_12 = self.calculate_ema(
             period=12,
             close=current_bar.close,
             previous_ema=previous_ema_12,
-            current_index=current_bar.index,
+            current_length=current_length,
         )
         ema_26 = self.calculate_ema(
             period=26,
             close=current_bar.close,
             previous_ema=previous_ema_26,
-            current_index=current_bar.index,
+            current_length=current_length,
         )
 
         current_bar.macd = ema_12 - ema_26
@@ -412,7 +415,7 @@ class Stock:
             period=9,
             close=current_bar.macd,
             previous_ema=previous_ema_12-previous_ema_26,
-            current_index=current_bar.index,
+            current_length=current_length,
         )
         current_bar.histogram = current_bar.macd - current_bar.signal_line
 
