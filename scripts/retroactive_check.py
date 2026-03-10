@@ -317,14 +317,29 @@ def update_table_with_status_per_stage(
     request_id_to_symbol: dict[int,common.objects.Stock],
     live_table: rich.live.Live,
 ):
+    already_finished: list[str] = []
     while any(
         symbol_data
         for symbol_data in symbols_data
         if symbol_data["actual_confirmation_bar_time"] == "in_progress"
     ):
         for _, symbol in request_id_to_symbol.items():
-            if symbol.is_one_minute_timeframe():
+            if symbol.symbol_name in already_finished:
                 continue
+
+            finished_collection = len([
+                symbol_obj
+                for symbol_obj in request_id_to_symbol.values()
+                if symbol_obj.symbol_name == symbol.symbol_name
+                and symbol_obj.finished_collection
+            ]) == 2
+
+            finished_analysis = len([
+                symbol_obj
+                for symbol_obj in request_id_to_symbol.values()
+                if symbol_obj.symbol_name == symbol.symbol_name
+                and symbol_obj.finished_analyze
+            ]) == 2
 
             relevant_symbol_data = [
                 symbol_data
@@ -332,10 +347,16 @@ def update_table_with_status_per_stage(
                 if symbol_data["symbol"] == symbol.symbol_name
                 and symbol_data["original_bar_time"] == symbol.specific_bar_time
             ][0]
-            if symbol.finished_collection and symbol.is_day_timeframe() and relevant_symbol_data["collection_status"] != "done":
+            if finished_collection and relevant_symbol_data["collection_status"] != "done":
                 relevant_symbol_data["collection_status"] = "done"
-            if symbol.finished_analyze and symbol.is_day_timeframe() and relevant_symbol_data["analysis_status"] != "done":
+            if finished_analysis and relevant_symbol_data["analysis_status"] != "done":
                 relevant_symbol_data["analysis_status"] = "done"
+
+            if (
+                relevant_symbol_data["collection_status"] == "done"
+                and relevant_symbol_data["analysis_status"] == "done"
+            ):
+                already_finished.append(symbol.symbol_name)
 
             live_table.update(build_table(symbols_data), refresh=True)
 
