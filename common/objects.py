@@ -284,7 +284,7 @@ class Stock:
             previous_ema_26 = 0.0
         else:
             previous_bar = None
-            if self.bars[0].bar_time < current_bar.bar_time:
+            if self.bars[0].bar_time < current_bar.bar_time or len(self.bars) == 1:
                 previous_bar = self.bars[0]
             else:
                 previous_bar = self.bars[1]

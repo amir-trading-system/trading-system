@@ -130,12 +130,12 @@ class DataStreamer():
             bar_time=bar_time,
         )
 
-        self.on_historical_data_update(
+        self.update_current_symbol_data_state(
             request_id=request_id,
             current_bar=current_bar,
         )
 
-    def on_historical_data_update(
+    def update_current_symbol_data_state(
         self,
         request_id: int,
         current_bar: common.objects.BarData,
