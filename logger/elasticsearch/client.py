@@ -5,11 +5,14 @@ class Client:
     def __init__(
         self,
     ):
-        self.host = "http://localhost:9200"
+        self.host: str = "http://localhost:9200"
 
-    def connect(
+    def delete_older_logs(
         self,
-    ) -> elasticsearch.Elasticsearch:
-        return elasticsearch.Elasticsearch(
+    ):
+        with elasticsearch.Elasticsearch(
             hosts=[self.host],
-        )
+        ) as es_client:
+            es_client.delete_by_query(
+                index="ds-day_trading*",
+            )
