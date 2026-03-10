@@ -257,6 +257,7 @@ def build_table(
         f"Actual Confirmation Bar Time {finished_confirmation}/{len(data)}",
         "Expected Confirmation Bar Time",
         "Evidence",
+        expand=True,
     )
     sorted_data_by_original_date = sorted(
         data,
@@ -405,8 +406,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="BATL",
-    #         datetime_str="03.04.26T11:27:00",
+    #         name="TWG",
+    #         datetime_str="12.08.25T13:10:00",
     #     ),
     # ]
 

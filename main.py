@@ -32,6 +32,24 @@ def flush_logs():
             time.sleep(10)
 
 #pylint:disable=unspecified-encoding
+def create_watchlist_for_tomorrow(
+    potential_for_tomorrow_file_path,
+):
+    symbols_for_tomorrow: list[str] = []
+    with open(potential_for_tomorrow_file_path, "r") as f:
+        potential_for_tomorrow = f.readlines()
+        for symbol_to_date in potential_for_tomorrow:
+            symbol, _ = symbol_to_date.split("--")
+            symbols_for_tomorrow.append(symbol)
+
+    watchlist_symbols: list[str] = ["COLUMN,0\n"]
+    for symbol in symbols_for_tomorrow:
+        watchlist_symbols.append(f"DES,{symbol},STK,SMART/AMEX,,,,,\n")
+
+    with open("watchlist.csv", "w") as f:
+        f.writelines(watchlist_symbols)
+
+#pylint:disable=unspecified-encoding
 def initiate_potential_symbols(
     file_path: str,
     logger_obj: logging.Logger,
@@ -116,6 +134,9 @@ if __name__ == "__main__":
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
     logger_object = app_logger.get_logger()
 
+    create_watchlist_for_tomorrow(
+        potential_for_tomorrow_file_path=configuration.potential_symbols_file_path,
+    )
     monitored_symbols = initiate_potential_symbols(
         file_path=configuration.potential_symbols_file_path,
         logger_obj=logger_object,
