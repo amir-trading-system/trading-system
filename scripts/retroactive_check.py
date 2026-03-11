@@ -223,6 +223,10 @@ def get_symbols() -> list[Symbol]:
             name="EDSA",
             datetime_str="03.09.26T11:08:00",
         ),
+        Symbol(
+            name="ANTX",
+            datetime_str="03.09.26T09:54:00",
+        ),
     ]
 
 def build_table(

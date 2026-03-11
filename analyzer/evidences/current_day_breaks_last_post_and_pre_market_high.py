@@ -45,7 +45,7 @@ class Evidence(
             and potential_confirmation_bar.close > potential_confirmation_bar.vwap
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.low < stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close
-            and stock.post_pre_market_volume_sum > 1000000
+            and stock.post_pre_market_volume_sum > 500000
         )
 
         return confirmed_bar
