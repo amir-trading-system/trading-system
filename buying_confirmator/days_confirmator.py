@@ -76,9 +76,7 @@ class Confirmator:
             potential_confirmation_bars = [
                 potential_confirmation_bar,
             ]
-            if potential_confirmation_bar.bar_time - datetime.timedelta(
-                minutes=15,
-            ) <= datetime.datetime(
+            if potential_confirmation_bar.bar_time > datetime.datetime(
                 year=potential_confirmation_bar.bar_time.year,
                 month=potential_confirmation_bar.bar_time.month,
                 day=potential_confirmation_bar.bar_time.day,
