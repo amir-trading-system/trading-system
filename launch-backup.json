@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "prod main",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "program": "main.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "retroactive_check",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "scripts.retroactive_check",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "upside_potential",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "scripts.tomorrow_upside_potential_stocks",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "get_relevant_stocks",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "scripts.get_relevant_stocks",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "create_watchlist",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "scripts.create_watchlist",
+            "console": "integratedTerminal"
+        },
+    ]
+}
