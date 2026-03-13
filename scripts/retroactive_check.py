@@ -227,6 +227,10 @@ def get_symbols() -> list[Symbol]:
             name="ANTX",
             datetime_str="03.09.26T09:54:00",
         ),
+        Symbol(
+            name="AIFF",
+            datetime_str="03.13.26T10:24:00",
+        ),
     ]
 
 def build_table(
