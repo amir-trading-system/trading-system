@@ -48,12 +48,8 @@ def get_symbols() -> list[Symbol]:
             datetime_str="12.08.25T13:10:00",
         ),
         Symbol(
-            name="AFJK",
-            datetime_str="12.09.25T10:35:00",
-        ),
-        Symbol(
             name="QCLS",
-            datetime_str="12.04.25T09:43:00",
+            datetime_str="12.04.25T10:05:00",
         ),
         Symbol(
             name="BBGI",
@@ -62,10 +58,6 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="ASPC",
             datetime_str="12.26.25T12:25:00",
-        ),
-        Symbol(
-            name="MBAI",
-            datetime_str="01.26.26T10:22:00",
         ),
         Symbol(
             name="INBS",
@@ -77,19 +69,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="AUST",
-            datetime_str="01.23.26T09:42:00",
-        ),
-        Symbol(
-            name="MOVE",
-            datetime_str="01.27.26T09:57:00",
-        ),
-        Symbol(
-            name="GITS",
-            datetime_str="01.21.26T09:42:00",
-        ),
-        Symbol(
-            name="GITS",
-            datetime_str="01.27.26T10:05:00",
+            datetime_str="01.23.26T12:45:00",
         ),
         Symbol(
             name="NAMM",
@@ -109,15 +89,11 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.02.26T09:57:00",
-        ),
-        Symbol(
-            name="BNAI",
             datetime_str="01.14.26T09:46:00",
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.23.26T09:57:00",
+            datetime_str="01.23.26T10:24:00",
         ),
         Symbol(
             name="BNAI",
@@ -140,12 +116,8 @@ def get_symbols() -> list[Symbol]:
             datetime_str="02.02.26T10:48:00",
         ),
         Symbol(
-            name="PLBY",
-            datetime_str="02.10.26T09:49:00",
-        ),
-        Symbol(
             name="SUNE",
-            datetime_str="02.10.26T09:48:00",
+            datetime_str="02.10.26T10:22:00",
         ),
         Symbol(
             name="QVCGP",
@@ -189,7 +161,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="EDSA",
-            datetime_str="03.03.26T09:31:00",
+            datetime_str="03.03.26T11:41:00",
         ),
         Symbol(
             name="BATL",
@@ -197,19 +169,19 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BATL",
-            datetime_str="03.05.26T09:31:00",
+            datetime_str="03.05.26T10:09:00",
         ),
         Symbol(
             name="TPET",
-            datetime_str="03.05.26T09:35:00",
+            datetime_str="03.05.26T09:45:00",
         ),
         Symbol(
             name="TMDE",
-            datetime_str="03.05.26T09:59:00",
+            datetime_str="03.05.26T11:14:00",
         ),
         Symbol(
             name="EDSA",
-            datetime_str="03.06.26T11:12:00",
+            datetime_str="03.06.26T11:54:00",
         ),
         Symbol(
             name="TURB",
@@ -219,10 +191,10 @@ def get_symbols() -> list[Symbol]:
             name="EDSA",
             datetime_str="03.09.26T11:08:00",
         ),
-        Symbol(
-            name="ANTX",
-            datetime_str="03.09.26T09:54:00",
-        ),
+        # Symbol(
+        #     name="ANTX",
+        #     datetime_str="03.09.26T11:27:00",
+        # ),
         Symbol(
             name="AIFF",
             datetime_str="03.13.26T10:24:00",
@@ -429,12 +401,12 @@ def run_retroactive_check():
     #     )
     #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
     # ]
-    # symbols = [
-    #     Symbol(
-    #         name="TWG",
-    #         datetime_str="12.08.25T13:10:00",
-    #     ),
-    # ]
+    symbols = [
+        Symbol(
+            name="ANTX",
+            datetime_str="03.09.26T11:27:00",
+        ),
+    ]
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
