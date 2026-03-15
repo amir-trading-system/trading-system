@@ -73,61 +73,37 @@ class Confirmator:
                 ):
                     continue
 
-            potential_confirmation_bars = [
-                potential_confirmation_bar,
+            temp_one_minute_bars = [
+                one_minute_bar
+                for one_minute_bar in one_minute_bars
+                if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
             ]
-            if potential_confirmation_bar.bar_time > datetime.datetime(
-                year=potential_confirmation_bar.bar_time.year,
-                month=potential_confirmation_bar.bar_time.month,
-                day=potential_confirmation_bar.bar_time.day,
+            market_open = datetime.datetime(
+                year=original_bar_to_confirm.bar_time.year,
+                month=original_bar_to_confirm.bar_time.month,
+                day=original_bar_to_confirm.bar_time.day,
                 hour=9,
                 minute=30,
+            )
+            volume_sum_since_market_open = sum(
+                one_minute_bar.volume
+                for one_minute_bar in one_minute_bars
+                if market_open <= one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
+            )
+            if volume_sum_since_market_open < 100000:
+                continue
+
+            if evidence_obj.confirm(
+                stock=stock,
+                original_bar_to_confirm=original_bar_to_confirm,
+                potential_confirmation_bar=potential_confirmation_bar,
+                milestones=milestones,
+                highest_high_one_minute=highest_high_one_minute,
+                one_minute_bars=temp_one_minute_bars,
+                volume_sum_since_market_open=volume_sum_since_market_open,
             ):
-                potential_confirmation_bars = [
-                    one_minute_bar
-                    for one_minute_bar in one_minute_bars
-                    if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
-                    and one_minute_bar.bar_time >= datetime.datetime(
-                        year=potential_confirmation_bar.bar_time.year,
-                        month=potential_confirmation_bar.bar_time.month,
-                        day=potential_confirmation_bar.bar_time.day,
-                        hour=9,
-                        minute=30,
-                    )
-                ]
-
-            for potential_confirmation_bar in potential_confirmation_bars:
-                temp_one_minute_bars = [
-                    one_minute_bar
-                    for one_minute_bar in one_minute_bars
-                    if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
-                ]
-                market_open = datetime.datetime(
-                    year=original_bar_to_confirm.bar_time.year,
-                    month=original_bar_to_confirm.bar_time.month,
-                    day=original_bar_to_confirm.bar_time.day,
-                    hour=9,
-                    minute=30,
-                )
-                volume_sum_since_market_open = sum(
-                    one_minute_bar.volume
-                    for one_minute_bar in one_minute_bars
-                    if market_open <= one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
-                )
-                if volume_sum_since_market_open < 100000:
-                    continue
-
-                if evidence_obj.confirm(
-                    stock=stock,
-                    original_bar_to_confirm=original_bar_to_confirm,
-                    potential_confirmation_bar=potential_confirmation_bar,
-                    milestones=milestones,
-                    highest_high_one_minute=highest_high_one_minute,
-                    one_minute_bars=temp_one_minute_bars,
-                    volume_sum_since_market_open=volume_sum_since_market_open,
-                ):
-                    entry_position_bar = potential_confirmation_bar
-                    confirmed_evidences.append(evidence.name)
+                entry_position_bar = potential_confirmation_bar
+                confirmed_evidences.append(evidence.name)
 
         if confirmed_evidences:
             self.results_queue.put(

@@ -109,23 +109,23 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.02.26T09:38:00",
+            datetime_str="01.02.26T09:57:00",
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.14.26T09:35:00",
+            datetime_str="01.14.26T09:46:00",
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.23.26T09:37:00",
+            datetime_str="01.23.26T09:57:00",
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.28.26T09:39:00",
+            datetime_str="01.28.26T09:45:00",
         ),
         Symbol(
             name="FEED",
-            datetime_str="01.29.26T09:40:00",
+            datetime_str="01.29.26T09:47:00",
         ),
         Symbol(
             name="FEED",
@@ -157,7 +157,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="ATOM",
-            datetime_str="02.17.26T09:31:00",
+            datetime_str="02.17.26T12:27:00",
         ),
         Symbol(
             name="MLEC",
@@ -186,10 +186,6 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="RXT",
             datetime_str="02.26.26T10:55:00",
-        ),
-        Symbol(
-            name="XWEL",
-            datetime_str="02.27.26T09:32:00",
         ),
         Symbol(
             name="EDSA",
