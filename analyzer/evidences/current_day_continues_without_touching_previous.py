@@ -43,7 +43,7 @@ class Evidence(
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
-        highest_high_one_minute: float,
+        highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
@@ -56,7 +56,7 @@ class Evidence(
             and potential_confirmation_bar.macd > 0
             and potential_confirmation_bar.signal_line > 0
             and potential_confirmation_bar.histogram > 0
-            and potential_confirmation_bar.low < highest_high_one_minute < potential_confirmation_bar.high
+            and potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.high
             and not any(
                 r_l
                 for r_l in stock.resistance_levels

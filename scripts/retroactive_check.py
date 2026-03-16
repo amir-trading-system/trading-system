@@ -49,7 +49,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="AFJK",
-            datetime_str="12.09.25T10:35:00",
+            datetime_str="12.09.25T14:14:00",
         ),
         Symbol(
             name="QCLS",
@@ -63,10 +63,10 @@ def get_symbols() -> list[Symbol]:
             name="ASPC",
             datetime_str="12.26.25T12:25:00",
         ),
-        Symbol(
-            name="MBAI",
-            datetime_str="01.26.26T10:22:00",
-        ),
+        # Symbol(
+        #     name="MBAI",
+        #     datetime_str="01.26.26T10:22:00",
+        # ),
         Symbol(
             name="INBS",
             datetime_str="12.31.25T12:52:00",
@@ -85,10 +85,6 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="GITS",
-            datetime_str="01.21.26T09:42:00",
-        ),
-        Symbol(
-            name="GITS",
             datetime_str="01.27.26T10:05:00",
         ),
         Symbol(
@@ -97,7 +93,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="NAMM",
-            datetime_str="01.28.26T14:51:00",
+            datetime_str="01.28.26T14:50:00",
         ),
         Symbol(
             name="DRMA",
@@ -161,7 +157,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="MLEC",
-            datetime_str="01.15.26T11:28:00",
+            datetime_str="01.15.26T11:59:00",
         ),
         Symbol(
             name="MLEC",
@@ -225,7 +221,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="AIFF",
-            datetime_str="03.13.26T10:24:00",
+            datetime_str="03.13.26T10:17:00",
         ),
     ]
 
@@ -431,8 +427,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="TWG",
-    #         datetime_str="12.08.25T13:10:00",
+    #         name="AFJK",
+    #         datetime_str="12.09.25T14:14:00",
     #     ),
     # ]
 

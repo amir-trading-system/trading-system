@@ -1,3 +1,5 @@
+import datetime
+
 import common
 
 class Evidence:
@@ -225,8 +227,11 @@ class Evidence:
     def crossed_resistance_level_strongly(
         self,
         resistance_levels: list[common.objects.BarData],
+        highest_high_one_minute_bar: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
     ) -> bool:
+        crossed_resistance_level_strongly: bool = False
+
         for resistance_level in resistance_levels:
             if (
                 potential_confirmation_bar.low < resistance_level.high < potential_confirmation_bar.close
@@ -245,9 +250,32 @@ class Evidence:
                 if resistance_level.high < r_l.high
                 and resistance_level.index > r_l.index
             ):
-                return True
+                crossed_resistance_level_strongly = True
+                break
 
-        return False
+        higher_resistance_levels_count = len(
+            [
+                r_l
+                for r_l in resistance_levels
+                if r_l.high > potential_confirmation_bar.high
+            ]
+        )
+
+        if (
+            True
+            and not crossed_resistance_level_strongly
+            and higher_resistance_levels_count/len(resistance_levels) <= 1
+            and len(resistance_levels) > 1
+            and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=10) > highest_high_one_minute_bar.bar_time
+            and potential_confirmation_bar.high - potential_confirmation_bar.low > 0.0
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.75
+            and potential_confirmation_bar.close > highest_high_one_minute_bar.high
+            and (potential_confirmation_bar.close - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.4
+        ):
+            crossed_resistance_level_strongly = True
+
+        return crossed_resistance_level_strongly
 
     def confirm(
         self,
@@ -255,7 +283,7 @@ class Evidence:
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
-        highest_high_one_minute: float,
+        highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:

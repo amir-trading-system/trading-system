@@ -84,7 +84,7 @@ class Evidence(
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
-        highest_high_one_minute: float,
+        highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
@@ -103,27 +103,27 @@ class Evidence(
             and (potential_confirmation_bar.high <= milestones.starting_bar.bar_object.high or potential_confirmation_bar.high <= milestones.top_bar.bar_object.high)
             and potential_confirmation_bar.high > stock.bars[1].high
             and potential_confirmation_bar.low < stock.bars[1].high
-            and potential_confirmation_bar.close > highest_high_one_minute
+            and potential_confirmation_bar.close > highest_high_one_minute_bar.high
         )
         crossed_starting_point = (
             True
             and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
             and potential_confirmation_bar.low < milestones.starting_bar.bar_object.high
-            and potential_confirmation_bar.close > highest_high_one_minute
+            and potential_confirmation_bar.close > highest_high_one_minute_bar.high
         )
         crossed_top_point = (
             True
             and potential_confirmation_bar.high > milestones.top_bar.bar_object.high
             and potential_confirmation_bar.low < milestones.top_bar.bar_object.high
-            and potential_confirmation_bar.close > highest_high_one_minute
+            and potential_confirmation_bar.close > highest_high_one_minute_bar.high
         )
 
         crossed_highest_one_minute = False
         if (
             True
-            and highest_high_one_minute > milestones.starting_bar.bar_object.high
+            and highest_high_one_minute_bar.high > milestones.starting_bar.bar_object.high
             and (
-                highest_high_one_minute > milestones.top_bar.bar_object.high
+                highest_high_one_minute_bar.high > milestones.top_bar.bar_object.high
                 if milestones.top_bar.bar_object.index > 0 else True
             )
             and potential_confirmation_bar.high > milestones.starting_bar.bar_object.high
@@ -134,8 +134,8 @@ class Evidence(
         ):
             crossed_highest_one_minute = (
                 True
-                and potential_confirmation_bar.low < highest_high_one_minute
-                and potential_confirmation_bar.close > highest_high_one_minute
+                and potential_confirmation_bar.low < highest_high_one_minute_bar.high
+                and potential_confirmation_bar.close > highest_high_one_minute_bar.high
             )
 
         crossed_only_highest_high_today_and_after_noon = False
@@ -145,7 +145,7 @@ class Evidence(
         highest_high_bar = [
             bar_obj
             for bar_obj in one_minute_bars
-            if bar_obj.high == highest_high_one_minute
+            if bar_obj.high == highest_high_one_minute_bar.high
         ]
         if highest_high_bar:
             highest_high_bar = highest_high_bar[-1]
@@ -154,8 +154,8 @@ class Evidence(
                 True
                 and previous_bar is not None
                 and original_bar_to_confirm.low < previous_bar.high
-                and potential_confirmation_bar.low < highest_high_one_minute
-                and potential_confirmation_bar.high > highest_high_one_minute
+                and potential_confirmation_bar.low < highest_high_one_minute_bar.high
+                and potential_confirmation_bar.high > highest_high_one_minute_bar.high
                 and potential_confirmation_bar.bar_time.hour >= 11
                 and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=20) < highest_high_bar.bar_time
             )
@@ -170,7 +170,7 @@ class Evidence(
                 or crossed_highest_one_minute
                 or crossed_only_highest_high_today_and_after_noon
             )
-            and potential_confirmation_bar.low < highest_high_one_minute < potential_confirmation_bar.close
+            and potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.close
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_20

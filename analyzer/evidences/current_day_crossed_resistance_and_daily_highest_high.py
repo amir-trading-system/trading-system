@@ -34,14 +34,14 @@ class Evidence(
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
-        highest_high_one_minute: float,
+        highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
         highest_high_bar = [
             bar_object
             for bar_object in one_minute_bars
-            if bar_object.high == highest_high_one_minute
+            if bar_object.high == highest_high_one_minute_bar.high
         ]
         if not highest_high_bar:
             return False
@@ -61,8 +61,8 @@ class Evidence(
         crossed_highest_high = (
             True
             and previous_bar is not None
-            and previous_bar.high < highest_high_one_minute
-            and potential_confirmation_bar.low < highest_high_one_minute <= potential_confirmation_bar.close
+            and previous_bar.high < highest_high_one_minute_bar.high
+            and potential_confirmation_bar.low < highest_high_one_minute_bar.high <= potential_confirmation_bar.close
             and (
                 potential_confirmation_bar.index+1 < highest_high_bar.index
                 or highest_high_bar.close < highest_high_bar.open_value
