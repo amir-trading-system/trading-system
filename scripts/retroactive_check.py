@@ -63,21 +63,41 @@ def get_symbols() -> list[Symbol]:
             name="ASPC",
             datetime_str="12.26.25T12:25:00",
         ),
-        # Symbol(
-        #     name="MBAI",
-        #     datetime_str="01.26.26T10:22:00",
-        # ),
         Symbol(
             name="INBS",
             datetime_str="12.31.25T12:52:00",
+        ),
+        Symbol(
+            name="BNAI",
+            datetime_str="01.02.26T09:57:00",
         ),
         Symbol(
             name="INBS",
             datetime_str="01.05.26T12:22:00",
         ),
         Symbol(
+            name="BNAI",
+            datetime_str="01.14.26T09:46:00",
+        ),
+        Symbol(
+            name="MLEC",
+            datetime_str="01.15.26T11:59:00",
+        ),
+        Symbol(
+            name="NAMM",
+            datetime_str="01.22.26T10:30:00",
+        ),
+        Symbol(
             name="AUST",
             datetime_str="01.23.26T09:42:00",
+        ),
+        Symbol(
+            name="BNAI",
+            datetime_str="01.23.26T09:57:00",
+        ),
+        Symbol(
+            name="DRMA",
+            datetime_str="01.26.26T12:18:00",
         ),
         Symbol(
             name="MOVE",
@@ -88,48 +108,24 @@ def get_symbols() -> list[Symbol]:
             datetime_str="01.27.26T10:05:00",
         ),
         Symbol(
-            name="NAMM",
-            datetime_str="01.22.26T10:30:00",
+            name="BNAI",
+            datetime_str="01.28.26T09:45:00",
         ),
         Symbol(
             name="NAMM",
             datetime_str="01.28.26T14:50:00",
         ),
         Symbol(
-            name="DRMA",
-            datetime_str="01.26.26T12:18:00",
-        ),
-        Symbol(
-            name="RIME",
-            datetime_str="02.13.26T14:11:00",
-        ),
-        Symbol(
-            name="BNAI",
-            datetime_str="01.02.26T09:57:00",
-        ),
-        Symbol(
-            name="BNAI",
-            datetime_str="01.14.26T09:46:00",
-        ),
-        Symbol(
-            name="BNAI",
-            datetime_str="01.23.26T09:57:00",
-        ),
-        Symbol(
-            name="BNAI",
-            datetime_str="01.28.26T09:45:00",
-        ),
-        Symbol(
             name="FEED",
             datetime_str="01.29.26T09:47:00",
         ),
         Symbol(
-            name="FEED",
-            datetime_str="01.30.26T09:57:00",
+            name="CATX",
+            datetime_str="01.29.26T10:21:00",
         ),
         Symbol(
-            name="CATX",
-            datetime_str="01.29.26T10:26:00",
+            name="FEED",
+            datetime_str="01.30.26T09:57:00",
         ),
         Symbol(
             name="CATX",
@@ -148,12 +144,16 @@ def get_symbols() -> list[Symbol]:
             datetime_str="02.11.26T11:00:00",
         ),
         Symbol(
+            name="RIME",
+            datetime_str="02.13.26T14:11:00",
+        ),
+        Symbol(
             name="ATOM",
             datetime_str="02.17.26T12:27:00",
         ),
         Symbol(
-            name="MLEC",
-            datetime_str="01.15.26T11:59:00",
+            name="FJET",
+            datetime_str="02.18.26T09:34:00",
         ),
         Symbol(
             name="MLEC",
@@ -161,19 +161,15 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="FJET",
-            datetime_str="02.18.26T09:34:00",
-        ),
-        Symbol(
-            name="FJET",
             datetime_str="02.19.26T10:18:00",
-        ),
-        Symbol(
-            name="LRMR",
-            datetime_str="02.25.26T09:32:00",
         ),
         Symbol(
             name="RXT",
             datetime_str="02.19.26T15:12:00",
+        ),
+        Symbol(
+            name="LRMR",
+            datetime_str="02.25.26T09:32:00",
         ),
         Symbol(
             name="RXT",
@@ -218,6 +214,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="AIFF",
             datetime_str="03.13.26T10:17:00",
+        ),
+        Symbol(
+            name="PRSO",
+            datetime_str="03.16.26T14:49:00",
         ),
     ]
 
@@ -423,8 +423,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="AFJK",
-    #         datetime_str="12.09.25T14:14:00",
+    #         name="PRSO",
+    #         datetime_str="03.16.26T14:49:00",
     #     ),
     # ]
 

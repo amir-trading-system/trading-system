@@ -130,6 +130,16 @@ class DataStreamer():
             bar_time=bar_time,
         )
 
+        stock = self.request_id_to_symbol[request_id]
+        if (
+            current_bar.symbol not in self.today_monitored_symbols
+            and stock.finished_collection
+            and stock.is_day_timeframe()
+        ):
+            self.insert_symbol_to_future_list(
+                symbol=current_bar.symbol,
+            )
+
         self.update_current_symbol_data_state(
             request_id=request_id,
             current_bar=current_bar,
@@ -156,11 +166,6 @@ class DataStreamer():
             )
         ):
             return
-
-        if stock.symbol_name not in self.today_monitored_symbols:
-            self.insert_symbol_to_future_list(
-                symbol=stock.symbol_name,
-            )
 
         stock.arrange_data_for_analysis()
 
