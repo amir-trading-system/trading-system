@@ -140,10 +140,6 @@ def get_symbols() -> list[Symbol]:
             datetime_str="02.10.26T09:49:00",
         ),
         Symbol(
-            name="SUNE",
-            datetime_str="02.10.26T09:48:00",
-        ),
-        Symbol(
             name="QVCGP",
             datetime_str="02.11.26T10:22:00",
         ),
