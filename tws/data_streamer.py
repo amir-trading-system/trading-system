@@ -82,6 +82,14 @@ class DataStreamer():
                 enriched_bar.high,
             )
 
+            if enriched_bar.bar_time >= datetime.datetime(
+                year=current_session_date.year,
+                month=current_session_date.month,
+                day=current_session_date.day,
+                hour=4,
+            ):
+                day_timeframe_stock.volume_sum_since_4_am_today += enriched_bar.volume
+
         if enriched_bar.bar_time >= datetime.datetime(
             year=current_session_date.year,
             month=current_session_date.month,

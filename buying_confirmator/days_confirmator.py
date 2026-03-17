@@ -151,7 +151,15 @@ class Confirmator:
                 },
             )
 
+            transmit = False
             if self.alerter_object:
+                if (
+                    True
+                    ## consider check this before confirming bar at all.
+                    and stock.volume_sum_since_4_am_today > stock.bars[1].volume
+                ):
+                    transmit = True
+
                 self.alerter_object.send_confirmation_alert(
                     sender="Confirmator",
                     stock=stock,
@@ -160,6 +168,7 @@ class Confirmator:
                     evidence_name=evidence_name,
                     is_retro=self.is_retro,
                     request_id=stock.request_id,
+                    transmit=transmit,
                 )
 
             unique_key_for_place_order = original_bar_to_confirm.symbol
@@ -177,9 +186,8 @@ class Confirmator:
                 self.tws_client.place_buy_order(
                     symbol=original_bar_to_confirm.symbol,
                     current_price=entry_position_bar.close,
-                    transmit=False,
+                    transmit=transmit,
                 )
-                return bar_has_confirmed
 
         return bar_has_confirmed
 

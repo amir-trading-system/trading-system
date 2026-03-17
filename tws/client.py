@@ -343,7 +343,7 @@ class Client(client.EClient, wrapper.EWrapper):
             },
         )
         if execution.side == "BOT":
-            take_profit_price = round(execution.price * 1.15, 2)
+            take_profit_price = round(execution.price * 1.1, 2)
             stop_loss_price = round(execution.price * 0.9, 2)
             self.place_take_profit_order(
                 symbol=symbol,

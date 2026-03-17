@@ -51,6 +51,7 @@ class Evidence(
             True
             and original_bar_to_confirm.low > original_bar_to_confirm.ema_9
             and original_bar_to_confirm.ema_9 > original_bar_to_confirm.ema_20
+            and stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close
         )
         previous_one_minute_bar = [
             bar_object

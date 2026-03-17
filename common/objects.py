@@ -115,6 +115,7 @@ class Stock:
         day_request_id: int = None,
         total_volume: float = 0.0,
         total_price_volume: float = 0.0,
+        volume_sum_since_4_am_today: float = 0.0,
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -128,6 +129,7 @@ class Stock:
         self.resistance_levels = resistance_levels
         self.last_post_pre_one_minute_highest_high = last_post_pre_one_minute_highest_high
         self.post_pre_market_volume_sum = post_pre_market_volume_sum
+        self.volume_sum_since_4_am_today = volume_sum_since_4_am_today
         self.last_lowest_low_bar = last_lowest_low_bar
         self.one_minute_request_id = one_minute_request_id
         self.day_request_id = day_request_id

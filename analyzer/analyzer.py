@@ -101,6 +101,7 @@ class Analyzer:
                 day_request_id=stock_object.day_request_id,
                 total_volume=stock_object.total_volume,
                 total_price_volume=stock_object.total_price_volume,
+                volume_sum_since_4_am_today=stock_object.volume_sum_since_4_am_today,
             )
             stock.arrange_data_for_analysis()
 
