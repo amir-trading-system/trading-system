@@ -114,8 +114,11 @@ class Confirmator:
                 if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
             ]
 
+            one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
+
             if evidence_obj.confirm(
                 stock=stock,
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
                 original_bar_to_confirm=original_bar_to_confirm,
                 potential_confirmation_bar=potential_confirmation_bar,
                 milestones=milestones,
@@ -133,6 +136,7 @@ class Confirmator:
                     "original_bar_time": original_bar_to_confirm.bar_time,
                     "confirmation_bar_time": entry_position_bar.bar_time,
                     "evidences": confirmed_evidences,
+                    "volume_until_now": stock.volume_sum_since_4_am_today,
                 },
             )
 
@@ -153,12 +157,7 @@ class Confirmator:
 
             transmit = False
             if self.alerter_object:
-                if (
-                    True
-                    ## consider check this before confirming bar at all.
-                    and stock.volume_sum_since_4_am_today > stock.bars[1].volume
-                ):
-                    transmit = True
+                transmit = True
 
                 self.alerter_object.send_confirmation_alert(
                     sender="Confirmator",

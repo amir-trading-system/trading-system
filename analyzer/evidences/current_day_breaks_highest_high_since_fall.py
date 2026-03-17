@@ -29,7 +29,7 @@ class Evidence(
 
         return current_day_breaks_highest_high_since_fall
 
-    def confirm(
+    def _confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,

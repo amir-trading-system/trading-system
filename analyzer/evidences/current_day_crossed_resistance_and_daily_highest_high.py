@@ -28,7 +28,7 @@ class Evidence(
 
         return current_bar_crossed_any_resistance
 
-    def confirm(
+    def _confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,

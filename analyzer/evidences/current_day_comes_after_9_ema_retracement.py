@@ -37,7 +37,7 @@ class Evidence(
 
         return current_day_comes_after_9_ema_retracement
 
-    def confirm(
+    def _confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,

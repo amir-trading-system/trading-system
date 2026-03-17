@@ -27,7 +27,7 @@ class Evidence(
 
         return current_bar_is_strong
 
-    def confirm(
+    def _confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,

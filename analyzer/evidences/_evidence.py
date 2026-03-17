@@ -280,6 +280,68 @@ class Evidence:
     def confirm(
         self,
         stock: common.objects.Stock,
+        one_minute_timeframe_stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
+        potential_confirmation_bar: common.objects.BarData,
+        milestones: common.objects.Milestones,
+        highest_high_one_minute_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
+        volume_sum_since_market_open: float,
+    ) -> bool:
+        if not self._confirm(
+            stock=stock,
+            original_bar_to_confirm=original_bar_to_confirm,
+            potential_confirmation_bar=potential_confirmation_bar,
+            milestones=milestones,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            one_minute_bars=one_minute_bars,
+            volume_sum_since_market_open=volume_sum_since_market_open,
+        ):
+            return False
+
+        current_bar_09_30 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=9,
+            minute=30,
+        )
+        current_bar_10_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=10,
+        )
+
+        today_04_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=4,
+        )
+
+        volume_sum_since_4_am_today = sum(
+            bar_object.volume
+            for bar_object in one_minute_timeframe_stock.bars
+            if today_04_00 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
+        )
+        stock.volume_sum_since_4_am_today = volume_sum_since_4_am_today
+
+        if current_bar_09_30 <= potential_confirmation_bar.bar_time <= current_bar_10_00:
+            return volume_sum_since_4_am_today > 5000000
+        if potential_confirmation_bar.bar_time > current_bar_10_00:
+            return (
+                (potential_confirmation_bar.high - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.3
+                and highest_high_one_minute_bar.index - 1 > potential_confirmation_bar.index
+            ) or (
+                volume_sum_since_4_am_today > 2000000
+            )
+
+        return False
+
+    def _confirm(
+        self,
+        stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,

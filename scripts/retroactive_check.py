@@ -77,7 +77,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.14.26T09:46:00",
+            datetime_str="01.14.26T09:51:00",
         ),
         Symbol(
             name="MLEC",
@@ -89,19 +89,15 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="AUST",
-            datetime_str="01.23.26T09:42:00",
+            datetime_str="01.23.26T12:45:00",
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.23.26T09:57:00",
+            datetime_str="01.23.26T10:24:00",
         ),
         Symbol(
             name="DRMA",
-            datetime_str="01.26.26T12:18:00",
-        ),
-        Symbol(
-            name="MOVE",
-            datetime_str="01.27.26T09:57:00",
+            datetime_str="01.26.26T12:19:00",
         ),
         Symbol(
             name="GITS",
@@ -109,7 +105,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BNAI",
-            datetime_str="01.28.26T09:45:00",
+            datetime_str="01.28.26T10:42:00",
         ),
         Symbol(
             name="NAMM",
@@ -132,10 +128,6 @@ def get_symbols() -> list[Symbol]:
             datetime_str="02.02.26T10:48:00",
         ),
         Symbol(
-            name="PLBY",
-            datetime_str="02.10.26T09:49:00",
-        ),
-        Symbol(
             name="QVCGP",
             datetime_str="02.11.26T10:22:00",
         ),
@@ -152,16 +144,8 @@ def get_symbols() -> list[Symbol]:
             datetime_str="02.17.26T12:27:00",
         ),
         Symbol(
-            name="FJET",
-            datetime_str="02.18.26T09:34:00",
-        ),
-        Symbol(
             name="MLEC",
-            datetime_str="02.18.26T09:47:00",
-        ),
-        Symbol(
-            name="FJET",
-            datetime_str="02.19.26T10:18:00",
+            datetime_str="02.18.26T10:09:00",
         ),
         Symbol(
             name="RXT",
@@ -169,7 +153,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="LRMR",
-            datetime_str="02.25.26T09:32:00",
+            datetime_str="02.25.26T09:57:00",
         ),
         Symbol(
             name="RXT",
@@ -177,7 +161,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="EDSA",
-            datetime_str="03.03.26T09:31:00",
+            datetime_str="03.03.26T11:41:00",
         ),
         Symbol(
             name="BATL",
@@ -185,7 +169,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BATL",
-            datetime_str="03.05.26T09:41:00",
+            datetime_str="03.05.26T10:09:00",
         ),
         Symbol(
             name="TPET",
@@ -200,17 +184,13 @@ def get_symbols() -> list[Symbol]:
             datetime_str="03.06.26T11:12:00",
         ),
         Symbol(
-            name="TURB",
-            datetime_str="03.09.26T09:46:00",
-        ),
-        Symbol(
             name="EDSA",
             datetime_str="03.09.26T11:08:00",
         ),
-        Symbol(
-            name="ANTX",
-            datetime_str="03.09.26T09:54:00",
-        ),
+        # Symbol(
+        #     name="ANTX",
+        #     datetime_str="03.09.26T09:54:00",
+        # ),
         Symbol(
             name="AIFF",
             datetime_str="03.13.26T10:17:00",
@@ -257,6 +237,7 @@ def build_table(
         f"Actual Confirmation Bar Time {finished_confirmation}/{len(data)}",
         "Expected Confirmation Bar Time",
         "Evidence",
+        "Volume Until Now",
         expand=True,
     )
     sorted_data_by_original_date = sorted(
@@ -300,6 +281,10 @@ def build_table(
             row_style = "bold yellow"
             symbol = f"[{row_style}]{symbol}[/{row_style}]"
 
+        volume_until_now = "0.0"
+        if symbol_data.get("volume_until_now"):
+            volume_until_now = str(symbol_data["volume_until_now"])
+
         table.add_row(
             symbol,
             str(original_bar_time),
@@ -308,6 +293,7 @@ def build_table(
             str(actual_confirmation_bar_time),
             str(expected_confirmation_bar_time),
             evidence_name,
+            volume_until_now,
         )
 
     return table
@@ -383,6 +369,7 @@ def update_table_with_results_queue(
                 relevant_symbol_data[0]["evidence_name"] = evidence_name
                 relevant_symbol_data[0]["collection_status"] = "done"
                 relevant_symbol_data[0]["analysis_status"] = "done"
+                relevant_symbol_data[0]["volume_until_now"] = confirmation_result["volume_until_now"]
                 should_update_first_default = False
                 continue
 
@@ -396,6 +383,7 @@ def update_table_with_results_queue(
                     "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
                     "evidence_name": evidence_name,
                     "is_new": True,
+                    "volume_until_now": confirmation_result["volume_until_now"],
                 },
             )
 
@@ -425,12 +413,12 @@ def run_retroactive_check():
     #     )
     #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
     # ]
-    # symbols = [
-    #     Symbol(
-    #         name="EDSA",
-    #         datetime_str="03.17.26T11:12:00",
-    #     ),
-    # ]
+    symbols = [
+        Symbol(
+            name="ANTX",
+            datetime_str="03.09.26T11:57:00",
+        ),
+    ]
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
@@ -517,6 +505,7 @@ def run_retroactive_check():
                 "expected_confirmation_bar_time": symbol.date_time,
                 "evidence_name": "in_progress",
                 "is_new": False,
+                "volume_until_now": "0.0",
             },
         )
 

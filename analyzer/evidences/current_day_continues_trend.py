@@ -78,7 +78,7 @@ class Evidence(
 
         return current_day_continues_trend
 
-    def confirm(
+    def _confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
