@@ -108,11 +108,15 @@ class Confirmator:
                 ):
                     continue
 
-            temp_one_minute_bars = [
-                one_minute_bar
-                for one_minute_bar in one_minute_bars
-                if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
-            ]
+            temp_one_minute_bars = sorted(
+                [
+                    one_minute_bar
+                    for one_minute_bar in one_minute_bars
+                    if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
+                ],
+                key=lambda bar_object: bar_object.bar_time,
+                reverse=True
+            )
 
             one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
 

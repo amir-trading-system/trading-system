@@ -51,15 +51,10 @@ class Evidence(
             and original_bar_to_confirm.low > original_bar_to_confirm.ema_9
             and original_bar_to_confirm.ema_9 > original_bar_to_confirm.ema_20
         )
-        previous_one_minute_bar = [
-            bar_object
-            for bar_object in one_minute_bars
-            if bar_object.index-1 == potential_confirmation_bar.index
-        ]
-        if not previous_one_minute_bar:
+        if len(one_minute_bars) == 1:
             return False
 
-        previous_one_minute_bar = previous_one_minute_bar[0]
+        previous_one_minute_bar = one_minute_bars[1]
 
         potential_bar_is_most_volatile = max(
             bar_object.volume

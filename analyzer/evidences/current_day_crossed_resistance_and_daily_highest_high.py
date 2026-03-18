@@ -38,15 +38,7 @@ class Evidence(
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
-        highest_high_bar = [
-            bar_object
-            for bar_object in one_minute_bars
-            if bar_object.high == highest_high_one_minute_bar.high
-        ]
-        if not highest_high_bar:
-            return False
-
-        highest_high_bar = highest_high_bar[0]
+        highest_high_bar = highest_high_one_minute_bar
 
         if (
             True

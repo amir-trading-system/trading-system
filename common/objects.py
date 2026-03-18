@@ -71,6 +71,12 @@ class BarData:
         ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
 
+    @property
+    def body_percentage(
+        self,
+    ) -> float:
+        return (self.close - self.open_value)/(self.high - self.low)
+
     def has_strong_rejection(
         self,
     ) -> bool:
