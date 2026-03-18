@@ -22,7 +22,6 @@ if __name__ == '__main__':
         symbols_to_collect_queue=symbols_to_collect_queue,
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
-        monitored_symbols=[],
         logger=logger_object,
         client_id=1,
         is_retro=True,

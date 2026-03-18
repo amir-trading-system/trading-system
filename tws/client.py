@@ -20,10 +20,8 @@ class Client(client.EClient, wrapper.EWrapper):
         request_id_to_symbol: dict[int, common.objects.Stock],
         bars_ready_to_analyze_queue: queue.Queue,
         logger: logging.Logger,
-        monitored_symbols: list[str],
         client_id: int,
         is_retro: bool,
-        potential_symbols_file_path: str = None,
     ):
         self.order_id: int = 0
         self.available_funds: float = 0.0
@@ -42,7 +40,6 @@ class Client(client.EClient, wrapper.EWrapper):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.symbols_to_collect_queue = symbols_to_collect_queue
         self.relevant_symbols: list[str] = []
-        self.monitored_symbols = monitored_symbols
         self.already_monitored: set[str] = set()
         self.logger = logger
 
@@ -54,8 +51,6 @@ class Client(client.EClient, wrapper.EWrapper):
             request_id_to_symbol=request_id_to_symbol,
             ibapi_requests=self.ibapi_requests,
             logger=logger,
-            monitored_symbols=monitored_symbols,
-            potential_symbols_file_path=potential_symbols_file_path,
         )
         self.is_retro = is_retro
 
@@ -130,9 +125,6 @@ class Client(client.EClient, wrapper.EWrapper):
         projection,
         legsStr,
     ):
-        if contractDetails.contract.symbol in self.monitored_symbols:
-            return
-
         self.reqContractDetails(
             reqId=reqId,
             contract=contractDetails.contract,

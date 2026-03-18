@@ -36,7 +36,7 @@ def initiate_potential_symbols(
     file_path: str,
     logger_obj: logging.Logger,
     symbols_queue: queue.Queue[str],
-) -> list[str]:
+):
     symbol_to_date: dict[str, datetime.datetime] = {}
     lines_to_save: list[str] = []
     unique_symbols: set[str] = set()
@@ -77,8 +77,6 @@ def initiate_potential_symbols(
     with open(file_path, "w") as f:
         f.writelines(lines_to_save)
 
-    return list(unique_symbols)
-
 def run_bot(
     tws_client_obj: tws.client.Client,
     c_obj: collector.collector.Collector,
@@ -116,7 +114,7 @@ if __name__ == "__main__":
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
     logger_object = app_logger.get_logger()
 
-    monitored_symbols = initiate_potential_symbols(
+    initiate_potential_symbols(
         file_path=configuration.potential_symbols_file_path,
         logger_obj=logger_object,
         symbols_queue=symbols_to_collect_queue,
@@ -132,8 +130,6 @@ if __name__ == "__main__":
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
-        potential_symbols_file_path=configuration.potential_symbols_file_path,
-        monitored_symbols=monitored_symbols,
         client_id=0,
         is_retro=False,
     )

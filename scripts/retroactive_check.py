@@ -449,7 +449,6 @@ def run_retroactive_check():
         symbols_to_collect_queue=symbols_to_collect_queue,
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         request_id_to_symbol=request_id_to_symbol,
-        monitored_symbols=[s.name for s in symbols],
         logger=logger_object,
         client_id=1,
         is_retro=True,

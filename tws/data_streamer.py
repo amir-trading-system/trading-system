@@ -14,15 +14,10 @@ class DataStreamer():
         request_id_to_symbol: dict[int, common.objects.Stock],
         ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
-        monitored_symbols: list[str],
-        potential_symbols_file_path: str = None,
     ):
         self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
         self.logger = logger
-        self.potential_symbols_file_path = potential_symbols_file_path
-        self.monitored_symbols = monitored_symbols
-        self.today_monitored_symbols: list[str] = []
 
     def insert_one_minute_bars_into_confirmation_queues(
         self,
@@ -130,16 +125,6 @@ class DataStreamer():
             bar_time=bar_time,
         )
 
-        stock = self.request_id_to_symbol[request_id]
-        if (
-            current_bar.symbol not in self.today_monitored_symbols
-            and stock.finished_collection
-            and stock.is_day_timeframe()
-        ):
-            self.insert_symbol_to_future_list(
-                symbol=current_bar.symbol,
-            )
-
         self.update_current_symbol_data_state(
             request_id=request_id,
             current_bar=current_bar,
@@ -151,24 +136,7 @@ class DataStreamer():
         current_bar: common.objects.BarData,
     ) -> None:
         stock = self.request_id_to_symbol[request_id]
-        now = datetime.datetime.now()
-
-        if (
-            True
-            and not self.on_specific_bar_time
-            and stock.symbol_name not in self.monitored_symbols
-            and now < datetime.datetime(
-                year=now.year,
-                month=now.month,
-                day=now.day,
-                hour=16,
-                minute=1,
-            )
-        ):
-            return
-
         stock.arrange_data_for_analysis()
-
         relevant_symbol_bars = stock.bars
 
         ibapi_request = self.ibapi_requests.get(request_id, None)
@@ -210,55 +178,3 @@ class DataStreamer():
                 enriched_bar=enriched_bar,
             )
             return
-
-    #pylint:disable=unspecified-encoding
-    def insert_symbol_to_future_list(
-        self,
-        symbol: str,
-    ):
-        current_bar: common.objects.BarData = None
-        relevant_bars: list[common.objects.BarData] = []
-
-        day_timeframe_stock = [
-            stock_obj
-            for stock_obj in self.request_id_to_symbol.values()
-            if stock_obj.symbol_name == symbol
-            and stock_obj.timeframe_type == common.objects.TimeframeType.DAY
-        ][0]
-
-        if day_timeframe_stock.bars:
-            relevant_bars = sorted(
-                day_timeframe_stock.bars,
-                key=lambda bar_obj: bar_obj.bar_time,
-                reverse=True,
-            )
-            current_bar = relevant_bars[0]
-        else:
-            return
-
-        now = datetime.datetime.now()
-        if (
-            True
-            and not self.on_specific_bar_time
-            and self.potential_symbols_file_path is not None
-            and now >= datetime.datetime(
-                year=now.year,
-                month=now.month,
-                day=now.day,
-                hour=16,
-                minute=1,
-            )
-        ):
-            if day_timeframe_stock.bar_is_the_first_one_in_trend(
-                bar_object=current_bar,
-                relevant_bars=relevant_bars,
-            ):
-                with open(self.potential_symbols_file_path, "a") as f:
-                    f.write(f"{current_bar.symbol}--{datetime.datetime(
-                        year=now.year,
-                        month=now.month,
-                        day=now.day,
-                    )}\n")
-
-                self.monitored_symbols.append(current_bar.symbol)
-                self.today_monitored_symbols.append(current_bar.symbol)
