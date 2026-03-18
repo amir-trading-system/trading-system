@@ -37,8 +37,15 @@ class Evidence(
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
+        most_of_current_bar_body_above_high = (
+            True
+            and potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0
+            and (potential_confirmation_bar.close - stock.last_post_pre_one_minute_highest_high)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) >= 0.5
+        )
+
         confirmed_bar = (
             True
+            and most_of_current_bar_body_above_high
             and potential_confirmation_bar.close > potential_confirmation_bar.open_value
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_20
