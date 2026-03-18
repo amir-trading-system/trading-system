@@ -40,7 +40,10 @@ class Evidence(
         most_of_current_bar_body_above_high = (
             True
             and potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0
-            and (potential_confirmation_bar.close - stock.last_post_pre_one_minute_highest_high)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) >= 0.5
+            and (
+                ((potential_confirmation_bar.close - stock.last_post_pre_one_minute_highest_high)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) >= 0.5)
+                or potential_confirmation_bar.body_percentage >= 0.9
+            )
         )
 
         confirmed_bar = (

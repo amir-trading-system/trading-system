@@ -88,7 +88,6 @@ class Evidence(
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
-        ## need to seperate this logic into different trends.
         if potential_confirmation_bar.bar_time < datetime.datetime(
             year=potential_confirmation_bar.bar_time.year,
             month=potential_confirmation_bar.bar_time.month,

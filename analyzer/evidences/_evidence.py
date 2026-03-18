@@ -299,6 +299,14 @@ class Evidence:
         ):
             return False
 
+        if (
+            True
+            and potential_confirmation_bar.body_percentage < 0.5
+            and potential_confirmation_bar.close < potential_confirmation_bar.high
+            and potential_confirmation_bar.low < potential_confirmation_bar.open_value
+        ):
+            return False
+
         current_bar_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
             month=original_bar_to_confirm.bar_time.month,

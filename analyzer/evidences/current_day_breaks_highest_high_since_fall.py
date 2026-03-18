@@ -59,6 +59,7 @@ class Evidence(
             True
             and potential_confirmation_bar.close > potential_confirmation_bar.open_value
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and potential_confirmation_bar.close > stock.last_post_pre_one_minute_highest_high
             and crossed_resistance_level_strongly
         )
 

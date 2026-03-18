@@ -64,10 +64,6 @@ def get_symbols() -> list[Symbol]:
             datetime_str="12.26.25T12:25:00",
         ),
         Symbol(
-            name="INBS",
-            datetime_str="12.31.25T12:52:00",
-        ),
-        Symbol(
             name="BNAI",
             datetime_str="01.02.26T09:57:00",
         ),
@@ -86,6 +82,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="NAMM",
             datetime_str="01.22.26T10:30:00",
+        ),
+        Symbol(
+            name="BGL",
+            datetime_str="01.22.26T14:24:00",
         ),
         Symbol(
             name="AUST",
@@ -118,6 +118,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="CATX",
             datetime_str="01.29.26T10:21:00",
+        ),
+        Symbol(
+            name="ANL",
+            datetime_str="01.29.26T15:33:00",
         ),
         Symbol(
             name="FEED",
@@ -160,6 +164,10 @@ def get_symbols() -> list[Symbol]:
             datetime_str="02.26.26T10:55:00",
         ),
         Symbol(
+            name="AEHL",
+            datetime_str="02.26.26T11:36:00",
+        ),
+        Symbol(
             name="EDSA",
             datetime_str="03.03.26T11:41:00",
         ),
@@ -169,19 +177,19 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="BATL",
-            datetime_str="03.05.26T10:09:00",
+            datetime_str="03.05.26T10:10:00",
         ),
         Symbol(
             name="TPET",
             datetime_str="03.05.26T09:45:00",
         ),
         Symbol(
-            name="TMDE",
-            datetime_str="03.05.26T11:16:00",
-        ),
-        Symbol(
             name="EDSA",
             datetime_str="03.06.26T11:12:00",
+        ),
+        Symbol(
+            name="DTCK",
+            datetime_str="03.09.26T10:12:00",
         ),
         Symbol(
             name="EDSA",
@@ -192,8 +200,12 @@ def get_symbols() -> list[Symbol]:
             datetime_str="03.09.26T11:57:00",
         ),
         Symbol(
+            name="ACXP",
+            datetime_str="03.11.26T10:03:00",
+        ),
+        Symbol(
             name="AIFF",
-            datetime_str="03.13.26T10:17:00",
+            datetime_str="03.13.26T10:24:00",
         ),
         Symbol(
             name="PRSO",
@@ -419,20 +431,38 @@ def flush_logs():
         else:
             time.sleep(1)
 
+def explore_past_potential_symbols() -> list[Symbol]:
+    symbols = [
+        Symbol(
+            name=symbol,
+            datetime_str=date,
+        )
+        for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
+    ]
+
+    current_symbols = get_symbols()
+    for symbol in symbols:
+        for current_symbol in current_symbols:
+            if (
+                True
+                and symbol.name == current_symbol.name
+                and symbol.date_time.year == current_symbol.date_time.year
+                and symbol.date_time.month == current_symbol.date_time.month
+                and symbol.date_time.day == current_symbol.date_time.day
+            ):
+                symbol.date_time = current_symbol.date_time
+
+    return symbols
+
 def run_retroactive_check():
     symbols_data = []
     symbols = get_symbols()
+    # symbols = explore_past_potential_symbols()
+
     # symbols = [
     #     Symbol(
-    #         name=symbol,
-    #         datetime_str=date,
-    #     )
-    #     for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
-    # ]
-    # symbols = [
-    #     Symbol(
-    #         name="NPT",
-    #         datetime_str="03.05.26T11:57:00",
+    #         name="TWG",
+    #         datetime_str="12.08.25T13:10:00",
     #     ),
     # ]
 
