@@ -22,6 +22,7 @@ class Client(client.EClient, wrapper.EWrapper):
         logger: logging.Logger,
         monitored_symbols: list[str],
         client_id: int,
+        is_retro: bool,
         potential_symbols_file_path: str = None,
     ):
         self.order_id: int = 0
@@ -56,6 +57,7 @@ class Client(client.EClient, wrapper.EWrapper):
             monitored_symbols=monitored_symbols,
             potential_symbols_file_path=potential_symbols_file_path,
         )
+        self.is_retro = is_retro
 
     #pylint: disable=too-many-arguments,too-many-positional-arguments
     def error(
@@ -204,6 +206,9 @@ class Client(client.EClient, wrapper.EWrapper):
         if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
             self.bars_ready_to_analyze_queue.put(stock)
             self.already_monitored.add(unique_key)
+            return
+        if self.is_retro and not stock.is_worth_to_monitor():
+            stock.finished_analyze = True
 
     def historicalDataUpdate(
         self,

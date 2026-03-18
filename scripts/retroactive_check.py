@@ -302,6 +302,7 @@ def update_table_with_status_per_stage(
     symbols_data: list[dict[str,any]],
     request_id_to_symbol: dict[int,common.objects.Stock],
     live_table: rich.live.Live,
+    counter: list[int],
 ):
     already_finished: list[str] = []
     while any(
@@ -310,6 +311,7 @@ def update_table_with_status_per_stage(
         if symbol_data["actual_confirmation_bar_time"] == "in_progress"
     ):
         for _, symbol in request_id_to_symbol.items():
+            not_qualify = False
             if symbol.symbol_name in already_finished:
                 continue
 
@@ -339,12 +341,26 @@ def update_table_with_status_per_stage(
                 relevant_symbol_data["analysis_status"] = "done"
 
             if (
+                True
+                and finished_collection
+                and finished_analysis
+                and symbol.is_day_timeframe()
+                and not symbol.is_worth_to_monitor()
+            ):
+                relevant_symbol_data["actual_confirmation_bar_time"] = "Does not qualify"
+                relevant_symbol_data["evidence_name"] = "Does not qualify"
+                relevant_symbol_data["volume_until_now"] = "Does not qualify"
+                not_qualify = True
+
+            if (
                 relevant_symbol_data["collection_status"] == "done"
                 and relevant_symbol_data["analysis_status"] == "done"
             ):
                 already_finished.append(symbol.symbol_name)
 
             live_table.update(build_table(symbols_data), refresh=True)
+            if not_qualify:
+                counter[0] -= 1
 
 def update_table_with_results_queue(
     results_queue: queue.Queue[dict[str,any]],
@@ -415,8 +431,8 @@ def run_retroactive_check():
     # ]
     # symbols = [
     #     Symbol(
-    #         name="ANTX",
-    #         datetime_str="03.09.26T11:57:00",
+    #         name="NPT",
+    #         datetime_str="03.05.26T11:57:00",
     #     ),
     # ]
 
@@ -436,6 +452,7 @@ def run_retroactive_check():
         monitored_symbols=[s.name for s in symbols],
         logger=logger_object,
         client_id=1,
+        is_retro=True,
     )
 
     threading.Thread(
@@ -516,6 +533,7 @@ def run_retroactive_check():
                 "symbols_data": symbols_data,
                 "request_id_to_symbol": request_id_to_symbol,
                 "live_table": live_table,
+                "counter": counter,
             }
         ).start()
 

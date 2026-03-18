@@ -25,6 +25,7 @@ if __name__ == '__main__':
         monitored_symbols=[],
         logger=logger_object,
         client_id=1,
+        is_retro=True,
     )
 
     collector_obj = collector.collector.Collector(
