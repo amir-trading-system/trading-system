@@ -91,6 +91,10 @@ def get_symbols() -> list[Symbol]:
             datetime_str="01.23.26T10:24:00",
         ),
         Symbol(
+            name="MBAI",
+            datetime_str="01.26.26T10:22:00",
+        ),
+        Symbol(
             name="DRMA",
             datetime_str="01.26.26T12:19:00",
         ),
@@ -454,8 +458,8 @@ def run_retroactive_check():
     # symbols = explore_past_potential_symbols()
     # symbols = [
     #     Symbol(
-    #         name="CYCU",
-    #         datetime_str="11.14.25T12:42:00",
+    #         name="SER",
+    #         datetime_str="03.19.26T12:21:00",
     #     ),
     # ]
     # output_file_name = "retroactive_test_results.csv"
