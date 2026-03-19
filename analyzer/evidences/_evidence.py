@@ -272,6 +272,12 @@ class Evidence:
             and (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.75
             and potential_confirmation_bar.close > highest_high_one_minute_bar.high
             and (potential_confirmation_bar.close - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.4
+            and not any(
+                r_l
+                for r_l in resistance_levels
+                if potential_confirmation_bar.high/r_l.high >= 0.95
+                and potential_confirmation_bar.high < r_l.high
+            )
         ):
             crossed_resistance_level_strongly = True
 
@@ -288,6 +294,19 @@ class Evidence:
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
+        current_bar_12_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=12,
+        )
+
+        if (
+            potential_confirmation_bar.volume_average < 10000
+            and potential_confirmation_bar.bar_time >= current_bar_12_00
+        ):
+            return False
+
         if not self._confirm(
             stock=stock,
             original_bar_to_confirm=original_bar_to_confirm,

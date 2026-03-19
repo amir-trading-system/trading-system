@@ -141,23 +141,16 @@ class Evidence(
         previous_bar = stock.previous_bar(
             bar_object=original_bar_to_confirm,
         )
-        highest_high_bar = [
-            bar_obj
-            for bar_obj in one_minute_bars
-            if bar_obj.high == highest_high_one_minute_bar.high
-        ]
-        if highest_high_bar:
-            highest_high_bar = highest_high_bar[-1]
 
-            crossed_only_highest_high_today_and_after_noon = (
-                True
-                and previous_bar is not None
-                and original_bar_to_confirm.low < previous_bar.high
-                and potential_confirmation_bar.low < highest_high_one_minute_bar.high
-                and potential_confirmation_bar.high > highest_high_one_minute_bar.high
-                and potential_confirmation_bar.bar_time.hour >= 11
-                and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=20) < highest_high_bar.bar_time
-            )
+        crossed_only_highest_high_today_and_after_noon = (
+            True
+            and previous_bar is not None
+            and original_bar_to_confirm.low < previous_bar.high
+            and potential_confirmation_bar.low < highest_high_one_minute_bar.high
+            and potential_confirmation_bar.high > highest_high_one_minute_bar.high
+            and potential_confirmation_bar.bar_time.hour >= 11
+            and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=20) < highest_high_one_minute_bar.bar_time
+        )
 
         if (
             True

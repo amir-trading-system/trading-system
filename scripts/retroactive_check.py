@@ -63,12 +63,8 @@ def get_symbols() -> list[Symbol]:
             datetime_str="12.26.25T12:25:00",
         ),
         Symbol(
-            name="BNAI",
-            datetime_str="01.02.26T09:57:00",
-        ),
-        Symbol(
             name="INBS",
-            datetime_str="01.05.26T12:22:00",
+            datetime_str="01.05.26T12:29:00",
         ),
         Symbol(
             name="BNAI",
@@ -108,7 +104,7 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="NAMM",
-            datetime_str="01.28.26T14:50:00",
+            datetime_str="01.28.26T14:51:00",
         ),
         Symbol(
             name="FEED",
@@ -116,11 +112,11 @@ def get_symbols() -> list[Symbol]:
         ),
         Symbol(
             name="CATX",
-            datetime_str="01.29.26T10:21:00",
+            datetime_str="01.29.26T11:39:00",
         ),
         Symbol(
             name="ANL",
-            datetime_str="01.29.26T15:33:00",
+            datetime_str="01.29.26T15:44:00",
         ),
         Symbol(
             name="FEED",
@@ -213,6 +209,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="BIAF",
             datetime_str="03.17.26T09:35:00",
+        ),
+        Symbol(
+            name="ACXP",
+            datetime_str="03.19.26T10:12:00",
         ),
     ]
 
@@ -454,8 +454,8 @@ def run_retroactive_check():
     # symbols = explore_past_potential_symbols()
     # symbols = [
     #     Symbol(
-    #         name="PRSO",
-    #         datetime_str="03.16.26T14:49:00",
+    #         name="CYCU",
+    #         datetime_str="11.14.25T12:42:00",
     #     ),
     # ]
     # output_file_name = "retroactive_test_results.csv"

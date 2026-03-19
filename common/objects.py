@@ -77,6 +77,12 @@ class BarData:
     ) -> float:
         return (self.close - self.open_value)/(self.high - self.low)
 
+    @property
+    def bar_up_percentage(
+        self,
+    ) -> float:
+        return (self.close - self.open_value)/self.open_value
+
     def has_strong_rejection(
         self,
     ) -> bool:

@@ -41,6 +41,23 @@ class Confirmator:
         entry_position_bar: common.objects.BarData = None
         one_minute_bars.append(potential_confirmation_bar)
 
+        if (
+            True
+            and self.is_retro
+            and potential_confirmation_bar.bar_time.hour == 19
+            and potential_confirmation_bar.bar_time.minute == 59
+        ):
+            self.results_queue.put(
+                {
+                    "symbol": stock.symbol_name,
+                    "original_bar_time": original_bar_to_confirm.bar_time,
+                    "confirmation_bar_time": None,
+                    "evidences": [],
+                    "volume_until_now": stock.volume_sum_since_4_am_today,
+                },
+            )
+            return False
+
         today_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
             month=original_bar_to_confirm.bar_time.month,
@@ -82,7 +99,13 @@ class Confirmator:
             )
         )
 
-        if should_wait_for_next_bar:
+        bar_is_strong_than_before = (
+            True
+            and potential_confirmation_bar.bar_up_percentage >= 0.03
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+        )
+
+        if should_wait_for_next_bar and not bar_is_strong_than_before:
             return bar_has_confirmed
 
         confirmed_evidences: list[str] = []
