@@ -12,4 +12,4 @@ stocks_by*.csv
 potential_symbols_for_tomorrow.txt
 potential_upside_for_tomorrow.txt
 logs/*
-watchlist.csv
+*.csv

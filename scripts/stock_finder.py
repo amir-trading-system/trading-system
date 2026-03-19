@@ -51,9 +51,7 @@ def get_stocks_list_from_nasdaq() -> Generator[Any, Any, Any]:
 def get_dynamic_symbols_from_last_month() -> dict[str, str]:
     symbol_to_date: dict[str,str] = {}
     stock_bulks = get_stocks_list_from_nasdaq()
-    t = tqdm.tqdm(total=8)
     for stock_bulk in stock_bulks:
-        t.update(1)
         symbols_to_download: list[str] = []
         for stock in stock_bulk:
             if stock["market_cap"] == '':
@@ -132,7 +130,6 @@ def get_dynamic_symbols_from_last_month() -> dict[str, str]:
                         continue
                     symbol_to_date[symbol] = date.strftime("%m.%d.%yT%H:%M:%S")
 
-    t.close()
     return symbol_to_date
 
 #pylint:disable=unspecified-encoding,too-many-locals

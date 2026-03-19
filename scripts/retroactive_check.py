@@ -1,3 +1,4 @@
+import csv
 import datetime
 import os
 import sys
@@ -5,9 +6,7 @@ import threading
 import time
 import queue
 
-import rich
-import rich.live
-import rich.table
+import tqdm
 
 import analyzer
 import buying_confirmator
@@ -217,104 +216,99 @@ def get_symbols() -> list[Symbol]:
         ),
     ]
 
-def build_table(
-    data: list[dict[str, str]],
-) -> rich.table.Table:
-    finished_collection = len(
-        [
-            symbol_data
-            for symbol_data in data
-            if symbol_data["collection_status"] == "done"
-        ]
-    )
-    finished_analysis = len(
-        [
-            symbol_data
-            for symbol_data in data
-            if symbol_data["analysis_status"] == "done"
-        ]
-    )
-    finished_confirmation = len(
-        [
-            symbol_data
-            for symbol_data in data
-            if symbol_data["actual_confirmation_bar_time"] != "in_progress"
-        ]
-    )
-    table = rich.table.Table(
-        "Symbol",
-        "Original Bar Time",
-        f"Collection Status: {finished_collection}/{len(data)}",
-        f"Analysis Status: {finished_analysis}/{len(data)}",
-        f"Actual Confirmation Bar Time {finished_confirmation}/{len(data)}",
-        "Expected Confirmation Bar Time",
-        "Evidence",
-        "Volume Until Now",
-        expand=True,
-    )
-    sorted_data_by_original_date = sorted(
-        data,
-        key=lambda symbol_data: symbol_data["symbol"],
-    )
-
-    for symbol_data in sorted_data_by_original_date:
-        symbol = symbol_data["symbol"]
-        original_bar_time = symbol_data["original_bar_time"]
-
-        collection_status = symbol_data["collection_status"]
-        if collection_status != "done":
-            collection_status = f"[red]{collection_status}[/red]"
-        else:
-            collection_status = f"[green]{collection_status}[/green]"
-
-        analysis_status = symbol_data["analysis_status"]
-        if analysis_status != "done":
-            analysis_status = f"[red]{analysis_status}[/red]"
-        else:
-            analysis_status = f"[green]{analysis_status}[/green]"
-
-        evidence_name = symbol_data["evidence_name"]
-        if evidence_name == "in_progress":
-            evidence_name = f"[red]{evidence_name}[/red]"
-        elif symbol_data["is_new"]:
-            evidence_name = f"[bold yellow]{evidence_name}[/bold yellow]"
-        else:
-            evidence_name = f"[green]{evidence_name}[/green]"
-
-        actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
-        expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
-
-        if actual_confirmation_bar_time == expected_confirmation_bar_time:
-            actual_confirmation_bar_time = f"[green]{actual_confirmation_bar_time}[/green]"
-        else:
-            actual_confirmation_bar_time = f"[red]{actual_confirmation_bar_time}[/red]"
-
-        if symbol_data["is_new"]:
-            row_style = "bold yellow"
-            symbol = f"[{row_style}]{symbol}[/{row_style}]"
-
-        volume_until_now = "0.0"
-        if symbol_data.get("volume_until_now"):
-            volume_until_now = str(symbol_data["volume_until_now"])
-
-        table.add_row(
-            symbol,
-            str(original_bar_time),
-            collection_status,
-            analysis_status,
-            str(actual_confirmation_bar_time),
-            str(expected_confirmation_bar_time),
-            evidence_name,
-            volume_until_now,
+#pylint:disable=unspecified-encoding
+def write_to_csv(
+    symbols_data: list[dict[str, str]],
+    file_name: str,
+    counter: list[int],
+):
+    t = tqdm.tqdm(total=len(symbols_data))
+    with open(file_name, mode="w") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "symbol",
+                "original_bar_time",
+                "collection_status",
+                "analysis_status",
+                "actual_confirmation_bar_time",
+                "expected_confirmation_bar_time",
+                "evidence",
+                "volume_until_now",
+                "result",
+            ],
         )
+        f.flush()
 
-    return table
+        while any(
+            s_data
+            for s_data in symbols_data
+            if s_data["result"] != "done"
+            and s_data["result"] != "failed"
+        ):
+            for symbol_data in sorted(
+                symbols_data,
+                key=lambda symbol_data: symbol_data["symbol"],
+            ):
+                symbol = symbol_data["symbol"]
+                original_bar_time = symbol_data["original_bar_time"]
+                result = symbol_data["result"]
 
-def update_table_with_status_per_stage(
+                collection_status = symbol_data["collection_status"]
+                analysis_status = symbol_data["analysis_status"]
+
+                evidence_name = symbol_data["evidence_name"]
+                if symbol_data["is_new"]:
+                    evidence_name = f"{evidence_name} - NEW"
+                    symbol = f"{symbol} - NEW"
+
+                actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
+                expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
+
+                volume_until_now = "0.0"
+                if symbol_data.get("volume_until_now"):
+                    volume_until_now = symbol_data["volume_until_now"]
+
+                if (
+                    True
+                    and result != "done"
+                    and result != "failed"
+                    and collection_status == "done"
+                    and analysis_status == "done"
+                    and actual_confirmation_bar_time != "in_progress"
+                ):
+                    if actual_confirmation_bar_time == expected_confirmation_bar_time or evidence_name == "no evidence":
+                        result = "done"
+                        symbol_data["result"] = "done"
+                    else:
+                        result = "failed"
+                        symbol_data["result"] = "failed"
+
+                    writer.writerow(
+                        [
+                            symbol,
+                            original_bar_time,
+                            collection_status,
+                            analysis_status,
+                            actual_confirmation_bar_time,
+                            expected_confirmation_bar_time,
+                            evidence_name,
+                            volume_until_now,
+                            result,
+                        ]
+                    )
+                    f.flush()
+                    t.update(1)
+
+                    counter[0] -= 1
+
+            time.sleep(2)
+
+    t.close()
+
+def wait_for_collection_and_analysis(
     symbols_data: list[dict[str,any]],
     request_id_to_symbol: dict[int,common.objects.Stock],
-    live_table: rich.live.Live,
-    counter: list[int],
 ):
     already_finished: list[str] = []
     while any(
@@ -323,7 +317,6 @@ def update_table_with_status_per_stage(
         if symbol_data["actual_confirmation_bar_time"] == "in_progress"
     ):
         for _, symbol in request_id_to_symbol.items():
-            not_qualify = False
             if symbol.symbol_name in already_finished:
                 continue
 
@@ -362,7 +355,6 @@ def update_table_with_status_per_stage(
                 relevant_symbol_data["actual_confirmation_bar_time"] = "Does not qualify"
                 relevant_symbol_data["evidence_name"] = "Does not qualify"
                 relevant_symbol_data["volume_until_now"] = "Does not qualify"
-                not_qualify = True
 
             if (
                 relevant_symbol_data["collection_status"] == "done"
@@ -370,15 +362,9 @@ def update_table_with_status_per_stage(
             ):
                 already_finished.append(symbol.symbol_name)
 
-            live_table.update(build_table(symbols_data), refresh=True)
-            if not_qualify:
-                counter[0] -= 1
-
-def update_table_with_results_queue(
+def wait_for_confirmation(
     results_queue: queue.Queue[dict[str,any]],
     symbols_data: list[dict[str,any]],
-    live_table: rich.live.Live,
-    counter: list[int],
 ):
     while True:
         confirmation_result = results_queue.get()
@@ -390,6 +376,14 @@ def update_table_with_results_queue(
             and symbol_data["evidence_name"] == "in_progress"
         ]
         should_update_first_default = True
+
+        if not confirmation_result["evidences"]:
+            relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
+            relevant_symbol_data[0]["evidence_name"] = "no evidence"
+            relevant_symbol_data[0]["collection_status"] = "done"
+            relevant_symbol_data[0]["analysis_status"] = "done"
+            relevant_symbol_data[0]["volume_until_now"] = confirmation_result["volume_until_now"]
+            continue
 
         for evidence_name in confirmation_result["evidences"]:
             if should_update_first_default and relevant_symbol_data:
@@ -412,11 +406,9 @@ def update_table_with_results_queue(
                     "evidence_name": evidence_name,
                     "is_new": True,
                     "volume_until_now": confirmation_result["volume_until_now"],
+                    "result": "in_progress",
                 },
             )
-
-        live_table.update(build_table(symbols_data), refresh=True)
-        counter[0] -= 1
 
 def flush_logs():
     last_time_flushed = datetime.datetime.now()
@@ -457,14 +449,16 @@ def explore_past_potential_symbols() -> list[Symbol]:
 def run_retroactive_check():
     symbols_data = []
     symbols = get_symbols()
-    # symbols = explore_past_potential_symbols()
+    output_file_name = "retroactive_test_results_current_results.csv"
 
+    # symbols = explore_past_potential_symbols()
     # symbols = [
     #     Symbol(
-    #         name="TWG",
-    #         datetime_str="12.08.25T13:10:00",
+    #         name="PRSO",
+    #         datetime_str="03.16.26T14:49:00",
     #     ),
     # ]
+    # output_file_name = "retroactive_test_results.csv"
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
@@ -552,33 +546,38 @@ def run_retroactive_check():
                 "evidence_name": "in_progress",
                 "is_new": False,
                 "volume_until_now": "0.0",
+                "result": "in_progress",
             },
         )
 
-    with rich.live.Live(build_table(symbols_data), refresh_per_second=4) as live_table:
-        threading.Thread(
-            target=update_table_with_status_per_stage,
-            kwargs={
-                "symbols_data": symbols_data,
-                "request_id_to_symbol": request_id_to_symbol,
-                "live_table": live_table,
-                "counter": counter,
-            }
-        ).start()
+    threading.Thread(
+        target=wait_for_collection_and_analysis,
+        kwargs={
+            "symbols_data": symbols_data,
+            "request_id_to_symbol": request_id_to_symbol,
+        }
+    ).start()
 
-        threading.Thread(
-            target=update_table_with_results_queue,
-            kwargs={
-                "results_queue": results_queue,
-                "symbols_data": symbols_data,
-                "counter": counter,
-                "live_table": live_table,
-            },
-        ).start()
+    threading.Thread(
+        target=wait_for_confirmation,
+        kwargs={
+            "results_queue": results_queue,
+            "symbols_data": symbols_data,
+        },
+    ).start()
 
-        while True:
-            if counter[0] == 0:
-                break
+    threading.Thread(
+        target=write_to_csv,
+        kwargs={
+            "symbols_data": symbols_data,
+            "file_name": output_file_name,
+            "counter": counter,
+        },
+    ).start()
+
+    while True:
+        if counter[0] == 0:
+            break
 
     sys.exit(0)
 
