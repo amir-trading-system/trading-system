@@ -54,6 +54,7 @@ class Confirmator:
                     "confirmation_bar_time": None,
                     "evidences": [],
                     "volume_until_now": stock.volume_sum_since_4_am_today,
+                    "price_movement_statistics": {},
                 },
             )
             return False
@@ -164,6 +165,7 @@ class Confirmator:
                     "confirmation_bar_time": entry_position_bar.bar_time,
                     "evidences": confirmed_evidences,
                     "volume_until_now": stock.volume_sum_since_4_am_today,
+                    "price_movement_statistics": entry_position_bar.price_movement_statistics,
                 },
             )
 

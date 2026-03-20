@@ -240,6 +240,17 @@ def write_to_csv(
                 "evidence",
                 "volume_until_now",
                 "result",
+                "positive_movement_since_market_open",
+                "negative_movement_since_market_open",
+                "movement_above_vwap_since_market_open",
+                "movement_under_vwap_since_market_open",
+                "movement_above_volume_average_counter_since_market_open",
+                "movement_under_volume_average_counter_since_market_open",
+                "highest_histogram_since_market_open",
+                "lowest_histogram_since_market_open",
+                "pullback_sharpness",
+                "pullback_duration",
+                "pullback_depth",
             ],
         )
         f.flush()
@@ -258,6 +269,32 @@ def write_to_csv(
                 original_bar_time = symbol_data["original_bar_time"]
                 result = symbol_data["result"]
 
+                positive_movement = 0.0
+                negative_movement = 0.0
+                above_vwap = 0.0
+                under_vwap = 0.0
+                bars_above_volume_average_counter = 0
+                bars_under_volume_average_counter = 0
+                highest_histogram = 0.0
+                lowest_histogram = 0.0
+                pullback_sharpness = 0.0
+                pullback_duration = 0
+                pullback_depth = 0.0
+
+                price_movement_statistics = symbol_data.get("price_movement_statistics", None)
+                if price_movement_statistics:
+                    positive_movement = price_movement_statistics["positive_movement_since_market_open"]
+                    negative_movement = price_movement_statistics["negative_movement_since_market_open"]
+                    above_vwap = price_movement_statistics["movement_above_vwap_since_market_open"]
+                    under_vwap = price_movement_statistics["movement_under_vwap_since_market_open"]
+                    bars_above_volume_average_counter = price_movement_statistics["movement_above_volume_average_counter_since_market_open"]
+                    bars_under_volume_average_counter = price_movement_statistics["movement_under_volume_average_counter_since_market_open"]
+                    highest_histogram = price_movement_statistics["highest_histogram_since_market_open"]
+                    lowest_histogram = price_movement_statistics["lowest_histogram_since_market_open"]
+                    pullback_sharpness = price_movement_statistics["pullback_sharpness"]
+                    pullback_duration = price_movement_statistics["pullback_duration"]
+                    pullback_depth = price_movement_statistics["pullback_depth"]
+
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
 
@@ -269,7 +306,7 @@ def write_to_csv(
                 actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
                 expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
 
-                volume_until_now = "0.0"
+                volume_until_now = "0"
                 if symbol_data.get("volume_until_now"):
                     volume_until_now = symbol_data["volume_until_now"]
 
@@ -299,6 +336,17 @@ def write_to_csv(
                             evidence_name,
                             volume_until_now,
                             result,
+                            positive_movement,
+                            negative_movement,
+                            above_vwap,
+                            under_vwap,
+                            bars_above_volume_average_counter,
+                            bars_under_volume_average_counter,
+                            highest_histogram,
+                            lowest_histogram,
+                            pullback_sharpness,
+                            pullback_duration,
+                            pullback_depth,
                         ]
                     )
                     f.flush()
@@ -386,7 +434,8 @@ def wait_for_confirmation(
             relevant_symbol_data[0]["evidence_name"] = "no evidence"
             relevant_symbol_data[0]["collection_status"] = "done"
             relevant_symbol_data[0]["analysis_status"] = "done"
-            relevant_symbol_data[0]["volume_until_now"] = confirmation_result["volume_until_now"]
+            relevant_symbol_data[0]["volume_until_now"] = int(confirmation_result["volume_until_now"])
+            relevant_symbol_data[0]["price_movement_statistics"] = {}
             continue
 
         for evidence_name in confirmation_result["evidences"]:
@@ -395,7 +444,8 @@ def wait_for_confirmation(
                 relevant_symbol_data[0]["evidence_name"] = evidence_name
                 relevant_symbol_data[0]["collection_status"] = "done"
                 relevant_symbol_data[0]["analysis_status"] = "done"
-                relevant_symbol_data[0]["volume_until_now"] = confirmation_result["volume_until_now"]
+                relevant_symbol_data[0]["volume_until_now"] = int(confirmation_result["volume_until_now"])
+                relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result["price_movement_statistics"]
                 should_update_first_default = False
                 continue
 
@@ -409,7 +459,8 @@ def wait_for_confirmation(
                     "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
                     "evidence_name": evidence_name,
                     "is_new": True,
-                    "volume_until_now": confirmation_result["volume_until_now"],
+                    "volume_until_now": int(confirmation_result["volume_until_now"]),
+                    "price_movement_statistics": confirmation_result["price_movement_statistics"],
                     "result": "in_progress",
                 },
             )
@@ -453,16 +504,76 @@ def explore_past_potential_symbols() -> list[Symbol]:
 def run_retroactive_check():
     symbols_data = []
     symbols = get_symbols()
-    output_file_name = "retroactive_test_results_current_results.csv"
+    output_file_name = "positive_results.csv"
 
     # symbols = explore_past_potential_symbols()
     # symbols = [
     #     Symbol(
-    #         name="SER",
-    #         datetime_str="03.19.26T12:21:00",
+    #         name="CAMP",
+    #         datetime_str="03.09.26T13:51:00",
+    #     ),
+    #     Symbol(
+    #         name="CDIO",
+    #         datetime_str="02.18.26T14:18:00",
+    #     ),
+    #     Symbol(
+    #         name="MOVE",
+    #         datetime_str="01.27.26T10:04:00",
+    #     ),
+    #     Symbol(
+    #         name="PLYX",
+    #         datetime_str="03.10.26T14:06:00",
+    #     ),
+    #     Symbol(
+    #         name="JLHL",
+    #         datetime_str="02.02.26T10:46:00",
+    #     ),
+    #     Symbol(
+    #         name="SMX",
+    #         datetime_str="02.06.26T10:16:00",
+    #     ),
+    #     Symbol(
+    #         name="TWAV",
+    #         datetime_str="03.16.26T10:55:00",
+    #     ),
+    #     Symbol(
+    #         name="TURB",
+    #         datetime_str="03.05.26T12:07:00",
+    #     ),
+    #     Symbol(
+    #         name="NCI",
+    #         datetime_str="02.23.26T14:19:00",
+    #     ),
+    #     Symbol(
+    #         name="ONEG",
+    #         datetime_str="01.27.26T10:14:00",
+    #     ),
+    #     Symbol(
+    #         name="BIYA",
+    #         datetime_str="02.20.26T10:49:00",
+    #     ),
+    #     Symbol(
+    #         name="DXST",
+    #         datetime_str="03.06.26T10:40:00",
+    #     ),
+    #     Symbol(
+    #         name="SORA",
+    #         datetime_str="02.02.26T15:19:00",
+    #     ),
+    #     Symbol(
+    #         name="MBAI",
+    #         datetime_str="01.26.26T10:22:00",
+    #     ),
+    #     Symbol(
+    #         name="XHLD",
+    #         datetime_str="01.27.26T15:36:00",
+    #     ),
+    #     Symbol(
+    #         name="XTKG",
+    #         datetime_str="01.26.26T14:11:00",
     #     ),
     # ]
-    # output_file_name = "retroactive_test_results.csv"
+    # output_file_name = "false_positives_results.csv"
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
@@ -549,7 +660,8 @@ def run_retroactive_check():
                 "expected_confirmation_bar_time": symbol.date_time,
                 "evidence_name": "in_progress",
                 "is_new": False,
-                "volume_until_now": "0.0",
+                "volume_until_now": "0",
+                "price_movement_statistics": {},
                 "result": "in_progress",
             },
         )

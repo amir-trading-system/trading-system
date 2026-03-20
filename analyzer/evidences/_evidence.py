@@ -283,6 +283,79 @@ class Evidence:
 
         return crossed_resistance_level_strongly
 
+    def price_movement_statistics(
+        self,
+        potential_confirmation_bar: common.objects.BarData,
+        highest_high_one_minute_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
+    ) -> dict[str, float]:
+        price_movement_statistics = {
+            "positive_movement_since_market_open": 0.0,
+            "negative_movement_since_market_open": 0.0,
+            "movement_above_vwap_since_market_open": 0.0,
+            "movement_under_vwap_since_market_open": 0.0,
+            "movement_above_volume_average_counter_since_market_open": 0,
+            "movement_under_volume_average_counter_since_market_open": 0,
+            "highest_histogram_since_market_open": 0.0,
+            "lowest_histogram_since_market_open": 1.0,
+            "pullback_sharpness": 0.0,
+            "pullback_duration": 0,
+            "pullback_depth": 0.0,
+        }
+
+        for bar_object in one_minute_bars:
+            bar_movement = bar_object.high - bar_object.low
+            if bar_object.close > bar_object.open_value:
+                price_movement_statistics["positive_movement_since_market_open"] += bar_movement
+            if bar_object.close <= bar_object.open_value:
+                price_movement_statistics["negative_movement_since_market_open"] += bar_movement
+            if bar_object.close > bar_object.vwap:
+                price_movement_statistics["movement_above_vwap_since_market_open"] += bar_movement
+            if bar_object.close <= bar_object.vwap:
+                price_movement_statistics["movement_under_vwap_since_market_open"] += bar_movement
+            if bar_object.volume > bar_object.volume_average:
+                price_movement_statistics["movement_above_volume_average_counter_since_market_open"] += 1
+            if bar_object.volume <= bar_object.volume_average:
+                price_movement_statistics["movement_under_volume_average_counter_since_market_open"] += 1
+            if bar_object.histogram > 0.0 and bar_object.histogram > price_movement_statistics["highest_histogram_since_market_open"]:
+                price_movement_statistics["highest_histogram_since_market_open"] = bar_object.histogram
+            if bar_object.histogram < 0.0 and bar_object.histogram < price_movement_statistics["lowest_histogram_since_market_open"]:
+                price_movement_statistics["lowest_histogram_since_market_open"] = bar_object.histogram
+
+        bars_since_highest_high = [
+            bar_object
+            for bar_object in one_minute_bars
+            if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
+        ]
+
+        if bars_since_highest_high:
+            lowest_low_since_highest_high = min(
+                bar_object.low
+                for bar_object in bars_since_highest_high
+            )
+            lowest_low_bar = None
+
+            for bar_object in bars_since_highest_high:
+                if bar_object.low == lowest_low_since_highest_high:
+                    lowest_low_bar = bar_object
+
+            pullback_bars = [
+                bar_object
+                for bar_object in bars_since_highest_high
+                if highest_high_one_minute_bar.bar_time < bar_object.bar_time <= lowest_low_bar.bar_time
+            ]
+
+            pullback_duration = len(pullback_bars)
+            pullback_size = sum(
+                bar_object.high - bar_object.low
+                for bar_object in pullback_bars
+            )
+            price_movement_statistics["pullback_sharpness"] = pullback_size/pullback_duration
+            price_movement_statistics["pullback_duration"] = pullback_duration
+            price_movement_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low
+
+        return price_movement_statistics
+
     def confirm(
         self,
         stock: common.objects.Stock,
@@ -317,6 +390,14 @@ class Evidence:
             volume_sum_since_market_open=volume_sum_since_market_open,
         ):
             return False
+
+        potential_confirmation_bar.price_movement_statistics = self.price_movement_statistics(
+            potential_confirmation_bar=potential_confirmation_bar,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            one_minute_bars=one_minute_bars,
+        )
+        # if potential_confirmation_bar.price_movement_statistics["pullback_sharpness"] > 0.4:
+        #     return False
 
         if (
             True

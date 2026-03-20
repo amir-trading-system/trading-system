@@ -42,6 +42,7 @@ class BarData:
         index: int = 0,
         is_after_market_open: bool = None,
         ready_to_analyze: bool = False,
+        price_movement_statistics: dict[str, float] = {},
     ):
         self.symbol = symbol
         self.timeframe = timeframe
@@ -70,11 +71,15 @@ class BarData:
             minute=30,
         ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
+        self.price_movement_statistics = price_movement_statistics
 
     @property
     def body_percentage(
         self,
     ) -> float:
+        if self.high - self.low <= 0.0:
+            return 0.0
+
         return (self.close - self.open_value)/(self.high - self.low)
 
     @property
