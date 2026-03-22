@@ -71,13 +71,13 @@ class Analyzer:
                 milestones=milestones,
                 logger=self.logger,
             )
-            indicator_response: common.objects.IndicatorResponse = indicator_obj.indicate(
+            indication_result: bool = indicator_obj.indicate(
                 stock=stock,
                 milestones=milestones,
                 current_bar=current_bar,
                 is_retro=is_retro,
             )
-            if indicator_response.result:
+            if indication_result:
                 self.request_id_to_symbol[stock.request_id] = stock
                 self.logger.info(
                     msg="Bar has Indication, waiting for confirmation",

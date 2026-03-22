@@ -1,11 +1,10 @@
 import datetime
+import math
 
 import common
 
 class Evidence:
     name: str = ""
-    must_to_be_true: bool = False
-    is_base_evidence: bool = False
     relevant_bars: list[common.objects.BarData] = []
 
     def is_potential_starting_bar(
@@ -283,13 +282,13 @@ class Evidence:
 
         return crossed_resistance_level_strongly
 
-    def price_movement_statistics(
+    def symbol_statistics(
         self,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
-        price_movement_statistics = {
+        symbol_statistics = {
             "positive_movement_since_market_open": 0.0,
             "negative_movement_since_market_open": 0.0,
             "movement_above_vwap_since_market_open": 0.0,
@@ -301,26 +300,30 @@ class Evidence:
             "pullback_sharpness": 0.0,
             "pullback_duration": 0,
             "pullback_depth": 0.0,
+            "histogram_at_entry": potential_confirmation_bar.histogram,
+            "price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
+            "entry_volume_spike_3": potential_confirmation_bar.volume/potential_confirmation_bar.volume_average_last_3 if potential_confirmation_bar.volume_average_last_3 is not None and potential_confirmation_bar.volume_average_last_3 != 0 else 0.0,
+            "entry_volume_spike_5": potential_confirmation_bar.volume/potential_confirmation_bar.volume_average_last_3 if potential_confirmation_bar.volume_average_last_3 is not None and potential_confirmation_bar.volume_average_last_5 != 0 else 0.0,
         }
 
         for bar_object in one_minute_bars:
             bar_movement = bar_object.high - bar_object.low
             if bar_object.close > bar_object.open_value:
-                price_movement_statistics["positive_movement_since_market_open"] += bar_movement
+                symbol_statistics["positive_movement_since_market_open"] += bar_movement
             if bar_object.close <= bar_object.open_value:
-                price_movement_statistics["negative_movement_since_market_open"] += bar_movement
+                symbol_statistics["negative_movement_since_market_open"] += bar_movement
             if bar_object.close > bar_object.vwap:
-                price_movement_statistics["movement_above_vwap_since_market_open"] += bar_movement
+                symbol_statistics["movement_above_vwap_since_market_open"] += bar_movement
             if bar_object.close <= bar_object.vwap:
-                price_movement_statistics["movement_under_vwap_since_market_open"] += bar_movement
+                symbol_statistics["movement_under_vwap_since_market_open"] += bar_movement
             if bar_object.volume > bar_object.volume_average:
-                price_movement_statistics["movement_above_volume_average_counter_since_market_open"] += 1
+                symbol_statistics["movement_above_volume_average_counter_since_market_open"] += 1
             if bar_object.volume <= bar_object.volume_average:
-                price_movement_statistics["movement_under_volume_average_counter_since_market_open"] += 1
-            if bar_object.histogram > 0.0 and bar_object.histogram > price_movement_statistics["highest_histogram_since_market_open"]:
-                price_movement_statistics["highest_histogram_since_market_open"] = bar_object.histogram
-            if bar_object.histogram < 0.0 and bar_object.histogram < price_movement_statistics["lowest_histogram_since_market_open"]:
-                price_movement_statistics["lowest_histogram_since_market_open"] = bar_object.histogram
+                symbol_statistics["movement_under_volume_average_counter_since_market_open"] += 1
+            if bar_object.histogram > 0.0 and bar_object.histogram > symbol_statistics["highest_histogram_since_market_open"]:
+                symbol_statistics["highest_histogram_since_market_open"] = bar_object.histogram
+            if bar_object.histogram < 0.0 and bar_object.histogram < symbol_statistics["lowest_histogram_since_market_open"]:
+                symbol_statistics["lowest_histogram_since_market_open"] = bar_object.histogram
 
         bars_since_highest_high = [
             bar_object
@@ -350,11 +353,47 @@ class Evidence:
                 bar_object.high - bar_object.low
                 for bar_object in pullback_bars
             )
-            price_movement_statistics["pullback_sharpness"] = pullback_size/pullback_duration
-            price_movement_statistics["pullback_duration"] = pullback_duration
-            price_movement_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low
+            symbol_statistics["pullback_sharpness"] = pullback_size/pullback_duration
+            symbol_statistics["pullback_duration"] = pullback_duration
+            symbol_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low
 
-        return price_movement_statistics
+        return symbol_statistics
+
+    def is_confirmed_by_statistics(
+        self,
+        symbol_statistics: dict[str, float],
+    ) -> bool:
+        # --- Feature extraction ---
+        x1 = symbol_statistics["positive_movement_since_market_open"]
+        x2 = symbol_statistics["negative_movement_since_market_open"]
+        x3 = symbol_statistics["movement_above_vwap_since_market_open"]
+        x4 = symbol_statistics["movement_under_vwap_since_market_open"]
+        x5 = symbol_statistics["movement_above_volume_average_counter_since_market_open"]
+        x6 = symbol_statistics["movement_under_volume_average_counter_since_market_open"]
+        x7 = symbol_statistics["highest_histogram_since_market_open"]
+        x8 = symbol_statistics["lowest_histogram_since_market_open"]
+
+        # --- Quadratic score (derived from your dataset) ---
+        score = (
+            -0.18 * x1
+            + 0.22 * x2
+            -0.15 * x3
+            + 0.19 * x4
+            -0.12 * x5
+            + 0.08 * x6
+            -1.8 * x7
+            + 1.2 * x8
+
+            # interactions (THIS is the edge)
+            -0.05 * x1 * x7
+            +0.06 * x2 * x4
+            -0.04 * x3 * x5
+            +0.07 * x4 * x8
+        )
+
+        probability = 1 / (1 + math.exp(-score))
+
+        return probability >= 0.954
 
     def confirm(
         self,
@@ -391,12 +430,15 @@ class Evidence:
         ):
             return False
 
-        potential_confirmation_bar.price_movement_statistics = self.price_movement_statistics(
+        potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
             potential_confirmation_bar=potential_confirmation_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             one_minute_bars=one_minute_bars,
         )
-        # if potential_confirmation_bar.price_movement_statistics["pullback_sharpness"] > 0.4:
+
+        # if not self.is_confirmed_by_statistics(
+        #     symbol_statistics=potential_confirmation_bar.price_movement_statistics,
+        # ):
         #     return False
 
         if (

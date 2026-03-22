@@ -32,6 +32,8 @@ class BarData:
         bar_time: datetime.datetime,
         vwap: float = 0.0,
         volume_average: float = 0.0,
+        volume_average_last_3: float = 0.0,
+        volume_average_last_5: float = 0.0,
         ema_9: float = 0.0,
         ema_20: float = 0.0,
         ema_12: float = 0.0,
@@ -53,6 +55,8 @@ class BarData:
         self.low = low
         self.volume = float(volume)
         self.volume_average = volume_average
+        self.volume_average_last_3 = volume_average_last_3
+        self.volume_average_last_5 = volume_average_last_5
         self.vwap = vwap
         self.ema_9 = ema_9
         self.ema_20 = ema_20
@@ -338,9 +342,17 @@ class Stock:
             previous_ema=previous_ema_26,
             current_length=current_length,
         )
-        self.calculate_volume_average(
+        current_bar.volume_average = self.calculate_volume_average(
             current_bar=current_bar,
             period=20,
+        )
+        current_bar.volume_average_last_3 = self.calculate_volume_average(
+            current_bar=current_bar,
+            period=3,
+        )
+        current_bar.volume_average_last_5 = self.calculate_volume_average(
+            current_bar=current_bar,
+            period=5,
         )
         self.calculate_vwap(
             current_bar=current_bar,
@@ -382,17 +394,17 @@ class Stock:
         self,
         current_bar: BarData,
         period: int = 20,
-    ):
+    ) -> float:
         sorted_bars = sorted(
             self.bars,
             key=lambda bar_object: bar_object.bar_time,
             reverse=True,
         )
         volume_sum = current_bar.volume
-        for bar_object in sorted_bars[:19]:
+        for bar_object in sorted_bars[:period-1]:
             volume_sum += bar_object.volume
 
-        current_bar.volume_average = volume_sum/period
+        return volume_sum/period
 
     def calculate_vwap(
         self,
@@ -528,16 +540,3 @@ class Milestones:
         self.are_valid = are_valid
         self.fibonacci_retracement = fibonacci_retracement
         self.retracement_indexes = retracement_indexes
-
-class IndicatorResponse:
-    def __init__(
-        self,
-        success_count: int,
-        success_rate: float,
-        result: bool,
-        failed_base_evidences_count: int,
-    ):
-        self.success_rate = success_rate
-        self.success_count = success_count
-        self.result = result
-        self.failed_base_evidences_count = failed_base_evidences_count

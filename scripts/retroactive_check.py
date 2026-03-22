@@ -90,10 +90,10 @@ def get_symbols() -> list[Symbol]:
             name="BNAI",
             datetime_str="01.23.26T10:24:00",
         ),
-        Symbol(
-            name="MBAI",
-            datetime_str="01.26.26T10:22:00",
-        ),
+        # Symbol(
+        #     name="MBAI",
+        #     datetime_str="01.26.26T10:22:00",
+        # ),
         Symbol(
             name="DRMA",
             datetime_str="01.26.26T12:19:00",
@@ -251,6 +251,10 @@ def write_to_csv(
                 "pullback_sharpness",
                 "pullback_duration",
                 "pullback_depth",
+                "histogram_at_entry",
+                "price_minus_vwap_at_entry",
+                "entry_volume_spike_3",
+                "entry_volume_spike_5",
             ],
         )
         f.flush()
@@ -280,6 +284,10 @@ def write_to_csv(
                 pullback_sharpness = 0.0
                 pullback_duration = 0
                 pullback_depth = 0.0
+                histogram_at_entry = 0.0
+                price_minus_vwap_at_entry = 0.0
+                entry_volume_spike_3 = 0.0
+                entry_volume_spike_5 = 0.0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
@@ -294,6 +302,11 @@ def write_to_csv(
                     pullback_sharpness = price_movement_statistics["pullback_sharpness"]
                     pullback_duration = price_movement_statistics["pullback_duration"]
                     pullback_depth = price_movement_statistics["pullback_depth"]
+                    histogram_at_entry = price_movement_statistics["histogram_at_entry"]
+                    price_minus_vwap_at_entry = price_movement_statistics["price_minus_vwap_at_entry"]
+                    entry_volume_spike_3 = price_movement_statistics["entry_volume_spike_3"]
+                    entry_volume_spike_5 = price_movement_statistics["entry_volume_spike_5"]
+
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
@@ -347,6 +360,10 @@ def write_to_csv(
                             pullback_sharpness,
                             pullback_duration,
                             pullback_depth,
+                            histogram_at_entry,
+                            price_minus_vwap_at_entry,
+                            entry_volume_spike_3,
+                            entry_volume_spike_5,
                         ]
                     )
                     f.flush()
@@ -505,6 +522,13 @@ def run_retroactive_check():
     symbols_data = []
     symbols = get_symbols()
     output_file_name = "positive_results.csv"
+
+    symbols = [
+        Symbol(
+            name="EPSM",
+            datetime_str="11.20.25T11:06:00",
+        ),
+    ]
 
     # symbols = explore_past_potential_symbols()
     # symbols = [
