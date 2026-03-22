@@ -34,6 +34,7 @@ class BarData:
         volume_average: float = 0.0,
         volume_average_last_3: float = 0.0,
         volume_average_last_5: float = 0.0,
+        volume_average_last_10: float = 0.0,
         ema_9: float = 0.0,
         ema_20: float = 0.0,
         ema_12: float = 0.0,
@@ -57,6 +58,7 @@ class BarData:
         self.volume_average = volume_average
         self.volume_average_last_3 = volume_average_last_3
         self.volume_average_last_5 = volume_average_last_5
+        self.volume_average_last_10 = volume_average_last_10
         self.vwap = vwap
         self.ema_9 = ema_9
         self.ema_20 = ema_20
@@ -91,6 +93,15 @@ class BarData:
         self,
     ) -> float:
         return (self.close - self.open_value)/self.open_value
+
+    @property
+    def bar_wick(
+        self,
+    ) -> float:
+        if self.high - self.low <= 0.0:
+            return 0.0
+
+        return (self.high - self.close)/(self.high - self.low)
 
     def has_strong_rejection(
         self,
@@ -130,6 +141,7 @@ class Stock:
         finished_analyze: bool = False,
         resistance_levels: list[BarData] = [],
         last_post_pre_one_minute_highest_high: float = 0.0,
+        pre_market_one_minute_highest_high_bar: BarData = None,
         post_pre_market_volume_sum: float = 0.0,
         last_lowest_low_bar: BarData = None,
         one_minute_request_id: int = None,
@@ -149,6 +161,7 @@ class Stock:
         self.finished_analyze = finished_analyze
         self.resistance_levels = resistance_levels
         self.last_post_pre_one_minute_highest_high = last_post_pre_one_minute_highest_high
+        self.pre_market_one_minute_highest_high_bar = pre_market_one_minute_highest_high_bar
         self.post_pre_market_volume_sum = post_pre_market_volume_sum
         self.volume_sum_since_4_am_today = volume_sum_since_4_am_today
         self.last_lowest_low_bar = last_lowest_low_bar
@@ -353,6 +366,10 @@ class Stock:
         current_bar.volume_average_last_5 = self.calculate_volume_average(
             current_bar=current_bar,
             period=5,
+        )
+        current_bar.volume_average_last_10 = self.calculate_volume_average(
+            current_bar=current_bar,
+            period=10,
         )
         self.calculate_vwap(
             current_bar=current_bar,

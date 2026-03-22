@@ -1,9 +1,9 @@
 import common
-from . import _evidence
+from . import evidence
 
 
 class Evidence(
-    _evidence.Evidence,
+    evidence.Evidence,
 ):
     name = "current_day_is_after_healthy_retracement"
 

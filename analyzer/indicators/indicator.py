@@ -12,7 +12,7 @@ class Indicator:
         logger: logging.Logger,
     ):
         self.logger = logger
-        self.evidence: type[analyzer.evidences._evidence.Evidence]
+        self.evidence: type[analyzer.evidences.evidence.Evidence]
         self.can_be_confirm_by_itself = False
         self.milestones = milestones
 
@@ -23,7 +23,7 @@ class Indicator:
         current_bar: common.objects.BarData,
         is_retro: bool,
     ) -> bool:
-        evidence_object: analyzer.evidences._evidence.Evidence = self.evidence()
+        evidence_object: analyzer.evidences.evidence.Evidence = self.evidence()
         if not evidence_object.pre_process(
             stock=stock,
             current_bar=current_bar,

@@ -1,5 +1,4 @@
 import datetime
-import math
 
 import common
 
@@ -284,10 +283,20 @@ class Evidence:
 
     def symbol_statistics(
         self,
+        stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
+        number_of_green_bars_last_5 = 0
+        number_of_red_bars_last_5 = 0
+        for bar_object in one_minute_bars[1:6]:
+            if bar_object.close > bar_object.open_value:
+                number_of_green_bars_last_5 += 1
+            else:
+                number_of_red_bars_last_5 += 1
+
         symbol_statistics = {
             "positive_movement_since_market_open": 0.0,
             "negative_movement_since_market_open": 0.0,
@@ -304,6 +313,22 @@ class Evidence:
             "price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
             "entry_volume_spike_3": potential_confirmation_bar.volume/potential_confirmation_bar.volume_average_last_3 if potential_confirmation_bar.volume_average_last_3 is not None and potential_confirmation_bar.volume_average_last_3 != 0 else 0.0,
             "entry_volume_spike_5": potential_confirmation_bar.volume/potential_confirmation_bar.volume_average_last_3 if potential_confirmation_bar.volume_average_last_3 is not None and potential_confirmation_bar.volume_average_last_5 != 0 else 0.0,
+            "minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30,
+            "distance_from_recent_high": (highest_high_one_minute_bar.high - potential_confirmation_bar.open_value) / highest_high_one_minute_bar.high,
+            "distance_from_high_of_day": (original_bar_to_confirm.high - potential_confirmation_bar.close) / original_bar_to_confirm.high,
+            "volume_trend": potential_confirmation_bar.volume_average_last_3/potential_confirmation_bar.volume_average_last_10,
+            "number_of_negative_bars": 0,
+            "broke_high_of_day_at_entry": potential_confirmation_bar.close >= highest_high_one_minute_bar.high,
+            "vwap_slope_3": (potential_confirmation_bar.vwap - one_minute_bars[3].vwap) / one_minute_bars[3].vwap,
+            "vwap_slope_5": (potential_confirmation_bar.vwap - one_minute_bars[5].vwap) / one_minute_bars[5].vwap,
+            "ema9_minus_vwap_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.vwap,
+            "ema9_minus_ema20_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.ema_20,
+            "number_of_green_bars_last_5": number_of_green_bars_last_5,
+            "number_of_red_bars_last_5": number_of_red_bars_last_5,
+            "distance_from_premarket_high": ((potential_confirmation_bar.bar_time.hour - stock.pre_market_one_minute_highest_high_bar.bar_time.hour) * 60) + potential_confirmation_bar.bar_time.minute - stock.pre_market_one_minute_highest_high_bar.bar_time.minute if stock.pre_market_one_minute_highest_high_bar is not None else 0.0,
+            "entry_bar_range_pct": (potential_confirmation_bar.high - potential_confirmation_bar.low)/ potential_confirmation_bar.close,
+            "entry_bar_body_pct": potential_confirmation_bar.body_percentage,
+            "upper_wick_pct_at_entry": potential_confirmation_bar.bar_wick,
         }
 
         for bar_object in one_minute_bars:
@@ -348,6 +373,14 @@ class Evidence:
                 if highest_high_one_minute_bar.bar_time < bar_object.bar_time <= lowest_low_bar.bar_time
             ]
 
+            number_of_negative_bars = len(
+                [
+                    bar_object
+                    for bar_object in pullback_bars
+                    if bar_object.close < bar_object.open_value
+                ]
+            )
+
             pullback_duration = len(pullback_bars)
             pullback_size = sum(
                 bar_object.high - bar_object.low
@@ -356,44 +389,49 @@ class Evidence:
             symbol_statistics["pullback_sharpness"] = pullback_size/pullback_duration
             symbol_statistics["pullback_duration"] = pullback_duration
             symbol_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low
+            symbol_statistics["number_of_negative_bars"] = number_of_negative_bars
 
         return symbol_statistics
 
-    def is_confirmed_by_statistics(
+    def compute_probability(
+        self,
+        symbol_statistics,
+        older_positive_scores,
+    ) -> float:
+        score = self.compute_score(
+            symbol_statistics=symbol_statistics,
+        )
+        better_than = sum(
+            score >= s for s in older_positive_scores
+        )
+        probability = better_than/len(older_positive_scores)
+
+        return probability * 100
+
+    def compute_score(
         self,
         symbol_statistics: dict[str, float],
-    ) -> bool:
-        # --- Feature extraction ---
-        x1 = symbol_statistics["positive_movement_since_market_open"]
-        x2 = symbol_statistics["negative_movement_since_market_open"]
-        x3 = symbol_statistics["movement_above_vwap_since_market_open"]
-        x4 = symbol_statistics["movement_under_vwap_since_market_open"]
-        x5 = symbol_statistics["movement_above_volume_average_counter_since_market_open"]
-        x6 = symbol_statistics["movement_under_volume_average_counter_since_market_open"]
-        x7 = symbol_statistics["highest_histogram_since_market_open"]
-        x8 = symbol_statistics["lowest_histogram_since_market_open"]
+    ) -> float:
+        ## converting each to float for retro check
+        return (
+            + 0.4 * float(symbol_statistics["negative_movement_since_market_open"])
+            + 0.6 * float(symbol_statistics["movement_under_vwap_since_market_open"])
+            + 0.5 * float(symbol_statistics["movement_under_volume_average_counter_since_market_open"])
 
-        # --- Quadratic score (derived from your dataset) ---
-        score = (
-            -0.18 * x1
-            + 0.22 * x2
-            -0.15 * x3
-            + 0.19 * x4
-            -0.12 * x5
-            + 0.08 * x6
-            -1.8 * x7
-            + 1.2 * x8
+            - 0.5 * float(symbol_statistics["positive_movement_since_market_open"])
+            - 0.4 * float(symbol_statistics["movement_above_vwap_since_market_open"])
+            - 0.3 * float(symbol_statistics["movement_above_volume_average_counter_since_market_open"])
 
-            # interactions (THIS is the edge)
-            -0.05 * x1 * x7
-            +0.06 * x2 * x4
-            -0.04 * x3 * x5
-            +0.07 * x4 * x8
+            - 2.0 * float(symbol_statistics["highest_histogram_since_market_open"])
+            + 1.5 * float(symbol_statistics["lowest_histogram_since_market_open"])
+
+            + 0.8 * float(symbol_statistics["pullback_depth"])
+            - 1.2 * float(symbol_statistics["pullback_sharpness"])
+            + 0.3 * float(symbol_statistics["pullback_duration"])
+
+            + 1.0 * float(symbol_statistics["entry_volume_spike_3"])
+            + 0.8 * float(symbol_statistics["entry_volume_spike_5"])
         )
-
-        probability = 1 / (1 + math.exp(-score))
-
-        return probability >= 0.954
 
     def confirm(
         self,
@@ -431,15 +469,12 @@ class Evidence:
             return False
 
         potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
+            stock=stock,
+            original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             one_minute_bars=one_minute_bars,
         )
-
-        # if not self.is_confirmed_by_statistics(
-        #     symbol_statistics=potential_confirmation_bar.price_movement_statistics,
-        # ):
-        #     return False
 
         if (
             True
