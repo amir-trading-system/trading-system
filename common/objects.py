@@ -78,6 +78,13 @@ class BarData:
         ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
         self.price_movement_statistics = price_movement_statistics
+        self.is_opening_bar = bar_time == datetime.datetime(
+            year=bar_time.year,
+            month=bar_time.month,
+            day=bar_time.day,
+            hour=9,
+            minute=30,
+        )
 
     @property
     def body_percentage(
@@ -95,7 +102,7 @@ class BarData:
         return (self.close - self.open_value)/self.open_value
 
     @property
-    def bar_wick(
+    def bar_wick_percentage(
         self,
     ) -> float:
         if self.high - self.low <= 0.0:

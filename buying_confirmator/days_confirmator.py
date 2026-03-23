@@ -35,7 +35,6 @@ class Confirmator:
         potential_confirmation_bar: common.objects.BarData,
         original_bar_to_confirm: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
-        lowest_low_one_minute_bar: common.objects.BarData,
         already_sent_buy_order_for_stock: dict[str,bool],
     ) -> bool:
         bar_has_confirmed: bool = False
@@ -152,7 +151,6 @@ class Confirmator:
                 potential_confirmation_bar=potential_confirmation_bar,
                 milestones=milestones,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
-                lowest_low_one_minute_bar=lowest_low_one_minute_bar,
                 one_minute_bars=temp_one_minute_bars,
                 volume_sum_since_market_open=volume_sum_since_market_open,
             ):
@@ -372,7 +370,6 @@ class Confirmator:
                 potential_confirmation_bar=potential_confirmation_bar,
                 original_bar_to_confirm=original_bar_to_confirm,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
-                lowest_low_one_minute_bar=lowest_low_one_minute_bar,
                 already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
             ):
                 break
