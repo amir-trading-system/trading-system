@@ -35,6 +35,7 @@ class Confirmator:
         potential_confirmation_bar: common.objects.BarData,
         original_bar_to_confirm: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
+        lowest_low_one_minute_bar: common.objects.BarData,
         already_sent_buy_order_for_stock: dict[str,bool],
     ) -> bool:
         bar_has_confirmed: bool = False
@@ -151,6 +152,7 @@ class Confirmator:
                 potential_confirmation_bar=potential_confirmation_bar,
                 milestones=milestones,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
+                lowest_low_one_minute_bar=lowest_low_one_minute_bar,
                 one_minute_bars=temp_one_minute_bars,
                 volume_sum_since_market_open=volume_sum_since_market_open,
             ):
@@ -251,6 +253,7 @@ class Confirmator:
     ):
         one_minute_bars: list[common.objects.BarData] = []
         highest_high_one_minute_bar: common.objects.BarData = None
+        lowest_low_one_minute_bar: common.objects.BarData = None
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
         already_sent_buy_order_for_stock: dict[str,bool] = {}
         stock.bars = sorted(
@@ -275,9 +278,25 @@ class Confirmator:
             ):
                 highest_high_one_minute_bar = potential_confirmation_bar
 
+            if (
+                True
+                and potential_confirmation_bar is not None
+                and lowest_low_one_minute_bar is not None
+                and potential_confirmation_bar.low < lowest_low_one_minute_bar.low
+                and potential_confirmation_bar.bar_time >= datetime.datetime(
+                    year=original_bar_to_confirm.bar_time.year,
+                    month=original_bar_to_confirm.bar_time.month,
+                    day=original_bar_to_confirm.bar_time.day,
+                    hour=4,
+                )
+            ):
+                lowest_low_one_minute_bar = potential_confirmation_bar
+
             potential_confirmation_bar = stock.one_minute_bars_queue.get()
             if highest_high_one_minute_bar is None:
                 highest_high_one_minute_bar = potential_confirmation_bar
+            if lowest_low_one_minute_bar is None:
+                lowest_low_one_minute_bar = potential_confirmation_bar
 
             self.logger.info(
                 msg="Got potential bar for confirmation",
@@ -344,6 +363,7 @@ class Confirmator:
                 minute=30,
             ):
                 highest_high_one_minute_bar = potential_confirmation_bar
+                lowest_low_one_minute_bar = potential_confirmation_bar
 
             if self._confirm(
                 stock=stock,
@@ -352,6 +372,7 @@ class Confirmator:
                 potential_confirmation_bar=potential_confirmation_bar,
                 original_bar_to_confirm=original_bar_to_confirm,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
+                lowest_low_one_minute_bar=lowest_low_one_minute_bar,
                 already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
             ):
                 break

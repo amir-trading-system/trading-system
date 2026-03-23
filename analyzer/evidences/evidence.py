@@ -1,4 +1,8 @@
 import datetime
+from statistics import mean
+
+from bisect import bisect_right
+import numpy
 
 import common
 
@@ -284,9 +288,11 @@ class Evidence:
     def symbol_statistics(
         self,
         stock: common.objects.Stock,
+        one_minute_timeframe_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
+        lowest_low_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
         number_of_green_bars_last_5 = 0
@@ -296,6 +302,9 @@ class Evidence:
                 number_of_green_bars_last_5 += 1
             else:
                 number_of_red_bars_last_5 += 1
+
+        third_bar = one_minute_timeframe_stock.bars[potential_confirmation_bar.index+3]
+        fifth_bar = one_minute_timeframe_stock.bars[potential_confirmation_bar.index+5]
 
         symbol_statistics = {
             "positive_movement_since_market_open": 0.0,
@@ -318,17 +327,38 @@ class Evidence:
             "distance_from_high_of_day": (original_bar_to_confirm.high - potential_confirmation_bar.close) / original_bar_to_confirm.high,
             "volume_trend": potential_confirmation_bar.volume_average_last_3/potential_confirmation_bar.volume_average_last_10,
             "number_of_negative_bars": 0,
-            "broke_high_of_day_at_entry": potential_confirmation_bar.close >= highest_high_one_minute_bar.high,
-            "vwap_slope_3": (potential_confirmation_bar.vwap - one_minute_bars[3].vwap) / one_minute_bars[3].vwap,
-            "vwap_slope_5": (potential_confirmation_bar.vwap - one_minute_bars[5].vwap) / one_minute_bars[5].vwap,
+            "broke_high_of_day_at_entry": 1 if potential_confirmation_bar.close >= highest_high_one_minute_bar.high else 0,
+            "vwap_slope_3": (potential_confirmation_bar.vwap - third_bar.vwap) / third_bar.vwap,
+            "vwap_slope_5": (potential_confirmation_bar.vwap - fifth_bar.vwap) / fifth_bar.vwap,
             "ema9_minus_vwap_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.vwap,
             "ema9_minus_ema20_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.ema_20,
             "number_of_green_bars_last_5": number_of_green_bars_last_5,
             "number_of_red_bars_last_5": number_of_red_bars_last_5,
-            "distance_from_premarket_high": ((potential_confirmation_bar.bar_time.hour - stock.pre_market_one_minute_highest_high_bar.bar_time.hour) * 60) + potential_confirmation_bar.bar_time.minute - stock.pre_market_one_minute_highest_high_bar.bar_time.minute if stock.pre_market_one_minute_highest_high_bar is not None else 0.0,
+            "distance_from_premarket_high": stock.pre_market_one_minute_highest_high_bar.index - potential_confirmation_bar.index if stock.pre_market_one_minute_highest_high_bar is not None else 0.0,
             "entry_bar_range_pct": (potential_confirmation_bar.high - potential_confirmation_bar.low)/ potential_confirmation_bar.close,
             "entry_bar_body_pct": potential_confirmation_bar.body_percentage,
             "upper_wick_pct_at_entry": potential_confirmation_bar.bar_wick,
+            "volume_acceleration": potential_confirmation_bar.volume_average_last_3/potential_confirmation_bar.volume_average_last_10,
+            "extension_vs_pullback": 0,
+            "move_efficiency": 0,
+            "pullback_to_trend_ratio": 0,
+            "trend_cleanliness": 0,
+            "pullback_structure_score": 0,
+            "volume_confirmation_ratio": 0,
+            "volume_trend_strength": 0,
+            "volume_during_pullback": 0,
+            "relative_position_in_range": 0,
+            "distance_from_vwap_normalized": 0,
+            "hod_proximity_score": 0,
+            "momentum_alignment_score": 0,
+            "momentum_strength": 0,
+            "entry_conviction_score": 0,
+            "entry_efficiency": 0,
+            "failed_breakout_risk": 0,
+            "late_move_indicator": 0,
+            "early_vs_late_flag": 0,
+            "volatility_regime": 0,
+            "average_range_last_5": 0,
         }
 
         for bar_object in one_minute_bars:
@@ -357,11 +387,11 @@ class Evidence:
         ]
 
         if bars_since_highest_high:
+            lowest_low_bar = None
             lowest_low_since_highest_high = min(
                 bar_object.low
                 for bar_object in bars_since_highest_high
             )
-            lowest_low_bar = None
 
             for bar_object in bars_since_highest_high:
                 if bar_object.low == lowest_low_since_highest_high:
@@ -386,10 +416,39 @@ class Evidence:
                 bar_object.high - bar_object.low
                 for bar_object in pullback_bars
             )
+            volume_during_pullback = sum(
+                bar_object.volume
+                for bar_object in pullback_bars
+            )
+
             symbol_statistics["pullback_sharpness"] = pullback_size/pullback_duration
             symbol_statistics["pullback_duration"] = pullback_duration
-            symbol_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low
+            symbol_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low if lowest_low_bar is not None else 0.0
             symbol_statistics["number_of_negative_bars"] = number_of_negative_bars
+            symbol_statistics["extension_vs_pullback"] = symbol_statistics["price_minus_vwap_at_entry"]/symbol_statistics["pullback_depth"] if symbol_statistics["pullback_depth"] > 0 else 0.0
+            symbol_statistics["move_efficiency"] = symbol_statistics["positive_movement_since_market_open"]/symbol_statistics["minutes_since_market_open"] if symbol_statistics["minutes_since_market_open"] > 0 else 0
+            symbol_statistics["pullback_to_trend_ratio"] = symbol_statistics["pullback_depth"]/symbol_statistics["positive_movement_since_market_open"] if symbol_statistics["positive_movement_since_market_open"] > 0 else 0
+            symbol_statistics["trend_cleanliness"] = number_of_green_bars_last_5/(number_of_green_bars_last_5 + number_of_red_bars_last_5) if (number_of_green_bars_last_5 + number_of_red_bars_last_5) > 0 else 0
+            symbol_statistics["pullback_structure_score"] = symbol_statistics["pullback_duration"]/symbol_statistics["number_of_negative_bars"] if symbol_statistics["number_of_negative_bars"] > 0 else 0.0
+            symbol_statistics["volume_confirmation_ratio"] = symbol_statistics["entry_volume_spike_3"]/stock.volume_sum_since_4_am_today if stock.volume_sum_since_4_am_today > 0 else 0.0
+            symbol_statistics["volume_trend_strength"] = symbol_statistics["volume_acceleration"]*symbol_statistics["volume_trend"]
+            symbol_statistics["volume_during_pullback"] = volume_during_pullback
+            symbol_statistics["relative_position_in_range"] = (potential_confirmation_bar.close - lowest_low_one_minute_bar.low)/(highest_high_one_minute_bar.high - lowest_low_one_minute_bar.low) if (highest_high_one_minute_bar.high - lowest_low_one_minute_bar.low) > 0 else 0.0
+            symbol_statistics["distance_from_vwap_normalized"] = symbol_statistics["price_minus_vwap_at_entry"]/symbol_statistics["entry_bar_range_pct"] if symbol_statistics["entry_bar_range_pct"] > 0 else 0.0
+            symbol_statistics["hod_proximity_score"] = symbol_statistics["distance_from_high_of_day"]/symbol_statistics["pullback_depth"] if symbol_statistics["pullback_depth"] > 0 else 0.0
+            symbol_statistics["momentum_alignment_score"] = numpy.sign(symbol_statistics["histogram_at_entry"]) * numpy.sign(symbol_statistics["vwap_slope_5"]) * numpy.sign(symbol_statistics["ema9_minus_ema20_at_entry"])
+            symbol_statistics["momentum_strength"] = abs(symbol_statistics["histogram_at_entry"]) * abs(symbol_statistics["vwap_slope_5"])
+            symbol_statistics["entry_conviction_score"] = symbol_statistics["entry_bar_body_pct"] * (1 - symbol_statistics["upper_wick_pct_at_entry"])
+            symbol_statistics["entry_efficiency"] = symbol_statistics["entry_bar_body_pct"] / symbol_statistics["entry_bar_range_pct"] if symbol_statistics["entry_bar_range_pct"] > 0 else 0.0
+            symbol_statistics["failed_breakout_risk"] = symbol_statistics["number_of_negative_bars"] * symbol_statistics["distance_from_high_of_day"]
+            symbol_statistics["late_move_indicator"] = symbol_statistics["minutes_since_market_open"] * symbol_statistics["distance_from_premarket_high"]
+            symbol_statistics["early_vs_late_flag"] = 0 if symbol_statistics["minutes_since_market_open"] < 10 else 1
+            symbol_statistics["average_range_last_5"] = mean(
+                bar_object.high - bar_object.low
+                for bar_object in one_minute_timeframe_stock.bars[1:6]
+            )
+            symbol_statistics["volatility_regime"] = symbol_statistics["entry_bar_range_pct"]/symbol_statistics["average_range_last_5"] if symbol_statistics["average_range_last_5"] > 0 else 0.0
+
 
         return symbol_statistics
 
@@ -401,37 +460,167 @@ class Evidence:
         score = self.compute_score(
             symbol_statistics=symbol_statistics,
         )
-        better_than = sum(
-            score >= s for s in older_positive_scores
-        )
-        probability = better_than/len(older_positive_scores)
+        idx = bisect_right(older_positive_scores, score)
+        return round(100.0 * (idx + 1) / (len(older_positive_scores) + 1), 2)
 
-        return probability * 100
+    def clamp(
+        self,
+        value: float,
+        low: float,
+        high: float,
+    ) -> float:
+        return max(low, min(high, value))
 
     def compute_score(
         self,
         symbol_statistics: dict[str, float],
     ) -> float:
-        ## converting each to float for retro check
-        return (
-            + 0.4 * float(symbol_statistics["negative_movement_since_market_open"])
-            + 0.6 * float(symbol_statistics["movement_under_vwap_since_market_open"])
-            + 0.5 * float(symbol_statistics["movement_under_volume_average_counter_since_market_open"])
+        score = 50.0
 
-            - 0.5 * float(symbol_statistics["positive_movement_since_market_open"])
-            - 0.4 * float(symbol_statistics["movement_above_vwap_since_market_open"])
-            - 0.3 * float(symbol_statistics["movement_above_volume_average_counter_since_market_open"])
+        vwap_slope_5 = float(symbol_statistics["vwap_slope_5"])
+        volume_acceleration = float(symbol_statistics["volume_acceleration"])
+        lowest_hist = float(symbol_statistics["lowest_histogram_since_market_open"])
+        highest_hist = float(symbol_statistics["highest_histogram_since_market_open"])
+        price_minus_vwap = float(symbol_statistics["price_minus_vwap_at_entry"])
+        distance_from_vwap_normalized = float(symbol_statistics["distance_from_vwap_normalized"])
+        pullback_depth = float(symbol_statistics["pullback_depth"])
+        pullback_sharpness = float(symbol_statistics["pullback_sharpness"])
+        minutes_since_open = float(symbol_statistics["minutes_since_market_open"])
+        ema9_minus_ema20 = float(symbol_statistics["ema9_minus_ema20_at_entry"])
+        distance_from_hod = float(symbol_statistics["distance_from_high_of_day"])
+        momentum_strength = float(symbol_statistics["momentum_strength"])
+        move_efficiency = float(symbol_statistics["move_efficiency"])
+        volume_confirmation_ratio = float(symbol_statistics["volume_confirmation_ratio"])
+        extension_vs_pullback = float(symbol_statistics["extension_vs_pullback"])
 
-            - 2.0 * float(symbol_statistics["highest_histogram_since_market_open"])
-            + 1.5 * float(symbol_statistics["lowest_histogram_since_market_open"])
+        # lower-priority modifiers
+        upper_wick = float(symbol_statistics["upper_wick_pct_at_entry"])
+        volume_trend = float(symbol_statistics["volume_trend"])
+        entry_volume_spike_3 = float(symbol_statistics["entry_volume_spike_3"])
+        entry_conviction_score = float(symbol_statistics["entry_conviction_score"])
 
-            + 0.8 * float(symbol_statistics["pullback_depth"])
-            - 1.2 * float(symbol_statistics["pullback_sharpness"])
-            + 0.3 * float(symbol_statistics["pullback_duration"])
+        # -----------------------------------------
+        # Minimal hard rejects only
+        # -----------------------------------------
+        if vwap_slope_5 <= 0:
+            return 5.0
 
-            + 1.0 * float(symbol_statistics["entry_volume_spike_3"])
-            + 0.8 * float(symbol_statistics["entry_volume_spike_5"])
-        )
+        score -= 25.0 * self.clamp((pullback_sharpness - 0.20), 0.0, 1.0)
+
+        # -----------------------------------------
+        # Trend quality
+        # -----------------------------------------
+        score += 250.0 * self.clamp(vwap_slope_5, 0.0, 0.05)
+
+        # -----------------------------------------
+        # Earlier session damage / overheating
+        # These are penalties now, not hard rejects
+        # -----------------------------------------
+        score -= 18.0 * self.clamp((-lowest_hist - 0.03), 0.0, 1.0)
+        score -= 16.0 * self.clamp((highest_hist - 0.06), 0.0, 1.0)
+
+        # -----------------------------------------
+        # Extension penalties
+        # -----------------------------------------
+        score -= 12.0 * self.clamp((price_minus_vwap - 0.5), 0.0, 1.0)
+        score -= 3.5 * self.clamp(distance_from_vwap_normalized - 7.5, 0.0, 10.0)
+        score -= 18.0 * self.clamp((ema9_minus_ema20 - 0.12), 0.0, 0.50)
+
+        # -----------------------------------------
+        # Pullback quality
+        # -----------------------------------------
+        score -= 14.0 * self.clamp((pullback_depth - 0.30), 0.0, 0.70)
+        score -= 20.0 * self.clamp((pullback_sharpness - 0.14), 0.0, 0.50)
+
+        # slight bonus for healthy pullback zone
+        if 0.15 <= pullback_depth <= 0.38:
+            score += 5.0
+
+        if 0.2 < pullback_depth < 0.4 and pullback_sharpness < 0.18:
+            score += 3.0
+
+        score -= 8.0 * self.clamp((0.015 - highest_hist), 0.0, 0.02)
+
+        if momentum_strength > 8.0:
+            score -= 12.0
+
+        score -= 10.0 * self.clamp((0.02 - move_efficiency), 0.0, 0.02)
+
+        score -= 6.0 * self.clamp((0.2 - volume_confirmation_ratio), 0.0, 0.2)
+
+        if momentum_strength > 8.0 and extension_vs_pullback > 1.8:
+            score -= 7.0
+
+        if (
+            highest_hist < 0.015
+            and move_efficiency < 0.02
+        ):
+            score -= 12.0
+
+        # -----------------------------------------
+        # Time-of-day
+        # penalty, not hard reject
+        # -----------------------------------------
+        if minutes_since_open <= 120:
+            score += 5.0
+        elif minutes_since_open <= 180:
+            score += 2.0
+        elif minutes_since_open <= 200:
+            score -= 5.0
+        elif minutes_since_open <= 260:
+            score -= 10.0
+        else:
+            score -= 15.0
+
+        if (
+            distance_from_vwap_normalized > 9.0
+            and ema9_minus_ema20 > 0.15
+        ):
+            score -= 12.0
+
+        # -----------------------------------------
+        # Distance from HOD
+        # -----------------------------------------
+        if distance_from_hod < 0.05:
+            score -= 6.0
+        elif distance_from_hod <= 0.35:
+            score += 4.0
+        elif distance_from_hod <= 0.60:
+            score += 1.0
+        else:
+            score -= 2.0
+
+        # -----------------------------------------
+        # Minor modifiers
+        # -----------------------------------------
+        score += 2.0 * self.clamp(volume_acceleration - 1.1, -0.5, 1.5)
+        score += 1.5 * self.clamp(volume_trend - 1.0, -0.5, 1.0)
+        score += 1.0 * self.clamp(entry_volume_spike_3 - 1.0, -0.5, 2.0)
+
+        score -= 3.0 * self.clamp(upper_wick - 0.20, 0.0, 0.50)
+        score += 2.0 * self.clamp(entry_conviction_score - 0.55, -0.5, 0.5)
+
+        # -----------------------------------------
+        # Interaction effects
+        # -----------------------------------------
+        if price_minus_vwap > 0.80 and pullback_depth > 0.40:
+            score -= 6.0
+
+        if highest_hist > 0.10 and pullback_sharpness > 0.20:
+            score -= 6.0
+
+        if minutes_since_open > 180 and distance_from_vwap_normalized > 9.0:
+            score -= 5.0
+
+        if (
+            lowest_hist > -0.03
+            and highest_hist < 0.08
+            and pullback_depth < 0.35
+            and pullback_sharpness < 0.18
+        ):
+            score += 6.0
+
+        return max(0.0, min(score, 100.0))
 
     def confirm(
         self,
@@ -441,6 +630,7 @@ class Evidence:
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
         highest_high_one_minute_bar: common.objects.BarData,
+        lowest_low_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
     ) -> bool:
@@ -470,9 +660,11 @@ class Evidence:
 
         potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
             stock=stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
             original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
+            lowest_low_one_minute_bar=lowest_low_one_minute_bar,
             one_minute_bars=one_minute_bars,
         )
 

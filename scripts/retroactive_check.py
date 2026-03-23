@@ -9,6 +9,7 @@ import queue
 import tqdm
 
 import analyzer
+import analyzer.evidences
 import buying_confirmator
 import common
 import collector
@@ -90,10 +91,10 @@ def get_symbols() -> list[Symbol]:
             name="BNAI",
             datetime_str="01.23.26T10:24:00",
         ),
-        # Symbol(
-        #     name="MBAI",
-        #     datetime_str="01.26.26T10:22:00",
-        # ),
+        Symbol(
+            name="MBAI",
+            datetime_str="01.26.26T10:22:00",
+        ),
         Symbol(
             name="DRMA",
             datetime_str="01.26.26T12:19:00",
@@ -255,6 +256,43 @@ def write_to_csv(
                 "price_minus_vwap_at_entry",
                 "entry_volume_spike_3",
                 "entry_volume_spike_5",
+                "minutes_since_market_open",
+                "distance_from_recent_high",
+                "distance_from_high_of_day",
+                "volume_trend",
+                "number_of_negative_bars",
+                "broke_high_of_day_at_entry",
+                "vwap_slope_3",
+                "vwap_slope_5",
+                "ema9_minus_vwap_at_entry",
+                "ema9_minus_ema20_at_entry",
+                "number_of_green_bars_last_5",
+                "number_of_red_bars_last_5",
+                "distance_from_premarket_high",
+                "entry_bar_range_pct",
+                "entry_bar_body_pct",
+                "upper_wick_pct_at_entry",
+                "volume_acceleration",
+                "extension_vs_pullback",
+                "move_efficiency",
+                "pullback_to_trend_ratio",
+                "trend_cleanliness",
+                "pullback_structure_score",
+                "volume_confirmation_ratio",
+                "volume_trend_strength",
+                "volume_during_pullback",
+                "relative_position_in_range",
+                "distance_from_vwap_normalized",
+                "hod_proximity_score",
+                "momentum_alignment_score",
+                "momentum_strength",
+                "entry_conviction_score",
+                "entry_efficiency",
+                "failed_breakout_risk",
+                "late_move_indicator",
+                "early_vs_late_flag",
+                "volatility_regime",
+                "average_range_last_5",
             ],
         )
         f.flush()
@@ -288,6 +326,43 @@ def write_to_csv(
                 price_minus_vwap_at_entry = 0.0
                 entry_volume_spike_3 = 0.0
                 entry_volume_spike_5 = 0.0
+                minutes_since_market_open = 0
+                distance_from_recent_high = 0.0
+                distance_from_high_of_day = 0.0
+                volume_trend = 0.0
+                number_of_negative_bars = 0
+                broke_high_of_day_at_entry = False
+                vwap_slope_3 = 0.0
+                vwap_slope_5 = 0.0
+                ema9_minus_vwap_at_entry = 0.0
+                ema9_minus_ema20_at_entry = 0.0
+                number_of_green_bars_last_5 = 0.0
+                number_of_red_bars_last_5 = 0.0
+                distance_from_premarket_high = 0.0
+                entry_bar_range_pct = 0.0
+                entry_bar_body_pct = 0.0
+                upper_wick_pct_at_entry = 0.0
+                volume_acceleration = 0.0
+                extension_vs_pullback = 0
+                move_efficiency = 0
+                pullback_to_trend_ratio = 0
+                trend_cleanliness = 0
+                pullback_structure_score = 0
+                volume_confirmation_ratio = 0
+                volume_trend_strength = 0
+                volume_during_pullback = 0
+                relative_position_in_range = 0
+                distance_from_vwap_normalized = 0
+                hod_proximity_score = 0
+                momentum_alignment_score = 0
+                momentum_strength = 0
+                entry_conviction_score = 0
+                entry_efficiency = 0
+                failed_breakout_risk = 0
+                late_move_indicator = 0
+                early_vs_late_flag = False
+                volatility_regime = 0
+                average_range_last_5 = 0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
@@ -306,7 +381,43 @@ def write_to_csv(
                     price_minus_vwap_at_entry = price_movement_statistics["price_minus_vwap_at_entry"]
                     entry_volume_spike_3 = price_movement_statistics["entry_volume_spike_3"]
                     entry_volume_spike_5 = price_movement_statistics["entry_volume_spike_5"]
-
+                    minutes_since_market_open = price_movement_statistics["minutes_since_market_open"]
+                    distance_from_recent_high = price_movement_statistics["distance_from_recent_high"]
+                    distance_from_high_of_day = price_movement_statistics["distance_from_high_of_day"]
+                    volume_trend = price_movement_statistics["volume_trend"]
+                    number_of_negative_bars = price_movement_statistics["number_of_negative_bars"]
+                    broke_high_of_day_at_entry = price_movement_statistics["broke_high_of_day_at_entry"]
+                    vwap_slope_3 = price_movement_statistics["vwap_slope_3"]
+                    vwap_slope_5 = price_movement_statistics["vwap_slope_5"]
+                    ema9_minus_vwap_at_entry = price_movement_statistics["ema9_minus_vwap_at_entry"]
+                    ema9_minus_ema20_at_entry = price_movement_statistics["ema9_minus_ema20_at_entry"]
+                    number_of_green_bars_last_5 = price_movement_statistics["number_of_green_bars_last_5"]
+                    number_of_red_bars_last_5 = price_movement_statistics["number_of_red_bars_last_5"]
+                    distance_from_premarket_high = price_movement_statistics["distance_from_premarket_high"]
+                    entry_bar_range_pct = price_movement_statistics["entry_bar_range_pct"]
+                    entry_bar_body_pct = price_movement_statistics["entry_bar_body_pct"]
+                    upper_wick_pct_at_entry = price_movement_statistics["upper_wick_pct_at_entry"]
+                    volume_acceleration = price_movement_statistics["volume_acceleration"]
+                    extension_vs_pullback = price_movement_statistics["extension_vs_pullback"]
+                    move_efficiency = price_movement_statistics["move_efficiency"]
+                    pullback_to_trend_ratio = price_movement_statistics["pullback_to_trend_ratio"]
+                    trend_cleanliness = price_movement_statistics["trend_cleanliness"]
+                    pullback_structure_score = price_movement_statistics["pullback_structure_score"]
+                    volume_confirmation_ratio = price_movement_statistics["volume_confirmation_ratio"]
+                    volume_trend_strength = price_movement_statistics["volume_trend_strength"]
+                    volume_during_pullback = price_movement_statistics["volume_during_pullback"]
+                    relative_position_in_range = price_movement_statistics["relative_position_in_range"]
+                    distance_from_vwap_normalized = price_movement_statistics["distance_from_vwap_normalized"]
+                    hod_proximity_score = price_movement_statistics["hod_proximity_score"]
+                    momentum_alignment_score = price_movement_statistics["momentum_alignment_score"]
+                    momentum_strength = price_movement_statistics["momentum_strength"]
+                    entry_conviction_score = price_movement_statistics["entry_conviction_score"]
+                    entry_efficiency = price_movement_statistics["entry_efficiency"]
+                    failed_breakout_risk = price_movement_statistics["failed_breakout_risk"]
+                    late_move_indicator = price_movement_statistics["late_move_indicator"]
+                    early_vs_late_flag = price_movement_statistics["early_vs_late_flag"]
+                    volatility_regime = price_movement_statistics["volatility_regime"]
+                    average_range_last_5 = price_movement_statistics["average_range_last_5"]
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
@@ -364,6 +475,43 @@ def write_to_csv(
                             price_minus_vwap_at_entry,
                             entry_volume_spike_3,
                             entry_volume_spike_5,
+                            minutes_since_market_open,
+                            distance_from_recent_high,
+                            distance_from_high_of_day,
+                            volume_trend,
+                            number_of_negative_bars,
+                            broke_high_of_day_at_entry,
+                            vwap_slope_3,
+                            vwap_slope_5,
+                            ema9_minus_vwap_at_entry,
+                            ema9_minus_ema20_at_entry,
+                            number_of_green_bars_last_5,
+                            number_of_red_bars_last_5,
+                            distance_from_premarket_high,
+                            entry_bar_range_pct,
+                            entry_bar_body_pct,
+                            upper_wick_pct_at_entry,
+                            volume_acceleration,
+                            extension_vs_pullback,
+                            move_efficiency,
+                            pullback_to_trend_ratio,
+                            trend_cleanliness,
+                            pullback_structure_score,
+                            volume_confirmation_ratio,
+                            volume_trend_strength,
+                            volume_during_pullback,
+                            relative_position_in_range,
+                            distance_from_vwap_normalized,
+                            hod_proximity_score,
+                            momentum_alignment_score,
+                            momentum_strength,
+                            entry_conviction_score,
+                            entry_efficiency,
+                            failed_breakout_risk,
+                            late_move_indicator,
+                            early_vs_late_flag,
+                            volatility_regime,
+                            average_range_last_5,
                         ]
                     )
                     f.flush()
@@ -520,84 +668,73 @@ def explore_past_potential_symbols() -> list[Symbol]:
 
 def run_retroactive_check():
     symbols_data = []
-    symbols = get_symbols()
-    output_file_name = "positive_results.csv"
-
-    symbols = [
-        Symbol(
-            name="EPSM",
-            datetime_str="11.20.25T11:06:00",
-        ),
-    ]
+    # symbols = get_symbols()
+    # output_file_name = "positive_results.csv"
 
     # symbols = explore_past_potential_symbols()
-    # symbols = [
-    #     Symbol(
-    #         name="CAMP",
-    #         datetime_str="03.09.26T13:51:00",
-    #     ),
-    #     Symbol(
-    #         name="CDIO",
-    #         datetime_str="02.18.26T14:18:00",
-    #     ),
-    #     Symbol(
-    #         name="MOVE",
-    #         datetime_str="01.27.26T10:04:00",
-    #     ),
-    #     Symbol(
-    #         name="PLYX",
-    #         datetime_str="03.10.26T14:06:00",
-    #     ),
-    #     Symbol(
-    #         name="JLHL",
-    #         datetime_str="02.02.26T10:46:00",
-    #     ),
-    #     Symbol(
-    #         name="SMX",
-    #         datetime_str="02.06.26T10:16:00",
-    #     ),
-    #     Symbol(
-    #         name="TWAV",
-    #         datetime_str="03.16.26T10:55:00",
-    #     ),
-    #     Symbol(
-    #         name="TURB",
-    #         datetime_str="03.05.26T12:07:00",
-    #     ),
-    #     Symbol(
-    #         name="NCI",
-    #         datetime_str="02.23.26T14:19:00",
-    #     ),
-    #     Symbol(
-    #         name="ONEG",
-    #         datetime_str="01.27.26T10:14:00",
-    #     ),
-    #     Symbol(
-    #         name="BIYA",
-    #         datetime_str="02.20.26T10:49:00",
-    #     ),
-    #     Symbol(
-    #         name="DXST",
-    #         datetime_str="03.06.26T10:40:00",
-    #     ),
-    #     Symbol(
-    #         name="SORA",
-    #         datetime_str="02.02.26T15:19:00",
-    #     ),
-    #     Symbol(
-    #         name="MBAI",
-    #         datetime_str="01.26.26T10:22:00",
-    #     ),
-    #     Symbol(
-    #         name="XHLD",
-    #         datetime_str="01.27.26T15:36:00",
-    #     ),
-    #     Symbol(
-    #         name="XTKG",
-    #         datetime_str="01.26.26T14:11:00",
-    #     ),
-    # ]
-    # output_file_name = "false_positives_results.csv"
+    symbols = [
+        Symbol(
+            name="CAMP",
+            datetime_str="03.09.26T13:51:00",
+        ),
+        Symbol(
+            name="CDIO",
+            datetime_str="02.18.26T14:18:00",
+        ),
+        Symbol(
+            name="MOVE",
+            datetime_str="01.27.26T10:04:00",
+        ),
+        Symbol(
+            name="PLYX",
+            datetime_str="03.10.26T14:06:00",
+        ),
+        Symbol(
+            name="JLHL",
+            datetime_str="02.02.26T10:46:00",
+        ),
+        Symbol(
+            name="SMX",
+            datetime_str="02.06.26T10:16:00",
+        ),
+        Symbol(
+            name="TWAV",
+            datetime_str="03.16.26T10:55:00",
+        ),
+        Symbol(
+            name="TURB",
+            datetime_str="03.05.26T12:07:00",
+        ),
+        Symbol(
+            name="NCI",
+            datetime_str="02.23.26T14:19:00",
+        ),
+        Symbol(
+            name="ONEG",
+            datetime_str="01.27.26T10:14:00",
+        ),
+        Symbol(
+            name="BIYA",
+            datetime_str="02.20.26T10:49:00",
+        ),
+        Symbol(
+            name="DXST",
+            datetime_str="03.06.26T10:40:00",
+        ),
+        Symbol(
+            name="SORA",
+            datetime_str="02.02.26T15:19:00",
+        ),
+        Symbol(
+            name="XHLD",
+            datetime_str="01.27.26T15:36:00",
+        ),
+        Symbol(
+            name="XTKG",
+            datetime_str="01.26.26T14:11:00",
+        ),
+    ]
+    output_file_name = "false_positive_results.csv"
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
@@ -721,7 +858,55 @@ def run_retroactive_check():
 
     sys.exit(0)
 
+def calculate_score():
+    positive_data: list[dict[str, any]] = []
+    false_positive_data: list[dict[str, any]] = []
+    positive_file_path = "positive_results.csv"
+    false_positive_file_path = "false_positive_results.csv"
+
+    evidence_object = analyzer.evidences.evidence.Evidence()
+
+    with open(positive_file_path, "r") as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        for row in csv_reader:
+            positive_data.append(row)
+
+    with open(false_positive_file_path, "r") as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        for row in csv_reader:
+            false_positive_data.append(row)
+
+    # positive_scores = []
+    for p_d in positive_data:
+        score = evidence_object.compute_score(
+            symbol_statistics=p_d,
+        )
+        # positive_scores.append(score)
+        print(f"POSITIVE - symbol: {p_d["symbol"]}, bar_time: {p_d["actual_confirmation_bar_time"]}, score: {score}")
+
+    # false_positive_scores = []
+    # for f_p_d in false_positive_data:
+    #     score = evidence_object.compute_score(
+    #         symbol_statistics=f_p_d,
+    #     )
+    #     # false_positive_scores.append(score)
+    #     print(f"NEGATIVE - symbol: {f_p_d["symbol"]}, bar_time: {f_p_d["actual_confirmation_bar_time"]}, score: {score}")
+
+    # for p_d in positive_data:
+    #     probability = evidence_object.compute_probability(
+    #         symbol_statistics=p_d,
+    #         older_positive_scores=positive_scores,
+    #     )
+
+    # for f_p_d in false_positive_data:
+    #     probability = evidence_object.compute_probability(
+    #         symbol_statistics=f_p_d,
+    #         older_positive_scores=positive_scores,
+    #     )
+
+
 if __name__ == "__main__":
-    if os.path.exists(LOGS_PATH):
-        os.remove(LOGS_PATH)
-    run_retroactive_check()
+    calculate_score()
+    # if os.path.exists(LOGS_PATH):
+    #     os.remove(LOGS_PATH)
+    # run_retroactive_check()
