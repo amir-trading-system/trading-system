@@ -388,7 +388,7 @@ class Evidence:
             "gains_dropped_since_highest_high": 0.0,
             "last_bars_under_volume_average": 0,
             "open_to_pre_market_highest_high_pct": 0.0,
-            "lowest_low_pre_market_to_pre_market_highest_high_pct": pre_market_lowest_low_since_highest_high/stock.pre_market_one_minute_highest_high_bar.high,
+            "lowest_low_pre_market_to_pre_market_highest_high_pct": pre_market_lowest_low_since_highest_high/stock.pre_market_one_minute_highest_high_bar.high if stock.pre_market_one_minute_highest_high_bar is not None else 0,
             "previous_day_body_pct": previous_day.body_percentage,
             "volume_average_to_volume_pct": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
             "previous_bar_volume_to_current_bar_volume_pct": previous_one_minute_bar.volume/potential_confirmation_bar.volume if previous_one_minute_bar is not None else 0.0,
@@ -397,7 +397,7 @@ class Evidence:
 
         for bar_object in one_minute_bars:
             if bar_object.is_opening_bar:
-                symbol_statistics["open_to_pre_market_highest_high_pct"] = bar_object.open_value/stock.pre_market_one_minute_highest_high_bar.high if stock.pre_market_one_minute_highest_high_bar is not None else 1
+                symbol_statistics["open_to_pre_market_highest_high_pct"] = bar_object.open_value/stock.pre_market_one_minute_highest_high_bar.high if stock.pre_market_one_minute_highest_high_bar is not None else 0
             if (
                 bar_object.bar_time + datetime.timedelta(minutes=30) > potential_confirmation_bar.bar_time
                 and bar_object.volume < bar_object.volume_average

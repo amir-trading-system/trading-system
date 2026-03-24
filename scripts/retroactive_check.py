@@ -809,8 +809,44 @@ def run_retroactive_check():
                     datetime_str="03.10.26T14:06:00",
                 ),
                 Symbol(
+                    name="LWLG",
+                    datetime_str="03.12.26T09:34:00",
+                ),
+                Symbol(
+                    name="ANTX",
+                    datetime_str="03.12.26T14:35:00",
+                ),
+                Symbol(
+                    name="ALTO",
+                    datetime_str="03.12.26T10:35:00",
+                ),
+                Symbol(
+                    name="LWLG",
+                    datetime_str="03.13.26T10:20:00",
+                ),
+                Symbol(
+                    name="AGRZ",
+                    datetime_str="03.13.26T11:11:00",
+                ),
+                Symbol(
+                    name="LWLG",
+                    datetime_str="03.13.26T15:03:00",
+                ),
+                Symbol(
+                    name="TLYS",
+                    datetime_str="03.13.26T13:41:00",
+                ),
+                Symbol(
                     name="TWAV",
                     datetime_str="03.16.26T10:55:00",
+                ),
+                Symbol(
+                    name="ARTL",
+                    datetime_str="03.18.26T09:54:00",
+                ),
+                Symbol(
+                    name="QCLS",
+                    datetime_str="03.18.26T11:30:00",
                 ),
             ]
             output_file_name = "model/false_positive_results.csv"
