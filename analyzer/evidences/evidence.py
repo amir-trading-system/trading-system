@@ -536,23 +536,27 @@ class Evidence:
             bar_statistics=potential_confirmation_bar.price_movement_statistics,
         )
 
+        msg = "Bar confirmed by model"
         if not score.should_take_trade:
-            self.logger.info(
-                msg="Bar confirmed by static confirmation, but got denied on model confirmation",
-                extra={
-                    "worker": "Confirmator",
-                    "symbol": stock.symbol_name,
-                    "timeframe": original_bar_to_confirm.timeframe,
-                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                    "bar_time": original_bar_to_confirm.bar_time,
-                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                    "evidence_name": self.name,
-                    "request_id": stock.request_id,
-                    "score": score.score,
-                    "probability": score.probability,
-                    "threshold": score.threshold,
-                },
-            )
+            msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
+
+        self.logger.info(
+            msg=msg,
+            extra={
+                "worker": "Confirmator",
+                "symbol": stock.symbol_name,
+                "timeframe": original_bar_to_confirm.timeframe,
+                "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                "bar_time": original_bar_to_confirm.bar_time,
+                "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                "evidence_name": self.name,
+                "request_id": stock.request_id,
+                "score": score.score,
+                "probability": score.probability,
+                "threshold": score.threshold,
+            },
+        )
+        if not score.should_take_trade:
             return False
 
         if (
