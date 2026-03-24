@@ -305,6 +305,7 @@ def write_to_csv(
                 "gains_dropped_since_highest_high",
                 "last_bars_under_volume_average",
                 "open_to_pre_market_highest_high_pct",
+                "lowest_low_pre_market_to_pre_market_highest_high_pct",
                 "previous_day_body_pct",
                 "volume_average_to_volume_pct",
                 "previous_bar_volume_to_current_bar_volume_pct",
@@ -379,6 +380,7 @@ def write_to_csv(
                 gains_dropped_since_highest_high = 0
                 last_bars_under_volume_average = 0
                 open_to_pre_market_highest_high_pct = 0
+                lowest_low_pre_market_to_pre_market_highest_high_pct = 0
                 previous_day_body_pct = 0
                 volume_average_to_volume_pct = 0
                 previous_bar_volume_to_current_bar_volume_pct = 0
@@ -442,6 +444,7 @@ def write_to_csv(
                     volume_average_to_volume_pct = price_movement_statistics["volume_average_to_volume_pct"]
                     previous_bar_volume_to_current_bar_volume_pct = price_movement_statistics["previous_bar_volume_to_current_bar_volume_pct"]
                     highest_high_to_current_bar_high_pct = price_movement_statistics["highest_high_to_current_bar_high_pct"]
+                    lowest_low_pre_market_to_pre_market_highest_high_pct = price_movement_statistics["lowest_low_pre_market_to_pre_market_highest_high_pct"]
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
@@ -536,6 +539,7 @@ def write_to_csv(
                             gains_dropped_since_highest_high,
                             last_bars_under_volume_average,
                             open_to_pre_market_highest_high_pct,
+                            lowest_low_pre_market_to_pre_market_highest_high_pct,
                             previous_day_body_pct,
                             volume_average_to_volume_pct,
                             previous_bar_volume_to_current_bar_volume_pct,
@@ -697,8 +701,8 @@ def explore_past_potential_symbols() -> list[Symbol]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = True
     for_positive_results = True
+    should_run_model = True
     for_test_real_case = False
     symbols_data = []
     symbols = []

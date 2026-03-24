@@ -313,6 +313,26 @@ class Evidence:
             bar_object=potential_confirmation_bar,
         )
 
+        relevant_lows_for_pre_market_low = []
+
+        if stock.pre_market_one_minute_highest_high_bar is not None:
+            relevant_lows_for_pre_market_low = [
+                bar_object.low
+                for bar_object in one_minute_timeframe_stock.bars
+                if bar_object.index < stock.pre_market_one_minute_highest_high_bar.index
+                and bar_object.bar_time < datetime.datetime(
+                    year=bar_object.bar_time.year,
+                    month=bar_object.bar_time.month,
+                    day=bar_object.bar_time.day,
+                    hour=9,
+                    minute=30,
+                )
+            ]
+
+        pre_market_lowest_low_since_highest_high = 0
+        if relevant_lows_for_pre_market_low:
+            pre_market_lowest_low_since_highest_high = min(relevant_lows_for_pre_market_low)
+
         symbol_statistics = {
             "positive_movement_since_market_open": 0.0,
             "negative_movement_since_market_open": 0.0,
@@ -368,6 +388,7 @@ class Evidence:
             "gains_dropped_since_highest_high": 0.0,
             "last_bars_under_volume_average": 0,
             "open_to_pre_market_highest_high_pct": 0.0,
+            "lowest_low_pre_market_to_pre_market_highest_high_pct": pre_market_lowest_low_since_highest_high/stock.pre_market_one_minute_highest_high_bar.high,
             "previous_day_body_pct": previous_day.body_percentage,
             "volume_average_to_volume_pct": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
             "previous_bar_volume_to_current_bar_volume_pct": previous_one_minute_bar.volume/potential_confirmation_bar.volume if previous_one_minute_bar is not None else 0.0,
@@ -522,17 +543,17 @@ class Evidence:
         ):
             return False
 
-        if model_runner.should_run_model:
-            potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
-                stock=stock,
-                one_minute_timeframe_stock=one_minute_timeframe_stock,
-                milestones=milestones,
-                original_bar_to_confirm=original_bar_to_confirm,
-                potential_confirmation_bar=potential_confirmation_bar,
-                highest_high_one_minute_bar=highest_high_one_minute_bar,
-                one_minute_bars=one_minute_bars,
-            )
+        potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
+            stock=stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            milestones=milestones,
+            original_bar_to_confirm=original_bar_to_confirm,
+            potential_confirmation_bar=potential_confirmation_bar,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            one_minute_bars=one_minute_bars,
+        )
 
+        if model_runner.should_run_model:
             score: common.objects.Score = model_runner.score_potential_confirmation_bar(
                 bar_statistics=potential_confirmation_bar.price_movement_statistics,
             )
