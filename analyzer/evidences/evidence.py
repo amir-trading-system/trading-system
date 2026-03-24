@@ -376,7 +376,7 @@ class Evidence:
 
         for bar_object in one_minute_bars:
             if bar_object.is_opening_bar:
-                symbol_statistics["open_to_pre_market_highest_high_pct"] = bar_object.open_value/stock.pre_market_one_minute_highest_high_bar.high
+                symbol_statistics["open_to_pre_market_highest_high_pct"] = bar_object.open_value/stock.pre_market_one_minute_highest_high_bar.high if stock.pre_market_one_minute_highest_high_bar is not None else 1
             if (
                 bar_object.bar_time + datetime.timedelta(minutes=30) > potential_confirmation_bar.bar_time
                 and bar_object.volume < bar_object.volume_average
@@ -522,42 +522,43 @@ class Evidence:
         ):
             return False
 
-        potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
-            stock=stock,
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            milestones=milestones,
-            original_bar_to_confirm=original_bar_to_confirm,
-            potential_confirmation_bar=potential_confirmation_bar,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            one_minute_bars=one_minute_bars,
-        )
+        if model_runner.should_run_model:
+            potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
+                stock=stock,
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                milestones=milestones,
+                original_bar_to_confirm=original_bar_to_confirm,
+                potential_confirmation_bar=potential_confirmation_bar,
+                highest_high_one_minute_bar=highest_high_one_minute_bar,
+                one_minute_bars=one_minute_bars,
+            )
 
-        score: common.objects.Score = model_runner.score_potential_confirmation_bar(
-            bar_statistics=potential_confirmation_bar.price_movement_statistics,
-        )
+            score: common.objects.Score = model_runner.score_potential_confirmation_bar(
+                bar_statistics=potential_confirmation_bar.price_movement_statistics,
+            )
 
-        msg = "Bar confirmed by model"
-        if not score.should_take_trade:
-            msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
+            msg = "Bar confirmed by model"
+            if not score.should_take_trade:
+                msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
 
-        self.logger.info(
-            msg=msg,
-            extra={
-                "worker": "Confirmator",
-                "symbol": stock.symbol_name,
-                "timeframe": original_bar_to_confirm.timeframe,
-                "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                "bar_time": original_bar_to_confirm.bar_time,
-                "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                "evidence_name": self.name,
-                "request_id": stock.request_id,
-                "score": score.score,
-                "probability": score.probability,
-                "threshold": score.threshold,
-            },
-        )
-        if not score.should_take_trade:
-            return False
+            self.logger.info(
+                msg=msg,
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": stock.symbol_name,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "evidence_name": self.name,
+                    "request_id": stock.request_id,
+                    "score": score.score,
+                    "probability": score.probability,
+                    "threshold": score.threshold,
+                },
+            )
+            if not score.should_take_trade:
+                return False
 
         if (
             True

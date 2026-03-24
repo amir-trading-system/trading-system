@@ -72,6 +72,10 @@ def get_symbols() -> list[Symbol]:
             datetime_str="01.14.26T09:51:00",
         ),
         Symbol(
+            name="AHMA",
+            datetime_str="01.15.26T10:31:00",
+        ),
+        Symbol(
             name="MLEC",
             datetime_str="01.15.26T11:59:00",
         ),
@@ -218,6 +222,10 @@ def get_symbols() -> list[Symbol]:
         Symbol(
             name="ACXP",
             datetime_str="03.19.26T10:12:00",
+        ),
+        Symbol(
+            name="ANNA",
+            datetime_str="03.20.26T10:02:00",
         ),
         Symbol(
             name="BIAF",
@@ -669,7 +677,9 @@ def explore_past_potential_symbols() -> list[Symbol]:
             name=symbol,
             datetime_str=date,
         )
-        for symbol, date in stock_finder.get_dynamic_symbols_from_last_month().items()
+        for symbol, date in stock_finder.get_dynamic_symbols_data_from_period(
+            period="5mo",
+        ).items()
     ]
 
     current_symbols = get_symbols()
@@ -693,6 +703,7 @@ def run_retroactive_check():
     symbols_data = []
     symbols = []
     output_file_name = "model/real_case_result.csv"
+    # symbols = explore_past_potential_symbols()
 
     if not for_test_real_case:
         should_run_model = False
@@ -700,67 +711,102 @@ def run_retroactive_check():
             symbols = get_symbols()
             output_file_name = "model/positive_results.csv"
         else:
-            # symbols = explore_past_potential_symbols()
             symbols = [
                 Symbol(
-                    name="CAMP",
-                    datetime_str="03.09.26T13:51:00",
+                    name="HBIO",
+                    datetime_str="10.30.25T09:52:00",
                 ),
                 Symbol(
-                    name="CDIO",
-                    datetime_str="02.18.26T14:18:00",
+                    name="FLYE",
+                    datetime_str="12.01.25T10:52:00",
+                ),
+                Symbol(
+                    name="JXG",
+                    datetime_str="12.09.25T15:45:00",
+                ),
+                Symbol(
+                    name="VMAR",
+                    datetime_str="12.16.25T10:17:00",
+                ),
+                Symbol(
+                    name="NBY",
+                    datetime_str="01.09.26T15:50:00",
+                ),
+                Symbol(
+                    name="LVLU",
+                    datetime_str="01.12.26T11:23:00",
+                ),
+                Symbol(
+                    name="EVTV",
+                    datetime_str="01.13.26T12:49:00",
+                ),
+                Symbol(
+                    name="CJMB",
+                    datetime_str="01.15.26T11:26:00",
+                ),
+                Symbol(
+                    name="XTKG",
+                    datetime_str="01.26.26T14:11:00",
                 ),
                 Symbol(
                     name="MOVE",
                     datetime_str="01.27.26T10:04:00",
                 ),
                 Symbol(
-                    name="PLYX",
-                    datetime_str="03.10.26T14:06:00",
-                ),
-                Symbol(
-                    name="JLHL",
-                    datetime_str="02.02.26T10:46:00",
-                ),
-                Symbol(
-                    name="SMX",
-                    datetime_str="02.06.26T10:16:00",
-                ),
-                Symbol(
-                    name="TWAV",
-                    datetime_str="03.16.26T10:55:00",
-                ),
-                Symbol(
-                    name="TURB",
-                    datetime_str="03.05.26T12:07:00",
-                ),
-                Symbol(
-                    name="NCI",
-                    datetime_str="02.23.26T14:19:00",
-                ),
-                Symbol(
                     name="ONEG",
                     datetime_str="01.27.26T10:14:00",
-                ),
-                Symbol(
-                    name="BIYA",
-                    datetime_str="02.20.26T10:49:00",
-                ),
-                Symbol(
-                    name="DXST",
-                    datetime_str="03.06.26T10:40:00",
-                ),
-                Symbol(
-                    name="SORA",
-                    datetime_str="02.02.26T15:19:00",
                 ),
                 Symbol(
                     name="XHLD",
                     datetime_str="01.27.26T15:36:00",
                 ),
                 Symbol(
-                    name="XTKG",
-                    datetime_str="01.26.26T14:11:00",
+                    name="JLHL",
+                    datetime_str="02.02.26T10:46:00",
+                ),
+                Symbol(
+                    name="SORA",
+                    datetime_str="02.02.26T15:19:00",
+                ),
+                Symbol(
+                    name="SMX",
+                    datetime_str="02.06.26T10:16:00",
+                ),
+                Symbol(
+                    name="JDZG",
+                    datetime_str="02.13.26T11:50:00",
+                ),
+                Symbol(
+                    name="CDIO",
+                    datetime_str="02.18.26T14:18:00",
+                ),
+                Symbol(
+                    name="BIYA",
+                    datetime_str="02.20.26T10:49:00",
+                ),
+                Symbol(
+                    name="NCI",
+                    datetime_str="02.23.26T14:19:00",
+                ),
+                Symbol(
+                    name="TURB",
+                    datetime_str="03.05.26T12:07:00",
+                ),
+                Symbol(
+                    name="DXST",
+                    datetime_str="03.06.26T10:40:00",
+                ),
+                Symbol(
+                    name="CAMP",
+                    datetime_str="03.09.26T13:51:00",
+                ),
+                Symbol(
+                    name="PLYX",
+                    datetime_str="03.10.26T14:06:00",
+                ),
+                Symbol(
+                    name="TWAV",
+                    datetime_str="03.16.26T10:55:00",
                 ),
             ]
             output_file_name = "model/false_positive_results.csv"

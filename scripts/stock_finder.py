@@ -48,7 +48,9 @@ def get_stocks_list_from_nasdaq() -> Generator[Any, Any, Any]:
     if list_to_return:
         yield list_to_return
 
-def get_dynamic_symbols_from_last_month() -> dict[str, str]:
+def get_dynamic_symbols_data_from_period(
+    period: str = "1mo",
+) -> dict[str, str]:
     symbol_to_date: dict[str,str] = {}
     stock_bulks = get_stocks_list_from_nasdaq()
     for stock_bulk in stock_bulks:
@@ -74,7 +76,7 @@ def get_dynamic_symbols_from_last_month() -> dict[str, str]:
 
         historical_data = yfinance.download(
             symbols_to_download,
-            period="2mo",
+            period=period,
             interval="1d",
             auto_adjust=False,
             progress=False,
