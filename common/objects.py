@@ -33,7 +33,6 @@ class BarData:
         vwap: float = 0.0,
         volume_average: float = 0.0,
         volume_average_last_3: float = 0.0,
-        volume_average_last_5: float = 0.0,
         volume_average_last_10: float = 0.0,
         ema_9: float = 0.0,
         ema_20: float = 0.0,
@@ -57,7 +56,6 @@ class BarData:
         self.volume = float(volume)
         self.volume_average = volume_average
         self.volume_average_last_3 = volume_average_last_3
-        self.volume_average_last_5 = volume_average_last_5
         self.volume_average_last_10 = volume_average_last_10
         self.vwap = vwap
         self.ema_9 = ema_9
@@ -369,10 +367,6 @@ class Stock:
         current_bar.volume_average_last_3 = self.calculate_volume_average(
             current_bar=current_bar,
             period=3,
-        )
-        current_bar.volume_average_last_5 = self.calculate_volume_average(
-            current_bar=current_bar,
-            period=5,
         )
         current_bar.volume_average_last_10 = self.calculate_volume_average(
             current_bar=current_bar,
