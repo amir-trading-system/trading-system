@@ -564,3 +564,16 @@ class Milestones:
         self.are_valid = are_valid
         self.fibonacci_retracement = fibonacci_retracement
         self.retracement_indexes = retracement_indexes
+
+class Score:
+    def __init__(
+        self,
+        score: float,
+        probability: float,
+        threshold: float,
+        should_take_trade: bool,
+    ):
+        self.score = score
+        self.probability = probability
+        self.threshold = threshold
+        self.should_take_trade = should_take_trade

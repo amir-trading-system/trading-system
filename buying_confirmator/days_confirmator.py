@@ -5,6 +5,7 @@ import queue
 import alerter
 import analyzer.evidences
 import common
+import model
 from tws import client
 
 
@@ -12,6 +13,7 @@ class Confirmator:
     def __init__(
         self,
         is_retro: bool,
+        should_run_model: bool,
         tws_client: client.Client,
         logger: logging.Logger,
         request_id_to_symbol: dict[int,common.objects.Stock],
@@ -26,6 +28,9 @@ class Confirmator:
         self.results_queue = results_queue
         self.request_id_to_symbol = request_id_to_symbol
         self.confirmation_only = confirmation_only
+        self.model_runner = model.runner.Runner(
+            should_run_model=should_run_model,
+        )
 
     def _confirm(
         self,
@@ -112,7 +117,9 @@ class Confirmator:
         confirmed_evidences: list[str] = []
         stock_is_valid_for_evidence = False
         for evidence in analyzer.evidences.__evidences__:
-            evidence_obj = evidence()
+            evidence_obj = evidence(
+                logger=self.logger,
+            )
             if (
                 not stock_is_valid_for_evidence
                 and not evidence_obj.pre_process(
@@ -153,6 +160,7 @@ class Confirmator:
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
                 one_minute_bars=temp_one_minute_bars,
                 volume_sum_since_market_open=volume_sum_since_market_open,
+                model_runner=self.model_runner,
             ):
                 entry_position_bar = potential_confirmation_bar
                 confirmed_evidences.append(evidence.name)

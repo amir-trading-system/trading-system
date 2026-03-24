@@ -219,6 +219,10 @@ def get_symbols() -> list[Symbol]:
             name="ACXP",
             datetime_str="03.19.26T10:12:00",
         ),
+        Symbol(
+            name="BIAF",
+            datetime_str="03.23.26T10:45:00",
+        ),
     ]
 
 #pylint:disable=unspecified-encoding
@@ -293,6 +297,10 @@ def write_to_csv(
                 "gains_dropped_since_highest_high",
                 "last_bars_under_volume_average",
                 "open_to_pre_market_highest_high_pct",
+                "previous_day_body_pct",
+                "volume_average_to_volume_pct",
+                "previous_bar_volume_to_current_bar_volume_pct",
+                "highest_high_to_current_bar_high_pct",
             ],
         )
         f.flush()
@@ -363,6 +371,10 @@ def write_to_csv(
                 gains_dropped_since_highest_high = 0
                 last_bars_under_volume_average = 0
                 open_to_pre_market_highest_high_pct = 0
+                previous_day_body_pct = 0
+                volume_average_to_volume_pct = 0
+                previous_bar_volume_to_current_bar_volume_pct = 0
+                highest_high_to_current_bar_high_pct = 0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
@@ -418,6 +430,10 @@ def write_to_csv(
                     gains_dropped_since_highest_high = price_movement_statistics["gains_dropped_since_highest_high"]
                     last_bars_under_volume_average = price_movement_statistics["last_bars_under_volume_average"]
                     open_to_pre_market_highest_high_pct = price_movement_statistics["open_to_pre_market_highest_high_pct"]
+                    previous_day_body_pct = price_movement_statistics["previous_day_body_pct"]
+                    volume_average_to_volume_pct = price_movement_statistics["volume_average_to_volume_pct"]
+                    previous_bar_volume_to_current_bar_volume_pct = price_movement_statistics["previous_bar_volume_to_current_bar_volume_pct"]
+                    highest_high_to_current_bar_high_pct = price_movement_statistics["highest_high_to_current_bar_high_pct"]
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
@@ -512,6 +528,10 @@ def write_to_csv(
                             gains_dropped_since_highest_high,
                             last_bars_under_volume_average,
                             open_to_pre_market_highest_high_pct,
+                            previous_day_body_pct,
+                            volume_average_to_volume_pct,
+                            previous_bar_volume_to_current_bar_volume_pct,
+                            highest_high_to_current_bar_high_pct,
                         ]
                     )
                     f.flush()
@@ -667,79 +687,83 @@ def explore_past_potential_symbols() -> list[Symbol]:
     return symbols
 
 def run_retroactive_check():
-    for_positive = False
+    should_run_model = True
+    for_positive_results = True
+    for_test_real_case = False
     symbols_data = []
     symbols = []
-    output_file_name = ""
+    output_file_name = "model/real_case_result.csv"
 
-    if for_positive:
-        symbols = get_symbols()
-        output_file_name = "positive_results.csv"
-    else:
-        # symbols = explore_past_potential_symbols()
-        symbols = [
-            Symbol(
-                name="CAMP",
-                datetime_str="03.09.26T13:51:00",
-            ),
-            Symbol(
-                name="CDIO",
-                datetime_str="02.18.26T14:18:00",
-            ),
-            Symbol(
-                name="MOVE",
-                datetime_str="01.27.26T10:04:00",
-            ),
-            Symbol(
-                name="PLYX",
-                datetime_str="03.10.26T14:06:00",
-            ),
-            Symbol(
-                name="JLHL",
-                datetime_str="02.02.26T10:46:00",
-            ),
-            Symbol(
-                name="SMX",
-                datetime_str="02.06.26T10:16:00",
-            ),
-            Symbol(
-                name="TWAV",
-                datetime_str="03.16.26T10:55:00",
-            ),
-            Symbol(
-                name="TURB",
-                datetime_str="03.05.26T12:07:00",
-            ),
-            Symbol(
-                name="NCI",
-                datetime_str="02.23.26T14:19:00",
-            ),
-            Symbol(
-                name="ONEG",
-                datetime_str="01.27.26T10:14:00",
-            ),
-            Symbol(
-                name="BIYA",
-                datetime_str="02.20.26T10:49:00",
-            ),
-            Symbol(
-                name="DXST",
-                datetime_str="03.06.26T10:40:00",
-            ),
-            Symbol(
-                name="SORA",
-                datetime_str="02.02.26T15:19:00",
-            ),
-            Symbol(
-                name="XHLD",
-                datetime_str="01.27.26T15:36:00",
-            ),
-            Symbol(
-                name="XTKG",
-                datetime_str="01.26.26T14:11:00",
-            ),
-        ]
-        output_file_name = "false_positive_results.csv"
+    if not for_test_real_case:
+        should_run_model = False
+        if for_positive_results:
+            symbols = get_symbols()
+            output_file_name = "model/positive_results.csv"
+        else:
+            # symbols = explore_past_potential_symbols()
+            symbols = [
+                Symbol(
+                    name="CAMP",
+                    datetime_str="03.09.26T13:51:00",
+                ),
+                Symbol(
+                    name="CDIO",
+                    datetime_str="02.18.26T14:18:00",
+                ),
+                Symbol(
+                    name="MOVE",
+                    datetime_str="01.27.26T10:04:00",
+                ),
+                Symbol(
+                    name="PLYX",
+                    datetime_str="03.10.26T14:06:00",
+                ),
+                Symbol(
+                    name="JLHL",
+                    datetime_str="02.02.26T10:46:00",
+                ),
+                Symbol(
+                    name="SMX",
+                    datetime_str="02.06.26T10:16:00",
+                ),
+                Symbol(
+                    name="TWAV",
+                    datetime_str="03.16.26T10:55:00",
+                ),
+                Symbol(
+                    name="TURB",
+                    datetime_str="03.05.26T12:07:00",
+                ),
+                Symbol(
+                    name="NCI",
+                    datetime_str="02.23.26T14:19:00",
+                ),
+                Symbol(
+                    name="ONEG",
+                    datetime_str="01.27.26T10:14:00",
+                ),
+                Symbol(
+                    name="BIYA",
+                    datetime_str="02.20.26T10:49:00",
+                ),
+                Symbol(
+                    name="DXST",
+                    datetime_str="03.06.26T10:40:00",
+                ),
+                Symbol(
+                    name="SORA",
+                    datetime_str="02.02.26T15:19:00",
+                ),
+                Symbol(
+                    name="XHLD",
+                    datetime_str="01.27.26T15:36:00",
+                ),
+                Symbol(
+                    name="XTKG",
+                    datetime_str="01.26.26T14:11:00",
+                ),
+            ]
+            output_file_name = "model/false_positive_results.csv"
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
@@ -789,6 +813,7 @@ def run_retroactive_check():
         results_queue=results_queue,
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
+        should_run_model=should_run_model,
         is_retro=True,
         # confirmation_only=True,
     )

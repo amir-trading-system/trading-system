@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import os
 
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -17,25 +18,32 @@ from sklearn.model_selection import train_test_split
 # CONFIG
 # ============================================================
 
-POSITIVE_CSV = "positive_results.csv"
-FALSE_POSITIVE_CSV = "false_positive_results.csv"
+POSITIVE_CSV = "model/positive_results.csv"
+FALSE_POSITIVE_CSV = "model/false_positive_results.csv"
 
 RANDOM_STATE = 42
-TEST_SIZE = 0.30
+TEST_SIZE = 0.3
 
 # Thresholds to inspect
 THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 
 # Output files
-TRAIN_SCORED_OUTPUT = "scored_training_dataset.csv"
-POSITIVE_SCORED_OUTPUT = "positive_results_scored.csv"
-FALSE_POSITIVE_SCORED_OUTPUT = "false_positive_results_scored.csv"
-MODEL_INFO_OUTPUT = "model_info.json"
+TRAIN_SCORED_OUTPUT = "model/scored_training_dataset.csv"
+POSITIVE_SCORED_OUTPUT = "model/positive_results_scored.csv"
+FALSE_POSITIVE_SCORED_OUTPUT = "model/false_positive_results_scored.csv"
+MODEL_INFO_OUTPUT = "model/model_info.json"
 
-os.remove(TRAIN_SCORED_OUTPUT)
-os.remove(POSITIVE_SCORED_OUTPUT)
-os.remove(FALSE_POSITIVE_SCORED_OUTPUT)
-os.remove(MODEL_INFO_OUTPUT)
+if os.path.exists(TRAIN_SCORED_OUTPUT):
+    os.remove(TRAIN_SCORED_OUTPUT)
+
+if os.path.exists(POSITIVE_SCORED_OUTPUT):
+    os.remove(POSITIVE_SCORED_OUTPUT)
+
+if os.path.exists(FALSE_POSITIVE_SCORED_OUTPUT):
+    os.remove(FALSE_POSITIVE_SCORED_OUTPUT)
+
+if os.path.exists(MODEL_INFO_OUTPUT):
+    os.remove(MODEL_INFO_OUTPUT)
 
 
 # ============================================================
@@ -354,3 +362,15 @@ def classify_row(row: pd.Series):
 print("\n================ SAMPLE LIVE OUTPUT ================\n")
 sample_row = positive_scored.iloc[0]
 print(classify_row(sample_row))
+
+
+
+joblib.dump(model, "model/trade_model.pkl")
+joblib.dump(imputer, "model/trade_imputer.pkl")
+
+model_bundle = {
+    "features": shared_features,
+    "threshold": 0.65,
+}
+
+joblib.dump(model_bundle, "model/trade_model_bundle.pkl")

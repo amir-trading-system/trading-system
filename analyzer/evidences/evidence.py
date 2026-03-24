@@ -1,10 +1,18 @@
 import datetime
+import logging
 
 import common
+import model
 
 class Evidence:
     name: str = ""
     relevant_bars: list[common.objects.BarData] = []
+
+    def __init__(
+        self,
+        logger: logging.Logger,
+    ):
+        self.logger = logger
 
     def is_potential_starting_bar(
         self,
@@ -284,11 +292,15 @@ class Evidence:
     def symbol_statistics(
         self,
         stock: common.objects.Stock,
+        one_minute_timeframe_stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
+        previous_day = milestones.previous_bar.bar_object
+
         number_of_green_bars_last_5 = 0
         number_of_red_bars_last_5 = 0
         for bar_object in one_minute_bars[1:6]:
@@ -296,6 +308,10 @@ class Evidence:
                 number_of_green_bars_last_5 += 1
             else:
                 number_of_red_bars_last_5 += 1
+
+        previous_one_minute_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
 
         symbol_statistics = {
             "positive_movement_since_market_open": 0.0,
@@ -352,6 +368,10 @@ class Evidence:
             "gains_dropped_since_highest_high": 0.0,
             "last_bars_under_volume_average": 0,
             "open_to_pre_market_highest_high_pct": 0.0,
+            "previous_day_body_pct": previous_day.body_percentage,
+            "volume_average_to_volume_pct": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
+            "previous_bar_volume_to_current_bar_volume_pct": previous_one_minute_bar.volume/potential_confirmation_bar.volume if previous_one_minute_bar is not None else 0.0,
+            "highest_high_to_current_bar_high_pct": highest_high_one_minute_bar.high/potential_confirmation_bar.high,
         }
 
         for bar_object in one_minute_bars:
@@ -464,7 +484,6 @@ class Evidence:
             symbol_statistics["volume_during_pullback"] = volume_during_pullback
             symbol_statistics["gains_dropped_since_highest_high"] = gains_dropped_since_highest_high
 
-
         return symbol_statistics
 
     def confirm(
@@ -477,6 +496,7 @@ class Evidence:
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
+        model_runner: model.runner.Runner,
     ) -> bool:
         current_bar_12_00 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
@@ -504,11 +524,36 @@ class Evidence:
 
         potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
             stock=stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            milestones=milestones,
             original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             one_minute_bars=one_minute_bars,
         )
+
+        score: common.objects.Score = model_runner.score_potential_confirmation_bar(
+            bar_statistics=potential_confirmation_bar.price_movement_statistics,
+        )
+
+        if not score.should_take_trade:
+            self.logger.info(
+                msg="Bar confirmed by static confirmation, but got denied on model confirmation",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": stock.symbol_name,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "evidence_name": self.name,
+                    "request_id": stock.request_id,
+                    "score": score.score,
+                    "probability": score.probability,
+                    "threshold": score.threshold,
+                },
+            )
+            return False
 
         if (
             True

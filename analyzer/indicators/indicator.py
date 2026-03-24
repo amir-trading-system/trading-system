@@ -23,7 +23,9 @@ class Indicator:
         current_bar: common.objects.BarData,
         is_retro: bool,
     ) -> bool:
-        evidence_object: analyzer.evidences.evidence.Evidence = self.evidence()
+        evidence_object: analyzer.evidences.evidence.Evidence = self.evidence(
+            logger=self.logger,
+        )
         if not evidence_object.pre_process(
             stock=stock,
             current_bar=current_bar,
