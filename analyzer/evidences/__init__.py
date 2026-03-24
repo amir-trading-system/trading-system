@@ -1,4 +1,4 @@
-from . import _evidence
+from . import evidence
 from . import current_day_continues_trend
 from . import current_day_breaks_highest_high_since_fall
 from . import current_day_continues_without_touching_previous
@@ -9,7 +9,7 @@ from . import current_day_comes_after_9_ema_retracement
 from . import current_day_comes_after_strong_day
 
 
-__evidences__: list[type[_evidence.Evidence]] = [
+__evidences__: list[type[evidence.Evidence]] = [
     current_day_continues_trend.Evidence,
     current_day_breaks_highest_high_since_fall.Evidence,
     current_day_continues_without_touching_previous.Evidence,

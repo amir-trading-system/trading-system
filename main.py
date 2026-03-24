@@ -153,6 +153,7 @@ if __name__ == "__main__":
         request_id_to_symbol=request_id_to_symbol,
         alerter_object=alerter_object,
         logger=logger_object,
+        should_run_model=True,
         is_retro=False,
     )
 

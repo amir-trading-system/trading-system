@@ -76,6 +76,20 @@ class DataStreamer():
                 day_timeframe_stock.last_post_pre_one_minute_highest_high,
                 enriched_bar.high,
             )
+            if enriched_bar.bar_time >= datetime.datetime(
+                year=current_session_date.year,
+                month=current_session_date.month,
+                day=current_session_date.day,
+                hour=4,
+            ):
+                if (
+                    day_timeframe_stock.pre_market_one_minute_highest_high_bar is None
+                    or (
+                        day_timeframe_stock.pre_market_one_minute_highest_high_bar is not None
+                        and day_timeframe_stock.pre_market_one_minute_highest_high_bar.high < enriched_bar.high
+                    )
+                ):
+                    day_timeframe_stock.pre_market_one_minute_highest_high_bar = enriched_bar
 
         if enriched_bar.bar_time >= datetime.datetime(
             year=current_session_date.year,

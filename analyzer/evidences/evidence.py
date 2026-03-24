@@ -1,12 +1,18 @@
 import datetime
+import logging
 
 import common
+import model
 
 class Evidence:
     name: str = ""
-    must_to_be_true: bool = False
-    is_base_evidence: bool = False
     relevant_bars: list[common.objects.BarData] = []
+
+    def __init__(
+        self,
+        logger: logging.Logger,
+    ):
+        self.logger = logger
 
     def is_potential_starting_bar(
         self,
@@ -283,13 +289,31 @@ class Evidence:
 
         return crossed_resistance_level_strongly
 
-    def price_movement_statistics(
+    def symbol_statistics(
         self,
+        stock: common.objects.Stock,
+        one_minute_timeframe_stock: common.objects.Stock,
+        milestones: common.objects.Milestones,
+        original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
-        price_movement_statistics = {
+        previous_day = milestones.previous_bar.bar_object
+
+        number_of_green_bars_last_5 = 0
+        number_of_red_bars_last_5 = 0
+        for bar_object in one_minute_bars[1:6]:
+            if bar_object.close > bar_object.open_value:
+                number_of_green_bars_last_5 += 1
+            else:
+                number_of_red_bars_last_5 += 1
+
+        previous_one_minute_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+
+        symbol_statistics = {
             "positive_movement_since_market_open": 0.0,
             "negative_movement_since_market_open": 0.0,
             "movement_above_vwap_since_market_open": 0.0,
@@ -301,26 +325,110 @@ class Evidence:
             "pullback_sharpness": 0.0,
             "pullback_duration": 0,
             "pullback_depth": 0.0,
+            "histogram_at_entry": potential_confirmation_bar.histogram,
+            "macd_at_entry": potential_confirmation_bar.macd,
+            "signal_line_at_entry": potential_confirmation_bar.signal_line,
+            "price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
+            "minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30,
+            "distance_from_recent_high": (highest_high_one_minute_bar.high - potential_confirmation_bar.open_value) / highest_high_one_minute_bar.high,
+            "distance_from_high_of_day": (original_bar_to_confirm.high - potential_confirmation_bar.close) / original_bar_to_confirm.high,
+            "volume_trend": potential_confirmation_bar.volume_average_last_3/potential_confirmation_bar.volume_average_last_10,
+            "number_of_negative_bars": 0,
+            "broke_high_of_day_at_entry": 1 if potential_confirmation_bar.close >= highest_high_one_minute_bar.high else 0,
+            "ema9_minus_vwap_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.vwap,
+            "ema9_minus_ema20_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.ema_20,
+            "number_of_green_bars_last_5": number_of_green_bars_last_5,
+            "number_of_red_bars_last_5": number_of_red_bars_last_5,
+            "distance_from_premarket_high": stock.pre_market_one_minute_highest_high_bar.index - potential_confirmation_bar.index if stock.pre_market_one_minute_highest_high_bar is not None else 0.0,
+            "entry_bar_range_pct": (potential_confirmation_bar.high - potential_confirmation_bar.low)/ potential_confirmation_bar.close,
+            "entry_bar_body_pct": potential_confirmation_bar.body_percentage,
+            "upper_wick_pct_at_entry": potential_confirmation_bar.bar_wick_percentage,
+            "volume_acceleration": potential_confirmation_bar.volume_average_last_3/potential_confirmation_bar.volume_average_last_10,
+            "move_efficiency": 0,
+            "pullback_to_trend_ratio": 0,
+            "pullback_structure_score": 0,
+            "volume_confirmation_ratio": 0,
+            "volume_trend_strength": 0,
+            "volume_during_pullback": 0,
+            "positive_volume_since_open": 0,
+            "negative_volume_since_open": 0,
+            "positive_bars_above_volume_average_since_open": 0,
+            "negative_bars_above_volume_average_since_open": 0,
+            "positive_bars_under_volume_average_since_open": 0,
+            "negative_bars_under_volume_average_since_open": 0,
+            "bars_above_volume_average_with_more_than_10_pct_wick_since_open": 0,
+            "bars_above_volume_average_with_more_than_20_pct_wick_since_open": 0,
+            "bars_above_volume_average_with_more_than_30_pct_wick_since_open": 0,
+            "bars_above_volume_average_with_more_than_40_pct_wick_since_open": 0,
+            "bars_above_volume_average_with_more_than_50_pct_wick_since_open": 0,
+            "bars_above_volume_average_with_more_than_60_pct_wick_since_open": 0,
+            "bars_above_volume_average_with_more_than_70_pct_wick_since_open": 0,
+            "bars_above_volume_average_with_more_than_80_pct_wick_since_open": 0,
+            "bars_with_resistance_since_open": 0,
+            "gains_dropped_since_highest_high": 0.0,
+            "last_bars_under_volume_average": 0,
+            "open_to_pre_market_highest_high_pct": 0.0,
+            "previous_day_body_pct": previous_day.body_percentage,
+            "volume_average_to_volume_pct": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
+            "previous_bar_volume_to_current_bar_volume_pct": previous_one_minute_bar.volume/potential_confirmation_bar.volume if previous_one_minute_bar is not None else 0.0,
+            "highest_high_to_current_bar_high_pct": highest_high_one_minute_bar.high/potential_confirmation_bar.high,
         }
 
         for bar_object in one_minute_bars:
+            if bar_object.is_opening_bar:
+                symbol_statistics["open_to_pre_market_highest_high_pct"] = bar_object.open_value/stock.pre_market_one_minute_highest_high_bar.high
+            if (
+                bar_object.bar_time + datetime.timedelta(minutes=30) > potential_confirmation_bar.bar_time
+                and bar_object.volume < bar_object.volume_average
+            ):
+                symbol_statistics["last_bars_under_volume_average"] += 1
+
+            if bar_object.volume > bar_object.volume_average:
+                if bar_object.body_percentage <= 0.5:
+                    symbol_statistics["bars_with_resistance_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.1:
+                    symbol_statistics["bars_above_volume_average_with_more_than_10_pct_wick_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.2:
+                    symbol_statistics["bars_above_volume_average_with_more_than_20_pct_wick_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.3:
+                    symbol_statistics["bars_above_volume_average_with_more_than_30_pct_wick_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.4:
+                    symbol_statistics["bars_above_volume_average_with_more_than_40_pct_wick_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.5:
+                    symbol_statistics["bars_above_volume_average_with_more_than_50_pct_wick_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.6:
+                    symbol_statistics["bars_above_volume_average_with_more_than_60_pct_wick_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.7:
+                    symbol_statistics["bars_above_volume_average_with_more_than_70_pct_wick_since_open"] += 1
+                if bar_object.bar_wick_percentage >= 0.8:
+                    symbol_statistics["bars_above_volume_average_with_more_than_80_pct_wick_since_open"] += 1
             bar_movement = bar_object.high - bar_object.low
             if bar_object.close > bar_object.open_value:
-                price_movement_statistics["positive_movement_since_market_open"] += bar_movement
+                symbol_statistics["positive_movement_since_market_open"] += bar_movement
+                symbol_statistics["positive_volume_since_open"] += bar_object.volume
             if bar_object.close <= bar_object.open_value:
-                price_movement_statistics["negative_movement_since_market_open"] += bar_movement
+                symbol_statistics["negative_movement_since_market_open"] += bar_movement
+                symbol_statistics["negative_volume_since_open"] += bar_object.volume
             if bar_object.close > bar_object.vwap:
-                price_movement_statistics["movement_above_vwap_since_market_open"] += bar_movement
+                symbol_statistics["movement_above_vwap_since_market_open"] += bar_movement
             if bar_object.close <= bar_object.vwap:
-                price_movement_statistics["movement_under_vwap_since_market_open"] += bar_movement
+                symbol_statistics["movement_under_vwap_since_market_open"] += bar_movement
             if bar_object.volume > bar_object.volume_average:
-                price_movement_statistics["movement_above_volume_average_counter_since_market_open"] += 1
+                symbol_statistics["movement_above_volume_average_counter_since_market_open"] += 1
+                if bar_object.close > bar_object.open_value:
+                    symbol_statistics["positive_bars_above_volume_average_since_open"] += 1
+                else:
+                    symbol_statistics["negative_bars_above_volume_average_since_open"] += 1
             if bar_object.volume <= bar_object.volume_average:
-                price_movement_statistics["movement_under_volume_average_counter_since_market_open"] += 1
-            if bar_object.histogram > 0.0 and bar_object.histogram > price_movement_statistics["highest_histogram_since_market_open"]:
-                price_movement_statistics["highest_histogram_since_market_open"] = bar_object.histogram
-            if bar_object.histogram < 0.0 and bar_object.histogram < price_movement_statistics["lowest_histogram_since_market_open"]:
-                price_movement_statistics["lowest_histogram_since_market_open"] = bar_object.histogram
+                symbol_statistics["movement_under_volume_average_counter_since_market_open"] += 1
+                if bar_object.close > bar_object.open_value:
+                    symbol_statistics["positive_bars_under_volume_average_since_open"] += 1
+                else:
+                    symbol_statistics["negative_bars_under_volume_average_since_open"] += 1
+            if bar_object.histogram > 0.0 and bar_object.histogram > symbol_statistics["highest_histogram_since_market_open"]:
+                symbol_statistics["highest_histogram_since_market_open"] = bar_object.histogram
+            if bar_object.histogram < 0.0 and bar_object.histogram < symbol_statistics["lowest_histogram_since_market_open"]:
+                symbol_statistics["lowest_histogram_since_market_open"] = bar_object.histogram
 
         bars_since_highest_high = [
             bar_object
@@ -329,11 +437,11 @@ class Evidence:
         ]
 
         if bars_since_highest_high:
+            lowest_low_bar = None
             lowest_low_since_highest_high = min(
                 bar_object.low
                 for bar_object in bars_since_highest_high
             )
-            lowest_low_bar = None
 
             for bar_object in bars_since_highest_high:
                 if bar_object.low == lowest_low_since_highest_high:
@@ -345,16 +453,38 @@ class Evidence:
                 if highest_high_one_minute_bar.bar_time < bar_object.bar_time <= lowest_low_bar.bar_time
             ]
 
+            number_of_negative_bars = len(
+                [
+                    bar_object
+                    for bar_object in pullback_bars
+                    if bar_object.close < bar_object.open_value
+                ]
+            )
+
+            gains_dropped_since_highest_high = (highest_high_one_minute_bar.high - lowest_low_bar.low)/highest_high_one_minute_bar.high
+
             pullback_duration = len(pullback_bars)
             pullback_size = sum(
                 bar_object.high - bar_object.low
                 for bar_object in pullback_bars
             )
-            price_movement_statistics["pullback_sharpness"] = pullback_size/pullback_duration
-            price_movement_statistics["pullback_duration"] = pullback_duration
-            price_movement_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low
+            volume_during_pullback = sum(
+                bar_object.volume
+                for bar_object in pullback_bars
+            )
 
-        return price_movement_statistics
+            symbol_statistics["pullback_sharpness"] = pullback_size/pullback_duration
+            symbol_statistics["pullback_duration"] = pullback_duration
+            symbol_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low if lowest_low_bar is not None else 0.0
+            symbol_statistics["number_of_negative_bars"] = number_of_negative_bars
+            symbol_statistics["move_efficiency"] = symbol_statistics["positive_movement_since_market_open"]/symbol_statistics["minutes_since_market_open"] if symbol_statistics["minutes_since_market_open"] > 0 else 0
+            symbol_statistics["pullback_to_trend_ratio"] = symbol_statistics["pullback_depth"]/symbol_statistics["positive_movement_since_market_open"] if symbol_statistics["positive_movement_since_market_open"] > 0 else 0
+            symbol_statistics["pullback_structure_score"] = symbol_statistics["pullback_duration"]/symbol_statistics["number_of_negative_bars"] if symbol_statistics["number_of_negative_bars"] > 0 else 0.0
+            symbol_statistics["volume_trend_strength"] = symbol_statistics["volume_acceleration"]*symbol_statistics["volume_trend"]
+            symbol_statistics["volume_during_pullback"] = volume_during_pullback
+            symbol_statistics["gains_dropped_since_highest_high"] = gains_dropped_since_highest_high
+
+        return symbol_statistics
 
     def confirm(
         self,
@@ -366,6 +496,7 @@ class Evidence:
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         volume_sum_since_market_open: float,
+        model_runner: model.runner.Runner,
     ) -> bool:
         current_bar_12_00 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
@@ -391,13 +522,38 @@ class Evidence:
         ):
             return False
 
-        potential_confirmation_bar.price_movement_statistics = self.price_movement_statistics(
+        potential_confirmation_bar.price_movement_statistics = self.symbol_statistics(
+            stock=stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            milestones=milestones,
+            original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             one_minute_bars=one_minute_bars,
         )
-        # if potential_confirmation_bar.price_movement_statistics["pullback_sharpness"] > 0.4:
-        #     return False
+
+        score: common.objects.Score = model_runner.score_potential_confirmation_bar(
+            bar_statistics=potential_confirmation_bar.price_movement_statistics,
+        )
+
+        if not score.should_take_trade:
+            self.logger.info(
+                msg="Bar confirmed by static confirmation, but got denied on model confirmation",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": stock.symbol_name,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "evidence_name": self.name,
+                    "request_id": stock.request_id,
+                    "score": score.score,
+                    "probability": score.probability,
+                    "threshold": score.threshold,
+                },
+            )
+            return False
 
         if (
             True

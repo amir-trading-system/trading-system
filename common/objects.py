@@ -32,6 +32,8 @@ class BarData:
         bar_time: datetime.datetime,
         vwap: float = 0.0,
         volume_average: float = 0.0,
+        volume_average_last_3: float = 0.0,
+        volume_average_last_10: float = 0.0,
         ema_9: float = 0.0,
         ema_20: float = 0.0,
         ema_12: float = 0.0,
@@ -53,6 +55,8 @@ class BarData:
         self.low = low
         self.volume = float(volume)
         self.volume_average = volume_average
+        self.volume_average_last_3 = volume_average_last_3
+        self.volume_average_last_10 = volume_average_last_10
         self.vwap = vwap
         self.ema_9 = ema_9
         self.ema_20 = ema_20
@@ -72,6 +76,13 @@ class BarData:
         ) or timeframe_type == TimeframeType.DAY
         self.ready_to_analyze = ready_to_analyze
         self.price_movement_statistics = price_movement_statistics
+        self.is_opening_bar = bar_time == datetime.datetime(
+            year=bar_time.year,
+            month=bar_time.month,
+            day=bar_time.day,
+            hour=9,
+            minute=30,
+        )
 
     @property
     def body_percentage(
@@ -87,6 +98,15 @@ class BarData:
         self,
     ) -> float:
         return (self.close - self.open_value)/self.open_value
+
+    @property
+    def bar_wick_percentage(
+        self,
+    ) -> float:
+        if self.high - self.low <= 0.0:
+            return 0.0
+
+        return (self.high - self.close)/(self.high - self.low)
 
     def has_strong_rejection(
         self,
@@ -126,6 +146,7 @@ class Stock:
         finished_analyze: bool = False,
         resistance_levels: list[BarData] = [],
         last_post_pre_one_minute_highest_high: float = 0.0,
+        pre_market_one_minute_highest_high_bar: BarData = None,
         post_pre_market_volume_sum: float = 0.0,
         last_lowest_low_bar: BarData = None,
         one_minute_request_id: int = None,
@@ -145,6 +166,7 @@ class Stock:
         self.finished_analyze = finished_analyze
         self.resistance_levels = resistance_levels
         self.last_post_pre_one_minute_highest_high = last_post_pre_one_minute_highest_high
+        self.pre_market_one_minute_highest_high_bar = pre_market_one_minute_highest_high_bar
         self.post_pre_market_volume_sum = post_pre_market_volume_sum
         self.volume_sum_since_4_am_today = volume_sum_since_4_am_today
         self.last_lowest_low_bar = last_lowest_low_bar
@@ -338,9 +360,17 @@ class Stock:
             previous_ema=previous_ema_26,
             current_length=current_length,
         )
-        self.calculate_volume_average(
+        current_bar.volume_average = self.calculate_volume_average(
             current_bar=current_bar,
             period=20,
+        )
+        current_bar.volume_average_last_3 = self.calculate_volume_average(
+            current_bar=current_bar,
+            period=3,
+        )
+        current_bar.volume_average_last_10 = self.calculate_volume_average(
+            current_bar=current_bar,
+            period=10,
         )
         self.calculate_vwap(
             current_bar=current_bar,
@@ -382,17 +412,17 @@ class Stock:
         self,
         current_bar: BarData,
         period: int = 20,
-    ):
+    ) -> float:
         sorted_bars = sorted(
             self.bars,
             key=lambda bar_object: bar_object.bar_time,
             reverse=True,
         )
         volume_sum = current_bar.volume
-        for bar_object in sorted_bars[:19]:
+        for bar_object in sorted_bars[:period-1]:
             volume_sum += bar_object.volume
 
-        current_bar.volume_average = volume_sum/period
+        return volume_sum/period
 
     def calculate_vwap(
         self,
@@ -529,15 +559,15 @@ class Milestones:
         self.fibonacci_retracement = fibonacci_retracement
         self.retracement_indexes = retracement_indexes
 
-class IndicatorResponse:
+class Score:
     def __init__(
         self,
-        success_count: int,
-        success_rate: float,
-        result: bool,
-        failed_base_evidences_count: int,
+        score: float,
+        probability: float,
+        threshold: float,
+        should_take_trade: bool,
     ):
-        self.success_rate = success_rate
-        self.success_count = success_count
-        self.result = result
-        self.failed_base_evidences_count = failed_base_evidences_count
+        self.score = score
+        self.probability = probability
+        self.threshold = threshold
+        self.should_take_trade = should_take_trade
