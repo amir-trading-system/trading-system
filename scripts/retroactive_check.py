@@ -188,12 +188,12 @@ def get_symbols() -> list[Symbol]:
             datetime_str="03.05.26T09:45:00",
         ),
         Symbol(
-            name="EDSA",
-            datetime_str="03.06.26T11:12:00",
+            name="DXST",
+            datetime_str="03.06.26T10:40:00",
         ),
         Symbol(
-            name="DTCK",
-            datetime_str="03.09.26T10:12:00",
+            name="EDSA",
+            datetime_str="03.06.26T11:12:00",
         ),
         Symbol(
             name="EDSA",
@@ -253,63 +253,60 @@ def write_to_csv(
                 "evidence",
                 "volume_until_now",
                 "result",
-                "positive_movement_since_market_open",
-                "negative_movement_since_market_open",
-                "movement_above_vwap_since_market_open",
-                "movement_under_vwap_since_market_open",
-                "movement_above_volume_average_counter_since_market_open",
-                "movement_under_volume_average_counter_since_market_open",
-                "highest_histogram_since_market_open",
-                "lowest_histogram_since_market_open",
-                "pullback_sharpness",
-                "pullback_duration",
-                "pullback_depth",
-                "histogram_at_entry",
-                "price_minus_vwap_at_entry",
-                "minutes_since_market_open",
-                "distance_from_recent_high",
-                "distance_from_high_of_day",
-                "volume_trend",
-                "number_of_negative_bars",
-                "broke_high_of_day_at_entry",
-                "ema9_minus_vwap_at_entry",
-                "ema9_minus_ema20_at_entry",
-                "number_of_green_bars_last_5",
-                "number_of_red_bars_last_5",
-                "distance_from_premarket_high",
-                "entry_bar_range_pct",
-                "entry_bar_body_pct",
-                "upper_wick_pct_at_entry",
-                "volume_acceleration",
-                "move_efficiency",
-                "pullback_to_trend_ratio",
-                "pullback_structure_score",
-                "volume_confirmation_ratio",
-                "volume_trend_strength",
-                "volume_during_pullback",
-                "positive_volume_since_open",
-                "negative_volume_since_open",
-                "positive_bars_above_volume_average_since_open",
-                "negative_bars_above_volume_average_since_open",
-                "positive_bars_under_volume_average_since_open",
-                "negative_bars_under_volume_average_since_open",
-                "bars_above_volume_average_with_more_than_10_pct_wick_since_open",
-                "bars_above_volume_average_with_more_than_20_pct_wick_since_open",
-                "bars_above_volume_average_with_more_than_30_pct_wick_since_open",
-                "bars_above_volume_average_with_more_than_40_pct_wick_since_open",
-                "bars_above_volume_average_with_more_than_50_pct_wick_since_open",
-                "bars_above_volume_average_with_more_than_60_pct_wick_since_open",
-                "bars_above_volume_average_with_more_than_70_pct_wick_since_open",
-                "bars_above_volume_average_with_more_than_80_pct_wick_since_open",
-                "bars_with_resistance_since_open",
-                "gains_dropped_since_highest_high",
-                "last_bars_under_volume_average",
-                "open_to_pre_market_highest_high_pct",
-                "lowest_low_pre_market_to_pre_market_highest_high_pct",
-                "previous_day_body_pct",
-                "volume_average_to_volume_pct",
-                "previous_bar_volume_to_current_bar_volume_pct",
-                "highest_high_to_current_bar_high_pct",
+                "feature_positive_movement_since_market_open",
+                "feature_negative_movement_since_market_open",
+                "feature_movement_above_vwap_since_market_open",
+                "feature_movement_under_vwap_since_market_open",
+                "feature_bars_above_volume_average_counter_since_market_open_pct",
+                "feature_bars_under_volume_average_counter_since_market_open_pct",
+                "feature_pullback_sharpness",
+                "feature_pullback_duration_pct",
+                "feature_pullback_depth",
+                "feature_histogram_at_entry",
+                "feature_price_minus_vwap_at_entry",
+                "feature_minutes_since_market_open_to_total_market_minutes_pct",
+                "feature_distance_from_recent_high",
+                "feature_distance_from_high_of_day",
+                "feature_volume_trend",
+                "feature_number_of_negative_bars_in_pullback_pct",
+                "feature_ema9_minus_vwap_at_entry",
+                "feature_ema9_minus_ema20_at_entry",
+                "feature_number_of_green_bars_last_5",
+                "feature_number_of_red_bars_last_5",
+                "feature_distance_from_pre_market_high",
+                "feature_entry_bar_range_pct",
+                "feature_entry_bar_body_pct",
+                "feature_upper_wick_pct_at_entry",
+                "feature_volume_acceleration",
+                "feature_move_efficiency",
+                "feature_pullback_to_trend_ratio",
+                "feature_pullback_structure_score",
+                "feature_volume_trend_strength",
+                "feature_volume_during_pullback_pct",
+                "feature_positive_volume_since_open_pct",
+                "feature_negative_volume_since_open_pct",
+                "feature_positive_bars_above_volume_average_since_open_pct",
+                "feature_negative_bars_above_volume_average_since_open_pct",
+                "feature_positive_bars_under_volume_average_since_open_pct",
+                "feature_negative_bars_under_volume_average_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct",
+                "feature_bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct",
+                "feature_bars_with_resistance_since_open_pct",
+                "feature_gains_dropped_since_highest_high",
+                "feature_last_bars_under_volume_average_pct",
+                "feature_open_to_pre_market_highest_high_pct",
+                "feature_lowest_low_pre_market_to_pre_market_highest_high_pct",
+                "feature_previous_day_body_pct",
+                "feature_volume_average_to_volume_pct",
+                "feature_previous_bar_volume_to_current_bar_volume_pct",
+                "feature_highest_high_to_current_bar_high_pct",
+                "feature_histogram_negative_momentum_pct",
             ],
         )
         f.flush()
@@ -332,26 +329,23 @@ def write_to_csv(
                 negative_movement_since_market_open = 0.0
                 movement_above_vwap_since_market_open = 0.0
                 movement_under_vwap_since_market_open = 0.0
-                movement_above_volume_average_counter_since_market_open = 0
-                movement_under_volume_average_counter_since_market_open = 0
-                highest_histogram_since_market_open = 0.0
-                lowest_histogram_since_market_open = 0.0
+                bars_above_volume_average_counter_since_market_open_pct = 0
+                bars_under_volume_average_counter_since_market_open_pct = 0
                 pullback_sharpness = 0.0
-                pullback_duration = 0
+                pullback_duration_pct = 0
                 pullback_depth = 0.0
                 histogram_at_entry = 0.0
                 price_minus_vwap_at_entry = 0.0
-                minutes_since_market_open = 0
+                minutes_since_market_open_to_total_market_minutes_pct = 0
                 distance_from_recent_high = 0.0
                 distance_from_high_of_day = 0.0
                 volume_trend = 0.0
-                number_of_negative_bars = 0
-                broke_high_of_day_at_entry = False
+                number_of_negative_bars_in_pullback_pct = 0
                 ema9_minus_vwap_at_entry = 0.0
                 ema9_minus_ema20_at_entry = 0.0
                 number_of_green_bars_last_5 = 0.0
                 number_of_red_bars_last_5 = 0.0
-                distance_from_premarket_high = 0.0
+                distance_from_pre_market_high = 0.0
                 entry_bar_range_pct = 0.0
                 entry_bar_body_pct = 0.0
                 upper_wick_pct_at_entry = 0.0
@@ -359,32 +353,32 @@ def write_to_csv(
                 move_efficiency = 0
                 pullback_to_trend_ratio = 0
                 pullback_structure_score = 0
-                volume_confirmation_ratio = 0
                 volume_trend_strength = 0
-                volume_during_pullback = 0
-                positive_volume_since_open = 0
-                negative_volume_since_open = 0
-                positive_bars_above_volume_average_since_open = 0
-                negative_bars_above_volume_average_since_open = 0
-                positive_bars_under_volume_average_since_open = 0
-                negative_bars_under_volume_average_since_open = 0
-                bars_above_volume_average_with_more_than_10_pct_wick_since_open = 0
-                bars_above_volume_average_with_more_than_20_pct_wick_since_open = 0
-                bars_above_volume_average_with_more_than_30_pct_wick_since_open = 0
-                bars_above_volume_average_with_more_than_40_pct_wick_since_open = 0
-                bars_above_volume_average_with_more_than_50_pct_wick_since_open = 0
-                bars_above_volume_average_with_more_than_60_pct_wick_since_open = 0
-                bars_above_volume_average_with_more_than_70_pct_wick_since_open = 0
-                bars_above_volume_average_with_more_than_80_pct_wick_since_open = 0
-                bars_with_resistance_since_open = 0
+                volume_during_pullback_pct = 0
+                positive_volume_since_open_pct = 0
+                negative_volume_since_open_pct = 0
+                positive_bars_above_volume_average_since_open_pct = 0
+                negative_bars_above_volume_average_since_open_pct = 0
+                positive_bars_under_volume_average_since_open_pct = 0
+                negative_bars_under_volume_average_since_open_pct = 0
+                bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct = 0
+                bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct = 0
+                bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct = 0
+                bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct = 0
+                bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct = 0
+                bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct = 0
+                bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct = 0
+                bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct = 0
+                bars_with_resistance_since_open_pct = 0
                 gains_dropped_since_highest_high = 0
-                last_bars_under_volume_average = 0
+                last_bars_under_volume_average_pct = 0
                 open_to_pre_market_highest_high_pct = 0
                 lowest_low_pre_market_to_pre_market_highest_high_pct = 0
                 previous_day_body_pct = 0
                 volume_average_to_volume_pct = 0
                 previous_bar_volume_to_current_bar_volume_pct = 0
                 highest_high_to_current_bar_high_pct = 0
+                histogram_negative_momentum_pct = 0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
@@ -392,26 +386,23 @@ def write_to_csv(
                     negative_movement_since_market_open = price_movement_statistics["negative_movement_since_market_open"]
                     movement_above_vwap_since_market_open = price_movement_statistics["movement_above_vwap_since_market_open"]
                     movement_under_vwap_since_market_open = price_movement_statistics["movement_under_vwap_since_market_open"]
-                    movement_above_volume_average_counter_since_market_open = price_movement_statistics["movement_above_volume_average_counter_since_market_open"]
-                    movement_under_volume_average_counter_since_market_open = price_movement_statistics["movement_under_volume_average_counter_since_market_open"]
-                    highest_histogram_since_market_open = price_movement_statistics["highest_histogram_since_market_open"]
-                    lowest_histogram_since_market_open = price_movement_statistics["lowest_histogram_since_market_open"]
+                    bars_above_volume_average_counter_since_market_open_pct = price_movement_statistics["bars_above_volume_average_counter_since_market_open_pct"]
+                    bars_under_volume_average_counter_since_market_open_pct = price_movement_statistics["bars_under_volume_average_counter_since_market_open_pct"]
                     pullback_sharpness = price_movement_statistics["pullback_sharpness"]
-                    pullback_duration = price_movement_statistics["pullback_duration"]
+                    pullback_duration_pct = price_movement_statistics["pullback_duration_pct"]
                     pullback_depth = price_movement_statistics["pullback_depth"]
                     histogram_at_entry = price_movement_statistics["histogram_at_entry"]
                     price_minus_vwap_at_entry = price_movement_statistics["price_minus_vwap_at_entry"]
-                    minutes_since_market_open = price_movement_statistics["minutes_since_market_open"]
+                    minutes_since_market_open_to_total_market_minutes_pct = price_movement_statistics["minutes_since_market_open_to_total_market_minutes_pct"]
                     distance_from_recent_high = price_movement_statistics["distance_from_recent_high"]
                     distance_from_high_of_day = price_movement_statistics["distance_from_high_of_day"]
                     volume_trend = price_movement_statistics["volume_trend"]
-                    number_of_negative_bars = price_movement_statistics["number_of_negative_bars"]
-                    broke_high_of_day_at_entry = price_movement_statistics["broke_high_of_day_at_entry"]
+                    number_of_negative_bars_in_pullback_pct = price_movement_statistics["number_of_negative_bars_in_pullback_pct"]
                     ema9_minus_vwap_at_entry = price_movement_statistics["ema9_minus_vwap_at_entry"]
                     ema9_minus_ema20_at_entry = price_movement_statistics["ema9_minus_ema20_at_entry"]
                     number_of_green_bars_last_5 = price_movement_statistics["number_of_green_bars_last_5"]
                     number_of_red_bars_last_5 = price_movement_statistics["number_of_red_bars_last_5"]
-                    distance_from_premarket_high = price_movement_statistics["distance_from_premarket_high"]
+                    distance_from_pre_market_high = price_movement_statistics["distance_from_pre_market_high"]
                     entry_bar_range_pct = price_movement_statistics["entry_bar_range_pct"]
                     entry_bar_body_pct = price_movement_statistics["entry_bar_body_pct"]
                     upper_wick_pct_at_entry = price_movement_statistics["upper_wick_pct_at_entry"]
@@ -419,32 +410,32 @@ def write_to_csv(
                     move_efficiency = price_movement_statistics["move_efficiency"]
                     pullback_to_trend_ratio = price_movement_statistics["pullback_to_trend_ratio"]
                     pullback_structure_score = price_movement_statistics["pullback_structure_score"]
-                    volume_confirmation_ratio = price_movement_statistics["volume_confirmation_ratio"]
                     volume_trend_strength = price_movement_statistics["volume_trend_strength"]
-                    volume_during_pullback = price_movement_statistics["volume_during_pullback"]
-                    positive_volume_since_open = price_movement_statistics["positive_volume_since_open"]
-                    negative_volume_since_open = price_movement_statistics["negative_volume_since_open"]
-                    positive_bars_above_volume_average_since_open = price_movement_statistics["positive_bars_above_volume_average_since_open"]
-                    negative_bars_above_volume_average_since_open = price_movement_statistics["negative_bars_above_volume_average_since_open"]
-                    positive_bars_under_volume_average_since_open = price_movement_statistics["positive_bars_under_volume_average_since_open"]
-                    negative_bars_under_volume_average_since_open = price_movement_statistics["negative_bars_under_volume_average_since_open"]
-                    bars_above_volume_average_with_more_than_10_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_10_pct_wick_since_open"]
-                    bars_above_volume_average_with_more_than_20_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_20_pct_wick_since_open"]
-                    bars_above_volume_average_with_more_than_30_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_30_pct_wick_since_open"]
-                    bars_above_volume_average_with_more_than_40_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_40_pct_wick_since_open"]
-                    bars_above_volume_average_with_more_than_50_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_50_pct_wick_since_open"]
-                    bars_above_volume_average_with_more_than_60_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_60_pct_wick_since_open"]
-                    bars_above_volume_average_with_more_than_70_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_70_pct_wick_since_open"]
-                    bars_above_volume_average_with_more_than_80_pct_wick_since_open = price_movement_statistics["bars_above_volume_average_with_more_than_80_pct_wick_since_open"]
-                    bars_with_resistance_since_open = price_movement_statistics["bars_with_resistance_since_open"]
+                    volume_during_pullback_pct = price_movement_statistics["volume_during_pullback_pct"]
+                    positive_volume_since_open_pct = price_movement_statistics["positive_volume_since_open_pct"]
+                    negative_volume_since_open_pct = price_movement_statistics["negative_volume_since_open_pct"]
+                    positive_bars_above_volume_average_since_open_pct = price_movement_statistics["positive_bars_above_volume_average_since_open_pct"]
+                    negative_bars_above_volume_average_since_open_pct = price_movement_statistics["negative_bars_above_volume_average_since_open_pct"]
+                    positive_bars_under_volume_average_since_open_pct = price_movement_statistics["positive_bars_under_volume_average_since_open_pct"]
+                    negative_bars_under_volume_average_since_open_pct = price_movement_statistics["negative_bars_under_volume_average_since_open_pct"]
+                    bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct"]
+                    bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct"]
+                    bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct"]
+                    bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct"]
+                    bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct"]
+                    bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct"]
+                    bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct"]
+                    bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct = price_movement_statistics["bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct"]
+                    bars_with_resistance_since_open_pct = price_movement_statistics["bars_with_resistance_since_open_pct"]
                     gains_dropped_since_highest_high = price_movement_statistics["gains_dropped_since_highest_high"]
-                    last_bars_under_volume_average = price_movement_statistics["last_bars_under_volume_average"]
+                    last_bars_under_volume_average_pct = price_movement_statistics["last_bars_under_volume_average_pct"]
                     open_to_pre_market_highest_high_pct = price_movement_statistics["open_to_pre_market_highest_high_pct"]
                     previous_day_body_pct = price_movement_statistics["previous_day_body_pct"]
                     volume_average_to_volume_pct = price_movement_statistics["volume_average_to_volume_pct"]
                     previous_bar_volume_to_current_bar_volume_pct = price_movement_statistics["previous_bar_volume_to_current_bar_volume_pct"]
                     highest_high_to_current_bar_high_pct = price_movement_statistics["highest_high_to_current_bar_high_pct"]
                     lowest_low_pre_market_to_pre_market_highest_high_pct = price_movement_statistics["lowest_low_pre_market_to_pre_market_highest_high_pct"]
+                    histogram_negative_momentum_pct = price_movement_statistics["histogram_negative_momentum_pct"]
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
@@ -491,26 +482,23 @@ def write_to_csv(
                             negative_movement_since_market_open,
                             movement_above_vwap_since_market_open,
                             movement_under_vwap_since_market_open,
-                            movement_above_volume_average_counter_since_market_open,
-                            movement_under_volume_average_counter_since_market_open,
-                            highest_histogram_since_market_open,
-                            lowest_histogram_since_market_open,
+                            bars_above_volume_average_counter_since_market_open_pct,
+                            bars_under_volume_average_counter_since_market_open_pct,
                             pullback_sharpness,
-                            pullback_duration,
+                            pullback_duration_pct,
                             pullback_depth,
                             histogram_at_entry,
                             price_minus_vwap_at_entry,
-                            minutes_since_market_open,
+                            minutes_since_market_open_to_total_market_minutes_pct,
                             distance_from_recent_high,
                             distance_from_high_of_day,
                             volume_trend,
-                            number_of_negative_bars,
-                            broke_high_of_day_at_entry,
+                            number_of_negative_bars_in_pullback_pct,
                             ema9_minus_vwap_at_entry,
                             ema9_minus_ema20_at_entry,
                             number_of_green_bars_last_5,
                             number_of_red_bars_last_5,
-                            distance_from_premarket_high,
+                            distance_from_pre_market_high,
                             entry_bar_range_pct,
                             entry_bar_body_pct,
                             upper_wick_pct_at_entry,
@@ -518,32 +506,32 @@ def write_to_csv(
                             move_efficiency,
                             pullback_to_trend_ratio,
                             pullback_structure_score,
-                            volume_confirmation_ratio,
                             volume_trend_strength,
-                            volume_during_pullback,
-                            positive_volume_since_open,
-                            negative_volume_since_open,
-                            positive_bars_above_volume_average_since_open,
-                            negative_bars_above_volume_average_since_open,
-                            positive_bars_under_volume_average_since_open,
-                            negative_bars_under_volume_average_since_open,
-                            bars_above_volume_average_with_more_than_10_pct_wick_since_open,
-                            bars_above_volume_average_with_more_than_20_pct_wick_since_open,
-                            bars_above_volume_average_with_more_than_30_pct_wick_since_open,
-                            bars_above_volume_average_with_more_than_40_pct_wick_since_open,
-                            bars_above_volume_average_with_more_than_50_pct_wick_since_open,
-                            bars_above_volume_average_with_more_than_60_pct_wick_since_open,
-                            bars_above_volume_average_with_more_than_70_pct_wick_since_open,
-                            bars_above_volume_average_with_more_than_80_pct_wick_since_open,
-                            bars_with_resistance_since_open,
+                            volume_during_pullback_pct,
+                            positive_volume_since_open_pct,
+                            negative_volume_since_open_pct,
+                            positive_bars_above_volume_average_since_open_pct,
+                            negative_bars_above_volume_average_since_open_pct,
+                            positive_bars_under_volume_average_since_open_pct,
+                            negative_bars_under_volume_average_since_open_pct,
+                            bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct,
+                            bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct,
+                            bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct,
+                            bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct,
+                            bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct,
+                            bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct,
+                            bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct,
+                            bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct,
+                            bars_with_resistance_since_open_pct,
                             gains_dropped_since_highest_high,
-                            last_bars_under_volume_average,
+                            last_bars_under_volume_average_pct,
                             open_to_pre_market_highest_high_pct,
                             lowest_low_pre_market_to_pre_market_highest_high_pct,
                             previous_day_body_pct,
                             volume_average_to_volume_pct,
                             previous_bar_volume_to_current_bar_volume_pct,
                             highest_high_to_current_bar_high_pct,
+                            histogram_negative_momentum_pct,
                         ]
                     )
                     f.flush()
@@ -701,7 +689,7 @@ def explore_past_potential_symbols() -> list[Symbol]:
     return symbols
 
 def run_retroactive_check():
-    for_positive_results = True
+    for_positive_results = False
     should_run_model = True
     for_test_real_case = False
     symbols_data = []
@@ -797,10 +785,6 @@ def run_retroactive_check():
                     datetime_str="03.05.26T12:07:00",
                 ),
                 Symbol(
-                    name="DXST",
-                    datetime_str="03.06.26T10:40:00",
-                ),
-                Symbol(
                     name="CAMP",
                     datetime_str="03.09.26T13:51:00",
                 ),
@@ -809,24 +793,12 @@ def run_retroactive_check():
                     datetime_str="03.10.26T14:06:00",
                 ),
                 Symbol(
-                    name="LWLG",
-                    datetime_str="03.12.26T09:34:00",
-                ),
-                Symbol(
                     name="ANTX",
                     datetime_str="03.12.26T14:35:00",
                 ),
                 Symbol(
                     name="ALTO",
                     datetime_str="03.12.26T10:35:00",
-                ),
-                Symbol(
-                    name="LWLG",
-                    datetime_str="03.13.26T10:20:00",
-                ),
-                Symbol(
-                    name="AGRZ",
-                    datetime_str="03.13.26T11:11:00",
                 ),
                 Symbol(
                     name="LWLG",
@@ -839,10 +811,6 @@ def run_retroactive_check():
                 Symbol(
                     name="TWAV",
                     datetime_str="03.16.26T10:55:00",
-                ),
-                Symbol(
-                    name="ARTL",
-                    datetime_str="03.18.26T09:54:00",
                 ),
                 Symbol(
                     name="QCLS",

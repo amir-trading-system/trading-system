@@ -333,33 +333,34 @@ class Evidence:
         if relevant_lows_for_pre_market_low:
             pre_market_lowest_low_since_highest_high = min(relevant_lows_for_pre_market_low)
 
+        minutes_since_market_open = ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30
+
         symbol_statistics = {
             "positive_movement_since_market_open": 0.0,
             "negative_movement_since_market_open": 0.0,
             "movement_above_vwap_since_market_open": 0.0,
             "movement_under_vwap_since_market_open": 0.0,
-            "movement_above_volume_average_counter_since_market_open": 0,
-            "movement_under_volume_average_counter_since_market_open": 0,
-            "highest_histogram_since_market_open": 0.0,
-            "lowest_histogram_since_market_open": 1.0,
+            "bars_above_volume_average_counter_since_market_open_pct": 0,
+            "bars_under_volume_average_counter_since_market_open_pct": 0,
             "pullback_sharpness": 0.0,
-            "pullback_duration": 0,
+            "pullback_duration_pct": 0,
             "pullback_depth": 0.0,
+            "positive_histogram_bars_since_open_pct": 0,
+            "negative_histogram_bars_since_open_pct": 0,
             "histogram_at_entry": potential_confirmation_bar.histogram,
             "macd_at_entry": potential_confirmation_bar.macd,
             "signal_line_at_entry": potential_confirmation_bar.signal_line,
             "price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
-            "minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30,
+            "minutes_since_market_open_to_total_market_minutes_pct": (minutes_since_market_open)/390,
             "distance_from_recent_high": (highest_high_one_minute_bar.high - potential_confirmation_bar.open_value) / highest_high_one_minute_bar.high,
             "distance_from_high_of_day": (original_bar_to_confirm.high - potential_confirmation_bar.close) / original_bar_to_confirm.high,
             "volume_trend": potential_confirmation_bar.volume_average_last_3/potential_confirmation_bar.volume_average_last_10,
-            "number_of_negative_bars": 0,
-            "broke_high_of_day_at_entry": 1 if potential_confirmation_bar.close >= highest_high_one_minute_bar.high else 0,
+            "number_of_negative_bars_in_pullback_pct": 0,
             "ema9_minus_vwap_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.vwap,
             "ema9_minus_ema20_at_entry": potential_confirmation_bar.ema_9 - potential_confirmation_bar.ema_20,
             "number_of_green_bars_last_5": number_of_green_bars_last_5,
             "number_of_red_bars_last_5": number_of_red_bars_last_5,
-            "distance_from_premarket_high": stock.pre_market_one_minute_highest_high_bar.index - potential_confirmation_bar.index if stock.pre_market_one_minute_highest_high_bar is not None else 0.0,
+            "distance_from_pre_market_high": stock.pre_market_one_minute_highest_high_bar.index - potential_confirmation_bar.index if stock.pre_market_one_minute_highest_high_bar is not None else 0.0,
             "entry_bar_range_pct": (potential_confirmation_bar.high - potential_confirmation_bar.low)/ potential_confirmation_bar.close,
             "entry_bar_body_pct": potential_confirmation_bar.body_percentage,
             "upper_wick_pct_at_entry": potential_confirmation_bar.bar_wick_percentage,
@@ -367,95 +368,151 @@ class Evidence:
             "move_efficiency": 0,
             "pullback_to_trend_ratio": 0,
             "pullback_structure_score": 0,
-            "volume_confirmation_ratio": 0,
             "volume_trend_strength": 0,
-            "volume_during_pullback": 0,
-            "positive_volume_since_open": 0,
-            "negative_volume_since_open": 0,
-            "positive_bars_above_volume_average_since_open": 0,
-            "negative_bars_above_volume_average_since_open": 0,
-            "positive_bars_under_volume_average_since_open": 0,
-            "negative_bars_under_volume_average_since_open": 0,
-            "bars_above_volume_average_with_more_than_10_pct_wick_since_open": 0,
-            "bars_above_volume_average_with_more_than_20_pct_wick_since_open": 0,
-            "bars_above_volume_average_with_more_than_30_pct_wick_since_open": 0,
-            "bars_above_volume_average_with_more_than_40_pct_wick_since_open": 0,
-            "bars_above_volume_average_with_more_than_50_pct_wick_since_open": 0,
-            "bars_above_volume_average_with_more_than_60_pct_wick_since_open": 0,
-            "bars_above_volume_average_with_more_than_70_pct_wick_since_open": 0,
-            "bars_above_volume_average_with_more_than_80_pct_wick_since_open": 0,
-            "bars_with_resistance_since_open": 0,
+            "volume_during_pullback_pct": 0,
+            "positive_volume_since_open_pct": 0,
+            "negative_volume_since_open_pct": 0,
+            "positive_bars_above_volume_average_since_open_pct": 0,
+            "negative_bars_above_volume_average_since_open_pct": 0,
+            "positive_bars_under_volume_average_since_open_pct": 0,
+            "negative_bars_under_volume_average_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct": 0,
+            "bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct": 0,
+            "bars_with_resistance_since_open_pct": 0,
             "gains_dropped_since_highest_high": 0.0,
-            "last_bars_under_volume_average": 0,
+            "last_bars_under_volume_average_pct": 0,
             "open_to_pre_market_highest_high_pct": 0.0,
             "lowest_low_pre_market_to_pre_market_highest_high_pct": pre_market_lowest_low_since_highest_high/stock.pre_market_one_minute_highest_high_bar.high if stock.pre_market_one_minute_highest_high_bar is not None else 0,
             "previous_day_body_pct": previous_day.body_percentage,
             "volume_average_to_volume_pct": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
             "previous_bar_volume_to_current_bar_volume_pct": previous_one_minute_bar.volume/potential_confirmation_bar.volume if previous_one_minute_bar is not None else 0.0,
             "highest_high_to_current_bar_high_pct": highest_high_one_minute_bar.high/potential_confirmation_bar.high,
+            "histogram_negative_momentum_pct": 0,
         }
 
+        bars_length = len(one_minute_bars)
+        bars_with_resistance_since_open = 0
+        total_volume_since_open = 0
+        positive_volume_since_open = 0
+        negative_volume_since_open = 0
+        bars_above_volume_average_counter_since_market_open = 0
+        bars_under_volume_average_counter_since_market_open = 0
+        last_bars_under_volume_average = 0
+        positive_histogram_bars_since_open = 0
+        negative_histogram_bars_since_open = 0
+        highest_histogram_bar = None
+        histogram_negative_momentum_counter = 0
         for bar_object in one_minute_bars:
+            previous_bar = one_minute_timeframe_stock.previous_bar(
+                bar_object=bar_object,
+            )
+            if (
+                True
+                and (
+                    previous_bar is not None
+                    and bar_object.histogram < previous_bar.histogram
+                ) or bar_object.histogram < 0
+            ):
+                histogram_negative_momentum_counter += 1
+
+            if highest_histogram_bar is None:
+                highest_histogram_bar = bar_object
+            if (
+                highest_histogram_bar is not None
+                and highest_histogram_bar.histogram < bar_object.histogram
+            ):
+                highest_histogram_bar = bar_object
+
+            total_volume_since_open += bar_object.volume
+            if bar_object.histogram > 0:
+                positive_histogram_bars_since_open += 1
+            else:
+                negative_histogram_bars_since_open += 1
             if bar_object.is_opening_bar:
                 symbol_statistics["open_to_pre_market_highest_high_pct"] = bar_object.open_value/stock.pre_market_one_minute_highest_high_bar.high if stock.pre_market_one_minute_highest_high_bar is not None else 0
             if (
                 bar_object.bar_time + datetime.timedelta(minutes=30) > potential_confirmation_bar.bar_time
                 and bar_object.volume < bar_object.volume_average
             ):
-                symbol_statistics["last_bars_under_volume_average"] += 1
+                last_bars_under_volume_average += 1
 
             if bar_object.volume > bar_object.volume_average:
                 if bar_object.body_percentage <= 0.5:
-                    symbol_statistics["bars_with_resistance_since_open"] += 1
+                    bars_with_resistance_since_open += 1
                 if bar_object.bar_wick_percentage >= 0.1:
-                    symbol_statistics["bars_above_volume_average_with_more_than_10_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct"] += 1
                 if bar_object.bar_wick_percentage >= 0.2:
-                    symbol_statistics["bars_above_volume_average_with_more_than_20_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct"] += 1
                 if bar_object.bar_wick_percentage >= 0.3:
-                    symbol_statistics["bars_above_volume_average_with_more_than_30_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct"] += 1
                 if bar_object.bar_wick_percentage >= 0.4:
-                    symbol_statistics["bars_above_volume_average_with_more_than_40_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct"] += 1
                 if bar_object.bar_wick_percentage >= 0.5:
-                    symbol_statistics["bars_above_volume_average_with_more_than_50_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct"] += 1
                 if bar_object.bar_wick_percentage >= 0.6:
-                    symbol_statistics["bars_above_volume_average_with_more_than_60_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct"] += 1
                 if bar_object.bar_wick_percentage >= 0.7:
-                    symbol_statistics["bars_above_volume_average_with_more_than_70_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct"] += 1
                 if bar_object.bar_wick_percentage >= 0.8:
-                    symbol_statistics["bars_above_volume_average_with_more_than_80_pct_wick_since_open"] += 1
+                    symbol_statistics["bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct"] += 1
+
             bar_movement = bar_object.high - bar_object.low
             if bar_object.close > bar_object.open_value:
                 symbol_statistics["positive_movement_since_market_open"] += bar_movement
-                symbol_statistics["positive_volume_since_open"] += bar_object.volume
+                positive_volume_since_open += bar_object.volume
             if bar_object.close <= bar_object.open_value:
                 symbol_statistics["negative_movement_since_market_open"] += bar_movement
-                symbol_statistics["negative_volume_since_open"] += bar_object.volume
+                negative_volume_since_open += bar_object.volume
             if bar_object.close > bar_object.vwap:
                 symbol_statistics["movement_above_vwap_since_market_open"] += bar_movement
             if bar_object.close <= bar_object.vwap:
                 symbol_statistics["movement_under_vwap_since_market_open"] += bar_movement
             if bar_object.volume > bar_object.volume_average:
-                symbol_statistics["movement_above_volume_average_counter_since_market_open"] += 1
+                bars_above_volume_average_counter_since_market_open += 1
                 if bar_object.close > bar_object.open_value:
-                    symbol_statistics["positive_bars_above_volume_average_since_open"] += 1
+                    symbol_statistics["positive_bars_above_volume_average_since_open_pct"] += 1
                 else:
-                    symbol_statistics["negative_bars_above_volume_average_since_open"] += 1
+                    symbol_statistics["negative_bars_above_volume_average_since_open_pct"] += 1
             if bar_object.volume <= bar_object.volume_average:
-                symbol_statistics["movement_under_volume_average_counter_since_market_open"] += 1
+                bars_under_volume_average_counter_since_market_open += 1
                 if bar_object.close > bar_object.open_value:
-                    symbol_statistics["positive_bars_under_volume_average_since_open"] += 1
+                    symbol_statistics["positive_bars_under_volume_average_since_open_pct"] += 1
                 else:
-                    symbol_statistics["negative_bars_under_volume_average_since_open"] += 1
-            if bar_object.histogram > 0.0 and bar_object.histogram > symbol_statistics["highest_histogram_since_market_open"]:
-                symbol_statistics["highest_histogram_since_market_open"] = bar_object.histogram
-            if bar_object.histogram < 0.0 and bar_object.histogram < symbol_statistics["lowest_histogram_since_market_open"]:
-                symbol_statistics["lowest_histogram_since_market_open"] = bar_object.histogram
+                    symbol_statistics["negative_bars_under_volume_average_since_open_pct"] += 1
 
         bars_since_highest_high = [
             bar_object
             for bar_object in one_minute_bars
             if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
         ]
+
+        symbol_statistics["negative_volume_since_open_pct"] = negative_volume_since_open/total_volume_since_open
+        symbol_statistics["positive_volume_since_open_pct"] = positive_volume_since_open/total_volume_since_open
+        symbol_statistics["bars_with_resistance_since_open_pct"] = bars_with_resistance_since_open/bars_length
+        symbol_statistics["positive_bars_above_volume_average_since_open_pct"] = symbol_statistics["positive_bars_above_volume_average_since_open_pct"]/bars_length
+        symbol_statistics["negative_bars_above_volume_average_since_open_pct"] = symbol_statistics["negative_bars_above_volume_average_since_open_pct"]/bars_length
+        symbol_statistics["positive_bars_under_volume_average_since_open_pct"] = symbol_statistics["positive_bars_under_volume_average_since_open_pct"]/bars_length
+        symbol_statistics["negative_bars_under_volume_average_since_open_pct"] = symbol_statistics["negative_bars_under_volume_average_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_10_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_20_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_30_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_40_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_50_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_60_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_70_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct"] = symbol_statistics["bars_above_volume_average_with_more_than_80_pct_wick_since_open_pct"]/bars_length
+        symbol_statistics["bars_under_volume_average_counter_since_market_open_pct"] = bars_under_volume_average_counter_since_market_open/bars_length
+        symbol_statistics["bars_above_volume_average_counter_since_market_open_pct"] = bars_above_volume_average_counter_since_market_open/bars_length
+        symbol_statistics["last_bars_under_volume_average_pct"] = last_bars_under_volume_average/30
+        symbol_statistics["positive_histogram_bars_since_open_pct"] = positive_histogram_bars_since_open/bars_length
+        symbol_statistics["negative_histogram_bars_since_open_pct"] = negative_histogram_bars_since_open/bars_length
+        symbol_statistics["histogram_negative_momentum_pct"] = histogram_negative_momentum_counter/bars_length
 
         if bars_since_highest_high:
             lowest_low_bar = None
@@ -474,7 +531,7 @@ class Evidence:
                 if highest_high_one_minute_bar.bar_time < bar_object.bar_time <= lowest_low_bar.bar_time
             ]
 
-            number_of_negative_bars = len(
+            number_of_negative_bars_in_pullback = len(
                 [
                     bar_object
                     for bar_object in pullback_bars
@@ -495,14 +552,14 @@ class Evidence:
             )
 
             symbol_statistics["pullback_sharpness"] = pullback_size/pullback_duration
-            symbol_statistics["pullback_duration"] = pullback_duration
+            symbol_statistics["pullback_duration_pct"] = pullback_duration/bars_length
             symbol_statistics["pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low if lowest_low_bar is not None else 0.0
-            symbol_statistics["number_of_negative_bars"] = number_of_negative_bars
-            symbol_statistics["move_efficiency"] = symbol_statistics["positive_movement_since_market_open"]/symbol_statistics["minutes_since_market_open"] if symbol_statistics["minutes_since_market_open"] > 0 else 0
+            symbol_statistics["number_of_negative_bars_in_pullback_pct"] = number_of_negative_bars_in_pullback/len(pullback_bars)
+            symbol_statistics["move_efficiency"] = symbol_statistics["positive_movement_since_market_open"]/minutes_since_market_open if minutes_since_market_open > 0 else 0
             symbol_statistics["pullback_to_trend_ratio"] = symbol_statistics["pullback_depth"]/symbol_statistics["positive_movement_since_market_open"] if symbol_statistics["positive_movement_since_market_open"] > 0 else 0
-            symbol_statistics["pullback_structure_score"] = symbol_statistics["pullback_duration"]/symbol_statistics["number_of_negative_bars"] if symbol_statistics["number_of_negative_bars"] > 0 else 0.0
+            symbol_statistics["pullback_structure_score"] = pullback_duration/number_of_negative_bars_in_pullback if number_of_negative_bars_in_pullback > 0 else 0.0
             symbol_statistics["volume_trend_strength"] = symbol_statistics["volume_acceleration"]*symbol_statistics["volume_trend"]
-            symbol_statistics["volume_during_pullback"] = volume_during_pullback
+            symbol_statistics["volume_during_pullback_pct"] = volume_during_pullback/total_volume_since_open
             symbol_statistics["gains_dropped_since_highest_high"] = gains_dropped_since_highest_high
 
         return symbol_statistics
