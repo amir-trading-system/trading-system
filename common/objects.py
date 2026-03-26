@@ -91,7 +91,7 @@ class BarData:
         if self.high - self.low <= 0.0:
             return 0.0
 
-        return (self.close - self.open_value)/(self.high - self.low)
+        return abs(self.close - self.open_value)/(self.high - self.low)
 
     @property
     def bar_up_percentage(
@@ -566,8 +566,10 @@ class Score:
         probability: float,
         threshold: float,
         should_take_trade: bool,
+        features_tree: dict[str, any],
     ):
         self.score = score
         self.probability = probability
         self.threshold = threshold
         self.should_take_trade = should_take_trade
+        self.features_tree = features_tree

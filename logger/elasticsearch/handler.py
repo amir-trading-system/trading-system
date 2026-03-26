@@ -64,6 +64,9 @@ class Handler(
             "bar_time",
             "last_one_minute_bar_time",
             "entry_position_bar_time",
+            "score",
+            "probability",
+            "threshold",
         ]
 
         for field in fields:
