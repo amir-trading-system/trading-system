@@ -56,8 +56,6 @@ def get_dynamic_symbols_data_from_period(
     for stock_bulk in stock_bulks:
         symbols_to_download: list[str] = []
         for stock in stock_bulk:
-            if stock["market_cap"] == '':
-                continue
             is_valid_symbol = True
             for char in stock["symbol"]:
                 if not char.isalpha():
@@ -68,10 +66,9 @@ def get_dynamic_symbols_data_from_period(
                 continue
 
             symbol = stock["symbol"].rstrip()
-            market_cap = int(float(stock["market_cap"]))
             price = float(stock["price"].replace('$', ''))
 
-            if market_cap < 500000000 and price > 1:
+            if price > 1:
                 symbols_to_download.append(symbol)
 
         historical_data = yfinance.download(
@@ -128,7 +125,7 @@ def get_dynamic_symbols_data_from_period(
                     if not price.get("low", None):
                         continue
                     ratio = (price["high"] - price["low"])/price["low"]
-                    if ratio < 0.8 or price["high"] < price["low"]:
+                    if ratio < 0.5 or price["high"] < price["low"]:
                         continue
                     symbol_to_date[symbol] = date.strftime("%m.%d.%yT%H:%M:%S")
 

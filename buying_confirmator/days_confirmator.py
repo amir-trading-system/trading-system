@@ -300,18 +300,6 @@ class Confirmator:
             if lowest_low_one_minute_bar is None:
                 lowest_low_one_minute_bar = potential_confirmation_bar
 
-            self.logger.info(
-                msg="Got potential bar for confirmation",
-                extra={
-                    "worker": "Confirmator",
-                    "symbol": original_bar_to_confirm.symbol,
-                    "timeframe": original_bar_to_confirm.timeframe,
-                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                    "bar_time": original_bar_to_confirm.bar_time,
-                    "request_id": stock.request_id,
-                },
-            )
             stock.one_minute_bars_queue.task_done()
             date_now = datetime.datetime.now()
 

@@ -272,12 +272,12 @@ class Evidence:
             and not crossed_resistance_level_strongly
             and higher_resistance_levels_count/len(resistance_levels) <= 1
             and len(resistance_levels) > 1
-            and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=10) > highest_high_one_minute_bar.bar_time
+            and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=5) > highest_high_one_minute_bar.bar_time
             and potential_confirmation_bar.high - potential_confirmation_bar.low > 0.0
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.75
+            and (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.6
             and potential_confirmation_bar.close > highest_high_one_minute_bar.high
-            and (potential_confirmation_bar.close - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.4
+            and (potential_confirmation_bar.close > highest_high_one_minute_bar.high)
             and not any(
                 r_l
                 for r_l in resistance_levels
@@ -355,7 +355,7 @@ class Evidence:
 
         if model_runner.should_run_model:
             score: common.objects.Score = model_runner.score_potential_confirmation_bar(
-                bar_statistics=potential_confirmation_bar.price_movement_statistics,
+                potential_confirmation_bar=potential_confirmation_bar,
             )
 
             msg = "Bar confirmed by model"
@@ -387,6 +387,9 @@ class Evidence:
             and potential_confirmation_bar.close < potential_confirmation_bar.high
             and potential_confirmation_bar.low < potential_confirmation_bar.open_value
         ):
+            return False
+
+        if (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.25:
             return False
 
         if current_bar_09_30 <= potential_confirmation_bar.bar_time <= current_bar_10_00:

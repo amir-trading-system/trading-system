@@ -21,7 +21,7 @@ class Runner:
 
     def score_potential_confirmation_bar(
         self,
-        bar_statistics: dict[str, float],
+        potential_confirmation_bar: common.objects.BarData,
     ) -> common.objects.Score:
         if not self.should_run_model:
             return common.objects.Score(
@@ -33,7 +33,7 @@ class Runner:
 
         features_data = {}
         for feature_name in self.features:
-            features_data[feature_name] = bar_statistics.get(feature_name, np.nan)
+            features_data[feature_name] = potential_confirmation_bar.price_movement_statistics.get(feature_name, np.nan)
 
         x_live = pd.DataFrame([features_data], columns=self.features)
         x_live = pd.DataFrame(self.imputer.transform(x_live), columns=self.features)

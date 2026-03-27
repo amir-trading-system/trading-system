@@ -9,9 +9,9 @@ for file_name in [
 ]:
     df = pd.read_csv(file_name)
 
-    df["bar_volume_to_volume_sum_since_market_open"] = df["bar_volume"]/(df["feature_volume_sum_since_market_open"] - df["bar_volume"])
-    df["volume_average_to_bar_volume"] = df["volume_average"]/df["bar_volume"]
-    df["volume_per_minute_to_bar_volume"] = df["volume_per_minute"]/df["bar_volume"]
+    # df["bar_volume_to_volume_sum_since_market_open"] = df["bar_volume"]/(df["feature_volume_sum_since_market_open"] - df["bar_volume"])
+    # df["volume_average_to_bar_volume"] = df["volume_average"]/df["bar_volume"]
+    # df["volume_per_minute_to_bar_volume"] = df["volume_per_minute"]/df["bar_volume"]
 
     df = df.drop(
         columns=[

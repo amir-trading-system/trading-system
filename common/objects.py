@@ -573,3 +573,14 @@ class Score:
         self.probability = probability
         self.threshold = threshold
         self.should_take_trade = should_take_trade
+
+class SymbolTest:
+    def __init__(
+        self,
+        name: str,
+        datetime_str: str,
+        is_positive: bool = False,
+    ):
+        self.name = name
+        self.date_time = datetime.datetime.strptime(datetime_str, "%m.%d.%yT%H:%M:%S")
+        self.is_positive = is_positive

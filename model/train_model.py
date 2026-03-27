@@ -77,36 +77,7 @@ def find_shared_numeric_features(pos_df, neg_df):
     shared_columns = sorted((pos_num & neg_num) - {"label"})
     final_shares_columns = []
     for feature in shared_columns:
-        # if str(feature).startswith("feature_"):
-        if str(feature) in [
-            "feature_entry_bar_strengh_pct",
-            "feature_strong_positive_bars_with_full_body_pct",
-            "feature_minutes_since_market_open_to_total_market_minutes_pct",
-            "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
-            "feature_highest_volume_before_to_entry_bar_volume_ratio",
-            "feature_high_volume_bars_with_rejection_pct",
-            "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
-            "feature_ema_9_keeps_going_up_pct",
-            "feature_price_minus_vwap_at_entry",
-            "feature_strong_bars_has_continuation",
-            "feature_bars_above_volume_average_pct",
-            "feature_strong_bars_above_volume_average_to_total_bars_pct",
-            "feature_strong_bars_above_volume_average_pct",
-            "feature_macd_under_signal_line_counter",
-            "feature_bars_with_at_least_50_pct_wick_pct",
-            "feature_bars_with_lower_volume_average_pct",
-            "feature_pullback_depth",
-            "feature_pullback_sharpness",
-            "feature_pullback_to_trend_ratio",
-            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
-            "feature_number_of_negative_bars_in_pullback_pct",
-            "feature_histogram_negative_momentum_pct",
-            "feature_has_positive_more_than_negative_bars",
-            "feature_entry_exaustion",
-            "feature_distance_from_highest_high",
-            "feature_volume_sum_since_market_open",
-            "feature_extension_from_vwap",
-        ]:
+        if str(feature).startswith("feature_"):
             final_shares_columns.append(feature)
 
     return final_shares_columns
@@ -405,7 +376,9 @@ def classify_row(row: pd.Series):
 
 print("\n================ SAMPLE LIVE OUTPUT ================\n")
 sample_row = positive_scored.iloc[0]
-print(classify_row(sample_row))
+
+classified_row = classify_row(sample_row)
+print(classified_row)
 
 
 
@@ -414,7 +387,7 @@ joblib.dump(imputer, "model/trade_imputer.pkl")
 
 model_bundle = {
     "features": shared_features,
-    "threshold": 0.65,
+    "threshold": classified_row["probability"],
 }
 
 joblib.dump(model_bundle, "model/trade_model_bundle.pkl")

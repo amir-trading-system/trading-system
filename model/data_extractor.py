@@ -199,6 +199,12 @@ class DataExtractor:
         feature_extension_from_vwap = (potential_confirmation_bar.close - potential_confirmation_bar.vwap)/potential_confirmation_bar.vwap
         feature_distance_from_highest_high = (potential_confirmation_bar.close - highest_high_one_minute_bar.high)/highest_high_one_minute_bar.high
         feature_entry_exaustion = entry_range/last_3_bars_profit_gain_avg if last_3_bars_profit_gain_avg > 0 else 0
+        feature_previous_bar_to_highest_high_pct = 0
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+        if previous_bar is not None:
+            feature_previous_bar_to_highest_high_pct = previous_bar.high/highest_high_one_minute_bar.high
 
         feature_highest_volume_before_to_entry_bar_volume_ratio = 0
         feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = 0
@@ -268,9 +274,6 @@ class DataExtractor:
             "feature_bars_with_lower_volume_average_pct": feature_bars_with_lower_volume_average_pct,
             "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open": feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open,
             "feature_volume_sum_since_market_open": volume_sum_since_market_open,
-            "feature_volume_per_minute": round(volume_per_minute, 2),
-            "feature_volume_average": potential_confirmation_bar.volume_average,
-            "feature_bar_volume": potential_confirmation_bar.volume,
             "feature_highest_volume_before_to_entry_bar_volume_ratio": feature_highest_volume_before_to_entry_bar_volume_ratio,
             "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio": feature_highest_average_volume_before_to_entry_bar_average_volume_ratio,
             "feature_highest_average_volume_before_to_entry_bar_volume_ratio": feature_highest_average_volume_before_to_entry_bar_volume_ratio,
@@ -285,6 +288,10 @@ class DataExtractor:
             "feature_extension_from_vwap": feature_extension_from_vwap,
             "feature_distance_from_highest_high": feature_distance_from_highest_high,
             "feature_entry_exaustion": feature_entry_exaustion,
+            "feature_previous_bar_to_highest_high_pct": feature_previous_bar_to_highest_high_pct,
+            "feature_bar_volume_to_volume_sum_since_market_open": potential_confirmation_bar.volume/(volume_sum_since_market_open - potential_confirmation_bar.volume),
+            "feature_volume_average_to_bar_volume": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
+            "feature_volume_per_minute_to_bar_volume": round(volume_per_minute, 2)/potential_confirmation_bar.volume,
         }
 
         return features
