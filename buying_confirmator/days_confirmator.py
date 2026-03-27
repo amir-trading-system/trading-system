@@ -49,8 +49,12 @@ class Confirmator:
         if (
             True
             and self.is_retro
-            and potential_confirmation_bar.bar_time.hour == 19
-            and potential_confirmation_bar.bar_time.minute == 59
+            and potential_confirmation_bar.bar_time > datetime.datetime(
+                year=potential_confirmation_bar.bar_time.year,
+                month=potential_confirmation_bar.bar_time.month,
+                day=potential_confirmation_bar.bar_time.day,
+                hour=16,
+            )
         ):
             self.results_queue.put(
                 {
@@ -61,7 +65,7 @@ class Confirmator:
                     "price_movement_statistics": {},
                 },
             )
-            return False
+            return True
 
         today_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,

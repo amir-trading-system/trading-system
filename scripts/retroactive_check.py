@@ -119,14 +119,6 @@ def get_symbols() -> list[Symbol]:
             datetime_str="01.29.26T09:47:00",
         ),
         Symbol(
-            name="CATX",
-            datetime_str="01.29.26T11:39:00",
-        ),
-        Symbol(
-            name="ANL",
-            datetime_str="01.29.26T15:44:00",
-        ),
-        Symbol(
             name="FEED",
             datetime_str="01.30.26T09:57:00",
         ),
@@ -231,6 +223,10 @@ def get_symbols() -> list[Symbol]:
             datetime_str="03.23.26T10:45:00",
         ),
         Symbol(
+            name="UGRO",
+            datetime_str="03.25.26T10:41:00",
+        ),
+        Symbol(
             name="EEIQ",
             datetime_str="03.26.26T09:59:00",
         ),
@@ -256,9 +252,6 @@ def write_to_csv(
                 "evidence",
                 "result",
                 "feature_has_positive_more_than_negative_bars",
-                "feature_has_more_positive_volume_than_negative",
-                "feature_open_close_to_ema_9",
-                "feature_most_of_bars_above_vwap",
                 "feature_pullback_sharpness",
                 "feature_pullback_depth",
                 "feature_number_of_negative_bars_in_pullback_pct",
@@ -279,6 +272,15 @@ def write_to_csv(
                 "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
                 "feature_macd_under_signal_line_counter",
                 "feature_entry_bar_strengh_pct",
+                "feature_ema_9_keeps_going_up_pct",
+                "feature_strong_bars_above_volume_average_pct",
+                "feature_strong_bars_above_volume_average_to_total_bars_pct",
+                "feature_bars_above_volume_average_pct",
+                "feature_strong_bars_has_continuation",
+                "feature_high_volume_bars_with_rejection_pct",
+                "feature_extension_from_vwap",
+                "feature_distance_from_highest_high",
+                "feature_entry_exaustion",
             ],
         )
         f.flush()
@@ -297,9 +299,6 @@ def write_to_csv(
                 original_bar_time = symbol_data["original_bar_time"]
                 result = symbol_data["result"]
                 feature_has_positive_more_than_negative_bars = False
-                feature_has_more_positive_volume_than_negative = False
-                feature_open_close_to_ema_9 = False
-                feature_most_of_bars_above_vwap = False
                 feature_pullback_sharpness = 0
                 feature_pullback_depth = 0
                 feature_number_of_negative_bars_in_pullback_pct = 0
@@ -320,13 +319,19 @@ def write_to_csv(
                 feature_highest_average_volume_before_to_entry_bar_volume_ratio = 0
                 feature_macd_under_signal_line_counter = 0
                 feature_entry_bar_strengh_pct = 0
+                feature_ema_9_keeps_going_up_pct = 0
+                feature_strong_bars_above_volume_average_pct = 0
+                feature_strong_bars_above_volume_average_to_total_bars_pct = 0
+                feature_bars_above_volume_average_pct = 0
+                feature_strong_bars_has_continuation = 0
+                feature_high_volume_bars_with_rejection_pct = 0
+                feature_extension_from_vwap = 0
+                feature_distance_from_highest_high = 0
+                feature_entry_exaustion = 0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
                     feature_has_positive_more_than_negative_bars = price_movement_statistics["feature_has_positive_more_than_negative_bars"]
-                    feature_has_more_positive_volume_than_negative = price_movement_statistics["feature_has_more_positive_volume_than_negative"]
-                    feature_open_close_to_ema_9 = price_movement_statistics["feature_open_close_to_ema_9"]
-                    feature_most_of_bars_above_vwap = price_movement_statistics["feature_most_of_bars_above_vwap"]
                     feature_pullback_sharpness = price_movement_statistics["feature_pullback_sharpness"]
                     feature_pullback_depth = price_movement_statistics["feature_pullback_depth"]
                     feature_number_of_negative_bars_in_pullback_pct = price_movement_statistics["feature_number_of_negative_bars_in_pullback_pct"]
@@ -347,6 +352,15 @@ def write_to_csv(
                     feature_highest_average_volume_before_to_entry_bar_volume_ratio = price_movement_statistics["feature_highest_average_volume_before_to_entry_bar_volume_ratio"]
                     feature_macd_under_signal_line_counter = price_movement_statistics["feature_macd_under_signal_line_counter"]
                     feature_entry_bar_strengh_pct = price_movement_statistics["feature_entry_bar_strengh_pct"]
+                    feature_ema_9_keeps_going_up_pct = price_movement_statistics["feature_ema_9_keeps_going_up_pct"]
+                    feature_strong_bars_above_volume_average_pct = price_movement_statistics["feature_strong_bars_above_volume_average_pct"]
+                    feature_strong_bars_above_volume_average_to_total_bars_pct = price_movement_statistics["feature_strong_bars_above_volume_average_to_total_bars_pct"]
+                    feature_bars_above_volume_average_pct = price_movement_statistics["feature_bars_above_volume_average_pct"]
+                    feature_strong_bars_has_continuation = price_movement_statistics["feature_strong_bars_has_continuation"]
+                    feature_high_volume_bars_with_rejection_pct = price_movement_statistics["feature_high_volume_bars_with_rejection_pct"]
+                    feature_extension_from_vwap = price_movement_statistics["feature_extension_from_vwap"]
+                    feature_distance_from_highest_high = price_movement_statistics["feature_distance_from_highest_high"]
+                    feature_entry_exaustion = price_movement_statistics["feature_entry_exaustion"]
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
@@ -386,9 +400,6 @@ def write_to_csv(
                                 evidence_name,
                                 result,
                                 feature_has_positive_more_than_negative_bars,
-                                feature_has_more_positive_volume_than_negative,
-                                feature_open_close_to_ema_9,
-                                feature_most_of_bars_above_vwap,
                                 feature_pullback_sharpness,
                                 feature_pullback_depth,
                                 feature_number_of_negative_bars_in_pullback_pct,
@@ -409,6 +420,15 @@ def write_to_csv(
                                 feature_highest_average_volume_before_to_entry_bar_volume_ratio,
                                 feature_macd_under_signal_line_counter,
                                 feature_entry_bar_strengh_pct,
+                                feature_ema_9_keeps_going_up_pct,
+                                feature_strong_bars_above_volume_average_pct,
+                                feature_strong_bars_above_volume_average_to_total_bars_pct,
+                                feature_bars_above_volume_average_pct,
+                                feature_strong_bars_has_continuation,
+                                feature_high_volume_bars_with_rejection_pct,
+                                feature_extension_from_vwap,
+                                feature_distance_from_highest_high,
+                                feature_entry_exaustion,
                             ]
                         )
 
@@ -496,7 +516,7 @@ def wait_for_confirmation(
             relevant_symbol_data[0]["evidence_name"] = "no evidence"
             relevant_symbol_data[0]["collection_status"] = "done"
             relevant_symbol_data[0]["analysis_status"] = "done"
-            relevant_symbol_data[0]["price_movement_statistics"] = {}
+            relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result.get("price_movement_statistics", {})
             continue
 
         for evidence_name in confirmation_result["evidences"]:
@@ -544,7 +564,7 @@ def explore_past_potential_symbols() -> list[Symbol]:
             datetime_str=date,
         )
         for symbol, date in stock_finder.get_dynamic_symbols_data_from_period(
-            period="5mo",
+            period="6mo",
         ).items()
     ]
 
@@ -563,11 +583,16 @@ def explore_past_potential_symbols() -> list[Symbol]:
     return symbols
 
 def run_retroactive_check():
-    for_positive_results = True
+    for_positive_results = False
     should_run_model = True
-    for_test_real_case = False
+    for_test_real_case = True
     symbols_data = []
-    symbols = []
+    symbols = [
+        Symbol(
+            name="BATL",
+            datetime_str="03.06.26T09:32:00",
+        ),
+    ]
     output_file_name = "model/real_case_result.csv"
     # symbols = explore_past_potential_symbols()
 
@@ -578,6 +603,10 @@ def run_retroactive_check():
             output_file_name = "model/positive_results.csv"
         else:
             symbols = [
+                Symbol(
+                    name="BGL",
+                    datetime_str="01.22.26T11:42:00",
+                ),
                 Symbol(
                     name="HBIO",
                     datetime_str="10.30.25T09:52:00",
@@ -627,6 +656,14 @@ def run_retroactive_check():
                     datetime_str="01.27.26T15:36:00",
                 ),
                 Symbol(
+                    name="CATX",
+                    datetime_str="01.29.26T12:22:00",
+                ),
+                Symbol(
+                    name="ROMA",
+                    datetime_str="02.02.26T10:00:00",
+                ),
+                Symbol(
                     name="JLHL",
                     datetime_str="02.02.26T10:46:00",
                 ),
@@ -635,8 +672,20 @@ def run_retroactive_check():
                     datetime_str="02.02.26T15:19:00",
                 ),
                 Symbol(
+                    name="ZCMD",
+                    datetime_str="02.04.26T11:23:00",
+                ),
+                Symbol(
                     name="SMX",
                     datetime_str="02.06.26T10:16:00",
+                ),
+                Symbol(
+                    name="MGRT",
+                    datetime_str="02.12.26T13:48:00",
+                ),
+                Symbol(
+                    name="FGL",
+                    datetime_str="02.13.26T10:37:00",
                 ),
                 Symbol(
                     name="JDZG",
@@ -645,6 +694,10 @@ def run_retroactive_check():
                 Symbol(
                     name="CDIO",
                     datetime_str="02.18.26T14:18:00",
+                ),
+                Symbol(
+                    name="KNRX",
+                    datetime_str="02.19.26T09:46:00",
                 ),
                 Symbol(
                     name="BIYA",
@@ -656,7 +709,7 @@ def run_retroactive_check():
                 ),
                 Symbol(
                     name="TURB",
-                    datetime_str="03.05.26T12:07:00",
+                    datetime_str="03.05.26T12:30:00",
                 ),
                 Symbol(
                     name="CAMP",
@@ -671,16 +724,8 @@ def run_retroactive_check():
                     datetime_str="03.12.26T14:35:00",
                 ),
                 Symbol(
-                    name="ALTO",
-                    datetime_str="03.12.26T10:35:00",
-                ),
-                Symbol(
                     name="LWLG",
                     datetime_str="03.13.26T15:03:00",
-                ),
-                Symbol(
-                    name="TLYS",
-                    datetime_str="03.13.26T13:41:00",
                 ),
                 Symbol(
                     name="TWAV",

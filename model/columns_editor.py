@@ -1,5 +1,8 @@
 import pandas as pd
 
+df = pd.read_csv('model/positive_results_scored.csv')
+false_positive_df = pd.read_csv('model/false_positive_results.csv')
+
 for file_name in [
     'model/positive_results.csv',
     'model/false_positive_results.csv',
@@ -19,9 +22,6 @@ for file_name in [
             "feature_volume_sum_since_market_open",
             "result",
             "feature_has_positive_more_than_negative_bars",
-            "feature_has_more_positive_volume_than_negative",
-            "feature_open_close_to_ema_9",
-            "feature_most_of_bars_above_vwap",
             "feature_pullback_sharpness",
             "feature_pullback_depth",
             "feature_number_of_negative_bars_in_pullback_pct",

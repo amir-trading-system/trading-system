@@ -79,29 +79,33 @@ def find_shared_numeric_features(pos_df, neg_df):
     for feature in shared_columns:
         # if str(feature).startswith("feature_"):
         if str(feature) in [
-            "feature_has_positive_more_than_negative_bars",
-            # "feature_has_more_positive_volume_than_negative",
-            # "feature_open_close_to_ema_9",
-            # "feature_most_of_bars_above_vwap",
-            # "feature_pullback_sharpness",
-            # "feature_pullback_depth",
-            # "feature_number_of_negative_bars_in_pullback_pct",
-            # "feature_price_minus_vwap_at_entry",
-            # "feature_pullback_to_trend_ratio",
-            # "feature_histogram_negative_momentum_pct",
-            # "feature_strong_positive_bars_with_full_body_pct",
-            # "feature_minutes_since_market_open_to_total_market_minutes_pct",
-            # "feature_bars_with_at_least_50_pct_wick_pct",
-            # "feature_bars_with_lower_volume_average_pct",
-            # "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
-
-            "feature_volume_sum_since_market_open",
-            "feature_volume_per_minute",
-            "feature_volume_average",
-            "feature_bar_volume",
-            "feature_highest_volume_before_to_entry_bar_volume_ratio",
+            "feature_entry_bar_strengh_pct",
+            "feature_strong_positive_bars_with_full_body_pct",
+            "feature_minutes_since_market_open_to_total_market_minutes_pct",
             "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
+            "feature_highest_volume_before_to_entry_bar_volume_ratio",
+            "feature_high_volume_bars_with_rejection_pct",
             "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
+            "feature_ema_9_keeps_going_up_pct",
+            "feature_price_minus_vwap_at_entry",
+            "feature_strong_bars_has_continuation",
+            "feature_bars_above_volume_average_pct",
+            "feature_strong_bars_above_volume_average_to_total_bars_pct",
+            "feature_strong_bars_above_volume_average_pct",
+            "feature_macd_under_signal_line_counter",
+            "feature_bars_with_at_least_50_pct_wick_pct",
+            "feature_bars_with_lower_volume_average_pct",
+            "feature_pullback_depth",
+            "feature_pullback_sharpness",
+            "feature_pullback_to_trend_ratio",
+            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
+            "feature_number_of_negative_bars_in_pullback_pct",
+            "feature_histogram_negative_momentum_pct",
+            "feature_has_positive_more_than_negative_bars",
+            "feature_entry_exaustion",
+            "feature_distance_from_highest_high",
+            "feature_volume_sum_since_market_open",
+            "feature_extension_from_vwap",
         ]:
             final_shares_columns.append(feature)
 
@@ -138,9 +142,6 @@ def format_features_data(
         false_positive_data,
     ]:
         features_data["feature_has_positive_more_than_negative_bars"] = features_data["feature_has_positive_more_than_negative_bars"] == 'True'
-        features_data["feature_has_more_positive_volume_than_negative"] = features_data["feature_has_more_positive_volume_than_negative"] == 'True'
-        features_data["feature_open_close_to_ema_9"] = features_data["feature_open_close_to_ema_9"] == 'True'
-        features_data["feature_most_of_bars_above_vwap"] = features_data["feature_most_of_bars_above_vwap"] == 'True'
         features_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"] = features_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"] == 'True'
 
 # ============================================================
