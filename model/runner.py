@@ -29,7 +29,6 @@ class Runner:
                 probability=0.0,
                 threshold=0.0,
                 should_take_trade=True,
-                features_tree={},
             )
 
         features_data = {}
@@ -41,7 +40,6 @@ class Runner:
 
         probability = float(self.model.predict_proba(x_live)[0, 1])
         should_take_trade = probability >= self.threshold
-        features_tree = {}
 
         score = round(probability * 100, 2)
 
@@ -50,5 +48,4 @@ class Runner:
             probability=probability,
             threshold=self.threshold,
             should_take_trade=should_take_trade,
-            features_tree=features_tree,
         )

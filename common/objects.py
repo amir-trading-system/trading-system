@@ -568,10 +568,8 @@ class Score:
         probability: float,
         threshold: float,
         should_take_trade: bool,
-        features_tree: dict[str, any],
     ):
         self.score = score
         self.probability = probability
         self.threshold = threshold
         self.should_take_trade = should_take_trade
-        self.features_tree = features_tree
