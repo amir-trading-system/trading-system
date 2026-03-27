@@ -299,6 +299,7 @@ class Evidence:
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         model_runner: model.runner.Runner,
+        get_only_statistics: bool = False,
     ) -> bool:
         current_bar_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
@@ -333,6 +334,27 @@ class Evidence:
         )
         stock.volume_sum_since_4_am_today = volume_sum_since_4_am_today
         stock.volume_sum_since_market_open = volume_sum_since_market_open
+
+        if (
+            True
+            and get_only_statistics
+            and potential_confirmation_bar.bar_time < stock.expected_bar_time
+        ):
+            return False
+
+        if (
+            True
+            and get_only_statistics
+            and potential_confirmation_bar.bar_time == stock.expected_bar_time
+        ):
+            potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=potential_confirmation_bar,
+                highest_high_one_minute_bar=highest_high_one_minute_bar,
+                volume_sum_since_market_open=stock.volume_sum_since_market_open,
+                one_minute_bars=one_minute_bars,
+            )
+            return True
 
         if not self._confirm(
             stock=stock,

@@ -20,6 +20,7 @@ class Confirmator:
         results_queue: queue.Queue[dict[str,any]],
         alerter_object: alerter.alerter.Alerter = None,
         confirmation_only: bool = False,
+        get_only_statistics: bool = False,
     ):
         self.tws_client = tws_client
         self.is_retro = is_retro
@@ -31,6 +32,7 @@ class Confirmator:
         self.model_runner = model.runner.Runner(
             should_run_model=should_run_model,
         )
+        self.get_only_statistics = get_only_statistics
 
     def _confirm(
         self,
@@ -158,6 +160,7 @@ class Confirmator:
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
                 one_minute_bars=temp_one_minute_bars,
                 model_runner=self.model_runner,
+                get_only_statistics=self.get_only_statistics,
             ):
                 entry_position_bar = potential_confirmation_bar
                 confirmed_evidences.append(evidence.name)

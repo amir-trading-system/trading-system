@@ -100,6 +100,17 @@ class BarData:
         return (self.close - self.open_value)/self.open_value
 
     @property
+    def bar_is_solid(
+        self,
+    ):
+        return (
+            True
+            and self.volume > self.volume_average
+            and self.close > self.open_value
+            and (self.open_value - self.low)/(self.high - self.low) < 0.2
+        )
+
+    @property
     def bar_wick_percentage(
         self,
     ) -> float:
@@ -141,6 +152,7 @@ class Stock:
         timeframe: int,
         timeframe_type: TimeframeType,
         specific_bar_time: datetime.datetime,
+        expected_bar_time: datetime.datetime,
         one_minute_bars_queue: queue.Queue[BarData] = None,
         finished_collection: bool = False,
         finished_analyze: bool = False,
@@ -163,6 +175,7 @@ class Stock:
         self.timeframe_type = timeframe_type
         self.one_minute_bars_queue = one_minute_bars_queue
         self.specific_bar_time = specific_bar_time
+        self.expected_bar_time = expected_bar_time
         self.finished_collection = finished_collection
         self.finished_analyze = finished_analyze
         self.resistance_levels = resistance_levels

@@ -80,6 +80,10 @@ def write_to_csv(
                     "feature_bar_volume_to_volume_sum_since_market_open",
                     "feature_volume_average_to_bar_volume",
                     "feature_volume_per_minute_to_bar_volume",
+                    "entry_bar_high",
+                    "entry_bar_low",
+                    "entry_bar_open",
+                    "entry_bar_close",
                 ],
             )
             f.flush()
@@ -128,6 +132,10 @@ def write_to_csv(
             feature_bar_volume_to_volume_sum_since_market_open = 0
             feature_volume_average_to_bar_volume = 0
             feature_volume_per_minute_to_bar_volume = 0
+            entry_bar_high = 0
+            entry_bar_low = 0
+            entry_bar_open = 0
+            entry_bar_close = 0
 
             price_movement_statistics = symbol_data.get("price_movement_statistics", None)
             if price_movement_statistics:
@@ -162,6 +170,10 @@ def write_to_csv(
                 feature_bar_volume_to_volume_sum_since_market_open = price_movement_statistics["feature_bar_volume_to_volume_sum_since_market_open"]
                 feature_volume_average_to_bar_volume = price_movement_statistics["feature_volume_average_to_bar_volume"]
                 feature_volume_per_minute_to_bar_volume = price_movement_statistics["feature_volume_per_minute_to_bar_volume"]
+                entry_bar_high = price_movement_statistics["entry_bar_high"]
+                entry_bar_low = price_movement_statistics["entry_bar_low"]
+                entry_bar_open = price_movement_statistics["entry_bar_open"]
+                entry_bar_close = price_movement_statistics["entry_bar_close"]
 
             collection_status = symbol_data["collection_status"]
             analysis_status = symbol_data["analysis_status"]
@@ -239,6 +251,10 @@ def write_to_csv(
                                 feature_bar_volume_to_volume_sum_since_market_open,
                                 feature_volume_average_to_bar_volume,
                                 feature_volume_per_minute_to_bar_volume,
+                                entry_bar_high,
+                                entry_bar_low,
+                                entry_bar_open,
+                                entry_bar_close,
                             ]
                         )
 
@@ -407,11 +423,13 @@ def run_retroactive_check():
         # )
     ]
     output_file_name = "model/real_case_result.csv"
+    get_only_statistics = False
     # symbols = explore_past_potential_symbols()
 
     if not symbols:
         output_file_name = ""
         symbols = train_data.get_tagged_data()
+        get_only_statistics = True
         should_run_model = False
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
@@ -464,6 +482,7 @@ def run_retroactive_check():
         logger=logger_object,
         should_run_model=should_run_model,
         is_retro=True,
+        get_only_statistics=get_only_statistics,
         # confirmation_only=True,
     )
 
@@ -489,6 +508,7 @@ def run_retroactive_check():
                 timeframe_type=common.objects.TimeframeType(2),
             ),
             specific_bar_time=specific_bar_time,
+            expected_bar_time=symbol.date_time,
         )
         symbols_data.append(
             {

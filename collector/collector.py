@@ -45,6 +45,7 @@ class Collector:
                     timeframe_type=timeframe_input.timeframe_type,
                     one_minute_bars_queue=queue.Queue(),
                     specific_bar_time=specific_bar_time,
+                    expected_bar_time=specific_bar_time,
                 )
                 if timeframe_input.timeframe_type == common.objects.TimeframeType.DAY:
                     day_timeframe_request_id = next_request_id
@@ -68,6 +69,7 @@ class Collector:
         symbol: str,
         manual_timeframe_for_tests: common.objects.TimeframeInput,
         specific_bar_time: datetime.datetime,
+        expected_bar_time: datetime.datetime,
     ):
         timeframes = [
             common.objects.TimeframeInput(
@@ -91,6 +93,7 @@ class Collector:
                 timeframe_type=timeframe_input.timeframe_type,
                 one_minute_bars_queue=queue.Queue(),
                 specific_bar_time=specific_bar_time,
+                expected_bar_time=expected_bar_time,
             )
             if timeframe_input.timeframe_type == common.objects.TimeframeType.DAY:
                 day_timeframe_request_id = next_request_id

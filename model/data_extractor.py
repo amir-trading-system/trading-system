@@ -259,6 +259,8 @@ class DataExtractor:
             if bar_object.volume > bar_object.volume_average * 1.1
         ):
             strong_entry_bar_points += 1
+        if potential_confirmation_bar.bar_is_solid:
+            strong_entry_bar_points += 2
 
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
@@ -278,7 +280,7 @@ class DataExtractor:
             "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio": feature_highest_average_volume_before_to_entry_bar_average_volume_ratio,
             "feature_highest_average_volume_before_to_entry_bar_volume_ratio": feature_highest_average_volume_before_to_entry_bar_volume_ratio,
             "feature_macd_under_signal_line_counter": feature_macd_under_signal_line_counter,
-            "feature_entry_bar_strengh_pct": strong_entry_bar_points / 11,
+            "feature_entry_bar_strengh_pct": strong_entry_bar_points / 13,
             "feature_ema_9_keeps_going_up_pct": ema_9_keeps_going_up_counter/total_bars,
             "feature_strong_bars_above_volume_average_pct": feature_strong_bars_above_volume_average_pct,
             "feature_strong_bars_above_volume_average_to_total_bars_pct": feature_strong_bars_above_volume_average_to_total_bars_pct,
@@ -292,6 +294,10 @@ class DataExtractor:
             "feature_bar_volume_to_volume_sum_since_market_open": potential_confirmation_bar.volume/(volume_sum_since_market_open - potential_confirmation_bar.volume),
             "feature_volume_average_to_bar_volume": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
             "feature_volume_per_minute_to_bar_volume": round(volume_per_minute, 2)/potential_confirmation_bar.volume,
+            "entry_bar_high": potential_confirmation_bar.high,
+            "entry_bar_low": potential_confirmation_bar.low,
+            "entry_bar_open": potential_confirmation_bar.open_value,
+            "entry_bar_close": potential_confirmation_bar.close,
         }
 
         return features

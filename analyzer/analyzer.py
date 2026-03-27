@@ -92,6 +92,7 @@ class Analyzer:
                 bars=copy.deepcopy(stock_object.bars),
                 one_minute_bars_queue=stock_object.one_minute_bars_queue,
                 specific_bar_time=stock_object.specific_bar_time,
+                expected_bar_time=stock_object.expected_bar_time,
                 last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
                 pre_market_one_minute_highest_high_bar=stock_object.pre_market_one_minute_highest_high_bar,
                 post_pre_market_volume_sum=stock_object.post_pre_market_volume_sum,
