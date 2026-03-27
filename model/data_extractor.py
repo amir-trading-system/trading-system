@@ -61,12 +61,10 @@ class DataExtractor:
 
     @staticmethod
     def extract_features_from_symbol_data(
-        stock: common.objects.Stock,
         one_minute_timeframe_stock: common.objects.Stock,
-        milestones: common.objects.Milestones,
-        original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
+        volume_sum_since_market_open: float,
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
         total_bars = len(one_minute_bars)
@@ -83,6 +81,7 @@ class DataExtractor:
         bars_with_negative_momentum_histogram_counter = 0
         bars_above_vwap_counter = 0
         bars_with_lower_volume_average_counter = 0
+        macd_under_signal_line_counter = 0
         bars_with_highest_volume: list[common.objects.BarData] = []
 
         for bar_object in one_minute_bars:
@@ -92,6 +91,8 @@ class DataExtractor:
             previous_bar = one_minute_timeframe_stock.previous_bar(
                 bar_object=bar_object,
             )
+            if bar_object.macd < bar_object.signal_line:
+                macd_under_signal_line_counter += 1
 
             if bar_object.bar_wick_percentage >= 0.5:
                 bars_with_at_least_50_pct_wick_counter += 1
@@ -147,7 +148,6 @@ class DataExtractor:
         )
         minutes_since_market_open = ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30
 
-        feature_last_bars_buyers_coming_in = 0
         last_bars_positive_bars = 0
         last_bars_negative_bars = 0
         last_bars_positive_volume = 0
@@ -176,13 +176,48 @@ class DataExtractor:
         feature_bars_with_at_least_50_pct_wick_pct = bars_with_at_least_50_pct_wick_counter/total_bars
         feature_strong_positive_bars_with_full_body_pct = strong_positive_bars_with_full_body_counter/positive_bars_counter if positive_bars_counter > 0 else 0
         feature_minutes_since_market_open_to_total_market_minutes_pct = minutes_since_market_open/390
-        feature_last_bars_buyers_coming_in = 1 if (
-            True
-            and last_bars_positive_bars > last_bars_negative_bars
-            and last_bars_positive_volume > last_bars_negative_volume
-        ) else 0
         feature_bars_with_lower_volume_average_pct = bars_with_lower_volume_average_counter/total_bars
         feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = bar_volume_close_to_entry_point_sum > bar_volume_close_to_market_open_sum
+        feature_macd_under_signal_line_counter = macd_under_signal_line_counter/total_bars
+
+        volume_per_minute = volume_sum_since_market_open/minutes_since_market_open
+        feature_highest_volume_before_to_entry_bar_volume_ratio = max(
+            bar_object.volume
+            for bar_object in one_minute_bars[1:]
+        )/potential_confirmation_bar.volume
+
+        feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = max(
+            bar_object.volume_average
+            for bar_object in one_minute_bars[1:]
+        )/potential_confirmation_bar.volume_average
+
+        feature_highest_average_volume_before_to_entry_bar_volume_ratio = max(
+            bar_object.volume_average
+            for bar_object in one_minute_bars[1:]
+        )/potential_confirmation_bar.volume
+
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+        strong_entry_bar_points = 0
+        if (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.9:
+            strong_entry_bar_points += 1
+        if potential_confirmation_bar.volume > highest_high_one_minute_bar.volume:
+            strong_entry_bar_points += 1
+        if potential_confirmation_bar.volume/max(bar_object.volume for bar_object in one_minute_bars[1:]) >= 0.9:
+            strong_entry_bar_points += 1
+        if 0.95 <= potential_confirmation_bar.ema_9/potential_confirmation_bar.low <= 1.05:
+            strong_entry_bar_points += 1
+        if potential_confirmation_bar.close > highest_high_one_minute_bar.high:
+            strong_entry_bar_points += 1
+        if previous_bar is not None and previous_bar.volume < potential_confirmation_bar.volume:
+            strong_entry_bar_points += 1
+        if (
+            potential_confirmation_bar.open_value > potential_confirmation_bar.ema_9
+            and potential_confirmation_bar.ema_9 > potential_confirmation_bar.ema_20
+            and potential_confirmation_bar.ema_9 > potential_confirmation_bar.vwap
+        ):
+            strong_entry_bar_points += 1
 
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
@@ -198,9 +233,17 @@ class DataExtractor:
             "feature_strong_positive_bars_with_full_body_pct": feature_strong_positive_bars_with_full_body_pct,
             "feature_minutes_since_market_open_to_total_market_minutes_pct": feature_minutes_since_market_open_to_total_market_minutes_pct,
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
-            "feature_last_bars_buyers_coming_in": feature_last_bars_buyers_coming_in,
             "feature_bars_with_lower_volume_average_pct": feature_bars_with_lower_volume_average_pct,
             "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open": feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open,
+            "feature_volume_sum_since_market_open": volume_sum_since_market_open,
+            "feature_volume_per_minute": round(volume_per_minute, 2),
+            "feature_volume_average": potential_confirmation_bar.volume_average,
+            "feature_bar_volume": potential_confirmation_bar.volume,
+            "feature_highest_volume_before_to_entry_bar_volume_ratio": feature_highest_volume_before_to_entry_bar_volume_ratio,
+            "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio": feature_highest_average_volume_before_to_entry_bar_average_volume_ratio,
+            "feature_highest_average_volume_before_to_entry_bar_volume_ratio": feature_highest_average_volume_before_to_entry_bar_volume_ratio,
+            "feature_macd_under_signal_line_counter": feature_macd_under_signal_line_counter,
+            "feature_entry_bar_strengh_pct": strong_entry_bar_points / 7,
         }
 
         return features

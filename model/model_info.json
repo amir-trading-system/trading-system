@@ -1,45 +1,35 @@
 {
   "shared_features": [
-    "feature_bars_with_at_least_50_pct_wick_pct",
-    "feature_bars_with_lower_volume_average_pct",
-    "feature_has_more_positive_volume_than_negative",
+    "feature_bar_volume",
     "feature_has_positive_more_than_negative_bars",
-    "feature_histogram_negative_momentum_pct",
-    "feature_minutes_since_market_open_to_total_market_minutes_pct",
-    "feature_most_of_bars_above_vwap",
-    "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
-    "feature_number_of_negative_bars_in_pullback_pct",
-    "feature_pullback_depth",
-    "feature_pullback_sharpness",
-    "feature_pullback_to_trend_ratio",
-    "feature_strong_positive_bars_with_full_body_pct"
+    "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
+    "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
+    "feature_highest_volume_before_to_entry_bar_volume_ratio",
+    "feature_volume_average",
+    "feature_volume_per_minute",
+    "feature_volume_sum_since_market_open"
   ],
   "best_model_only_threshold": {
     "threshold": 0.5,
-    "positive_pass_rate": 0.8775510204081632,
-    "false_positive_reject_rate": 0.8076923076923077,
-    "balanced_score": 0.8426216640502355
+    "positive_pass_rate": 0.8979591836734694,
+    "false_positive_reject_rate": 0.84,
+    "balanced_score": 0.8689795918367347
   },
   "best_hybrid_threshold": {
     "threshold": 0.5,
-    "positive_pass_rate": 0.8775510204081632,
-    "false_positive_reject_rate": 0.8076923076923077,
-    "balanced_score": 0.8426216640502355
+    "positive_pass_rate": 0.8979591836734694,
+    "false_positive_reject_rate": 0.84,
+    "balanced_score": 0.8689795918367347
   },
   "top_25_feature_importance": {
-    "feature_has_positive_more_than_negative_bars": 0.2018114780065049,
-    "feature_minutes_since_market_open_to_total_market_minutes_pct": 0.138524431276164,
-    "feature_bars_with_lower_volume_average_pct": 0.09946220838013532,
-    "feature_bars_with_at_least_50_pct_wick_pct": 0.08581810736575754,
-    "feature_histogram_negative_momentum_pct": 0.08565636373456571,
-    "feature_strong_positive_bars_with_full_body_pct": 0.07868445382940853,
-    "feature_pullback_depth": 0.07808926267043646,
-    "feature_pullback_sharpness": 0.07594663861663875,
-    "feature_number_of_negative_bars_in_pullback_pct": 0.0655335505629239,
-    "feature_pullback_to_trend_ratio": 0.06388042159006266,
-    "feature_has_more_positive_volume_than_negative": 0.012204744969629653,
-    "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open": 0.009531638859853954,
-    "feature_most_of_bars_above_vwap": 0.004856700137918636
+    "feature_volume_sum_since_market_open": 0.21444146484883117,
+    "feature_volume_per_minute": 0.15991105909580408,
+    "feature_bar_volume": 0.15185193831083993,
+    "feature_has_positive_more_than_negative_bars": 0.13496861819965908,
+    "feature_volume_average": 0.1240469116336005,
+    "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio": 0.07558724441997518,
+    "feature_highest_volume_before_to_entry_bar_volume_ratio": 0.0755777522001586,
+    "feature_highest_average_volume_before_to_entry_bar_volume_ratio": 0.06361501129113128
   },
   "test_size": 0.3,
   "random_state": 42

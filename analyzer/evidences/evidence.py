@@ -298,21 +298,41 @@ class Evidence:
         milestones: common.objects.Milestones,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
-        volume_sum_since_market_open: float,
         model_runner: model.runner.Runner,
     ) -> bool:
-        current_bar_12_00 = datetime.datetime(
+        current_bar_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
             month=original_bar_to_confirm.bar_time.month,
             day=original_bar_to_confirm.bar_time.day,
-            hour=12,
+            hour=9,
+            minute=30,
+        )
+        current_bar_10_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=10,
         )
 
-        if (
-            potential_confirmation_bar.volume_average < 10000
-            and potential_confirmation_bar.bar_time >= current_bar_12_00
-        ):
-            return False
+        today_04_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=4,
+        )
+
+        volume_sum_since_4_am_today = sum(
+            bar_object.volume
+            for bar_object in one_minute_timeframe_stock.bars
+            if today_04_00 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
+        )
+        volume_sum_since_market_open = sum(
+            bar_object.volume
+            for bar_object in one_minute_timeframe_stock.bars
+            if current_bar_09_30 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
+        )
+        stock.volume_sum_since_4_am_today = volume_sum_since_4_am_today
+        stock.volume_sum_since_market_open = volume_sum_since_market_open
 
         if not self._confirm(
             stock=stock,
@@ -321,17 +341,15 @@ class Evidence:
             milestones=milestones,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             one_minute_bars=one_minute_bars,
-            volume_sum_since_market_open=volume_sum_since_market_open,
+            volume_sum_since_market_open=stock.volume_sum_since_market_open,
         ):
             return False
 
         potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
-            stock=stock,
             one_minute_timeframe_stock=one_minute_timeframe_stock,
-            milestones=milestones,
-            original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
+            volume_sum_since_market_open=stock.volume_sum_since_market_open,
             one_minute_bars=one_minute_bars,
         )
 
@@ -370,34 +388,6 @@ class Evidence:
             and potential_confirmation_bar.low < potential_confirmation_bar.open_value
         ):
             return False
-
-        current_bar_09_30 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=9,
-            minute=30,
-        )
-        current_bar_10_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=10,
-        )
-
-        today_04_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=4,
-        )
-
-        volume_sum_since_4_am_today = sum(
-            bar_object.volume
-            for bar_object in one_minute_timeframe_stock.bars
-            if today_04_00 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
-        )
-        stock.volume_sum_since_4_am_today = volume_sum_since_4_am_today
 
         if current_bar_09_30 <= potential_confirmation_bar.bar_time <= current_bar_10_00:
             return volume_sum_since_4_am_today > 5000000

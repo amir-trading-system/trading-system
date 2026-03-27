@@ -2,8 +2,6 @@ import joblib
 import pandas as pd
 import numpy as np
 
-import shap
-
 import common
 
 
@@ -14,13 +12,12 @@ class Runner:
     ):
         self.should_run_model = should_run_model
         if should_run_model:
-            self.model = joblib.load("model/trade_model.pkl")
-            self.imputer = joblib.load("model/trade_imputer.pkl")
+            self.model = joblib.load("model/prod/trade_model.pkl")
+            self.imputer = joblib.load("model/prod/trade_imputer.pkl")
 
-            bundle = joblib.load("model/trade_model_bundle.pkl")
+            bundle = joblib.load("model/prod/trade_model_bundle.pkl")
             self.features = bundle["features"]
             self.threshold = bundle["threshold"]
-            self.explainer = shap.TreeExplainer(self.model)
 
     def score_potential_confirmation_bar(
         self,
@@ -45,13 +42,6 @@ class Runner:
         probability = float(self.model.predict_proba(x_live)[0, 1])
         should_take_trade = probability >= self.threshold
         features_tree = {}
-
-        if should_take_trade:
-            shap_values = self.explainer.shap_values(x_live)
-            values = shap_values[1][0]
-
-            for feature, value in zip(x_live.columns, values):
-              features_tree[feature] = value
 
         score = round(probability * 100, 2)
 

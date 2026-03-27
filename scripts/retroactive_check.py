@@ -230,6 +230,10 @@ def get_symbols() -> list[Symbol]:
             name="BIAF",
             datetime_str="03.23.26T10:45:00",
         ),
+        Symbol(
+            name="EEIQ",
+            datetime_str="03.26.26T09:59:00",
+        ),
     ]
 
 #pylint:disable=unspecified-encoding
@@ -250,7 +254,6 @@ def write_to_csv(
                 "actual_confirmation_bar_time",
                 "expected_confirmation_bar_time",
                 "evidence",
-                "volume_until_now",
                 "result",
                 "feature_has_positive_more_than_negative_bars",
                 "feature_has_more_positive_volume_than_negative",
@@ -265,9 +268,17 @@ def write_to_csv(
                 "feature_strong_positive_bars_with_full_body_pct",
                 "feature_minutes_since_market_open_to_total_market_minutes_pct",
                 "feature_bars_with_at_least_50_pct_wick_pct",
-                "feature_last_bars_buyers_coming_in",
                 "feature_bars_with_lower_volume_average_pct",
+                "feature_volume_sum_since_market_open",
+                "feature_volume_per_minute",
+                "feature_volume_average",
+                "feature_bar_volume",
                 "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
+                "feature_highest_volume_before_to_entry_bar_volume_ratio",
+                "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
+                "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
+                "feature_macd_under_signal_line_counter",
+                "feature_entry_bar_strengh_pct",
             ],
         )
         f.flush()
@@ -298,9 +309,17 @@ def write_to_csv(
                 feature_strong_positive_bars_with_full_body_pct = 0
                 feature_minutes_since_market_open_to_total_market_minutes_pct = 0
                 feature_bars_with_at_least_50_pct_wick_pct = 0
-                feature_last_bars_buyers_coming_in = 0
                 feature_bars_with_lower_volume_average_pct = 0
+                feature_volume_sum_since_market_open = 0
+                feature_volume_per_minute = 0
+                feature_volume_average = 0
+                feature_bar_volume = 0
                 feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = False
+                feature_highest_volume_before_to_entry_bar_volume_ratio = 0
+                feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = 0
+                feature_highest_average_volume_before_to_entry_bar_volume_ratio = 0
+                feature_macd_under_signal_line_counter = 0
+                feature_entry_bar_strengh_pct = 0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
@@ -317,9 +336,17 @@ def write_to_csv(
                     feature_strong_positive_bars_with_full_body_pct = price_movement_statistics["feature_strong_positive_bars_with_full_body_pct"]
                     feature_minutes_since_market_open_to_total_market_minutes_pct = price_movement_statistics["feature_minutes_since_market_open_to_total_market_minutes_pct"]
                     feature_bars_with_at_least_50_pct_wick_pct = price_movement_statistics["feature_bars_with_at_least_50_pct_wick_pct"]
-                    feature_last_bars_buyers_coming_in = price_movement_statistics["feature_last_bars_buyers_coming_in"]
                     feature_bars_with_lower_volume_average_pct = price_movement_statistics["feature_bars_with_lower_volume_average_pct"]
+                    feature_volume_sum_since_market_open = price_movement_statistics["feature_volume_sum_since_market_open"]
+                    feature_volume_per_minute = price_movement_statistics["feature_volume_per_minute"]
+                    feature_volume_average = price_movement_statistics["feature_volume_average"]
+                    feature_bar_volume = price_movement_statistics["feature_bar_volume"]
                     feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = price_movement_statistics["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"]
+                    feature_highest_volume_before_to_entry_bar_volume_ratio = price_movement_statistics["feature_highest_volume_before_to_entry_bar_volume_ratio"]
+                    feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = price_movement_statistics["feature_highest_average_volume_before_to_entry_bar_average_volume_ratio"]
+                    feature_highest_average_volume_before_to_entry_bar_volume_ratio = price_movement_statistics["feature_highest_average_volume_before_to_entry_bar_volume_ratio"]
+                    feature_macd_under_signal_line_counter = price_movement_statistics["feature_macd_under_signal_line_counter"]
+                    feature_entry_bar_strengh_pct = price_movement_statistics["feature_entry_bar_strengh_pct"]
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
@@ -331,10 +358,6 @@ def write_to_csv(
 
                 actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
                 expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
-
-                volume_until_now = "0"
-                if symbol_data.get("volume_until_now"):
-                    volume_until_now = symbol_data["volume_until_now"]
 
                 if (
                     True
@@ -361,7 +384,6 @@ def write_to_csv(
                                 actual_confirmation_bar_time,
                                 expected_confirmation_bar_time,
                                 evidence_name,
-                                volume_until_now,
                                 result,
                                 feature_has_positive_more_than_negative_bars,
                                 feature_has_more_positive_volume_than_negative,
@@ -376,9 +398,17 @@ def write_to_csv(
                                 feature_strong_positive_bars_with_full_body_pct,
                                 feature_minutes_since_market_open_to_total_market_minutes_pct,
                                 feature_bars_with_at_least_50_pct_wick_pct,
-                                feature_last_bars_buyers_coming_in,
                                 feature_bars_with_lower_volume_average_pct,
+                                feature_volume_sum_since_market_open,
+                                feature_volume_per_minute,
+                                feature_volume_average,
+                                feature_bar_volume,
                                 feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open,
+                                feature_highest_volume_before_to_entry_bar_volume_ratio,
+                                feature_highest_average_volume_before_to_entry_bar_average_volume_ratio,
+                                feature_highest_average_volume_before_to_entry_bar_volume_ratio,
+                                feature_macd_under_signal_line_counter,
+                                feature_entry_bar_strengh_pct,
                             ]
                         )
 
@@ -439,7 +469,6 @@ def wait_for_collection_and_analysis(
             ):
                 relevant_symbol_data["actual_confirmation_bar_time"] = "Does not qualify"
                 relevant_symbol_data["evidence_name"] = "Does not qualify"
-                relevant_symbol_data["volume_until_now"] = "Does not qualify"
 
             if (
                 relevant_symbol_data["collection_status"] == "done"
@@ -467,7 +496,6 @@ def wait_for_confirmation(
             relevant_symbol_data[0]["evidence_name"] = "no evidence"
             relevant_symbol_data[0]["collection_status"] = "done"
             relevant_symbol_data[0]["analysis_status"] = "done"
-            relevant_symbol_data[0]["volume_until_now"] = int(confirmation_result["volume_until_now"])
             relevant_symbol_data[0]["price_movement_statistics"] = {}
             continue
 
@@ -477,7 +505,6 @@ def wait_for_confirmation(
                 relevant_symbol_data[0]["evidence_name"] = evidence_name
                 relevant_symbol_data[0]["collection_status"] = "done"
                 relevant_symbol_data[0]["analysis_status"] = "done"
-                relevant_symbol_data[0]["volume_until_now"] = int(confirmation_result["volume_until_now"])
                 relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result["price_movement_statistics"]
                 should_update_first_default = False
                 continue
@@ -492,7 +519,6 @@ def wait_for_confirmation(
                     "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
                     "evidence_name": evidence_name,
                     "is_new": True,
-                    "volume_until_now": int(confirmation_result["volume_until_now"]),
                     "price_movement_statistics": confirmation_result["price_movement_statistics"],
                     "result": "in_progress",
                 },
@@ -537,124 +563,11 @@ def explore_past_potential_symbols() -> list[Symbol]:
     return symbols
 
 def run_retroactive_check():
-    for_positive_results = False
+    for_positive_results = True
     should_run_model = True
-    for_test_real_case = True
+    for_test_real_case = False
     symbols_data = []
-    symbols = [
-        Symbol(
-            name="HBIO",
-            datetime_str="10.30.25T09:52:00",
-        ),
-        # Symbol(
-        #     name="FLYE",
-        #     datetime_str="12.01.25T10:52:00",
-        # ),
-        # Symbol(
-        #     name="JXG",
-        #     datetime_str="12.09.25T15:45:00",
-        # ),
-        # Symbol(
-        #     name="VMAR",
-        #     datetime_str="12.16.25T10:17:00",
-        # ),
-        # Symbol(
-        #     name="NBY",
-        #     datetime_str="01.09.26T15:50:00",
-        # ),
-        # Symbol(
-        #     name="LVLU",
-        #     datetime_str="01.12.26T11:23:00",
-        # ),
-        # Symbol(
-        #     name="EVTV",
-        #     datetime_str="01.13.26T12:49:00",
-        # ),
-        # Symbol(
-        #     name="CJMB",
-        #     datetime_str="01.15.26T11:26:00",
-        # ),
-        # Symbol(
-        #     name="XTKG",
-        #     datetime_str="01.26.26T14:11:00",
-        # ),
-        # Symbol(
-        #     name="MOVE",
-        #     datetime_str="01.27.26T10:04:00",
-        # ),
-        # Symbol(
-        #     name="ONEG",
-        #     datetime_str="01.27.26T10:14:00",
-        # ),
-        # Symbol(
-        #     name="XHLD",
-        #     datetime_str="01.27.26T15:36:00",
-        # ),
-        # Symbol(
-        #     name="JLHL",
-        #     datetime_str="02.02.26T10:46:00",
-        # ),
-        # Symbol(
-        #     name="SORA",
-        #     datetime_str="02.02.26T15:19:00",
-        # ),
-        # Symbol(
-        #     name="SMX",
-        #     datetime_str="02.06.26T10:16:00",
-        # ),
-        # Symbol(
-        #     name="JDZG",
-        #     datetime_str="02.13.26T11:50:00",
-        # ),
-        # Symbol(
-        #     name="CDIO",
-        #     datetime_str="02.18.26T14:18:00",
-        # ),
-        # Symbol(
-        #     name="BIYA",
-        #     datetime_str="02.20.26T10:49:00",
-        # ),
-        # Symbol(
-        #     name="NCI",
-        #     datetime_str="02.23.26T14:19:00",
-        # ),
-        # Symbol(
-        #     name="TURB",
-        #     datetime_str="03.05.26T12:07:00",
-        # ),
-        # Symbol(
-        #     name="CAMP",
-        #     datetime_str="03.09.26T13:51:00",
-        # ),
-        # Symbol(
-        #     name="PLYX",
-        #     datetime_str="03.10.26T14:06:00",
-        # ),
-        # Symbol(
-        #     name="ANTX",
-        #     datetime_str="03.12.26T14:35:00",
-        # ),
-        # Symbol(
-        #     name="ALTO",
-        #     datetime_str="03.12.26T10:35:00",
-        # ),
-        # Symbol(
-        #     name="LWLG",
-        #     datetime_str="03.13.26T15:03:00",
-        # ),
-        # Symbol(
-        #     name="TLYS",
-        #     datetime_str="03.13.26T13:41:00",
-        # ),
-        # Symbol(
-        #     name="TWAV",
-        #     datetime_str="03.16.26T10:55:00",
-        # ),
-        # Symbol(
-        #     name="QCLS",
-        #     datetime_str="03.18.26T11:30:00",
-        # ),
-    ]
+    symbols = []
     output_file_name = "model/real_case_result.csv"
     # symbols = explore_past_potential_symbols()
 
@@ -866,7 +779,6 @@ def run_retroactive_check():
                 "expected_confirmation_bar_time": symbol.date_time,
                 "evidence_name": "in_progress",
                 "is_new": False,
-                "volume_until_now": "0",
                 "price_movement_statistics": {},
                 "result": "in_progress",
             },
