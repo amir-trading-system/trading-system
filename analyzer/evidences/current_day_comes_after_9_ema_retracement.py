@@ -15,7 +15,7 @@ class Evidence(
         is_retro: bool,
     ) -> bool:
         previous_day = milestones.previous_bar.bar_object
-        if stock.len(stock.bars) < 3:
+        if len(stock.bars) < 3:
             return False
 
         two_days_ago_bar = stock.bars[2]

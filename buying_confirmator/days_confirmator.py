@@ -58,7 +58,6 @@ class Confirmator:
                     "original_bar_time": original_bar_to_confirm.bar_time,
                     "confirmation_bar_time": None,
                     "evidences": [],
-                    "volume_until_now": stock.volume_sum_since_4_am_today,
                     "price_movement_statistics": {},
                 },
             )
@@ -85,23 +84,18 @@ class Confirmator:
             hour=12,
             minute=00,
         )
-        volume_sum_since_market_open = sum(
-            one_minute_bar.volume
-            for one_minute_bar in one_minute_bars
-            if today_09_30 <= one_minute_bar.bar_time < potential_confirmation_bar.bar_time
-        )
 
         should_wait_for_next_bar = (
             potential_confirmation_bar.bar_time < today_09_30
             or potential_confirmation_bar.volume < 20000
-            or volume_sum_since_market_open < 100000
+            or stock.volume_sum_since_market_open < 100000
             or (
                 today_10_00 <= potential_confirmation_bar.bar_time <= today_12_00
-                and volume_sum_since_market_open < 500000
+                and stock.volume_sum_since_market_open < 500000
             )
             or (
                 potential_confirmation_bar.bar_time > today_12_00
-                and volume_sum_since_market_open < 1000000
+                and stock.volume_sum_since_market_open < 1000000
             )
         )
 
@@ -159,7 +153,6 @@ class Confirmator:
                 milestones=milestones,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
                 one_minute_bars=temp_one_minute_bars,
-                volume_sum_since_market_open=volume_sum_since_market_open,
                 model_runner=self.model_runner,
             ):
                 entry_position_bar = potential_confirmation_bar
@@ -172,7 +165,6 @@ class Confirmator:
                     "original_bar_time": original_bar_to_confirm.bar_time,
                     "confirmation_bar_time": entry_position_bar.bar_time,
                     "evidences": confirmed_evidences,
-                    "volume_until_now": stock.volume_sum_since_4_am_today,
                     "price_movement_statistics": entry_position_bar.price_movement_statistics,
                 },
             )

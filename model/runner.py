@@ -12,10 +12,10 @@ class Runner:
     ):
         self.should_run_model = should_run_model
         if should_run_model:
-            self.model = joblib.load("model/trade_model.pkl")
-            self.imputer = joblib.load("model/trade_imputer.pkl")
+            self.model = joblib.load("model/prod/trade_model.pkl")
+            self.imputer = joblib.load("model/prod/trade_imputer.pkl")
 
-            bundle = joblib.load("model/trade_model_bundle.pkl")
+            bundle = joblib.load("model/prod/trade_model_bundle.pkl")
             self.features = bundle["features"]
             self.threshold = bundle["threshold"]
 
@@ -39,8 +39,9 @@ class Runner:
         x_live = pd.DataFrame(self.imputer.transform(x_live), columns=self.features)
 
         probability = float(self.model.predict_proba(x_live)[0, 1])
-        score = round(probability * 100, 2)
         should_take_trade = probability >= self.threshold
+
+        score = round(probability * 100, 2)
 
         return common.objects.Score(
             score=score,

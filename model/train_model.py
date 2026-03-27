@@ -72,10 +72,40 @@ def stable_sigmoid(x):
 
 
 def find_shared_numeric_features(pos_df, neg_df):
-    pos_num = set(pos_df.select_dtypes(include=[np.number]).columns)
-    neg_num = set(neg_df.select_dtypes(include=[np.number]).columns)
-    shared = sorted((pos_num & neg_num) - {"label"})
-    return shared
+    pos_num = set(pos_df.select_dtypes(include=[np.number, np.bool]).columns)
+    neg_num = set(neg_df.select_dtypes(include=[np.number, np.bool]).columns)
+    shared_columns = sorted((pos_num & neg_num) - {"label"})
+    final_shares_columns = []
+    for feature in shared_columns:
+        # if str(feature).startswith("feature_"):
+        if str(feature) in [
+            "feature_has_positive_more_than_negative_bars",
+            # "feature_has_more_positive_volume_than_negative",
+            # "feature_open_close_to_ema_9",
+            # "feature_most_of_bars_above_vwap",
+            # "feature_pullback_sharpness",
+            # "feature_pullback_depth",
+            # "feature_number_of_negative_bars_in_pullback_pct",
+            # "feature_price_minus_vwap_at_entry",
+            # "feature_pullback_to_trend_ratio",
+            # "feature_histogram_negative_momentum_pct",
+            # "feature_strong_positive_bars_with_full_body_pct",
+            # "feature_minutes_since_market_open_to_total_market_minutes_pct",
+            # "feature_bars_with_at_least_50_pct_wick_pct",
+            # "feature_bars_with_lower_volume_average_pct",
+            # "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
+
+            "feature_volume_sum_since_market_open",
+            "feature_volume_per_minute",
+            "feature_volume_average",
+            "feature_bar_volume",
+            "feature_highest_volume_before_to_entry_bar_volume_ratio",
+            "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
+            "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
+        ]:
+            final_shares_columns.append(feature)
+
+    return final_shares_columns
 
 def evaluate_threshold(df, threshold):
     """
@@ -99,6 +129,19 @@ def evaluate_threshold(df, threshold):
         "balanced_score": float(balanced),
     }
 
+def format_features_data(
+    positive_data: pd.DataFrame,
+    false_positive_data: pd.DataFrame,
+):
+    for features_data in [
+        positive_data,
+        false_positive_data,
+    ]:
+        features_data["feature_has_positive_more_than_negative_bars"] = features_data["feature_has_positive_more_than_negative_bars"] == 'True'
+        features_data["feature_has_more_positive_volume_than_negative"] = features_data["feature_has_more_positive_volume_than_negative"] == 'True'
+        features_data["feature_open_close_to_ema_9"] = features_data["feature_open_close_to_ema_9"] == 'True'
+        features_data["feature_most_of_bars_above_vwap"] = features_data["feature_most_of_bars_above_vwap"] == 'True'
+        features_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"] = features_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"] == 'True'
 
 # ============================================================
 # LOAD DATA
@@ -165,7 +208,7 @@ model = RandomForestClassifier(
     min_samples_leaf=4,
     min_samples_split=8,
     class_weight="balanced_subsample",
-    random_state=RANDOM_STATE,
+    random_state=42,
     n_jobs=-1,
 )
 
