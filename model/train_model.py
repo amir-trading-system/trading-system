@@ -77,7 +77,41 @@ def find_shared_numeric_features(pos_df, neg_df):
     shared_columns = sorted((pos_num & neg_num) - {"label"})
     final_shares_columns = []
     for feature in shared_columns:
-        if str(feature).startswith("feature_"):
+        if str(feature) in [
+            "feature_has_positive_more_than_negative_bars",
+            "feature_pullback_sharpness",
+            "feature_bars_with_lower_volume_average_pct",
+            "feature_bars_with_at_least_50_pct_wick_pct",
+            "feature_number_of_negative_bars_in_pullback_pct",
+            "feature_strong_positive_bars_with_full_body_pct",
+            "feature_minutes_since_market_open_to_total_market_minutes_pct",
+            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
+            "feature_pullback_depth",
+            "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
+            "feature_macd_under_signal_line_counter",
+            "feature_pullback_to_trend_ratio",
+            "feature_positive_vs_negative_movement",
+            "feature_positive_vs_negative_volume",
+            "feature_price_minus_vwap_at_entry",
+            "feature_strong_bars_above_volume_average_pct",
+            "feature_strong_bars_above_volume_average_to_total_bars_pct",
+            "feature_previous_bar_to_highest_high_pct",
+            "feature_bars_above_volume_average_pct",
+            "feature_bar_volume_to_volume_sum_since_market_open",
+            "feature_histogram_negative_momentum_pct",
+            "feature_high_lows_pct",
+            "feature_volume_average_to_bar_volume",
+            "feature_high_volume_bars_with_rejection_pct",
+            "feature_bars_with_rejection_inside_entry_bar_range_pct",
+            "feature_entry_bar_strengh_pct",
+            "feature_ema_9_keeps_going_up_pct",
+            "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
+            "feature_highest_volume_before_to_entry_bar_volume_ratio",
+            "feature_volume_per_minute_to_bar_volume",
+            "feature_strong_bars_has_continuation",
+            "feature_volume_before_middle_point_vs_after_middle_point_pct",
+            "feature_bars_without_movement_pct", #68.94 5-5
+        ]:
             final_shares_columns.append(feature)
 
     return final_shares_columns
@@ -387,7 +421,7 @@ joblib.dump(imputer, "model/trade_imputer.pkl")
 
 model_bundle = {
     "features": shared_features,
-    "threshold": classified_row["probability"],
+    "threshold": classified_row["threshold"] + 0.05,
 }
 
 joblib.dump(model_bundle, "model/trade_model_bundle.pkl")

@@ -176,7 +176,7 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         common.objects.SymbolTest(
             name="CATX",
             datetime_str="01.29.26T12:22:00",
-            is_positive=False,
+            is_positive=True,
         ),
         common.objects.SymbolTest(
             name="FEED",

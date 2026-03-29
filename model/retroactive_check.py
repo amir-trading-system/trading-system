@@ -60,7 +60,6 @@ def write_to_csv(
                     "feature_minutes_since_market_open_to_total_market_minutes_pct",
                     "feature_bars_with_at_least_50_pct_wick_pct",
                     "feature_bars_with_lower_volume_average_pct",
-                    "feature_volume_sum_since_market_open",
                     "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
                     "feature_highest_volume_before_to_entry_bar_volume_ratio",
                     "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
@@ -73,13 +72,16 @@ def write_to_csv(
                     "feature_bars_above_volume_average_pct",
                     "feature_strong_bars_has_continuation",
                     "feature_high_volume_bars_with_rejection_pct",
-                    "feature_extension_from_vwap",
-                    "feature_distance_from_highest_high",
-                    "feature_entry_exaustion",
                     "feature_previous_bar_to_highest_high_pct",
                     "feature_bar_volume_to_volume_sum_since_market_open",
                     "feature_volume_average_to_bar_volume",
                     "feature_volume_per_minute_to_bar_volume",
+                    "feature_high_lows_pct",
+                    "feature_bars_with_rejection_inside_entry_bar_range_pct",
+                    "feature_positive_vs_negative_volume",
+                    "feature_positive_vs_negative_movement",
+                    "feature_volume_before_middle_point_vs_after_middle_point_pct",
+                    "feature_bars_without_movement_pct",
                     "entry_bar_high",
                     "entry_bar_low",
                     "entry_bar_open",
@@ -112,7 +114,6 @@ def write_to_csv(
             feature_minutes_since_market_open_to_total_market_minutes_pct = 0
             feature_bars_with_at_least_50_pct_wick_pct = 0
             feature_bars_with_lower_volume_average_pct = 0
-            feature_volume_sum_since_market_open = 0
             feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = False
             feature_highest_volume_before_to_entry_bar_volume_ratio = 0
             feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = 0
@@ -125,13 +126,16 @@ def write_to_csv(
             feature_bars_above_volume_average_pct = 0
             feature_strong_bars_has_continuation = 0
             feature_high_volume_bars_with_rejection_pct = 0
-            feature_extension_from_vwap = 0
-            feature_distance_from_highest_high = 0
-            feature_entry_exaustion = 0
             feature_previous_bar_to_highest_high_pct = 0
             feature_bar_volume_to_volume_sum_since_market_open = 0
             feature_volume_average_to_bar_volume = 0
             feature_volume_per_minute_to_bar_volume = 0
+            feature_high_lows_pct = 0
+            feature_bars_with_rejection_inside_entry_bar_range_pct = 0
+            feature_positive_vs_negative_volume = 0
+            feature_positive_vs_negative_movement = 0
+            feature_volume_before_middle_point_vs_after_middle_point_pct = 0
+            feature_bars_without_movement_pct = 0
             entry_bar_high = 0
             entry_bar_low = 0
             entry_bar_open = 0
@@ -150,7 +154,6 @@ def write_to_csv(
                 feature_minutes_since_market_open_to_total_market_minutes_pct = price_movement_statistics["feature_minutes_since_market_open_to_total_market_minutes_pct"]
                 feature_bars_with_at_least_50_pct_wick_pct = price_movement_statistics["feature_bars_with_at_least_50_pct_wick_pct"]
                 feature_bars_with_lower_volume_average_pct = price_movement_statistics["feature_bars_with_lower_volume_average_pct"]
-                feature_volume_sum_since_market_open = price_movement_statistics["feature_volume_sum_since_market_open"]
                 feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = price_movement_statistics["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"]
                 feature_highest_volume_before_to_entry_bar_volume_ratio = price_movement_statistics["feature_highest_volume_before_to_entry_bar_volume_ratio"]
                 feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = price_movement_statistics["feature_highest_average_volume_before_to_entry_bar_average_volume_ratio"]
@@ -163,13 +166,16 @@ def write_to_csv(
                 feature_bars_above_volume_average_pct = price_movement_statistics["feature_bars_above_volume_average_pct"]
                 feature_strong_bars_has_continuation = price_movement_statistics["feature_strong_bars_has_continuation"]
                 feature_high_volume_bars_with_rejection_pct = price_movement_statistics["feature_high_volume_bars_with_rejection_pct"]
-                feature_extension_from_vwap = price_movement_statistics["feature_extension_from_vwap"]
-                feature_distance_from_highest_high = price_movement_statistics["feature_distance_from_highest_high"]
-                feature_entry_exaustion = price_movement_statistics["feature_entry_exaustion"]
                 feature_previous_bar_to_highest_high_pct = price_movement_statistics["feature_previous_bar_to_highest_high_pct"]
                 feature_bar_volume_to_volume_sum_since_market_open = price_movement_statistics["feature_bar_volume_to_volume_sum_since_market_open"]
                 feature_volume_average_to_bar_volume = price_movement_statistics["feature_volume_average_to_bar_volume"]
                 feature_volume_per_minute_to_bar_volume = price_movement_statistics["feature_volume_per_minute_to_bar_volume"]
+                feature_high_lows_pct = price_movement_statistics["feature_high_lows_pct"]
+                feature_bars_with_rejection_inside_entry_bar_range_pct = price_movement_statistics["feature_bars_with_rejection_inside_entry_bar_range_pct"]
+                feature_positive_vs_negative_volume = price_movement_statistics["feature_positive_vs_negative_volume"]
+                feature_positive_vs_negative_movement = price_movement_statistics["feature_positive_vs_negative_movement"]
+                feature_volume_before_middle_point_vs_after_middle_point_pct = price_movement_statistics["feature_volume_before_middle_point_vs_after_middle_point_pct"]
+                feature_bars_without_movement_pct = price_movement_statistics["feature_bars_without_movement_pct"]
                 entry_bar_high = price_movement_statistics["entry_bar_high"]
                 entry_bar_low = price_movement_statistics["entry_bar_low"]
                 entry_bar_open = price_movement_statistics["entry_bar_open"]
@@ -231,7 +237,6 @@ def write_to_csv(
                                 feature_minutes_since_market_open_to_total_market_minutes_pct,
                                 feature_bars_with_at_least_50_pct_wick_pct,
                                 feature_bars_with_lower_volume_average_pct,
-                                feature_volume_sum_since_market_open,
                                 feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open,
                                 feature_highest_volume_before_to_entry_bar_volume_ratio,
                                 feature_highest_average_volume_before_to_entry_bar_average_volume_ratio,
@@ -244,13 +249,16 @@ def write_to_csv(
                                 feature_bars_above_volume_average_pct,
                                 feature_strong_bars_has_continuation,
                                 feature_high_volume_bars_with_rejection_pct,
-                                feature_extension_from_vwap,
-                                feature_distance_from_highest_high,
-                                feature_entry_exaustion,
                                 feature_previous_bar_to_highest_high_pct,
                                 feature_bar_volume_to_volume_sum_since_market_open,
                                 feature_volume_average_to_bar_volume,
                                 feature_volume_per_minute_to_bar_volume,
+                                feature_high_lows_pct,
+                                feature_bars_with_rejection_inside_entry_bar_range_pct,
+                                feature_positive_vs_negative_volume,
+                                feature_positive_vs_negative_movement,
+                                feature_volume_before_middle_point_vs_after_middle_point_pct,
+                                feature_bars_without_movement_pct,
                                 entry_bar_high,
                                 entry_bar_low,
                                 entry_bar_open,
@@ -417,10 +425,10 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         # common.objects.SymbolTest(
-        #     name="SST",
-        #     datetime_str="03.27.26T12:42:00",
-        #     is_positive=True,
-        # )
+        #     name="LWLG",
+        #     datetime_str="03.13.26T15:03:00",
+        #     is_positive=False,
+        # ),
     ]
     output_file_name = "model/real_case_result.csv"
     get_only_statistics = False
