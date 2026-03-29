@@ -16,7 +16,7 @@ import logger
 from scripts import stock_finder
 import tws
 
-from . import train_data
+from . import training
 
 LOGS_PATH = "logs/app.log"
 app_logger = logger.logger.Logger(
@@ -424,7 +424,7 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
 
     current_symbols = [
         symbol
-        for symbol in train_data.get_tagged_data()
+        for symbol in training.train_data.get_tagged_data()
         if symbol.is_positive
     ]
     for symbol in symbols:
@@ -443,25 +443,14 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
 def run_retroactive_check():
     should_run_model = True
     symbols_data = []
-    symbols = [
-        common.objects.SymbolTest(
-            name="NXTT",
-            datetime_str="03.25.26T10:03:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="NXTT",
-            datetime_str="03.27.26T10:03:00",
-            is_positive=False,
-        ),
-    ]
+    symbols = []
     output_file_name = "model/real_case_result.csv"
     get_only_statistics = False
     # symbols = explore_past_potential_symbols()
 
     if not symbols:
         output_file_name = ""
-        symbols = train_data.get_tagged_data()
+        symbols = training.train_data.get_tagged_data()
         get_only_statistics = True
         should_run_model = False
 
@@ -542,6 +531,7 @@ def run_retroactive_check():
             ),
             specific_bar_time=specific_bar_time,
             expected_bar_time=symbol.date_time,
+            is_positive=symbol.is_positive,
         )
         symbols_data.append(
             {

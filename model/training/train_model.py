@@ -18,8 +18,8 @@ from sklearn.model_selection import train_test_split
 # CONFIG
 # ============================================================
 
-POSITIVE_CSV = "model/positive_results.csv"
-FALSE_POSITIVE_CSV = "model/false_positive_results.csv"
+POSITIVE_CSV = "model/training/positive_results.csv"
+FALSE_POSITIVE_CSV = "model/training/false_positive_results.csv"
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.3

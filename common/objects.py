@@ -153,6 +153,7 @@ class Stock:
         timeframe_type: TimeframeType,
         specific_bar_time: datetime.datetime,
         expected_bar_time: datetime.datetime,
+        is_positive: bool = True,
         one_minute_bars_queue: queue.Queue[BarData] = None,
         finished_collection: bool = False,
         finished_analyze: bool = False,
@@ -176,6 +177,7 @@ class Stock:
         self.one_minute_bars_queue = one_minute_bars_queue
         self.specific_bar_time = specific_bar_time
         self.expected_bar_time = expected_bar_time
+        self.is_positive = is_positive
         self.finished_collection = finished_collection
         self.finished_analyze = finished_analyze
         self.resistance_levels = resistance_levels
@@ -189,6 +191,17 @@ class Stock:
         self.day_request_id = day_request_id
         self.total_volume = total_volume
         self.total_price_volume = total_price_volume
+
+    def __getstate__(self):
+        # Return a dictionary of attributes to pickle, excluding 'lock'
+        state = self.__dict__.copy()
+        del state['one_minute_bars_queue']
+        return state
+
+    def __setstate__(self, state):
+        # Restore attributes and re-initialize 'one_minute_bars_queue' after unpickling
+        self.__dict__.update(state)
+        self.one_minute_bars_queue = queue.Queue()
 
     def previous_bar(
         self,

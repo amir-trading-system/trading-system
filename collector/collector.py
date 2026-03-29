@@ -70,6 +70,7 @@ class Collector:
         manual_timeframe_for_tests: common.objects.TimeframeInput,
         specific_bar_time: datetime.datetime,
         expected_bar_time: datetime.datetime,
+        is_positive: bool,
     ):
         timeframes = [
             common.objects.TimeframeInput(
@@ -94,6 +95,7 @@ class Collector:
                 one_minute_bars_queue=queue.Queue(),
                 specific_bar_time=specific_bar_time,
                 expected_bar_time=expected_bar_time,
+                is_positive=is_positive,
             )
             if timeframe_input.timeframe_type == common.objects.TimeframeType.DAY:
                 day_timeframe_request_id = next_request_id

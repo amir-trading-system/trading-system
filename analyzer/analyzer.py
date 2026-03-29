@@ -105,6 +105,7 @@ class Analyzer:
                 total_price_volume=stock_object.total_price_volume,
                 volume_sum_since_4_am_today=stock_object.volume_sum_since_4_am_today,
                 volume_sum_since_market_open=stock_object.volume_sum_since_market_open,
+                is_positive=stock_object.is_positive,
             )
             stock.arrange_data_for_analysis()
 

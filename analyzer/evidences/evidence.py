@@ -1,5 +1,6 @@
 import datetime
 import logging
+import pickle
 
 import common
 import model
@@ -358,6 +359,18 @@ class Evidence:
                 volume_sum_since_market_open=stock.volume_sum_since_market_open,
                 one_minute_bars=one_minute_bars,
             )
+            with open(f"model/training/data/{stock.symbol_name}-{stock.expected_bar_time}.json", "wb") as f:
+                pickle.dump(
+                    {
+                        "day_timeframe_stock": stock,
+                        "one_minute_timeframe_stock": one_minute_timeframe_stock,
+                        "potential_confirmation_bar": potential_confirmation_bar,
+                        "highest_high_one_minute_bar": highest_high_one_minute_bar,
+                        "volume_sum_since_market_open": stock.volume_sum_since_market_open,
+                        "one_minute_bars": one_minute_bars,
+                    },
+                    f,
+                )
             return True
 
         if not self._confirm(
