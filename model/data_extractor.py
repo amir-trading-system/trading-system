@@ -109,6 +109,7 @@ class DataExtractor:
 
     @staticmethod
     def extract_features_from_symbol_data(
+        day_timeframe_stock: common.objects.Stock,
         one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
@@ -124,6 +125,8 @@ class DataExtractor:
 
         positive_bars_counter = 0
         negative_bars_counter = 0
+        last_bars_positive_bars = 0
+        last_bars_negative_bars = 0
 
         bars_with_at_least_50_pct_wick_counter = 0
         strong_positive_bars_with_full_body_counter = 0
@@ -139,6 +142,7 @@ class DataExtractor:
         bars_with_rejection_inside_entry_bar_range: list[common.objects.BarData] = []
         bars_with_highest_volume: list[common.objects.BarData] = []
         bars_without_movement_counter = 0
+        bars_above_vwap_counter = 0
 
         for bar_object in one_minute_bars:
             total_volume += bar_object.volume
@@ -163,12 +167,16 @@ class DataExtractor:
                 positive_volume_sum += bar_object.volume
                 positive_bars_counter += 1
                 positive_movement += bar_object.close - bar_object.open_value
+                if bar_object.index - 5 < potential_confirmation_bar.index:
+                    last_bars_positive_bars += 1
                 if bar_object.body_percentage >= 0.75:
                     strong_positive_bars_with_full_body_counter += 1
             else:
                 negative_volume_sum += bar_object.volume
                 negative_bars_counter += 1
                 negative_movement += bar_object.open_value - bar_object.close
+                if bar_object.index - 5 < potential_confirmation_bar.index:
+                    last_bars_negative_bars += 1
 
             if previous_bar is not None:
                 if bar_object.histogram < previous_bar.histogram:
@@ -232,6 +240,9 @@ class DataExtractor:
 
             if round(bar_object.high, 2) == round(bar_object.low, 2):
                 bars_without_movement_counter += 1
+
+            if bar_object.close > bar_object.vwap:
+                bars_above_vwap_counter += 1
 
         feature_bars_with_rejection_inside_entry_bar_range_pct = 0
         max_bars_since_first_breakout_attempt = 0
@@ -320,7 +331,7 @@ class DataExtractor:
             if bar_object.bar_time > highest_high_one_minute_bar.bar_time
         ]
         strong_entry_bar_points = 0
-        if (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.9:
+        if potential_confirmation_bar.body_percentage >= 0.9:
             strong_entry_bar_points += 2
         if potential_confirmation_bar.volume > highest_high_one_minute_bar.volume:
             strong_entry_bar_points += 1
@@ -351,6 +362,29 @@ class DataExtractor:
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             one_minute_bars=one_minute_bars,
         )
+
+        bars_under_vwap_since_highest_high = len(
+            [
+                bar_object
+                for bar_object in one_minute_bars
+                if bar_object.index < highest_high_one_minute_bar.index
+                and (bar_object.close < bar_object.vwap or bar_object.ema_9 < bar_object.vwap)
+            ]
+        )
+
+        crossed_any_resistance = any(
+            r_l
+            for r_l in day_timeframe_stock.resistance_levels
+            if potential_confirmation_bar.low < r_l.close < potential_confirmation_bar.close
+        )
+        if not crossed_any_resistance:
+            crossed_any_resistance = any(
+                [
+                    bar_object
+                    for bar_object in one_minute_bars
+                    if potential_confirmation_bar.low < bar_object.close < potential_confirmation_bar.close
+                ]
+            )
 
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
@@ -386,10 +420,15 @@ class DataExtractor:
             "feature_positive_vs_negative_movement": positive_movement/negative_movement if negative_movement > 0 else 1,
             "feature_volume_before_middle_point_vs_after_middle_point_pct": feature_volume_before_middle_point_vs_after_middle_point_pct,
             "feature_bars_without_movement_pct": bars_without_movement_counter/total_bars,
+            "feature_last_negative_to_positive_bars_pct": last_bars_negative_bars/last_bars_positive_bars,
+            "bars_under_vwap_since_highest_high": bars_under_vwap_since_highest_high/total_bars,
+            "feature_crossed_any_resistance": crossed_any_resistance,
+            "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
             "entry_bar_high": potential_confirmation_bar.high,
             "entry_bar_low": potential_confirmation_bar.low,
             "entry_bar_open": potential_confirmation_bar.open_value,
             "entry_bar_close": potential_confirmation_bar.close,
+            "entry_bar_volume": potential_confirmation_bar.volume,
         }
 
         return features

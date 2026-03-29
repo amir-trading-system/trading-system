@@ -82,10 +82,15 @@ def write_to_csv(
                     "feature_positive_vs_negative_movement",
                     "feature_volume_before_middle_point_vs_after_middle_point_pct",
                     "feature_bars_without_movement_pct",
+                    "feature_last_negative_to_positive_bars_pct",
+                    "bars_under_vwap_since_highest_high",
+                    "feature_crossed_any_resistance",
+                    "feature_bars_above_vwap_pct",
                     "entry_bar_high",
                     "entry_bar_low",
                     "entry_bar_open",
                     "entry_bar_close",
+                    "entry_bar_volume",
                 ],
             )
             f.flush()
@@ -136,10 +141,15 @@ def write_to_csv(
             feature_positive_vs_negative_movement = 0
             feature_volume_before_middle_point_vs_after_middle_point_pct = 0
             feature_bars_without_movement_pct = 0
+            feature_last_negative_to_positive_bars_pct = 0
+            bars_under_vwap_since_highest_high = 0
+            feature_crossed_any_resistance = 0
+            feature_bars_above_vwap_pct = 0
             entry_bar_high = 0
             entry_bar_low = 0
             entry_bar_open = 0
             entry_bar_close = 0
+            entry_bar_volume = 0
 
             price_movement_statistics = symbol_data.get("price_movement_statistics", None)
             if price_movement_statistics:
@@ -176,10 +186,15 @@ def write_to_csv(
                 feature_positive_vs_negative_movement = price_movement_statistics["feature_positive_vs_negative_movement"]
                 feature_volume_before_middle_point_vs_after_middle_point_pct = price_movement_statistics["feature_volume_before_middle_point_vs_after_middle_point_pct"]
                 feature_bars_without_movement_pct = price_movement_statistics["feature_bars_without_movement_pct"]
+                feature_last_negative_to_positive_bars_pct = price_movement_statistics["feature_last_negative_to_positive_bars_pct"]
+                bars_under_vwap_since_highest_high = price_movement_statistics["bars_under_vwap_since_highest_high"]
+                feature_crossed_any_resistance = price_movement_statistics["feature_crossed_any_resistance"]
+                feature_bars_above_vwap_pct = price_movement_statistics["feature_bars_above_vwap_pct"]
                 entry_bar_high = price_movement_statistics["entry_bar_high"]
                 entry_bar_low = price_movement_statistics["entry_bar_low"]
                 entry_bar_open = price_movement_statistics["entry_bar_open"]
                 entry_bar_close = price_movement_statistics["entry_bar_close"]
+                entry_bar_volume = price_movement_statistics["entry_bar_volume"]
 
             collection_status = symbol_data["collection_status"]
             analysis_status = symbol_data["analysis_status"]
@@ -259,10 +274,15 @@ def write_to_csv(
                                 feature_positive_vs_negative_movement,
                                 feature_volume_before_middle_point_vs_after_middle_point_pct,
                                 feature_bars_without_movement_pct,
+                                feature_last_negative_to_positive_bars_pct,
+                                bars_under_vwap_since_highest_high,
+                                feature_crossed_any_resistance,
+                                feature_bars_above_vwap_pct,
                                 entry_bar_high,
                                 entry_bar_low,
                                 entry_bar_open,
                                 entry_bar_close,
+                                entry_bar_volume,
                             ]
                         )
 
@@ -424,11 +444,16 @@ def run_retroactive_check():
     should_run_model = True
     symbols_data = []
     symbols = [
-        # common.objects.SymbolTest(
-        #     name="LWLG",
-        #     datetime_str="03.13.26T15:03:00",
-        #     is_positive=False,
-        # ),
+        common.objects.SymbolTest(
+            name="NXTT",
+            datetime_str="03.25.26T10:03:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="NXTT",
+            datetime_str="03.27.26T10:03:00",
+            is_positive=False,
+        ),
     ]
     output_file_name = "model/real_case_result.csv"
     get_only_statistics = False

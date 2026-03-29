@@ -301,6 +301,9 @@ class Evidence:
         model_runner: model.runner.Runner,
         get_only_statistics: bool = False,
     ) -> bool:
+        if potential_confirmation_bar.volume < 20000:
+            return False
+
         current_bar_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
             month=original_bar_to_confirm.bar_time.month,
@@ -348,6 +351,7 @@ class Evidence:
             and potential_confirmation_bar.bar_time == stock.expected_bar_time
         ):
             potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
+                day_timeframe_stock=stock,
                 one_minute_timeframe_stock=one_minute_timeframe_stock,
                 potential_confirmation_bar=potential_confirmation_bar,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
@@ -368,6 +372,7 @@ class Evidence:
             return False
 
         potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
+            day_timeframe_stock=stock,
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,

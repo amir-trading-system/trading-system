@@ -110,7 +110,11 @@ def find_shared_numeric_features(pos_df, neg_df):
             "feature_volume_per_minute_to_bar_volume",
             "feature_strong_bars_has_continuation",
             "feature_volume_before_middle_point_vs_after_middle_point_pct",
-            "feature_bars_without_movement_pct", #68.94 5-5
+            "feature_bars_without_movement_pct",
+            "feature_last_negative_to_positive_bars_pct",
+            "feature_bars_above_vwap_pct",
+            "feature_crossed_any_resistance", # 0.8 2-6
+            # "bars_under_vwap_since_highest_high",
         ]:
             final_shares_columns.append(feature)
 

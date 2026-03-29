@@ -36,6 +36,7 @@ class Runner:
             features_data[feature_name] = potential_confirmation_bar.price_movement_statistics.get(feature_name, np.nan)
 
         x_live = pd.DataFrame([features_data], columns=self.features)
+        x_live = x_live.reindex(columns=self.features, fill_value=0)
         x_live = pd.DataFrame(self.imputer.transform(x_live), columns=self.features)
 
         probability = float(self.model.predict_proba(x_live)[0, 1])
