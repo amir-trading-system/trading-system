@@ -62,6 +62,15 @@ def write_to_csv(
                     "bars_under_vwap_since_highest_high",
                     "feature_crossed_any_resistance",
                     "feature_bars_above_vwap_pct",
+                    "feature_entry_bar_profit_pct",
+                    "feature_entry_bar_volume_to_highest_bar_volume_pct",
+                    "feature_previous_bar_volume_to_entry_bar_volume_pct",
+                    "feature_bars_closed_under_ema_20_since_highest_high_bar_pct",
+                    "feature_volume_average_change_since_highest_high_pct",
+                    "feature_volume_to_volume_average_ratio_since_highest_high",
+                    "feature_entry_bar_volume_is_highest_until_now",
+                    "feature_ema_9_has_been_tested_since_highest_high",
+                    "feature_entry_strength_vs_avg",
                     "entry_bar_high",
                     "entry_bar_low",
                     "entry_bar_open",
@@ -114,6 +123,15 @@ def write_to_csv(
         bars_under_vwap_since_highest_high = 0
         feature_crossed_any_resistance = 0
         feature_bars_above_vwap_pct = 0
+        feature_entry_bar_profit_pct = 0
+        feature_entry_bar_volume_to_highest_bar_volume_pct = 0
+        feature_previous_bar_volume_to_entry_bar_volume_pct = 0
+        feature_bars_closed_under_ema_20_since_highest_high_bar_pct = 0
+        feature_volume_average_change_since_highest_high_pct = 0
+        feature_volume_to_volume_average_ratio_since_highest_high = 0
+        feature_entry_bar_volume_is_highest_until_now = 0
+        feature_ema_9_has_been_tested_since_highest_high = 0
+        feature_entry_strength_vs_avg = 0
         entry_bar_high = 0
         entry_bar_low = 0
         entry_bar_open = 0
@@ -157,6 +175,15 @@ def write_to_csv(
         bars_under_vwap_since_highest_high = symbol_data["bars_under_vwap_since_highest_high"]
         feature_crossed_any_resistance = symbol_data["feature_crossed_any_resistance"]
         feature_bars_above_vwap_pct = symbol_data["feature_bars_above_vwap_pct"]
+        feature_entry_bar_profit_pct = symbol_data["feature_entry_bar_profit_pct"]
+        feature_entry_bar_volume_to_highest_bar_volume_pct = symbol_data["feature_entry_bar_volume_to_highest_bar_volume_pct"]
+        feature_previous_bar_volume_to_entry_bar_volume_pct = symbol_data["feature_previous_bar_volume_to_entry_bar_volume_pct"]
+        feature_bars_closed_under_ema_20_since_highest_high_bar_pct = symbol_data["feature_bars_closed_under_ema_20_since_highest_high_bar_pct"]
+        feature_volume_average_change_since_highest_high_pct = symbol_data["feature_volume_average_change_since_highest_high_pct"]
+        feature_volume_to_volume_average_ratio_since_highest_high = symbol_data["feature_volume_to_volume_average_ratio_since_highest_high"]
+        feature_entry_bar_volume_is_highest_until_now = symbol_data["feature_entry_bar_volume_is_highest_until_now"]
+        feature_ema_9_has_been_tested_since_highest_high = symbol_data["feature_ema_9_has_been_tested_since_highest_high"]
+        feature_entry_strength_vs_avg = symbol_data["feature_entry_strength_vs_avg"]
         entry_bar_high = symbol_data["entry_bar_high"]
         entry_bar_low = symbol_data["entry_bar_low"]
         entry_bar_open = symbol_data["entry_bar_open"]
@@ -212,6 +239,15 @@ def write_to_csv(
                     bars_under_vwap_since_highest_high,
                     feature_crossed_any_resistance,
                     feature_bars_above_vwap_pct,
+                    feature_entry_bar_profit_pct,
+                    feature_entry_bar_volume_to_highest_bar_volume_pct,
+                    feature_previous_bar_volume_to_entry_bar_volume_pct,
+                    feature_bars_closed_under_ema_20_since_highest_high_bar_pct,
+                    feature_volume_average_change_since_highest_high_pct,
+                    feature_volume_to_volume_average_ratio_since_highest_high,
+                    feature_entry_bar_volume_is_highest_until_now,
+                    feature_ema_9_has_been_tested_since_highest_high,
+                    feature_entry_strength_vs_avg,
                     entry_bar_high,
                     entry_bar_low,
                     entry_bar_open,

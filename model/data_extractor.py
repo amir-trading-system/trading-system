@@ -386,6 +386,54 @@ class DataExtractor:
                 ]
             )
 
+        bars_closed_under_ema_20_since_highest_high = [
+            bar_object
+            for bar_object in bars_since_highest_high
+            if bar_object.close < bar_object.ema_20
+        ]
+        min_volume_average_since_highest_high = 0
+        max_volume_average_since_highest_high = 0
+
+        if bars_since_highest_high:
+            min_volume_average_since_highest_high = min(
+                bar_object.volume_average
+                for bar_object in bars_since_highest_high
+            )
+            max_volume_average_since_highest_high = max(
+                bar_object.volume_average
+                for bar_object in bars_since_highest_high
+            )
+
+        volume_to_volume_average_ratio_since_highest_high = 0
+        for bar_object in bars_since_highest_high:
+            volume_to_volume_average_ratio_since_highest_high += bar_object.volume/bar_object.volume_average
+
+        feature_ema_9_has_been_tested_since_highest_high = False
+        for bar_object in bars_since_highest_high:
+            previous_bar = one_minute_timeframe_stock.previous_bar(
+                bar_object=bar_object,
+            )
+
+            if (
+                True
+                and previous_bar is not None
+                and previous_bar.ema_9 < bar_object.ema_9
+            ):
+                feature_ema_9_has_been_tested_since_highest_high = True
+                break
+
+        last_10_bars = [
+            bar_object
+            for bar_object
+            in one_minute_bars
+            if bar_object.bar_time + datetime.timedelta(minutes=10) > potential_confirmation_bar.bar_time
+        ]
+
+        last_10_bars_range_average = sum(
+            bar_object.high - bar_object.low
+            for bar_object in last_10_bars
+        )/len(last_10_bars)
+
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
             "feature_pullback_sharpness": pullback_analysis["feature_pullback_sharpness"],
@@ -420,10 +468,19 @@ class DataExtractor:
             "feature_positive_vs_negative_movement": positive_movement/negative_movement if negative_movement > 0 else 1,
             "feature_volume_before_middle_point_vs_after_middle_point_pct": feature_volume_before_middle_point_vs_after_middle_point_pct,
             "feature_bars_without_movement_pct": bars_without_movement_counter/total_bars,
-            "feature_last_negative_to_positive_bars_pct": last_bars_negative_bars/last_bars_positive_bars,
+            "feature_last_negative_to_positive_bars_pct": last_bars_negative_bars/last_bars_positive_bars if last_bars_positive_bars > 0 else 0,
             "bars_under_vwap_since_highest_high": bars_under_vwap_since_highest_high/total_bars,
             "feature_crossed_any_resistance": crossed_any_resistance,
             "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
+            "feature_entry_bar_profit_pct": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/potential_confirmation_bar.open_value,
+            "feature_entry_bar_volume_to_highest_bar_volume_pct": potential_confirmation_bar.volume/highest_high_one_minute_bar.volume,
+            "feature_previous_bar_volume_to_entry_bar_volume_pct": previous_bar.volume/potential_confirmation_bar.volume if previous_bar is not None else 0,
+            "feature_bars_closed_under_ema_20_since_highest_high_bar_pct": len(bars_closed_under_ema_20_since_highest_high)/(highest_high_one_minute_bar.index - potential_confirmation_bar.index),
+            "feature_volume_average_change_since_highest_high_pct": min_volume_average_since_highest_high/max_volume_average_since_highest_high if max_volume_average_since_highest_high > 0 else 0,
+            "feature_volume_to_volume_average_ratio_since_highest_high": volume_to_volume_average_ratio_since_highest_high/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0,
+            "feature_entry_bar_volume_is_highest_until_now": max(bar_object.volume for bar_object in one_minute_bars) == potential_confirmation_bar.volume,
+            "feature_ema_9_has_been_tested_since_highest_high": feature_ema_9_has_been_tested_since_highest_high,
+            "feature_entry_strength_vs_avg": (potential_confirmation_bar.high - potential_confirmation_bar.low)/last_10_bars_range_average,
             "entry_bar_high": potential_confirmation_bar.high,
             "entry_bar_low": potential_confirmation_bar.low,
             "entry_bar_open": potential_confirmation_bar.open_value,
