@@ -59,7 +59,6 @@ def write_to_csv(
                     "feature_volume_before_middle_point_vs_after_middle_point_pct",
                     "feature_bars_without_movement_pct",
                     "feature_last_negative_to_positive_bars_pct",
-                    "bars_under_vwap_since_highest_high",
                     "feature_crossed_any_resistance",
                     "feature_bars_above_vwap_pct",
                     "feature_entry_bar_profit_pct",
@@ -120,7 +119,6 @@ def write_to_csv(
         feature_volume_before_middle_point_vs_after_middle_point_pct = 0
         feature_bars_without_movement_pct = 0
         feature_last_negative_to_positive_bars_pct = 0
-        bars_under_vwap_since_highest_high = 0
         feature_crossed_any_resistance = 0
         feature_bars_above_vwap_pct = 0
         feature_entry_bar_profit_pct = 0
@@ -172,7 +170,6 @@ def write_to_csv(
         feature_volume_before_middle_point_vs_after_middle_point_pct = symbol_data["feature_volume_before_middle_point_vs_after_middle_point_pct"]
         feature_bars_without_movement_pct = symbol_data["feature_bars_without_movement_pct"]
         feature_last_negative_to_positive_bars_pct = symbol_data["feature_last_negative_to_positive_bars_pct"]
-        bars_under_vwap_since_highest_high = symbol_data["bars_under_vwap_since_highest_high"]
         feature_crossed_any_resistance = symbol_data["feature_crossed_any_resistance"]
         feature_bars_above_vwap_pct = symbol_data["feature_bars_above_vwap_pct"]
         feature_entry_bar_profit_pct = symbol_data["feature_entry_bar_profit_pct"]
@@ -236,7 +233,6 @@ def write_to_csv(
                     feature_volume_before_middle_point_vs_after_middle_point_pct,
                     feature_bars_without_movement_pct,
                     feature_last_negative_to_positive_bars_pct,
-                    bars_under_vwap_since_highest_high,
                     feature_crossed_any_resistance,
                     feature_bars_above_vwap_pct,
                     feature_entry_bar_profit_pct,

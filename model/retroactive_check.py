@@ -83,7 +83,6 @@ def write_to_csv(
                     "feature_volume_before_middle_point_vs_after_middle_point_pct",
                     "feature_bars_without_movement_pct",
                     "feature_last_negative_to_positive_bars_pct",
-                    "bars_under_vwap_since_highest_high",
                     "feature_crossed_any_resistance",
                     "feature_bars_above_vwap_pct",
                     "entry_bar_high",
@@ -142,7 +141,6 @@ def write_to_csv(
             feature_volume_before_middle_point_vs_after_middle_point_pct = 0
             feature_bars_without_movement_pct = 0
             feature_last_negative_to_positive_bars_pct = 0
-            bars_under_vwap_since_highest_high = 0
             feature_crossed_any_resistance = 0
             feature_bars_above_vwap_pct = 0
             entry_bar_high = 0
@@ -187,7 +185,6 @@ def write_to_csv(
                 feature_volume_before_middle_point_vs_after_middle_point_pct = price_movement_statistics["feature_volume_before_middle_point_vs_after_middle_point_pct"]
                 feature_bars_without_movement_pct = price_movement_statistics["feature_bars_without_movement_pct"]
                 feature_last_negative_to_positive_bars_pct = price_movement_statistics["feature_last_negative_to_positive_bars_pct"]
-                bars_under_vwap_since_highest_high = price_movement_statistics["bars_under_vwap_since_highest_high"]
                 feature_crossed_any_resistance = price_movement_statistics["feature_crossed_any_resistance"]
                 feature_bars_above_vwap_pct = price_movement_statistics["feature_bars_above_vwap_pct"]
                 entry_bar_high = price_movement_statistics["entry_bar_high"]
@@ -275,7 +272,6 @@ def write_to_csv(
                                 feature_volume_before_middle_point_vs_after_middle_point_pct,
                                 feature_bars_without_movement_pct,
                                 feature_last_negative_to_positive_bars_pct,
-                                bars_under_vwap_since_highest_high,
                                 feature_crossed_any_resistance,
                                 feature_bars_above_vwap_pct,
                                 entry_bar_high,
