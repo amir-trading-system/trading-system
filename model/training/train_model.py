@@ -129,15 +129,15 @@ def find_shared_numeric_features(pos_df, neg_df):
 
     return final_shares_columns
 
-def evaluate_threshold(df, threshold):
+def evaluate_threshold(scored_df_obj, threshold):
     """
     Positive pass rate: positives classified as pass
     False-positive reject rate: negatives classified as reject
     """
-    passed = df["probability"] >= threshold
+    passed = scored_df_obj["probability"] >= threshold
 
-    positives = df["label"] == 1
-    negatives = df["label"] == 0
+    positives = scored_df_obj["label"] == 1
+    negatives = scored_df_obj["label"] == 0
 
     pos_pass_rate = passed[positives].mean() if positives.any() else np.nan
     neg_reject_rate = (~passed[negatives]).mean() if negatives.any() else np.nan
@@ -346,6 +346,7 @@ model_info = {
     "random_state": RANDOM_STATE,
 }
 
+#pylint:disable=unspecified-encoding
 with open(MODEL_INFO_OUTPUT, "w") as f:
     json.dump(model_info, f, indent=2)
 
