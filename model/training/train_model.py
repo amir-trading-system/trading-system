@@ -28,10 +28,10 @@ TEST_SIZE = 0.3
 THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 
 # Output files
-TRAIN_SCORED_OUTPUT = "model/scored_training_dataset.csv"
-POSITIVE_SCORED_OUTPUT = "model/positive_results_scored.csv"
-FALSE_POSITIVE_SCORED_OUTPUT = "model/false_positive_results_scored.csv"
-MODEL_INFO_OUTPUT = "model/model_info.json"
+TRAIN_SCORED_OUTPUT = "model/training/scored_training_dataset.csv"
+POSITIVE_SCORED_OUTPUT = "model/training/positive_results_scored.csv"
+FALSE_POSITIVE_SCORED_OUTPUT = "model/training/false_positive_results_scored.csv"
+MODEL_INFO_OUTPUT = "model/training/model_info.json"
 
 if os.path.exists(TRAIN_SCORED_OUTPUT):
     os.remove(TRAIN_SCORED_OUTPUT)
