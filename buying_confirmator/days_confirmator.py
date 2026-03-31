@@ -194,7 +194,7 @@ class Confirmator:
             transmit = False
             if self.alerter_object:
                 ## For now keping it false until we think how to manage it.
-                # transmit = True
+                transmit = True
 
                 self.alerter_object.send_confirmation_alert(
                     sender="Confirmator",

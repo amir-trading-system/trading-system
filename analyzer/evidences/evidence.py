@@ -393,6 +393,7 @@ class Evidence:
             one_minute_bars=one_minute_bars,
         )
 
+        should_take_trade = False
         if model_runner.should_run_model:
             score: common.objects.Score = model_runner.score_potential_confirmation_bar(
                 potential_confirmation_bar=potential_confirmation_bar,
@@ -418,31 +419,30 @@ class Evidence:
                     "threshold": score.threshold,
                 },
             )
-            if not score.should_take_trade:
-                return False
+            should_take_trade = score.should_take_trade
 
-        if (
-            True
-            and potential_confirmation_bar.body_percentage < 0.5
-            and potential_confirmation_bar.close < potential_confirmation_bar.high
-            and potential_confirmation_bar.low < potential_confirmation_bar.open_value
-        ):
-            return False
+        # if (
+        #     True
+        #     and potential_confirmation_bar.body_percentage < 0.5
+        #     and potential_confirmation_bar.close < potential_confirmation_bar.high
+        #     and potential_confirmation_bar.low < potential_confirmation_bar.open_value
+        # ):
+        #     return False
 
-        if (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.25:
-            return False
+        # if (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.25:
+        #     return False
 
-        if current_bar_09_30 <= potential_confirmation_bar.bar_time <= current_bar_10_00:
-            return volume_sum_since_4_am_today > 5000000
-        if potential_confirmation_bar.bar_time > current_bar_10_00:
-            return (
-                (potential_confirmation_bar.high - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.3
-                and highest_high_one_minute_bar.index - 1 > potential_confirmation_bar.index
-            ) or (
-                volume_sum_since_4_am_today > 2000000
-            )
+        # if current_bar_09_30 <= potential_confirmation_bar.bar_time <= current_bar_10_00:
+        #     return volume_sum_since_4_am_today > 5000000
+        # if potential_confirmation_bar.bar_time > current_bar_10_00:
+        #     return (
+        #         (potential_confirmation_bar.high - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.3
+        #         and highest_high_one_minute_bar.index - 1 > potential_confirmation_bar.index
+        #     ) or (
+        #         volume_sum_since_4_am_today > 2000000
+        #     )
 
-        return False
+        return should_take_trade
 
     def _confirm(
         self,
