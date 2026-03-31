@@ -70,11 +70,9 @@ def write_to_csv(
                     "feature_entry_bar_volume_is_highest_until_now",
                     "feature_ema_9_has_been_tested_since_highest_high",
                     "feature_entry_strength_vs_avg",
-                    "entry_bar_high",
-                    "entry_bar_low",
-                    "entry_bar_open",
-                    "entry_bar_close",
-                    "entry_bar_volume",
+                    "feature_weak_bars_since_highest_high_to_total_pct",
+                    "feature_bars_since_highest_high_to_total_bars_pct",
+                    "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
                 ],
             )
             f.flush()
@@ -130,11 +128,9 @@ def write_to_csv(
         feature_entry_bar_volume_is_highest_until_now = 0
         feature_ema_9_has_been_tested_since_highest_high = 0
         feature_entry_strength_vs_avg = 0
-        entry_bar_high = 0
-        entry_bar_low = 0
-        entry_bar_open = 0
-        entry_bar_close = 0
-        entry_bar_volume = 0
+        feature_weak_bars_since_highest_high_to_total_pct = 0
+        feature_bars_since_highest_high_to_total_bars_pct = 0
+        feature_weak_bars_to_bars_since_highest_high_to_total_bars = 0
 
         feature_has_positive_more_than_negative_bars = symbol_data["feature_has_positive_more_than_negative_bars"]
         feature_pullback_sharpness = symbol_data["feature_pullback_sharpness"]
@@ -181,11 +177,9 @@ def write_to_csv(
         feature_entry_bar_volume_is_highest_until_now = symbol_data["feature_entry_bar_volume_is_highest_until_now"]
         feature_ema_9_has_been_tested_since_highest_high = symbol_data["feature_ema_9_has_been_tested_since_highest_high"]
         feature_entry_strength_vs_avg = symbol_data["feature_entry_strength_vs_avg"]
-        entry_bar_high = symbol_data["entry_bar_high"]
-        entry_bar_low = symbol_data["entry_bar_low"]
-        entry_bar_open = symbol_data["entry_bar_open"]
-        entry_bar_close = symbol_data["entry_bar_close"]
-        entry_bar_volume = symbol_data["entry_bar_volume"]
+        feature_weak_bars_since_highest_high_to_total_pct = symbol_data["feature_weak_bars_since_highest_high_to_total_pct"]
+        feature_bars_since_highest_high_to_total_bars_pct = symbol_data["feature_bars_since_highest_high_to_total_bars_pct"]
+        feature_weak_bars_to_bars_since_highest_high_to_total_bars = symbol_data["feature_weak_bars_since_highest_high_to_total_pct"]/symbol_data["feature_bars_since_highest_high_to_total_bars_pct"] if symbol_data["feature_bars_since_highest_high_to_total_bars_pct"] > 0 else 0
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -244,11 +238,9 @@ def write_to_csv(
                     feature_entry_bar_volume_is_highest_until_now,
                     feature_ema_9_has_been_tested_since_highest_high,
                     feature_entry_strength_vs_avg,
-                    entry_bar_high,
-                    entry_bar_low,
-                    entry_bar_open,
-                    entry_bar_close,
-                    entry_bar_volume,
+                    feature_weak_bars_since_highest_high_to_total_pct,
+                    feature_bars_since_highest_high_to_total_bars_pct,
+                    feature_weak_bars_to_bars_since_highest_high_to_total_bars,
                 ]
             )
 

@@ -425,6 +425,19 @@ class DataExtractor:
             for bar_object in last_10_bars
         )/len(last_10_bars)
 
+        feature_weak_bars_since_highest_high_to_total_pct = len(
+            [
+                bar_object
+                for bar_object in bars_since_highest_high
+                if bar_object.ema_9 < bar_object.vwap
+                and bar_object.close < bar_object.vwap
+                and bar_object.volume/bar_object.volume_average <= 1.1
+            ]
+        )/len(bars_since_highest_high) if bars_since_highest_high else 0
+
+        feature_bars_since_highest_high_to_total_bars_pct = len(bars_since_highest_high)/total_bars
+        feature_weak_bars_to_bars_since_highest_high_to_total_bars = feature_weak_bars_since_highest_high_to_total_pct/feature_bars_since_highest_high_to_total_bars_pct if feature_bars_since_highest_high_to_total_bars_pct > 0 else 0
+
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
             "feature_pullback_sharpness": pullback_analysis["feature_pullback_sharpness"],
@@ -471,11 +484,9 @@ class DataExtractor:
             "feature_entry_bar_volume_is_highest_until_now": max(bar_object.volume for bar_object in one_minute_bars) == potential_confirmation_bar.volume,
             "feature_ema_9_has_been_tested_since_highest_high": feature_ema_9_has_been_tested_since_highest_high,
             "feature_entry_strength_vs_avg": (potential_confirmation_bar.high - potential_confirmation_bar.low)/last_10_bars_range_average,
-            "entry_bar_high": potential_confirmation_bar.high,
-            "entry_bar_low": potential_confirmation_bar.low,
-            "entry_bar_open": potential_confirmation_bar.open_value,
-            "entry_bar_close": potential_confirmation_bar.close,
-            "entry_bar_volume": potential_confirmation_bar.volume,
+            "feature_weak_bars_since_highest_high_to_total_pct": feature_weak_bars_since_highest_high_to_total_pct,
+            "feature_bars_since_highest_high_to_total_bars_pct": feature_bars_since_highest_high_to_total_bars_pct,
+            "feature_weak_bars_to_bars_since_highest_high_to_total_bars": feature_weak_bars_to_bars_since_highest_high_to_total_bars,
         }
 
         return features

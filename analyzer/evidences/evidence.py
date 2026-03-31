@@ -312,12 +312,6 @@ class Evidence:
             hour=9,
             minute=30,
         )
-        current_bar_10_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=10,
-        )
 
         today_04_00 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
@@ -419,28 +413,11 @@ class Evidence:
                     "threshold": score.threshold,
                 },
             )
-            should_take_trade = score.should_take_trade
-
-        # if (
-        #     True
-        #     and potential_confirmation_bar.body_percentage < 0.5
-        #     and potential_confirmation_bar.close < potential_confirmation_bar.high
-        #     and potential_confirmation_bar.low < potential_confirmation_bar.open_value
-        # ):
-        #     return False
-
-        # if (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.25:
-        #     return False
-
-        # if current_bar_09_30 <= potential_confirmation_bar.bar_time <= current_bar_10_00:
-        #     return volume_sum_since_4_am_today > 5000000
-        # if potential_confirmation_bar.bar_time > current_bar_10_00:
-        #     return (
-        #         (potential_confirmation_bar.high - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) >= 0.3
-        #         and highest_high_one_minute_bar.index - 1 > potential_confirmation_bar.index
-        #     ) or (
-        #         volume_sum_since_4_am_today > 2000000
-        #     )
+            should_take_trade = (
+                True
+                and score.should_take_trade
+                and potential_confirmation_bar.price_movement_statistics["feature_weak_bars_to_bars_since_highest_high_to_total_bars"] < 0.95
+            )
 
         return should_take_trade
 
