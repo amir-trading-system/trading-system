@@ -7,6 +7,7 @@ from . import current_day_crossed_resistance_and_daily_highest_high
 from . import current_day_is_after_healthy_retracement
 from . import current_day_comes_after_9_ema_retracement
 from . import current_day_comes_after_strong_day
+from . import current_day_breaks_current_highest_high_and_pre_market_high
 
 
 __evidences__: list[type[evidence.Evidence]] = [
@@ -18,4 +19,5 @@ __evidences__: list[type[evidence.Evidence]] = [
     current_day_is_after_healthy_retracement.Evidence,
     current_day_comes_after_9_ema_retracement.Evidence,
     current_day_comes_after_strong_day.Evidence,
+    current_day_breaks_current_highest_high_and_pre_market_high.Evidence,
 ]

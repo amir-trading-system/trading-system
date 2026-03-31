@@ -85,11 +85,6 @@ def write_to_csv(
                     "feature_last_negative_to_positive_bars_pct",
                     "feature_crossed_any_resistance",
                     "feature_bars_above_vwap_pct",
-                    "entry_bar_high",
-                    "entry_bar_low",
-                    "entry_bar_open",
-                    "entry_bar_close",
-                    "entry_bar_volume",
                 ],
             )
             f.flush()
@@ -143,11 +138,6 @@ def write_to_csv(
             feature_last_negative_to_positive_bars_pct = 0
             feature_crossed_any_resistance = 0
             feature_bars_above_vwap_pct = 0
-            entry_bar_high = 0
-            entry_bar_low = 0
-            entry_bar_open = 0
-            entry_bar_close = 0
-            entry_bar_volume = 0
 
             price_movement_statistics = symbol_data.get("price_movement_statistics", None)
             if price_movement_statistics:
@@ -187,11 +177,6 @@ def write_to_csv(
                 feature_last_negative_to_positive_bars_pct = price_movement_statistics["feature_last_negative_to_positive_bars_pct"]
                 feature_crossed_any_resistance = price_movement_statistics["feature_crossed_any_resistance"]
                 feature_bars_above_vwap_pct = price_movement_statistics["feature_bars_above_vwap_pct"]
-                entry_bar_high = price_movement_statistics["entry_bar_high"]
-                entry_bar_low = price_movement_statistics["entry_bar_low"]
-                entry_bar_open = price_movement_statistics["entry_bar_open"]
-                entry_bar_close = price_movement_statistics["entry_bar_close"]
-                entry_bar_volume = price_movement_statistics["entry_bar_volume"]
 
             collection_status = symbol_data["collection_status"]
             analysis_status = symbol_data["analysis_status"]
@@ -274,11 +259,6 @@ def write_to_csv(
                                 feature_last_negative_to_positive_bars_pct,
                                 feature_crossed_any_resistance,
                                 feature_bars_above_vwap_pct,
-                                entry_bar_high,
-                                entry_bar_low,
-                                entry_bar_open,
-                                entry_bar_close,
-                                entry_bar_volume,
                             ]
                         )
 

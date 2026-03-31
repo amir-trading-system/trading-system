@@ -8,6 +8,7 @@ from . import case_5
 from . import case_6
 from . import case_7
 from . import case_8
+from . import case_9
 
 __indicators__ : list[type[indicator.Indicator]] = [
     case_1.Indicator,
@@ -18,4 +19,5 @@ __indicators__ : list[type[indicator.Indicator]] = [
     case_6.Indicator,
     case_7.Indicator,
     case_8.Indicator,
+    case_9.Indicator,
 ]

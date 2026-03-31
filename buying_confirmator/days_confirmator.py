@@ -194,7 +194,14 @@ class Confirmator:
             transmit = False
             if self.alerter_object:
                 ## For now keping it false until we think how to manage it.
-                transmit = True
+                if potential_confirmation_bar.bar_time >= datetime.datetime(
+                    year=potential_confirmation_bar.bar_time.year,
+                    month=potential_confirmation_bar.bar_time.month,
+                    day=potential_confirmation_bar.bar_time.day,
+                    hour=9,
+                    minute=40,
+                ):
+                    transmit = True
 
                 self.alerter_object.send_confirmation_alert(
                     sender="Confirmator",
