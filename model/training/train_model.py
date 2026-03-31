@@ -77,41 +77,40 @@ def find_shared_numeric_features(pos_df, neg_df):
     shared_columns = sorted((pos_num & neg_num) - {"label"})
     final_shares_columns = []
     for feature in shared_columns:
-        ## now score is: positive_pase: 0.923 false_positive_reject: 0.923 balanced: 0.923
+        ## now score is: positive_pase: 0.903 false_positive_reject: 0.961 balanced: 0.932
         if str(feature) in [
-            "feature_volume_before_middle_point_vs_after_middle_point_pct", # 0.56 0.88 = 72
-            "feature_pullback_depth", # 0.8 0.57 = 68.5
-            "feature_minutes_since_market_open_to_total_market_minutes_pct", # 0.7 0.84 = 77
-            "feature_bars_without_movement_pct", # 0.8 0.65 = 72.5
-            "feature_price_minus_vwap_at_entry", #0.66 0.73 = 69.5
-            "feature_volume_average_to_bar_volume", # 0.47 0.96 = 71.5
-            "feature_volume_per_minute_to_bar_volume", # 0.84 0.69 = 76.5
-            "feature_bars_with_at_least_50_pct_wick_pct", # 0.74 0.92 = 83
-            "feature_volume_average_change_since_highest_high_pct", #0.64 0.73 = 68.5
-            "feature_strong_positive_bars_with_full_body_pct", # 0.41 0.96 = 68.5
-            "feature_positive_vs_negative_volume", # 0.72 0.73 = 72.5
-            "feature_entry_bar_volume_to_highest_bar_volume_pct", # 0.72 0.61 = 66.5
-            "feature_bars_with_lower_volume_average_pct", #0.64 0.73 = 68.5
-            "feature_entry_bar_profit_pct", # 0.66 0.65 = 65.5
-            "feature_highest_volume_before_to_entry_bar_volume_ratio", #0.66 0.76 = 71
-            "feature_previous_bar_to_highest_high_pct", # 0.74 0.61 = 68
-            "feature_highest_average_volume_before_to_entry_bar_volume_ratio", # 0.47 0.88 = 67.5
-            "feature_high_volume_bars_with_rejection_pct", # 0.72 0.69 = 70.5
-            "feature_previous_bar_volume_to_entry_bar_volume_pct", # 0.49 0.88 = 68.5
-            "feature_bar_volume_to_volume_sum_since_market_open", # 0.5 0.96 = 73
-            "feature_positive_vs_negative_movement", # 0.64 0.69 = 66.5
-            "feature_bars_with_rejection_inside_entry_bar_range_pct", #0.29 0.92 = 60.5
-            "feature_histogram_negative_momentum_pct", # 0.64 0.61 = 62
-            "feature_strong_bars_above_volume_average_to_total_bars_pct", # 0.66 0.61 = 63
-            "feature_macd_under_signal_line_counter", # 0.6 0.69 = 64.5
-            "feature_entry_strength_vs_avg", # 0.69
-            "feature_entry_bar_strengh_pct", # 0.42 0.78 = 60
-            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open", # 0.35 0.8 57.5
-
-            # "feature_has_positive_more_than_negative_bars",
+            "feature_volume_before_middle_point_vs_after_middle_point_pct",
+            "feature_pullback_depth",
+            "feature_minutes_since_market_open_to_total_market_minutes_pct",
+            "feature_bars_without_movement_pct",
+            "feature_price_minus_vwap_at_entry",
+            "feature_volume_average_to_bar_volume",
+            "feature_volume_per_minute_to_bar_volume",
+            "feature_bars_with_at_least_50_pct_wick_pct",
+            "feature_volume_average_change_since_highest_high_pct",
+            "feature_strong_positive_bars_with_full_body_pct",
+            "feature_positive_vs_negative_volume",
+            "feature_entry_bar_volume_to_highest_bar_volume_pct",
+            "feature_bars_with_lower_volume_average_pct",
+            "feature_entry_bar_profit_pct",
+            "feature_highest_volume_before_to_entry_bar_volume_ratio",
+            "feature_previous_bar_to_highest_high_pct",
+            "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
+            "feature_high_volume_bars_with_rejection_pct",
+            "feature_previous_bar_volume_to_entry_bar_volume_pct",
+            "feature_bar_volume_to_volume_sum_since_market_open",
+            "feature_positive_vs_negative_movement",
+            "feature_bars_with_rejection_inside_entry_bar_range_pct",
+            "feature_histogram_negative_momentum_pct",
+            "feature_strong_bars_above_volume_average_to_total_bars_pct",
+            "feature_macd_under_signal_line_counter",
+            "feature_entry_strength_vs_avg",
+            "feature_entry_bar_strengh_pct",
+            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
+            "feature_has_positive_more_than_negative_bars",
             # "feature_pullback_sharpness",
             # "feature_number_of_negative_bars_in_pullback_pct",
-            # "feature_pullback_to_trend_ratio", - above that it can be removed. Continue from here.
+            # "feature_pullback_to_trend_ratio",
             # "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
             # "feature_ema_9_keeps_going_up_pct",
             # "feature_strong_bars_above_volume_average_pct",
