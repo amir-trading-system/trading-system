@@ -363,15 +363,6 @@ class DataExtractor:
             one_minute_bars=one_minute_bars,
         )
 
-        bars_under_vwap_since_highest_high = len(
-            [
-                bar_object
-                for bar_object in one_minute_bars
-                if bar_object.index < highest_high_one_minute_bar.index
-                and (bar_object.close < bar_object.vwap or bar_object.ema_9 < bar_object.vwap)
-            ]
-        )
-
         crossed_any_resistance = any(
             r_l
             for r_l in day_timeframe_stock.resistance_levels
@@ -469,7 +460,6 @@ class DataExtractor:
             "feature_volume_before_middle_point_vs_after_middle_point_pct": feature_volume_before_middle_point_vs_after_middle_point_pct,
             "feature_bars_without_movement_pct": bars_without_movement_counter/total_bars,
             "feature_last_negative_to_positive_bars_pct": last_bars_negative_bars/last_bars_positive_bars if last_bars_positive_bars > 0 else 0,
-            "bars_under_vwap_since_highest_high": bars_under_vwap_since_highest_high/total_bars,
             "feature_crossed_any_resistance": crossed_any_resistance,
             "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
             "feature_entry_bar_profit_pct": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/potential_confirmation_bar.open_value,
