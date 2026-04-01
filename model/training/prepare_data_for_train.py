@@ -73,6 +73,19 @@ def write_to_csv(
                     "feature_weak_bars_since_highest_high_to_total_pct",
                     "feature_bars_since_highest_high_to_total_bars_pct",
                     "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
+                    "feature_bars_ema_above_vwap_pct",
+                    "feature_positive_bars_close_strong_pct",
+                    "feature_positive_to_negative_histograms_pct",
+                    "feature_volume_per_minute_to_bar_volume_above_threshold",
+                    "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
+                    "feature_bars_without_movement_pct_above_threshold",
+                    "feature_crossed_highest_high_of_the_day",
+                    "feature_crossed_highest_high_of_post_pre_market",
+                    "feature_potential_bar_volume_greater_than_volume_average",
+                    "feature_potential_bar_low_close_to_open",
+                    "feature_potential_bar_wick_is_weak",
+                    "feature_volume_average_goes_up_pct",
+                    "feature_overlapped_bars_since_market_open_pct",
                 ],
             )
             f.flush()
@@ -131,6 +144,19 @@ def write_to_csv(
         feature_weak_bars_since_highest_high_to_total_pct = 0
         feature_bars_since_highest_high_to_total_bars_pct = 0
         feature_weak_bars_to_bars_since_highest_high_to_total_bars = 0
+        feature_bars_ema_above_vwap_pct = 0
+        feature_positive_bars_close_strong_pct = 0
+        feature_positive_to_negative_histograms_pct = 0
+        feature_volume_per_minute_to_bar_volume_above_threshold = 0
+        feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = 0
+        feature_bars_without_movement_pct_above_threshold = 0
+        feature_crossed_highest_high_of_the_day = 0
+        feature_crossed_highest_high_of_post_pre_market = 0
+        feature_potential_bar_volume_greater_than_volume_average = 0
+        feature_potential_bar_low_close_to_open = 0
+        feature_potential_bar_wick_is_weak = 0
+        feature_volume_average_goes_up_pct = 0
+        feature_overlapped_bars_since_market_open_pct = 0
 
         feature_has_positive_more_than_negative_bars = symbol_data["feature_has_positive_more_than_negative_bars"]
         feature_pullback_sharpness = symbol_data["feature_pullback_sharpness"]
@@ -180,6 +206,19 @@ def write_to_csv(
         feature_weak_bars_since_highest_high_to_total_pct = symbol_data["feature_weak_bars_since_highest_high_to_total_pct"]
         feature_bars_since_highest_high_to_total_bars_pct = symbol_data["feature_bars_since_highest_high_to_total_bars_pct"]
         feature_weak_bars_to_bars_since_highest_high_to_total_bars = symbol_data["feature_weak_bars_since_highest_high_to_total_pct"]/symbol_data["feature_bars_since_highest_high_to_total_bars_pct"] if symbol_data["feature_bars_since_highest_high_to_total_bars_pct"] > 0 else 0
+        feature_bars_ema_above_vwap_pct = symbol_data["feature_bars_ema_above_vwap_pct"]
+        feature_positive_bars_close_strong_pct = symbol_data["feature_positive_bars_close_strong_pct"]
+        feature_positive_to_negative_histograms_pct = symbol_data["feature_positive_to_negative_histograms_pct"]
+        feature_volume_per_minute_to_bar_volume_above_threshold = symbol_data["feature_volume_per_minute_to_bar_volume_above_threshold"]
+        feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = symbol_data["feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold"]
+        feature_bars_without_movement_pct_above_threshold = symbol_data["feature_bars_without_movement_pct_above_threshold"]
+        feature_crossed_highest_high_of_the_day = symbol_data["feature_crossed_highest_high_of_the_day"]
+        feature_crossed_highest_high_of_post_pre_market = symbol_data["feature_crossed_highest_high_of_post_pre_market"]
+        feature_potential_bar_volume_greater_than_volume_average = symbol_data["feature_potential_bar_volume_greater_than_volume_average"]
+        feature_potential_bar_low_close_to_open = symbol_data["feature_potential_bar_low_close_to_open"]
+        feature_potential_bar_wick_is_weak = symbol_data["feature_potential_bar_wick_is_weak"]
+        feature_volume_average_goes_up_pct = symbol_data["feature_volume_average_goes_up_pct"]
+        feature_overlapped_bars_since_market_open_pct = symbol_data["feature_overlapped_bars_since_market_open_pct"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -241,6 +280,19 @@ def write_to_csv(
                     feature_weak_bars_since_highest_high_to_total_pct,
                     feature_bars_since_highest_high_to_total_bars_pct,
                     feature_weak_bars_to_bars_since_highest_high_to_total_bars,
+                    feature_bars_ema_above_vwap_pct,
+                    feature_positive_bars_close_strong_pct,
+                    feature_positive_to_negative_histograms_pct,
+                    feature_volume_per_minute_to_bar_volume_above_threshold,
+                    feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold,
+                    feature_bars_without_movement_pct_above_threshold,
+                    feature_crossed_highest_high_of_the_day,
+                    feature_crossed_highest_high_of_post_pre_market,
+                    feature_potential_bar_volume_greater_than_volume_average,
+                    feature_potential_bar_low_close_to_open,
+                    feature_potential_bar_wick_is_weak,
+                    feature_volume_average_goes_up_pct,
+                    feature_overlapped_bars_since_market_open_pct,
                 ]
             )
 

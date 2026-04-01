@@ -395,7 +395,10 @@ class Evidence:
 
             msg = "Bar confirmed by model"
             if not score.should_take_trade:
-                msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
+                if score.score/score.threshold < 0.95:
+                    msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
+                else:
+                    score.should_take_trade = True
 
             self.logger.info(
                 msg=msg,

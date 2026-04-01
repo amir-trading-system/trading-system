@@ -1,17 +1,16 @@
-import math
 import json
-from pathlib import Path
 import os
+from pathlib import Path
+from collections import defaultdict
 
 import joblib
 import numpy as np
 import pandas as pd
 
-
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import RepeatedStratifiedKFold, train_test_split
 
 
 # ============================================================
@@ -22,33 +21,55 @@ POSITIVE_CSV = "model/training/positive_results.csv"
 FALSE_POSITIVE_CSV = "model/training/false_positive_results.csv"
 
 RANDOM_STATE = 42
-TEST_SIZE = 0.3
+TEST_SIZE = 0.30
 
-# Thresholds to inspect
+# CV for feature stability + threshold tuning
+CV_SPLITS = 5
+CV_REPEATS = 10
+
 THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
+
+# Final stable feature filtering
+MIN_MEAN_IMPORTANCE = 0.02
+MIN_TOP_K_FREQUENCY = 0.5
+TOP_K_FOR_STABILITY = 20
+MIN_SELECTED_FEATURES = 8
+
+# Optional hard rules for final decision layer
+USE_HARD_RULES = True
 
 # Output files
 TRAIN_SCORED_OUTPUT = "model/training/scored_training_dataset.csv"
 POSITIVE_SCORED_OUTPUT = "model/training/positive_results_scored.csv"
 FALSE_POSITIVE_SCORED_OUTPUT = "model/training/false_positive_results_scored.csv"
 MODEL_INFO_OUTPUT = "model/training/model_info.json"
+CV_FEATURE_REPORT_OUTPUT = "model/training/cv_feature_report.csv"
+CV_FOLD_REPORT_OUTPUT = "model/training/cv_fold_report.csv"
 
-if os.path.exists(TRAIN_SCORED_OUTPUT):
-    os.remove(TRAIN_SCORED_OUTPUT)
-
-if os.path.exists(POSITIVE_SCORED_OUTPUT):
-    os.remove(POSITIVE_SCORED_OUTPUT)
-
-if os.path.exists(FALSE_POSITIVE_SCORED_OUTPUT):
-    os.remove(FALSE_POSITIVE_SCORED_OUTPUT)
-
-if os.path.exists(MODEL_INFO_OUTPUT):
-    os.remove(MODEL_INFO_OUTPUT)
+MODEL_PATH = "model/trade_model.pkl"
+IMPUTER_PATH = "model/trade_imputer.pkl"
+BUNDLE_PATH = "model/trade_model_bundle.pkl"
 
 
 # ============================================================
 # HELPERS
 # ============================================================
+
+def cleanup_old_outputs():
+    for path in [
+        TRAIN_SCORED_OUTPUT,
+        POSITIVE_SCORED_OUTPUT,
+        FALSE_POSITIVE_SCORED_OUTPUT,
+        MODEL_INFO_OUTPUT,
+        CV_FEATURE_REPORT_OUTPUT,
+        CV_FOLD_REPORT_OUTPUT,
+        MODEL_PATH,
+        IMPUTER_PATH,
+        BUNDLE_PATH,
+    ]:
+        if os.path.exists(path):
+            os.remove(path)
+
 
 def safe_float(value, default=0.0):
     try:
@@ -59,111 +80,343 @@ def safe_float(value, default=0.0):
         return default
 
 
-def clamp(x, lo, hi):
-    return max(lo, min(hi, x))
+def convert_bool_like_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Converts object columns that look like booleans to numeric 0/1.
+    """
+    temp = df.copy()
+
+    for col in temp.columns:
+        if temp[col].dtype == object:
+            lowered = temp[col].astype(str).str.strip().str.lower()
+            unique_values = set(lowered.dropna().unique())
+
+            if unique_values.issubset({"true", "false"}):
+                temp[col] = lowered.map({"true": 1.0, "false": 0.0})
+
+    return temp
 
 
-def stable_sigmoid(x):
-    # Included in case you want to transform custom scores later.
-    if x >= 0:
-        return 1.0 / (1.0 + math.exp(-x))
-    ex = math.exp(x)
-    return ex / (1.0 + ex)
+def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
+    """
+    Find all shared numeric/bool columns automatically.
+    Do not hardcode a final list here.
+    """
+    pos_num = set(pos_df.select_dtypes(include=[np.number, "bool"]).columns)
+    neg_num = set(neg_df.select_dtypes(include=[np.number, "bool"]).columns)
+    shared = sorted((pos_num & neg_num) - {"label"})
 
-
-def find_shared_numeric_features(pos_df, neg_df):
-    pos_num = set(pos_df.select_dtypes(include=[np.number, np.bool]).columns)
-    neg_num = set(neg_df.select_dtypes(include=[np.number, np.bool]).columns)
-    shared_columns = sorted((pos_num & neg_num) - {"label"})
     final_shares_columns = []
-    for feature in shared_columns:
-        ## now score is: positive_pase: 0.903 false_positive_reject: 0.961 balanced: 0.932
+    for feature in shared:
         if str(feature) in [
-            "feature_volume_before_middle_point_vs_after_middle_point_pct",
-            "feature_pullback_depth",
-            "feature_minutes_since_market_open_to_total_market_minutes_pct",
-            "feature_bars_without_movement_pct",
-            "feature_price_minus_vwap_at_entry",
-            "feature_volume_average_to_bar_volume",
-            "feature_volume_per_minute_to_bar_volume",
-            "feature_bars_with_at_least_50_pct_wick_pct",
-            "feature_volume_average_change_since_highest_high_pct",
-            "feature_strong_positive_bars_with_full_body_pct",
-            "feature_positive_vs_negative_volume",
-            "feature_entry_bar_volume_to_highest_bar_volume_pct",
-            "feature_bars_with_lower_volume_average_pct",
-            "feature_entry_bar_profit_pct",
-            "feature_highest_volume_before_to_entry_bar_volume_ratio",
-            "feature_previous_bar_to_highest_high_pct",
-            "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
-            "feature_high_volume_bars_with_rejection_pct",
-            "feature_previous_bar_volume_to_entry_bar_volume_pct",
-            "feature_bar_volume_to_volume_sum_since_market_open",
-            "feature_positive_vs_negative_movement",
+            "feature_volume_per_minute_to_bar_volume_above_threshold",
+            "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
+            "feature_bars_without_movement_pct_above_threshold",
+            "feature_crossed_highest_high_of_the_day",
+            "feature_crossed_highest_high_of_post_pre_market",
+            "feature_potential_bar_low_close_to_open",
+            "feature_volume_average_goes_up_pct",
+            "feature_overlapped_bars_since_market_open_pct",
             "feature_bars_with_rejection_inside_entry_bar_range_pct",
-            "feature_histogram_negative_momentum_pct",
-            "feature_strong_bars_above_volume_average_to_total_bars_pct",
-            "feature_macd_under_signal_line_counter",
-            "feature_entry_strength_vs_avg",
-            "feature_entry_bar_strengh_pct",
-            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
+            "feature_positive_vs_negative_volume",
+            "feature_positive_vs_negative_movement",
             "feature_has_positive_more_than_negative_bars",
-            # "feature_pullback_sharpness",
-            # "feature_number_of_negative_bars_in_pullback_pct",
+            "feature_price_minus_vwap_at_entry",
+            "feature_histogram_negative_momentum_pct",
+            "feature_bars_with_at_least_50_pct_wick_pct",
+            "feature_bars_with_lower_volume_average_pct",
+            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open", #[6-2] [5-11]
+            "feature_entry_bar_strengh_pct",
+            "feature_strong_bars_above_volume_average_pct",
+            "feature_high_volume_bars_with_rejection_pct", #[8-0] [6-10]
+            "feature_entry_strength_vs_avg", #[8-0] [6-10]
+            "feature_volume_per_minute_to_bar_volume", #[8-0] [5-11]
             # "feature_pullback_to_trend_ratio",
-            # "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
+            # "feature_strong_positive_bars_with_full_body_pct",
+            # "feature_macd_under_signal_line_counter",
             # "feature_ema_9_keeps_going_up_pct",
-            # "feature_strong_bars_above_volume_average_pct",
+            # "feature_strong_bars_above_volume_average_to_total_bars_pct",
             # "feature_bars_above_volume_average_pct",
-            # "feature_strong_bars_has_continuation",
-            # "feature_high_lows_pct",
-            # "feature_last_negative_to_positive_bars_pct",
-            # "feature_crossed_any_resistance",
-            # "feature_bars_above_vwap_pct",
-            # "feature_bars_closed_under_ema_20_since_highest_high_bar_pct",
-            # "feature_volume_to_volume_average_ratio_since_highest_high",
-            # "feature_entry_bar_volume_is_highest_until_now",
+            # "feature_volume_before_middle_point_vs_after_middle_point_pct",
             # "feature_ema_9_has_been_tested_since_highest_high",
+            # "feature_bars_without_movement_pct",
+            # "feature_last_negative_to_positive_bars_pct",
+            # "feature_bars_closed_under_ema_20_since_highest_high_bar_pct",
+            # "feature_entry_bar_volume_is_highest_until_now",
+            # "feature_bars_above_vwap_pct",
+            # "feature_bars_ema_above_vwap_pct",
+            # "feature_positive_bars_close_strong_pct",
+            # "feature_pullback_sharpness",
+            # "feature_pullback_depth",
+            # "feature_number_of_negative_bars_in_pullback_pct",
+            # "feature_minutes_since_market_open_to_total_market_minutes_pct",
+            # "feature_highest_volume_before_to_entry_bar_volume_ratio",
+            # "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio", #[7-1] [5-11]
+            # "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
+            # "feature_strong_bars_has_continuation",
+            # "feature_previous_bar_to_highest_high_pct",
+            # "feature_bar_volume_to_volume_sum_since_market_open",
+            # "feature_volume_average_to_bar_volume",
+            # "feature_high_lows_pct",
+            # "feature_crossed_any_resistance",
+            # "feature_entry_bar_profit_pct",
+            # "feature_entry_bar_volume_to_highest_bar_volume_pct",
+            # "feature_previous_bar_volume_to_entry_bar_volume_pct",
+            # "feature_volume_average_change_since_highest_high_pct",
+            # "feature_volume_to_volumse_average_ratio_since_highest_high",
+            # "feature_weak_bars_since_highest_high_to_total_pct",
+            # "feature_bars_since_highest_high_to_total_bars_pct",
+            # "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
         ]:
             final_shares_columns.append(feature)
 
     return final_shares_columns
 
-def evaluate_threshold(scored_df_obj, threshold):
-    """
-    Positive pass rate: positives classified as pass
-    False-positive reject rate: negatives classified as reject
-    """
-    passed = scored_df_obj["probability"] >= threshold
 
-    positives = scored_df_obj["label"] == 1
-    negatives = scored_df_obj["label"] == 0
+def evaluate_threshold_from_probs(y_true, probs, threshold):
+    pred = (probs >= threshold).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y_true, pred, labels=[0, 1]).ravel()
 
-    pos_pass_rate = passed[positives].mean() if positives.any() else np.nan
-    neg_reject_rate = (~passed[negatives]).mean() if negatives.any() else np.nan
-
-    balanced = np.nanmean([pos_pass_rate, neg_reject_rate])
+    positive_pass_rate = tp / (tp + fn) if (tp + fn) else np.nan
+    false_positive_reject_rate = tn / (tn + fp) if (tn + fp) else np.nan
+    balanced_score = np.nanmean([positive_pass_rate, false_positive_reject_rate])
 
     return {
-        "threshold": threshold,
-        "positive_pass_rate": float(pos_pass_rate),
-        "false_positive_reject_rate": float(neg_reject_rate),
-        "balanced_score": float(balanced),
+        "threshold": float(threshold),
+        "positive_pass_rate": float(positive_pass_rate),
+        "false_positive_reject_rate": float(false_positive_reject_rate),
+        "balanced_score": float(balanced_score),
+        "tn": int(tn),
+        "fp": int(fp),
+        "fn": int(fn),
+        "tp": int(tp),
     }
 
-def format_features_data(
-    positive_data: pd.DataFrame,
-    false_positive_data: pd.DataFrame,
-):
-    for features_data in [
-        positive_data,
-        false_positive_data,
-    ]:
-        features_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"] = features_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"] == 'True'
+
+def train_rf_model(X_train: pd.DataFrame, y_train: pd.Series, random_state: int):
+    model = RandomForestClassifier(
+        n_estimators=400,
+        max_depth=7,
+        min_samples_leaf=4,
+        min_samples_split=8,
+        class_weight="balanced_subsample",
+        random_state=random_state,
+        n_jobs=-1,
+    )
+    model.fit(X_train, y_train)
+    return model
+
+
+def select_best_threshold(y_true, probs):
+    results = [evaluate_threshold_from_probs(y_true, probs, th) for th in THRESHOLDS]
+    best = max(results, key=lambda x: x["balanced_score"])
+    return best, results
+
+
+def run_feature_stability_cv(X: pd.DataFrame, y: pd.Series, candidate_features: list[str]):
+    """
+    Run repeated CV on the training set only.
+    Tracks:
+    - best threshold per fold
+    - fold scores
+    - feature importances
+    - how often a feature appears in top-k importance
+    """
+    cv = RepeatedStratifiedKFold(
+        n_splits=CV_SPLITS,
+        n_repeats=CV_REPEATS,
+        random_state=RANDOM_STATE,
+    )
+
+    feature_importances = defaultdict(list)
+    feature_topk_hits = defaultdict(int)
+    fold_rows = []
+
+    for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X, y), start=1):
+        X_train = X.iloc[train_idx][candidate_features].copy()
+        X_val = X.iloc[val_idx][candidate_features].copy()
+        y_train = y.iloc[train_idx].copy()
+        y_val = y.iloc[val_idx].copy()
+
+        imputer = SimpleImputer(strategy="median")
+        X_train_imp = pd.DataFrame(
+            imputer.fit_transform(X_train),
+            columns=candidate_features,
+            index=X_train.index,
+        )
+        X_val_imp = pd.DataFrame(
+            imputer.transform(X_val),
+            columns=candidate_features,
+            index=X_val.index,
+        )
+
+        model = train_rf_model(X_train_imp, y_train, RANDOM_STATE + fold_idx)
+
+        val_probs = model.predict_proba(X_val_imp)[:, 1]
+        best_threshold_result, threshold_rows = select_best_threshold(y_val.values, val_probs)
+
+        importances = pd.Series(
+            model.feature_importances_,
+            index=candidate_features,
+        ).sort_values(ascending=False)
+
+        top_k_features = set(importances.head(TOP_K_FOR_STABILITY).index)
+
+        for feature, importance in importances.items():
+            feature_importances[feature].append(float(importance))
+            if feature in top_k_features:
+                feature_topk_hits[feature] += 1
+
+        fold_rows.append(
+            {
+                "fold": fold_idx,
+                "best_threshold": best_threshold_result["threshold"],
+                "positive_pass_rate": best_threshold_result["positive_pass_rate"],
+                "false_positive_reject_rate": best_threshold_result["false_positive_reject_rate"],
+                "balanced_score": best_threshold_result["balanced_score"],
+                "tn": best_threshold_result["tn"],
+                "fp": best_threshold_result["fp"],
+                "fn": best_threshold_result["fn"],
+                "tp": best_threshold_result["tp"],
+            }
+        )
+
+    total_folds = len(fold_rows)
+
+    feature_rows = []
+    for feature in candidate_features:
+        vals = feature_importances[feature]
+        feature_rows.append(
+            {
+                "feature": feature,
+                "mean_importance": float(np.mean(vals)),
+                "std_importance": float(np.std(vals)),
+                "top_k_frequency": float(feature_topk_hits[feature] / total_folds),
+            }
+        )
+
+    feature_report_df = pd.DataFrame(feature_rows).sort_values(
+        ["mean_importance", "top_k_frequency"],
+        ascending=[False, False],
+    )
+
+    fold_report_df = pd.DataFrame(fold_rows)
+
+    return feature_report_df, fold_report_df
+
+
+def choose_stable_features(feature_report_df: pd.DataFrame):
+    selected = feature_report_df[
+        (feature_report_df["mean_importance"] >= MIN_MEAN_IMPORTANCE) &
+        (feature_report_df["top_k_frequency"] >= MIN_TOP_K_FREQUENCY)
+    ]["feature"].tolist()
+
+    # fallback: always keep at least a minimum number of strongest features
+    if len(selected) < MIN_SELECTED_FEATURES:
+        selected = feature_report_df.head(MIN_SELECTED_FEATURES)["feature"].tolist()
+
+    return selected
+
+
+def apply_hard_rules(df: pd.DataFrame) -> pd.Series:
+    """
+    Return True for rows that are allowed to pass.
+    Adjust rules only if they generalize.
+    """
+    allowed = pd.Series(True, index=df.index)
+
+    if not USE_HARD_RULES:
+        return allowed
+
+    # Example from your recent filter idea.
+    weak_col = "feature_weak_bars_to_bars_since_highest_high_to_total_bars"
+    if weak_col in df.columns:
+        allowed &= df[weak_col].fillna(0) < 0.95
+
+    return allowed
+
+
+def score_dataframe(raw_df, features, model, imputer, threshold, label_value=None):
+    temp = raw_df.copy()
+
+    for col in features:
+        if col not in temp.columns:
+            temp[col] = np.nan
+
+    temp_x = temp[features].copy()
+    temp_x_imputed = pd.DataFrame(
+        imputer.transform(temp_x),
+        columns=features,
+        index=temp.index,
+    )
+
+    probs = model.predict_proba(temp_x_imputed)[:, 1]
+    temp["probability"] = probs
+    temp["score"] = (temp["probability"] * 100.0).round(2)
+
+    model_pass = temp["probability"] >= threshold
+    rules_pass = apply_hard_rules(temp)
+
+    temp["model_pass"] = model_pass
+    temp["rules_pass"] = rules_pass
+    temp["pass_recommended"] = model_pass & rules_pass
+
+    if label_value is not None:
+        temp["label"] = label_value
+
+    return temp
+
+
+def probability_from_row(row: pd.Series, features, model, imputer) -> float:
+    row_dict = {}
+    for col in features:
+        row_dict[col] = row[col] if col in row.index else np.nan
+
+    row_df = pd.DataFrame([row_dict], columns=features)
+    row_df_imputed = pd.DataFrame(
+        imputer.transform(row_df),
+        columns=features,
+    )
+
+    prob = float(model.predict_proba(row_df_imputed)[0, 1])
+    return prob
+
+
+def classify_row(row: pd.Series, features, model, imputer, threshold):
+    prob = probability_from_row(row, features, model, imputer)
+    score = round(prob * 100.0, 2)
+
+    rules_pass = bool(apply_hard_rules(pd.DataFrame([row]))[0])
+    passed = (prob >= threshold) and rules_pass
+
+    if prob >= 0.85:
+        grade = "A+"
+    elif prob >= 0.75:
+        grade = "A"
+    elif prob >= 0.65:
+        grade = "B"
+    elif prob >= threshold:
+        grade = "C"
+    elif prob >= threshold - 0.03:
+        grade = "D"   # near-miss
+    else:
+        grade = "REJECT"
+
+    return {
+        "probability": round(prob, 6),
+        "score": score,
+        "threshold": threshold,
+        "rules_pass": rules_pass,
+        "pass_recommended": passed,
+        "grade": grade,
+    }
+
 
 # ============================================================
-# LOAD DATA
+# MAIN
 # ============================================================
+
+cleanup_old_outputs()
 
 pos_path = Path(POSITIVE_CSV)
 neg_path = Path(FALSE_POSITIVE_CSV)
@@ -179,268 +432,229 @@ false_positive_df = pd.read_csv(neg_path)
 positive_df["label"] = 1
 false_positive_df["label"] = 0
 
-# Keep original copies for later scoring
+positive_df = convert_bool_like_columns(positive_df)
+false_positive_df = convert_bool_like_columns(false_positive_df)
+
 positive_raw = positive_df.copy()
 false_positive_raw = false_positive_df.copy()
 
-# ============================================================
-# PREP FEATURES
-# ============================================================
-
-shared_features = find_shared_numeric_features(positive_df, false_positive_df)
-
-if not shared_features:
-    raise ValueError("No shared numeric features were found between the two CSV files.")
+candidate_features = find_candidate_numeric_features(positive_df, false_positive_df)
+if not candidate_features:
+    raise ValueError("No shared numeric features found.")
 
 df = pd.concat([positive_df, false_positive_df], ignore_index=True).copy()
+X_all = df[candidate_features].copy()
+y_all = df["label"].copy()
 
-# Keep only shared numeric features + label
-model_df = df[shared_features + ["label"]].copy()
+# ------------------------------------------------------------
+# FINAL HOLDOUT SPLIT
+# ------------------------------------------------------------
 
-# Impute missing values
-X = model_df[shared_features].copy()
-y = model_df["label"].copy()
-
-imputer = SimpleImputer(strategy="median")
-X_imputed = pd.DataFrame(imputer.fit_transform(X), columns=shared_features, index=X.index)
-
-# ============================================================
-# TRAIN / TEST SPLIT
-# ============================================================
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X_imputed,
-    y,
+X_train_full, X_test_holdout, y_train_full, y_test_holdout = train_test_split(
+    X_all,
+    y_all,
     test_size=TEST_SIZE,
     random_state=RANDOM_STATE,
-    stratify=y,
+    stratify=y_all,
 )
 
-# ============================================================
-# MODEL
-# ============================================================
+print("\n================ CANDIDATE FEATURES ================\n")
+print(f"Total candidate features: {len(candidate_features)}")
 
-model = RandomForestClassifier(
-    n_estimators=400,
-    max_depth=7,
-    min_samples_leaf=4,
-    min_samples_split=8,
-    class_weight="balanced_subsample",
-    random_state=42,
-    n_jobs=-1,
+# ------------------------------------------------------------
+# CV FEATURE STABILITY ON TRAINING SET ONLY
+# ------------------------------------------------------------
+
+feature_report_df, fold_report_df = run_feature_stability_cv(
+    X_train_full,
+    y_train_full,
+    candidate_features,
 )
 
-model.fit(X_train, y_train)
+selected_features = choose_stable_features(feature_report_df)
 
-# ============================================================
-# EVALUATION ON TEST SET
-# ============================================================
+print("\n================ FEATURE STABILITY REPORT ================\n")
+print(feature_report_df.head(50))
+print("\nSelected stable features:")
+for f in selected_features:
+    print(f"- {f}")
 
-test_probs = model.predict_proba(X_test)[:, 1]
-test_pred_default = (test_probs >= 0.5).astype(int)
+print("\n================ CV FOLD REPORT ================\n")
+print(fold_report_df.describe(include="all"))
 
-print("\n================ TEST SET REPORT (threshold=0.50) ================\n")
-print(classification_report(y_test, test_pred_default, digits=4))
+# ------------------------------------------------------------
+# TRAIN FINAL MODEL ON TRAINING SET USING STABLE FEATURES
+# ------------------------------------------------------------
+
+final_imputer = SimpleImputer(strategy="median")
+
+X_train_selected = X_train_full[selected_features].copy()
+X_test_selected = X_test_holdout[selected_features].copy()
+
+X_train_selected_imp = pd.DataFrame(
+    final_imputer.fit_transform(X_train_selected),
+    columns=selected_features,
+    index=X_train_selected.index,
+)
+
+X_test_selected_imp = pd.DataFrame(
+    final_imputer.transform(X_test_selected),
+    columns=selected_features,
+    index=X_test_selected.index,
+)
+
+final_model = train_rf_model(
+    X_train_selected_imp,
+    y_train_full,
+    RANDOM_STATE,
+)
+
+# ------------------------------------------------------------
+# CHOOSE THRESHOLD ON TRAINING SET OUT-OF-FOLD STYLE SUMMARY
+# ------------------------------------------------------------
+
+chosen_threshold = float(fold_report_df["best_threshold"].median())
+
+print("\n================ CHOSEN THRESHOLD ================\n")
+print(f"Median best CV threshold: {chosen_threshold:.2f}")
+
+# ------------------------------------------------------------
+# FINAL HOLDOUT EVALUATION
+# ------------------------------------------------------------
+
+test_probs = final_model.predict_proba(X_test_selected_imp)[:, 1]
+test_pred_default = (test_probs >= 0.50).astype(int)
+test_pred_best = (test_probs >= chosen_threshold).astype(int)
+
+print("\n================ HOLDOUT TEST REPORT (threshold=0.50) ================\n")
+print(classification_report(y_test_holdout, test_pred_default, digits=4))
 print("Confusion matrix:")
-print(confusion_matrix(y_test, test_pred_default))
+print(confusion_matrix(y_test_holdout, test_pred_default))
 
-# ============================================================
-# SCORE FULL DATASET
-# ============================================================
+print(f"\n================ HOLDOUT TEST REPORT (threshold={chosen_threshold:.2f}) ================\n")
+print(classification_report(y_test_holdout, test_pred_best, digits=4))
+print("Confusion matrix:")
+print(confusion_matrix(y_test_holdout, test_pred_best))
 
-full_probs = model.predict_proba(X_imputed)[:, 1]
+# ------------------------------------------------------------
+# FINAL FEATURE IMPORTANCE
+# ------------------------------------------------------------
+
+final_feature_importance = pd.Series(
+    final_model.feature_importances_,
+    index=selected_features,
+).sort_values(ascending=False)
+
+print("\n================ FINAL FEATURE IMPORTANCE ================\n")
+print(final_feature_importance.head(100))
+
+# ------------------------------------------------------------
+# SCORE FULL DATASET + ORIGINAL FILES
+# ------------------------------------------------------------
+
+# fit scoring imputer/model on ALL DATA using selected features
+full_imputer = SimpleImputer(strategy="median")
+X_all_selected_imp = pd.DataFrame(
+    full_imputer.fit_transform(X_all[selected_features]),
+    columns=selected_features,
+    index=X_all.index,
+)
+
+full_model = train_rf_model(
+    X_all_selected_imp,
+    y_all,
+    RANDOM_STATE,
+)
+
+full_probs = full_model.predict_proba(X_all_selected_imp)[:, 1]
 
 scored_df = df.copy()
 scored_df["probability"] = full_probs
 scored_df["score"] = (scored_df["probability"] * 100.0).round(2)
+scored_df["model_pass"] = scored_df["probability"] >= chosen_threshold
+scored_df["rules_pass"] = apply_hard_rules(scored_df)
+scored_df["pass_recommended"] = scored_df["model_pass"] & scored_df["rules_pass"]
 
-# ============================================================
-# THRESHOLD ANALYSIS
-# ============================================================
-
-print("\n================ THRESHOLD ANALYSIS (MODEL ONLY) ================\n")
-model_results = []
-for th in THRESHOLDS:
-    r = evaluate_threshold(scored_df, th)
-    model_results.append(r)
-    print(
-        f"threshold={r['threshold']:.2f} | "
-        f"positive_pass_rate={r['positive_pass_rate']:.4f} | "
-        f"false_positive_reject_rate={r['false_positive_reject_rate']:.4f} | "
-        f"balanced={r['balanced_score']:.4f}"
-    )
-
-best_model = max(model_results, key=lambda x: x["balanced_score"])
-
-print("\n================ BEST THRESHOLDS ================\n")
-print("Best model threshold:", best_model)
-
-test_pred_best_threshold = (test_probs >= best_model["threshold"]).astype(int)
-print(f"\n================ TEST SET REPORT FOR BEST THRESHOLD (threshold={best_model["threshold"]}) ================\n")
-print(classification_report(y_test, test_pred_best_threshold, digits=4))
-print("Confusion matrix:")
-print(confusion_matrix(y_test, test_pred_best_threshold))
-
-# ============================================================
-# FEATURE IMPORTANCE
-# ============================================================
-
-feature_importance = (
-    pd.Series(model.feature_importances_, index=shared_features)
-    .sort_values(ascending=False)
+positive_scored = score_dataframe(
+    positive_raw,
+    selected_features,
+    full_model,
+    full_imputer,
+    chosen_threshold,
+    label_value=1,
+)
+false_positive_scored = score_dataframe(
+    false_positive_raw,
+    selected_features,
+    full_model,
+    full_imputer,
+    chosen_threshold,
+    label_value=0,
 )
 
-print("\n================ TOP 100 FEATURE IMPORTANCE ================\n")
-print(feature_importance.head(100))
-
-# ============================================================
-# SCORE INDIVIDUAL ORIGINAL FILES
-# ============================================================
-
-def score_dataframe(raw_df, label_value=None):
-    missing_features = [c for c in shared_features if c not in raw_df.columns]
-
-    temp = raw_df.copy()
-
-    # Ensure all model features exist
-    for col in missing_features:
-        temp[col] = np.nan
-
-    temp_x = temp[shared_features].copy()
-    temp_x_imputed = pd.DataFrame(
-        imputer.transform(temp_x),
-        columns=shared_features,
-        index=temp.index,
-    )
-
-    temp["probability"] = model.predict_proba(temp_x_imputed)[:, 1]
-    temp["score"] = (temp["probability"] * 100.0).round(2)
-
-    if label_value is not None:
-        temp["label"] = label_value
-
-    # Recommended pass flag using best hybrid threshold
-    chosen_threshold = best_model["threshold"]
-    temp["pass_recommended"] = temp["probability"] >= chosen_threshold
-
-    return temp
-
-
-positive_scored = score_dataframe(positive_raw, label_value=1)
-false_positive_scored = score_dataframe(false_positive_raw, label_value=0)
-
-# ============================================================
+# ------------------------------------------------------------
 # SAVE OUTPUTS
-# ============================================================
+# ------------------------------------------------------------
 
 scored_df.to_csv(TRAIN_SCORED_OUTPUT, index=False)
 positive_scored.to_csv(POSITIVE_SCORED_OUTPUT, index=False)
 false_positive_scored.to_csv(FALSE_POSITIVE_SCORED_OUTPUT, index=False)
+feature_report_df.to_csv(CV_FEATURE_REPORT_OUTPUT, index=False)
+fold_report_df.to_csv(CV_FOLD_REPORT_OUTPUT, index=False)
 
 model_info = {
-    "shared_features": shared_features,
-    "best_model_only_threshold": best_model,
-    "best_hybrid_threshold": best_model,
-    "top_25_feature_importance": feature_importance.head(25).to_dict(),
-    "test_size": TEST_SIZE,
+    "candidate_feature_count": len(candidate_features),
+    "selected_feature_count": len(selected_features),
+    "selected_features": selected_features,
+    "chosen_threshold": chosen_threshold,
+    "cv_mean_balanced_score": float(fold_report_df["balanced_score"].mean()),
+    "cv_std_balanced_score": float(fold_report_df["balanced_score"].std()),
+    "cv_mean_positive_pass_rate": float(fold_report_df["positive_pass_rate"].mean()),
+    "cv_mean_false_positive_reject_rate": float(fold_report_df["false_positive_reject_rate"].mean()),
+    "final_holdout_threshold": chosen_threshold,
+    "top_25_feature_importance": final_feature_importance.head(25).to_dict(),
     "random_state": RANDOM_STATE,
+    "test_size": TEST_SIZE,
+    "cv_splits": CV_SPLITS,
+    "cv_repeats": CV_REPEATS,
 }
 
-#pylint:disable=unspecified-encoding
-with open(MODEL_INFO_OUTPUT, "w") as f:
+with open(MODEL_INFO_OUTPUT, "w", encoding="utf-8") as f:
     json.dump(model_info, f, indent=2)
+
+joblib.dump(full_model, MODEL_PATH)
+joblib.dump(full_imputer, IMPUTER_PATH)
+joblib.dump(
+    {
+        "features": selected_features,
+        "threshold": chosen_threshold,
+        "use_hard_rules": USE_HARD_RULES,
+    },
+    BUNDLE_PATH,
+)
 
 print("\n================ FILES SAVED ================\n")
 print(TRAIN_SCORED_OUTPUT)
 print(POSITIVE_SCORED_OUTPUT)
 print(FALSE_POSITIVE_SCORED_OUTPUT)
+print(CV_FEATURE_REPORT_OUTPUT)
+print(CV_FOLD_REPORT_OUTPUT)
 print(MODEL_INFO_OUTPUT)
+print(MODEL_PATH)
+print(IMPUTER_PATH)
+print(BUNDLE_PATH)
 
-# ============================================================
-# LIVE-USE FUNCTIONS
-# ============================================================
-
-CHOSEN_THRESHOLD = best_model["threshold"]
-
-def probability_from_row(row: pd.Series) -> float:
-    """
-    Returns probability from 0.0 to 1.0 using the trained model.
-    row must contain the feature columns used by the model.
-    Missing values are allowed.
-    """
-    row_dict = {}
-    for col in shared_features:
-        if col in row.index:
-            row_dict[col] = row[col]
-        else:
-            row_dict[col] = np.nan
-
-    row_df = pd.DataFrame([row_dict], columns=shared_features)
-    row_df_imputed = pd.DataFrame(
-        imputer.transform(row_df),
-        columns=shared_features,
-    )
-
-    prob = float(model.predict_proba(row_df_imputed)[0, 1])
-    return prob
-
-
-def score_from_row(row: pd.Series) -> float:
-    """
-    Returns score from 0 to 100.
-    """
-    prob = probability_from_row(row)
-    return round(prob * 100.0, 2)
-
-
-def classify_row(row: pd.Series):
-    """
-    Hybrid decision:
-    - must exceed chosen threshold
-    """
-    prob = probability_from_row(row)
-    score = round(prob * 100.0, 2)
-
-    passed = prob >= CHOSEN_THRESHOLD
-
-    if not passed:
-        grade = "REJECT"
-    elif prob >= 0.85:
-        grade = "A+"
-    elif prob >= 0.75:
-        grade = "A"
-    elif prob >= 0.65:
-        grade = "B"
-    else:
-        grade = "C"
-
-    return {
-        "probability": round(prob, 6),
-        "score": score,
-        "threshold": CHOSEN_THRESHOLD,
-        "pass_recommended": passed,
-        "grade": grade,
-    }
-
-
-# ============================================================
-# EXAMPLE
-# ============================================================
+# ------------------------------------------------------------
+# SAMPLE LIVE OUTPUT
+# ------------------------------------------------------------
 
 print("\n================ SAMPLE LIVE OUTPUT ================\n")
 sample_row = positive_scored.iloc[0]
-
-classified_row = classify_row(sample_row)
+classified_row = classify_row(
+    sample_row,
+    selected_features,
+    full_model,
+    full_imputer,
+    chosen_threshold,
+)
 print(classified_row)
-
-
-
-joblib.dump(model, "model/trade_model.pkl")
-joblib.dump(imputer, "model/trade_imputer.pkl")
-
-model_bundle = {
-    "features": shared_features,
-    "threshold": best_model["threshold"],
-}
-
-joblib.dump(model_bundle, "model/trade_model_bundle.pkl")
