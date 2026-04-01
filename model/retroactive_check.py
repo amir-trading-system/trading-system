@@ -367,13 +367,7 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
 def run_retroactive_check():
     should_run_model = True
     symbols_data = []
-    symbols = [
-        common.objects.SymbolTest(
-            name="AGPU",
-            datetime_str="04.01.26T11:17:00",
-            is_positive=True,
-        ),
-    ]
+    symbols = []
     output_file_name = "model/real_case_result.csv"
     get_only_statistics = False
     # symbols = explore_past_potential_symbols()

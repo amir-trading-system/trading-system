@@ -16,6 +16,7 @@ class Evidence(
     ) -> bool:
         current_bar_is_strong = (
             True
+            and stock.last_post_pre_one_minute_highest_high > 0
             and (current_bar.close > current_bar.open_value or is_retro)
             and (stock.last_post_pre_one_minute_highest_high - milestones.previous_bar.bar_object.high)/stock.last_post_pre_one_minute_highest_high >= 0.2
         )

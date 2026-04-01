@@ -294,7 +294,10 @@ class Evidence:
         self,
         potential_confirmation_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
-    ):
+    ) -> bool:
+        if len(one_minute_bars) < 2:
+            return False
+
         current_bar_is_highest_high = max(
             bar_object.high
             for bar_object in one_minute_bars
