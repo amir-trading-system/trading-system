@@ -96,7 +96,6 @@ class Analyzer:
                 last_post_pre_one_minute_highest_high=stock_object.last_post_pre_one_minute_highest_high,
                 pre_market_one_minute_highest_high_bar=stock_object.pre_market_one_minute_highest_high_bar,
                 post_pre_market_volume_sum=stock_object.post_pre_market_volume_sum,
-                last_lowest_low_bar=stock_object.last_lowest_low_bar,
                 finished_collection=stock_object.finished_collection,
                 finished_analyze=stock_object.finished_analyze,
                 one_minute_request_id=stock_object.one_minute_request_id,

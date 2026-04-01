@@ -28,109 +28,6 @@ class DataExtractor:
         return overlapped_bars_counter/len(one_minute_bars)
 
     @staticmethod
-    def feature_high_lows_pct(
-        one_minute_timeframe_stock: common.objects.Stock,
-        one_minute_bars: list[common.objects.BarData],
-    ):
-        swing_lows: list[float] = []
-        for bar_object in one_minute_bars[1:]:
-            if (
-                bar_object.low < bar_object.vwap
-                or bar_object.ema_9 < bar_object.vwap
-                or bar_object.ema_9 < bar_object.ema_20
-            ):
-                break
-
-            previous_bar = one_minute_timeframe_stock.previous_bar(
-                bar_object=bar_object,
-            )
-            next_bar = one_minute_timeframe_stock.next_bar(
-                bar_object=bar_object,
-            )
-
-            if previous_bar is None or next_bar is None:
-                continue
-
-            is_local_low = (
-                bar_object.low < previous_bar.low
-                and bar_object.low < next_bar.low
-            )
-            bullish_context = (
-                bar_object.low > bar_object.vwap
-                and bar_object.ema_9 > bar_object.vwap
-                and bar_object.ema_9 > bar_object.ema_20
-            )
-            if is_local_low and bullish_context:
-                swing_lows.append(bar_object.low)
-
-        if len(swing_lows) < 2:
-            return 0.0
-
-        higher_count = 0
-        for i in range(1, len(swing_lows)):
-            if swing_lows[i] > swing_lows[i - 1]:
-                higher_count += 1
-
-        return higher_count / (len(swing_lows) - 1)
-
-    @staticmethod
-    def analyze_last_pullback(
-        potential_confirmation_bar: common.objects.BarData,
-        highest_high_one_minute_bar: common.objects.BarData,
-        one_minute_bars: list[common.objects.BarData],
-    ) -> dict[str, float]:
-        pullback_analysis = {
-            "feature_pullback_sharpness": 0.0,
-            "feature_pullback_depth": 0.0,
-            "feature_number_of_negative_bars_in_pullback_pct": 0.0,
-            "feature_pullback_to_trend_ratio": 0.0,
-        }
-
-        bars_since_highest_high = [
-            bar_object
-            for bar_object in one_minute_bars
-            if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
-        ]
-
-        if bars_since_highest_high:
-            lowest_low_bar = None
-            lowest_low_since_highest_high = min(
-                bar_object.low
-                for bar_object in bars_since_highest_high
-            )
-
-            for bar_object in bars_since_highest_high:
-                if bar_object.low == lowest_low_since_highest_high:
-                    lowest_low_bar = bar_object
-
-            pullback_bars = [
-                bar_object
-                for bar_object in bars_since_highest_high
-                if highest_high_one_minute_bar.bar_time < bar_object.bar_time <= lowest_low_bar.bar_time
-            ]
-
-            number_of_negative_bars_in_pullback = len(
-                [
-                    bar_object
-                    for bar_object in pullback_bars
-                    if bar_object.close < bar_object.open_value
-                ]
-            )
-
-            pullback_duration = len(pullback_bars)
-            pullback_size = sum(
-                bar_object.high - bar_object.low
-                for bar_object in pullback_bars
-            )
-
-            pullback_analysis["feature_pullback_sharpness"] = pullback_size/pullback_duration
-            pullback_analysis["feature_pullback_depth"] = highest_high_one_minute_bar.high - lowest_low_bar.low if lowest_low_bar is not None else 0.0
-            pullback_analysis["feature_number_of_negative_bars_in_pullback_pct"] = number_of_negative_bars_in_pullback/len(pullback_bars)
-            pullback_analysis["feature_pullback_to_trend_ratio"] = pullback_analysis["feature_pullback_depth"]/highest_high_one_minute_bar.high if highest_high_one_minute_bar is not None else 0
-
-        return pullback_analysis
-
-    @staticmethod
     def extract_features_from_symbol_data(
         day_timeframe_stock: common.objects.Stock,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -310,11 +207,6 @@ class DataExtractor:
             else:
                 bar_volume_close_to_entry_point_sum += bar_object.volume
 
-        pullback_analysis = DataExtractor.analyze_last_pullback(
-            potential_confirmation_bar=potential_confirmation_bar,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            one_minute_bars=one_minute_bars,
-        )
         minutes_since_market_open = ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30
 
         volume_sum_from_middle_point_to_entry_point = sum(
@@ -331,42 +223,11 @@ class DataExtractor:
         feature_volume_before_middle_point_vs_after_middle_point_pct = volume_sum_from_market_start_to_middle_point/volume_sum_from_middle_point_to_entry_point
         feature_histogram_negative_momentum_pct = bars_with_negative_momentum_histogram_counter/total_bars
         feature_bars_with_at_least_50_pct_wick_pct = bars_with_at_least_50_pct_wick_counter/total_bars
-        feature_strong_positive_bars_with_full_body_pct = strong_positive_bars_with_full_body_counter/positive_bars_counter if positive_bars_counter > 0 else 0
-        feature_minutes_since_market_open_to_total_market_minutes_pct = minutes_since_market_open/390
         feature_bars_with_lower_volume_average_pct = bars_with_lower_volume_average_counter/total_bars
         feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = bar_volume_close_to_entry_point_sum > bar_volume_close_to_market_open_sum
-        feature_macd_under_signal_line_counter = macd_under_signal_line_counter/total_bars
         feature_strong_bars_above_volume_average_pct = strong_bars_above_volume_average_counter/bars_above_volume_average_counter
-        feature_strong_bars_above_volume_average_to_total_bars_pct = strong_bars_above_volume_average_counter/total_bars
-        feature_bars_above_volume_average_pct = bars_above_volume_average_counter/total_bars
-        feature_strong_bars_has_continuation = bars_after_strong_bars_that_continues_trend_counter/strong_bars_counter
         feature_high_volume_bars_with_rejection_pct = high_volume_bars_with_rejection_counter/bars_above_volume_average_counter
-        feature_previous_bar_to_highest_high_pct = 0
-        previous_bar = one_minute_timeframe_stock.previous_bar(
-            bar_object=potential_confirmation_bar,
-        )
-        if previous_bar is not None:
-            feature_previous_bar_to_highest_high_pct = previous_bar.high/highest_high_one_minute_bar.high
-
-        feature_highest_volume_before_to_entry_bar_volume_ratio = 0
-        feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = 0
-        feature_highest_average_volume_before_to_entry_bar_volume_ratio = 0
-        volume_per_minute = volume_sum_since_market_open/minutes_since_market_open
-        if len(one_minute_bars[1:]) > 0:
-            feature_highest_volume_before_to_entry_bar_volume_ratio = max(
-                bar_object.volume
-                for bar_object in one_minute_bars[1:]
-            )/potential_confirmation_bar.volume
-
-            feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = max(
-                bar_object.volume_average
-                for bar_object in one_minute_bars[1:]
-            )/potential_confirmation_bar.volume_average
-
-            feature_highest_average_volume_before_to_entry_bar_volume_ratio = max(
-                bar_object.volume_average
-                for bar_object in one_minute_bars[1:]
-            )/potential_confirmation_bar.volume
+        volume_per_minute = volume_sum_since_market_open/minutes_since_market_open if minutes_since_market_open > 0 else 1
 
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
@@ -404,11 +265,6 @@ class DataExtractor:
         if potential_confirmation_bar.bar_is_solid:
             strong_entry_bar_points += 2
 
-        feature_high_lows_pct = DataExtractor.feature_high_lows_pct(
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            one_minute_bars=one_minute_bars,
-        )
-
         crossed_any_resistance = any(
             r_l
             for r_l in day_timeframe_stock.resistance_levels
@@ -423,41 +279,9 @@ class DataExtractor:
                 ]
             )
 
-        bars_closed_under_ema_20_since_highest_high = [
-            bar_object
-            for bar_object in bars_since_highest_high
-            if bar_object.close < bar_object.ema_20
-        ]
-        min_volume_average_since_highest_high = 0
-        max_volume_average_since_highest_high = 0
-
-        if bars_since_highest_high:
-            min_volume_average_since_highest_high = min(
-                bar_object.volume_average
-                for bar_object in bars_since_highest_high
-            )
-            max_volume_average_since_highest_high = max(
-                bar_object.volume_average
-                for bar_object in bars_since_highest_high
-            )
-
         volume_to_volume_average_ratio_since_highest_high = 0
         for bar_object in bars_since_highest_high:
             volume_to_volume_average_ratio_since_highest_high += bar_object.volume/bar_object.volume_average
-
-        feature_ema_9_has_been_tested_since_highest_high = False
-        for bar_object in bars_since_highest_high:
-            previous_bar = one_minute_timeframe_stock.previous_bar(
-                bar_object=bar_object,
-            )
-
-            if (
-                True
-                and previous_bar is not None
-                and previous_bar.ema_9 < bar_object.ema_9
-            ):
-                feature_ema_9_has_been_tested_since_highest_high = True
-                break
 
         last_10_bars = [
             bar_object
@@ -471,20 +295,6 @@ class DataExtractor:
             for bar_object in last_10_bars
         )/len(last_10_bars)
 
-        feature_weak_bars_since_highest_high_to_total_pct = len(
-            [
-                bar_object
-                for bar_object in bars_since_highest_high
-                if bar_object.ema_9 < bar_object.vwap
-                and bar_object.close < bar_object.vwap
-                and bar_object.volume/bar_object.volume_average <= 1.1
-            ]
-        )/len(bars_since_highest_high) if bars_since_highest_high else 0
-
-        feature_bars_since_highest_high_to_total_bars_pct = len(bars_since_highest_high)/total_bars
-        feature_weak_bars_to_bars_since_highest_high_to_total_bars = feature_weak_bars_since_highest_high_to_total_pct/feature_bars_since_highest_high_to_total_bars_pct if feature_bars_since_highest_high_to_total_bars_pct > 0 else 0
-        feature_bars_ema_above_vwap_pct = bars_ema_above_vwap_counter/total_bars
-        feature_positive_bars_close_strong_pct = positive_bars_close_strong_counter/positive_bars_counter
         feature_crossed_highest_high_of_the_day = potential_confirmation_bar.low < day_timeframe_stock.pre_market_one_minute_highest_high_bar.high < potential_confirmation_bar.high if day_timeframe_stock.pre_market_one_minute_highest_high_bar is not None else False
         feature_crossed_highest_high_of_post_pre_market = potential_confirmation_bar.low < day_timeframe_stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close if day_timeframe_stock.pre_market_one_minute_highest_high_bar is not None else False
 
@@ -496,64 +306,25 @@ class DataExtractor:
 
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
-            "feature_pullback_sharpness": pullback_analysis["feature_pullback_sharpness"],
-            "feature_pullback_depth": pullback_analysis["feature_pullback_depth"],
-            "feature_number_of_negative_bars_in_pullback_pct": pullback_analysis["feature_number_of_negative_bars_in_pullback_pct"],
             "feature_price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
-            "feature_pullback_to_trend_ratio": pullback_analysis["feature_pullback_to_trend_ratio"],
             "feature_histogram_negative_momentum_pct": feature_histogram_negative_momentum_pct,
-            "feature_strong_positive_bars_with_full_body_pct": feature_strong_positive_bars_with_full_body_pct,
-            "feature_minutes_since_market_open_to_total_market_minutes_pct": feature_minutes_since_market_open_to_total_market_minutes_pct,
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
             "feature_bars_with_lower_volume_average_pct": feature_bars_with_lower_volume_average_pct,
             "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open": feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open,
-            "feature_highest_volume_before_to_entry_bar_volume_ratio": feature_highest_volume_before_to_entry_bar_volume_ratio,
-            "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio": feature_highest_average_volume_before_to_entry_bar_average_volume_ratio,
-            "feature_highest_average_volume_before_to_entry_bar_volume_ratio": feature_highest_average_volume_before_to_entry_bar_volume_ratio,
-            "feature_macd_under_signal_line_counter": feature_macd_under_signal_line_counter,
             "feature_entry_bar_strengh_pct": strong_entry_bar_points / 13,
-            "feature_ema_9_keeps_going_up_pct": ema_9_keeps_going_up_counter/total_bars,
             "feature_strong_bars_above_volume_average_pct": feature_strong_bars_above_volume_average_pct,
-            "feature_strong_bars_above_volume_average_to_total_bars_pct": feature_strong_bars_above_volume_average_to_total_bars_pct,
-            "feature_bars_above_volume_average_pct": feature_bars_above_volume_average_pct,
-            "feature_strong_bars_has_continuation": feature_strong_bars_has_continuation,
             "feature_high_volume_bars_with_rejection_pct": feature_high_volume_bars_with_rejection_pct,
-            "feature_previous_bar_to_highest_high_pct": feature_previous_bar_to_highest_high_pct,
-            "feature_bar_volume_to_volume_sum_since_market_open": potential_confirmation_bar.volume/(volume_sum_since_market_open - potential_confirmation_bar.volume),
-            "feature_volume_average_to_bar_volume": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
             "feature_volume_per_minute_to_bar_volume": round(volume_per_minute, 2)/potential_confirmation_bar.volume,
             "feature_volume_per_minute_to_bar_volume_above_threshold": round(volume_per_minute, 2)/potential_confirmation_bar.volume > 0.18,
-            "feature_high_lows_pct": feature_high_lows_pct,
             "feature_bars_with_rejection_inside_entry_bar_range_pct": feature_bars_with_rejection_inside_entry_bar_range_pct,
             "feature_positive_vs_negative_volume": positive_volume_sum/negative_volume_sum if negative_volume_sum > 0 else 1,
             "feature_positive_vs_negative_movement": positive_movement/negative_movement if negative_movement > 0 else 1,
-            "feature_volume_before_middle_point_vs_after_middle_point_pct": feature_volume_before_middle_point_vs_after_middle_point_pct,
             "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold": feature_volume_before_middle_point_vs_after_middle_point_pct > 0.2,
-            "feature_bars_without_movement_pct": bars_without_movement_counter/total_bars,
             "feature_bars_without_movement_pct_above_threshold": bars_without_movement_counter/total_bars > 0.02,
-            "feature_last_negative_to_positive_bars_pct": last_bars_negative_bars/last_bars_positive_bars if last_bars_positive_bars > 0 else 0,
-            "feature_crossed_any_resistance": crossed_any_resistance,
-            "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
-            "feature_entry_bar_profit_pct": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/potential_confirmation_bar.open_value,
-            "feature_entry_bar_volume_to_highest_bar_volume_pct": potential_confirmation_bar.volume/highest_high_one_minute_bar.volume,
-            "feature_previous_bar_volume_to_entry_bar_volume_pct": previous_bar.volume/potential_confirmation_bar.volume if previous_bar is not None else 0,
-            "feature_bars_closed_under_ema_20_since_highest_high_bar_pct": len(bars_closed_under_ema_20_since_highest_high)/(highest_high_one_minute_bar.index - potential_confirmation_bar.index),
-            "feature_volume_average_change_since_highest_high_pct": min_volume_average_since_highest_high/max_volume_average_since_highest_high if max_volume_average_since_highest_high > 0 else 0,
-            "feature_volume_to_volume_average_ratio_since_highest_high": volume_to_volume_average_ratio_since_highest_high/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0,
-            "feature_entry_bar_volume_is_highest_until_now": max(bar_object.volume for bar_object in one_minute_bars) == potential_confirmation_bar.volume,
-            "feature_ema_9_has_been_tested_since_highest_high": feature_ema_9_has_been_tested_since_highest_high,
             "feature_entry_strength_vs_avg": (potential_confirmation_bar.high - potential_confirmation_bar.low)/last_10_bars_range_average,
-            "feature_weak_bars_since_highest_high_to_total_pct": feature_weak_bars_since_highest_high_to_total_pct,
-            "feature_bars_since_highest_high_to_total_bars_pct": feature_bars_since_highest_high_to_total_bars_pct,
-            "feature_weak_bars_to_bars_since_highest_high_to_total_bars": feature_weak_bars_to_bars_since_highest_high_to_total_bars,
-            "feature_bars_ema_above_vwap_pct": feature_bars_ema_above_vwap_pct,
-            "feature_positive_bars_close_strong_pct": feature_positive_bars_close_strong_pct,
-            "feature_positive_to_negative_histograms_pct": negative_histograms_sum/positive_histograms_sum,
             "feature_crossed_highest_high_of_the_day": feature_crossed_highest_high_of_the_day,
             "feature_crossed_highest_high_of_post_pre_market": feature_crossed_highest_high_of_post_pre_market,
-            "feature_potential_bar_volume_greater_than_volume_average": potential_confirmation_bar.volume > potential_confirmation_bar.volume_average * 2,
             "feature_potential_bar_low_close_to_open": potential_confirmation_bar.low/potential_confirmation_bar.open_value >= 0.99,
-            "feature_potential_bar_wick_is_weak": potential_confirmation_bar.bar_wick_percentage < 0.4,
             "feature_volume_average_goes_up_pct": feature_volume_average_goes_up_pct,
             "feature_overlapped_bars_since_market_open_pct": feature_overlapped_bars_since_market_open_pct,
         }

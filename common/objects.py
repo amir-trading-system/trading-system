@@ -161,7 +161,6 @@ class Stock:
         last_post_pre_one_minute_highest_high: float = 0.0,
         pre_market_one_minute_highest_high_bar: BarData = None,
         post_pre_market_volume_sum: float = 0.0,
-        last_lowest_low_bar: BarData = None,
         one_minute_request_id: int = None,
         day_request_id: int = None,
         total_volume: float = 0.0,
@@ -186,7 +185,6 @@ class Stock:
         self.post_pre_market_volume_sum = post_pre_market_volume_sum
         self.volume_sum_since_4_am_today = volume_sum_since_4_am_today
         self.volume_sum_since_market_open = volume_sum_since_market_open
-        self.last_lowest_low_bar = last_lowest_low_bar
         self.one_minute_request_id = one_minute_request_id
         self.day_request_id = day_request_id
         self.total_volume = total_volume

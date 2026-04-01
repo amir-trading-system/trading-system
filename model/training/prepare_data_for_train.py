@@ -26,64 +26,25 @@ def write_to_csv(
                     "original_bar_time",
                     "expected_confirmation_bar_time",
                     "feature_has_positive_more_than_negative_bars",
-                    "feature_pullback_sharpness",
-                    "feature_pullback_depth",
-                    "feature_number_of_negative_bars_in_pullback_pct",
                     "feature_price_minus_vwap_at_entry",
-                    "feature_pullback_to_trend_ratio",
                     "feature_histogram_negative_momentum_pct",
-                    "feature_strong_positive_bars_with_full_body_pct",
-                    "feature_minutes_since_market_open_to_total_market_minutes_pct",
                     "feature_bars_with_at_least_50_pct_wick_pct",
                     "feature_bars_with_lower_volume_average_pct",
                     "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
-                    "feature_highest_volume_before_to_entry_bar_volume_ratio",
-                    "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio",
-                    "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
-                    "feature_macd_under_signal_line_counter",
                     "feature_entry_bar_strengh_pct",
-                    "feature_ema_9_keeps_going_up_pct",
                     "feature_strong_bars_above_volume_average_pct",
-                    "feature_strong_bars_above_volume_average_to_total_bars_pct",
-                    "feature_bars_above_volume_average_pct",
-                    "feature_strong_bars_has_continuation",
                     "feature_high_volume_bars_with_rejection_pct",
-                    "feature_previous_bar_to_highest_high_pct",
-                    "feature_bar_volume_to_volume_sum_since_market_open",
-                    "feature_volume_average_to_bar_volume",
                     "feature_volume_per_minute_to_bar_volume",
-                    "feature_high_lows_pct",
                     "feature_bars_with_rejection_inside_entry_bar_range_pct",
                     "feature_positive_vs_negative_volume",
                     "feature_positive_vs_negative_movement",
-                    "feature_volume_before_middle_point_vs_after_middle_point_pct",
-                    "feature_bars_without_movement_pct",
-                    "feature_last_negative_to_positive_bars_pct",
-                    "feature_crossed_any_resistance",
-                    "feature_bars_above_vwap_pct",
-                    "feature_entry_bar_profit_pct",
-                    "feature_entry_bar_volume_to_highest_bar_volume_pct",
-                    "feature_previous_bar_volume_to_entry_bar_volume_pct",
-                    "feature_bars_closed_under_ema_20_since_highest_high_bar_pct",
-                    "feature_volume_average_change_since_highest_high_pct",
-                    "feature_volume_to_volume_average_ratio_since_highest_high",
-                    "feature_entry_bar_volume_is_highest_until_now",
-                    "feature_ema_9_has_been_tested_since_highest_high",
                     "feature_entry_strength_vs_avg",
-                    "feature_weak_bars_since_highest_high_to_total_pct",
-                    "feature_bars_since_highest_high_to_total_bars_pct",
-                    "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
-                    "feature_bars_ema_above_vwap_pct",
-                    "feature_positive_bars_close_strong_pct",
-                    "feature_positive_to_negative_histograms_pct",
                     "feature_volume_per_minute_to_bar_volume_above_threshold",
                     "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
                     "feature_bars_without_movement_pct_above_threshold",
                     "feature_crossed_highest_high_of_the_day",
                     "feature_crossed_highest_high_of_post_pre_market",
-                    "feature_potential_bar_volume_greater_than_volume_average",
                     "feature_potential_bar_low_close_to_open",
-                    "feature_potential_bar_wick_is_weak",
                     "feature_volume_average_goes_up_pct",
                     "feature_overlapped_bars_since_market_open_pct",
                 ],
@@ -97,126 +58,48 @@ def write_to_csv(
         original_bar_time = stock_object.specific_bar_time
 
         feature_has_positive_more_than_negative_bars = False
-        feature_pullback_sharpness = 0
-        feature_pullback_depth = 0
-        feature_number_of_negative_bars_in_pullback_pct = 0
         feature_price_minus_vwap_at_entry = 0
-        feature_pullback_to_trend_ratio = 0
         feature_histogram_negative_momentum_pct = 0
-        feature_strong_positive_bars_with_full_body_pct = 0
-        feature_minutes_since_market_open_to_total_market_minutes_pct = 0
         feature_bars_with_at_least_50_pct_wick_pct = 0
         feature_bars_with_lower_volume_average_pct = 0
         feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = False
-        feature_highest_volume_before_to_entry_bar_volume_ratio = 0
-        feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = 0
-        feature_highest_average_volume_before_to_entry_bar_volume_ratio = 0
-        feature_macd_under_signal_line_counter = 0
         feature_entry_bar_strengh_pct = 0
-        feature_ema_9_keeps_going_up_pct = 0
         feature_strong_bars_above_volume_average_pct = 0
-        feature_strong_bars_above_volume_average_to_total_bars_pct = 0
-        feature_bars_above_volume_average_pct = 0
-        feature_strong_bars_has_continuation = 0
         feature_high_volume_bars_with_rejection_pct = 0
-        feature_previous_bar_to_highest_high_pct = 0
-        feature_bar_volume_to_volume_sum_since_market_open = 0
-        feature_volume_average_to_bar_volume = 0
         feature_volume_per_minute_to_bar_volume = 0
-        feature_high_lows_pct = 0
         feature_bars_with_rejection_inside_entry_bar_range_pct = 0
         feature_positive_vs_negative_volume = 0
         feature_positive_vs_negative_movement = 0
-        feature_volume_before_middle_point_vs_after_middle_point_pct = 0
-        feature_bars_without_movement_pct = 0
-        feature_last_negative_to_positive_bars_pct = 0
-        feature_crossed_any_resistance = 0
-        feature_bars_above_vwap_pct = 0
-        feature_entry_bar_profit_pct = 0
-        feature_entry_bar_volume_to_highest_bar_volume_pct = 0
-        feature_previous_bar_volume_to_entry_bar_volume_pct = 0
-        feature_bars_closed_under_ema_20_since_highest_high_bar_pct = 0
-        feature_volume_average_change_since_highest_high_pct = 0
-        feature_volume_to_volume_average_ratio_since_highest_high = 0
-        feature_entry_bar_volume_is_highest_until_now = 0
-        feature_ema_9_has_been_tested_since_highest_high = 0
         feature_entry_strength_vs_avg = 0
-        feature_weak_bars_since_highest_high_to_total_pct = 0
-        feature_bars_since_highest_high_to_total_bars_pct = 0
-        feature_weak_bars_to_bars_since_highest_high_to_total_bars = 0
-        feature_bars_ema_above_vwap_pct = 0
-        feature_positive_bars_close_strong_pct = 0
-        feature_positive_to_negative_histograms_pct = 0
         feature_volume_per_minute_to_bar_volume_above_threshold = 0
         feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = 0
         feature_bars_without_movement_pct_above_threshold = 0
         feature_crossed_highest_high_of_the_day = 0
         feature_crossed_highest_high_of_post_pre_market = 0
-        feature_potential_bar_volume_greater_than_volume_average = 0
         feature_potential_bar_low_close_to_open = 0
-        feature_potential_bar_wick_is_weak = 0
         feature_volume_average_goes_up_pct = 0
         feature_overlapped_bars_since_market_open_pct = 0
 
         feature_has_positive_more_than_negative_bars = symbol_data["feature_has_positive_more_than_negative_bars"]
-        feature_pullback_sharpness = symbol_data["feature_pullback_sharpness"]
-        feature_pullback_depth = symbol_data["feature_pullback_depth"]
-        feature_number_of_negative_bars_in_pullback_pct = symbol_data["feature_number_of_negative_bars_in_pullback_pct"]
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
-        feature_pullback_to_trend_ratio = symbol_data["feature_pullback_to_trend_ratio"]
         feature_histogram_negative_momentum_pct = symbol_data["feature_histogram_negative_momentum_pct"]
-        feature_strong_positive_bars_with_full_body_pct = symbol_data["feature_strong_positive_bars_with_full_body_pct"]
-        feature_minutes_since_market_open_to_total_market_minutes_pct = symbol_data["feature_minutes_since_market_open_to_total_market_minutes_pct"]
         feature_bars_with_at_least_50_pct_wick_pct = symbol_data["feature_bars_with_at_least_50_pct_wick_pct"]
         feature_bars_with_lower_volume_average_pct = symbol_data["feature_bars_with_lower_volume_average_pct"]
         feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = symbol_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"]
-        feature_highest_volume_before_to_entry_bar_volume_ratio = symbol_data["feature_highest_volume_before_to_entry_bar_volume_ratio"]
-        feature_highest_average_volume_before_to_entry_bar_average_volume_ratio = symbol_data["feature_highest_average_volume_before_to_entry_bar_average_volume_ratio"]
-        feature_highest_average_volume_before_to_entry_bar_volume_ratio = symbol_data["feature_highest_average_volume_before_to_entry_bar_volume_ratio"]
-        feature_macd_under_signal_line_counter = symbol_data["feature_macd_under_signal_line_counter"]
         feature_entry_bar_strengh_pct = symbol_data["feature_entry_bar_strengh_pct"]
-        feature_ema_9_keeps_going_up_pct = symbol_data["feature_ema_9_keeps_going_up_pct"]
         feature_strong_bars_above_volume_average_pct = symbol_data["feature_strong_bars_above_volume_average_pct"]
-        feature_strong_bars_above_volume_average_to_total_bars_pct = symbol_data["feature_strong_bars_above_volume_average_to_total_bars_pct"]
-        feature_bars_above_volume_average_pct = symbol_data["feature_bars_above_volume_average_pct"]
-        feature_strong_bars_has_continuation = symbol_data["feature_strong_bars_has_continuation"]
         feature_high_volume_bars_with_rejection_pct = symbol_data["feature_high_volume_bars_with_rejection_pct"]
-        feature_previous_bar_to_highest_high_pct = symbol_data["feature_previous_bar_to_highest_high_pct"]
-        feature_bar_volume_to_volume_sum_since_market_open = symbol_data["feature_bar_volume_to_volume_sum_since_market_open"]
-        feature_volume_average_to_bar_volume = symbol_data["feature_volume_average_to_bar_volume"]
         feature_volume_per_minute_to_bar_volume = symbol_data["feature_volume_per_minute_to_bar_volume"]
-        feature_high_lows_pct = symbol_data["feature_high_lows_pct"]
         feature_bars_with_rejection_inside_entry_bar_range_pct = symbol_data["feature_bars_with_rejection_inside_entry_bar_range_pct"]
         feature_positive_vs_negative_volume = symbol_data["feature_positive_vs_negative_volume"]
         feature_positive_vs_negative_movement = symbol_data["feature_positive_vs_negative_movement"]
-        feature_volume_before_middle_point_vs_after_middle_point_pct = symbol_data["feature_volume_before_middle_point_vs_after_middle_point_pct"]
-        feature_bars_without_movement_pct = symbol_data["feature_bars_without_movement_pct"]
-        feature_last_negative_to_positive_bars_pct = symbol_data["feature_last_negative_to_positive_bars_pct"]
-        feature_crossed_any_resistance = symbol_data["feature_crossed_any_resistance"]
-        feature_bars_above_vwap_pct = symbol_data["feature_bars_above_vwap_pct"]
-        feature_entry_bar_profit_pct = symbol_data["feature_entry_bar_profit_pct"]
-        feature_entry_bar_volume_to_highest_bar_volume_pct = symbol_data["feature_entry_bar_volume_to_highest_bar_volume_pct"]
-        feature_previous_bar_volume_to_entry_bar_volume_pct = symbol_data["feature_previous_bar_volume_to_entry_bar_volume_pct"]
-        feature_bars_closed_under_ema_20_since_highest_high_bar_pct = symbol_data["feature_bars_closed_under_ema_20_since_highest_high_bar_pct"]
-        feature_volume_average_change_since_highest_high_pct = symbol_data["feature_volume_average_change_since_highest_high_pct"]
-        feature_volume_to_volume_average_ratio_since_highest_high = symbol_data["feature_volume_to_volume_average_ratio_since_highest_high"]
-        feature_entry_bar_volume_is_highest_until_now = symbol_data["feature_entry_bar_volume_is_highest_until_now"]
-        feature_ema_9_has_been_tested_since_highest_high = symbol_data["feature_ema_9_has_been_tested_since_highest_high"]
         feature_entry_strength_vs_avg = symbol_data["feature_entry_strength_vs_avg"]
-        feature_weak_bars_since_highest_high_to_total_pct = symbol_data["feature_weak_bars_since_highest_high_to_total_pct"]
-        feature_bars_since_highest_high_to_total_bars_pct = symbol_data["feature_bars_since_highest_high_to_total_bars_pct"]
-        feature_weak_bars_to_bars_since_highest_high_to_total_bars = symbol_data["feature_weak_bars_since_highest_high_to_total_pct"]/symbol_data["feature_bars_since_highest_high_to_total_bars_pct"] if symbol_data["feature_bars_since_highest_high_to_total_bars_pct"] > 0 else 0
-        feature_bars_ema_above_vwap_pct = symbol_data["feature_bars_ema_above_vwap_pct"]
-        feature_positive_bars_close_strong_pct = symbol_data["feature_positive_bars_close_strong_pct"]
-        feature_positive_to_negative_histograms_pct = symbol_data["feature_positive_to_negative_histograms_pct"]
         feature_volume_per_minute_to_bar_volume_above_threshold = symbol_data["feature_volume_per_minute_to_bar_volume_above_threshold"]
         feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = symbol_data["feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold"]
         feature_bars_without_movement_pct_above_threshold = symbol_data["feature_bars_without_movement_pct_above_threshold"]
         feature_crossed_highest_high_of_the_day = symbol_data["feature_crossed_highest_high_of_the_day"]
         feature_crossed_highest_high_of_post_pre_market = symbol_data["feature_crossed_highest_high_of_post_pre_market"]
-        feature_potential_bar_volume_greater_than_volume_average = symbol_data["feature_potential_bar_volume_greater_than_volume_average"]
         feature_potential_bar_low_close_to_open = symbol_data["feature_potential_bar_low_close_to_open"]
-        feature_potential_bar_wick_is_weak = symbol_data["feature_potential_bar_wick_is_weak"]
         feature_volume_average_goes_up_pct = symbol_data["feature_volume_average_goes_up_pct"]
         feature_overlapped_bars_since_market_open_pct = symbol_data["feature_overlapped_bars_since_market_open_pct"]
 
@@ -233,64 +116,25 @@ def write_to_csv(
                     original_bar_time,
                     expected_confirmation_bar_time,
                     feature_has_positive_more_than_negative_bars,
-                    feature_pullback_sharpness,
-                    feature_pullback_depth,
-                    feature_number_of_negative_bars_in_pullback_pct,
                     feature_price_minus_vwap_at_entry,
-                    feature_pullback_to_trend_ratio,
                     feature_histogram_negative_momentum_pct,
-                    feature_strong_positive_bars_with_full_body_pct,
-                    feature_minutes_since_market_open_to_total_market_minutes_pct,
                     feature_bars_with_at_least_50_pct_wick_pct,
                     feature_bars_with_lower_volume_average_pct,
                     feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open,
-                    feature_highest_volume_before_to_entry_bar_volume_ratio,
-                    feature_highest_average_volume_before_to_entry_bar_average_volume_ratio,
-                    feature_highest_average_volume_before_to_entry_bar_volume_ratio,
-                    feature_macd_under_signal_line_counter,
                     feature_entry_bar_strengh_pct,
-                    feature_ema_9_keeps_going_up_pct,
                     feature_strong_bars_above_volume_average_pct,
-                    feature_strong_bars_above_volume_average_to_total_bars_pct,
-                    feature_bars_above_volume_average_pct,
-                    feature_strong_bars_has_continuation,
                     feature_high_volume_bars_with_rejection_pct,
-                    feature_previous_bar_to_highest_high_pct,
-                    feature_bar_volume_to_volume_sum_since_market_open,
-                    feature_volume_average_to_bar_volume,
                     feature_volume_per_minute_to_bar_volume,
-                    feature_high_lows_pct,
                     feature_bars_with_rejection_inside_entry_bar_range_pct,
                     feature_positive_vs_negative_volume,
                     feature_positive_vs_negative_movement,
-                    feature_volume_before_middle_point_vs_after_middle_point_pct,
-                    feature_bars_without_movement_pct,
-                    feature_last_negative_to_positive_bars_pct,
-                    feature_crossed_any_resistance,
-                    feature_bars_above_vwap_pct,
-                    feature_entry_bar_profit_pct,
-                    feature_entry_bar_volume_to_highest_bar_volume_pct,
-                    feature_previous_bar_volume_to_entry_bar_volume_pct,
-                    feature_bars_closed_under_ema_20_since_highest_high_bar_pct,
-                    feature_volume_average_change_since_highest_high_pct,
-                    feature_volume_to_volume_average_ratio_since_highest_high,
-                    feature_entry_bar_volume_is_highest_until_now,
-                    feature_ema_9_has_been_tested_since_highest_high,
                     feature_entry_strength_vs_avg,
-                    feature_weak_bars_since_highest_high_to_total_pct,
-                    feature_bars_since_highest_high_to_total_bars_pct,
-                    feature_weak_bars_to_bars_since_highest_high_to_total_bars,
-                    feature_bars_ema_above_vwap_pct,
-                    feature_positive_bars_close_strong_pct,
-                    feature_positive_to_negative_histograms_pct,
                     feature_volume_per_minute_to_bar_volume_above_threshold,
                     feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold,
                     feature_bars_without_movement_pct_above_threshold,
                     feature_crossed_highest_high_of_the_day,
                     feature_crossed_highest_high_of_post_pre_market,
-                    feature_potential_bar_volume_greater_than_volume_average,
                     feature_potential_bar_low_close_to_open,
-                    feature_potential_bar_wick_is_weak,
                     feature_volume_average_goes_up_pct,
                     feature_overlapped_bars_since_market_open_pct,
                 ]

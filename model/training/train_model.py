@@ -131,42 +131,6 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_high_volume_bars_with_rejection_pct", #[8-0] [6-10]
             "feature_entry_strength_vs_avg", #[8-0] [6-10]
             "feature_volume_per_minute_to_bar_volume", #[8-0] [5-11]
-            # "feature_pullback_to_trend_ratio",
-            # "feature_strong_positive_bars_with_full_body_pct",
-            # "feature_macd_under_signal_line_counter",
-            # "feature_ema_9_keeps_going_up_pct",
-            # "feature_strong_bars_above_volume_average_to_total_bars_pct",
-            # "feature_bars_above_volume_average_pct",
-            # "feature_volume_before_middle_point_vs_after_middle_point_pct",
-            # "feature_ema_9_has_been_tested_since_highest_high",
-            # "feature_bars_without_movement_pct",
-            # "feature_last_negative_to_positive_bars_pct",
-            # "feature_bars_closed_under_ema_20_since_highest_high_bar_pct",
-            # "feature_entry_bar_volume_is_highest_until_now",
-            # "feature_bars_above_vwap_pct",
-            # "feature_bars_ema_above_vwap_pct",
-            # "feature_positive_bars_close_strong_pct",
-            # "feature_pullback_sharpness",
-            # "feature_pullback_depth",
-            # "feature_number_of_negative_bars_in_pullback_pct",
-            # "feature_minutes_since_market_open_to_total_market_minutes_pct",
-            # "feature_highest_volume_before_to_entry_bar_volume_ratio",
-            # "feature_highest_average_volume_before_to_entry_bar_average_volume_ratio", #[7-1] [5-11]
-            # "feature_highest_average_volume_before_to_entry_bar_volume_ratio",
-            # "feature_strong_bars_has_continuation",
-            # "feature_previous_bar_to_highest_high_pct",
-            # "feature_bar_volume_to_volume_sum_since_market_open",
-            # "feature_volume_average_to_bar_volume",
-            # "feature_high_lows_pct",
-            # "feature_crossed_any_resistance",
-            # "feature_entry_bar_profit_pct",
-            # "feature_entry_bar_volume_to_highest_bar_volume_pct",
-            # "feature_previous_bar_volume_to_entry_bar_volume_pct",
-            # "feature_volume_average_change_since_highest_high_pct",
-            # "feature_volume_to_volumse_average_ratio_since_highest_high",
-            # "feature_weak_bars_since_highest_high_to_total_pct",
-            # "feature_bars_since_highest_high_to_total_bars_pct",
-            # "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
         ]:
             final_shares_columns.append(feature)
 
