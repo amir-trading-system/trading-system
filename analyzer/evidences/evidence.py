@@ -290,6 +290,23 @@ class Evidence:
 
         return crossed_resistance_level_strongly
 
+    def highest_high_occurred_more_than_once_in_the_last_bars(
+        self,
+        potential_confirmation_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
+    ):
+        current_bar_is_highest_high = max(
+            bar_object.high
+            for bar_object in one_minute_bars
+        ) == potential_confirmation_bar.high
+
+        previous_bar_was_highest_high = max(
+            bar_object.high
+            for bar_object in one_minute_bars[1:]
+        ) == one_minute_bars[1].high
+
+        return current_bar_is_highest_high and previous_bar_was_highest_high
+
     def confirm(
         self,
         stock: common.objects.Stock,
@@ -339,6 +356,19 @@ class Evidence:
         )
         stock.volume_sum_since_4_am_today = volume_sum_since_4_am_today
         stock.volume_sum_since_market_open = volume_sum_since_market_open
+
+        if self.highest_high_occurred_more_than_once_in_the_last_bars(
+            potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_bars=one_minute_bars,
+        ):
+            return score
+
+        if sum(
+            bar_object.volume
+            for bar_object in one_minute_bars
+            if bar_object.bar_time > highest_high_one_minute_bar.bar_time
+        ) < 100000:
+            return score
 
         if (
             True

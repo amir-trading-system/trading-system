@@ -114,11 +114,11 @@ if __name__ == "__main__":
     request_id_to_symbol: dict[int,common.objects.Stock] = {}
     logger_object = app_logger.get_logger()
 
-    initiate_potential_symbols(
-        file_path=configuration.potential_symbols_file_path,
-        logger_obj=logger_object,
-        symbols_queue=symbols_to_collect_queue,
-    )
+    # initiate_potential_symbols(
+    #     file_path=configuration.potential_symbols_file_path,
+    #     logger_obj=logger_object,
+    #     symbols_queue=symbols_to_collect_queue,
+    # )
     alerter_object = alerter.alerter.Alerter(
         logger=logger_object,
         configuration=configuration.alerts,

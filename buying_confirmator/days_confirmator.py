@@ -307,6 +307,19 @@ class Confirmator:
                 lowest_low_one_minute_bar = potential_confirmation_bar
 
             potential_confirmation_bar = stock.one_minute_bars_queue.get()
+            if potential_confirmation_bar.bar_time > most_updated_datetime:
+                self.logger.info(
+                    msg="Got potential bar to confirm",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "request_id": stock.request_id,
+                    }
+                )
             if highest_high_one_minute_bar is None:
                 highest_high_one_minute_bar = potential_confirmation_bar
             if lowest_low_one_minute_bar is None:

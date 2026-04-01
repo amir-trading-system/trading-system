@@ -413,4 +413,9 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             datetime_str="03.31.26T09:54:00",
             is_positive=True,
         ),
+        common.objects.SymbolTest(
+            name="AGPU",
+            datetime_str="04.01.26T11:17:00",
+            is_positive=True,
+        ),
     ]

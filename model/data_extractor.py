@@ -303,6 +303,17 @@ class DataExtractor:
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             one_minute_bars=one_minute_bars,
         )
+        feature_weak_bars_since_highest_high_to_total_pct = len(
+            [
+                bar_object
+                for bar_object in bars_since_highest_high
+                if bar_object.ema_9 < bar_object.vwap
+                and bar_object.close < bar_object.vwap
+                and bar_object.volume/bar_object.volume_average <= 1.1
+            ]
+        )/len(bars_since_highest_high) if bars_since_highest_high else 0
+        feature_bars_since_highest_high_to_total_bars_pct = len(bars_since_highest_high)/total_bars
+        feature_weak_bars_to_bars_since_highest_high_to_total_bars = feature_weak_bars_since_highest_high_to_total_pct/feature_bars_since_highest_high_to_total_bars_pct if feature_bars_since_highest_high_to_total_bars_pct > 0 else 0
 
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
@@ -327,6 +338,13 @@ class DataExtractor:
             "feature_potential_bar_low_close_to_open": potential_confirmation_bar.low/potential_confirmation_bar.open_value >= 0.99,
             "feature_volume_average_goes_up_pct": feature_volume_average_goes_up_pct,
             "feature_overlapped_bars_since_market_open_pct": feature_overlapped_bars_since_market_open_pct,
+            "feature_previous_bar_is_the_highest_bar": (
+                True
+                and previous_bar.high == highest_high_one_minute_bar.high
+                and previous_bar.close > previous_bar.open_value
+                and previous_bar.volume > previous_bar.volume_average
+            ),
+            "feature_weak_bars_to_bars_since_highest_high_to_total_bars": feature_weak_bars_to_bars_since_highest_high_to_total_bars,
         }
 
         return features
