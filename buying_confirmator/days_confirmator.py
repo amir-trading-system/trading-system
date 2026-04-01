@@ -116,6 +116,8 @@ class Confirmator:
 
         confirmed_evidences: list[str] = []
         stock_is_valid_for_evidence = False
+        transmit_order = False
+
         for evidence in analyzer.evidences.__evidences__:
             evidence_obj = evidence(
                 logger=self.logger,
@@ -151,7 +153,7 @@ class Confirmator:
 
             one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
 
-            if evidence_obj.confirm(
+            score = evidence_obj.confirm(
                 stock=stock,
                 one_minute_timeframe_stock=one_minute_timeframe_stock,
                 original_bar_to_confirm=original_bar_to_confirm,
@@ -161,9 +163,19 @@ class Confirmator:
                 one_minute_bars=temp_one_minute_bars,
                 model_runner=self.model_runner,
                 get_only_statistics=self.get_only_statistics,
-            ):
+            )
+
+            if score.should_take_trade:
+                transmit_order = potential_confirmation_bar.bar_time >= datetime.datetime(
+                    year=potential_confirmation_bar.bar_time.year,
+                    month=potential_confirmation_bar.bar_time.month,
+                    day=potential_confirmation_bar.bar_time.day,
+                    hour=9,
+                    minute=40,
+                )
                 entry_position_bar = potential_confirmation_bar
                 confirmed_evidences.append(evidence.name)
+                break
 
         if confirmed_evidences:
             self.results_queue.put(
@@ -191,18 +203,7 @@ class Confirmator:
                 },
             )
 
-            transmit = False
             if self.alerter_object:
-                ## For now keping it false until we think how to manage it.
-                if potential_confirmation_bar.bar_time >= datetime.datetime(
-                    year=potential_confirmation_bar.bar_time.year,
-                    month=potential_confirmation_bar.bar_time.month,
-                    day=potential_confirmation_bar.bar_time.day,
-                    hour=9,
-                    minute=40,
-                ):
-                    transmit = True
-
                 self.alerter_object.send_confirmation_alert(
                     sender="Confirmator",
                     stock=stock,
@@ -211,7 +212,7 @@ class Confirmator:
                     evidence_name=evidence_name,
                     is_retro=self.is_retro,
                     request_id=stock.request_id,
-                    transmit=transmit,
+                    transmit=transmit_order,
                 )
 
             unique_key_for_place_order = original_bar_to_confirm.symbol
@@ -229,7 +230,8 @@ class Confirmator:
                 self.tws_client.place_buy_order(
                     symbol=original_bar_to_confirm.symbol,
                     current_price=entry_position_bar.close,
-                    transmit=transmit,
+                    transmit=transmit_order,
+                    score=score,
                 )
 
         return bar_has_confirmed

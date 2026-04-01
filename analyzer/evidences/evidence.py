@@ -301,9 +301,16 @@ class Evidence:
         one_minute_bars: list[common.objects.BarData],
         model_runner: model.runner.Runner,
         get_only_statistics: bool = False,
-    ) -> bool:
+    ) -> common.objects.Score:
+        score = common.objects.Score(
+            score=0.0,
+            probability=0.0,
+            threshold=0.0,
+            should_take_trade=False
+        )
+
         if potential_confirmation_bar.volume < 20000:
-            return False
+            return score
 
         current_bar_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
@@ -338,7 +345,7 @@ class Evidence:
             and get_only_statistics
             and potential_confirmation_bar.bar_time < stock.expected_bar_time
         ):
-            return False
+            return score
 
         if (
             True
@@ -365,7 +372,8 @@ class Evidence:
                     },
                     f,
                 )
-            return True
+            score.should_take_trade = True
+            return score
 
         if not self._confirm(
             stock=stock,
@@ -376,7 +384,7 @@ class Evidence:
             one_minute_bars=one_minute_bars,
             volume_sum_since_market_open=stock.volume_sum_since_market_open,
         ):
-            return False
+            return score
 
         potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
             day_timeframe_stock=stock,
@@ -387,7 +395,6 @@ class Evidence:
             one_minute_bars=one_minute_bars,
         )
 
-        should_take_trade = False
         if model_runner.should_run_model:
             score: common.objects.Score = model_runner.score_potential_confirmation_bar(
                 potential_confirmation_bar=potential_confirmation_bar,
@@ -416,13 +423,13 @@ class Evidence:
                     "threshold": score.threshold,
                 },
             )
-            should_take_trade = (
+            score.should_take_trade = (
                 True
                 and score.should_take_trade
                 and potential_confirmation_bar.price_movement_statistics["feature_weak_bars_to_bars_since_highest_high_to_total_bars"] < 0.95
             )
 
-        return should_take_trade
+        return score
 
     def _confirm(
         self,
