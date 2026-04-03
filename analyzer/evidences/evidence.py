@@ -1,6 +1,5 @@
 import datetime
 import logging
-import pickle
 
 import common
 import model
@@ -295,7 +294,7 @@ class Evidence:
         potential_confirmation_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
     ) -> bool:
-        if len(one_minute_bars) < 2:
+        if len(one_minute_bars) < 3:
             return False
 
         current_bar_is_highest_high = max(
@@ -305,8 +304,8 @@ class Evidence:
 
         previous_bar_was_highest_high = max(
             bar_object.high
-            for bar_object in one_minute_bars[1:]
-        ) == one_minute_bars[1].high
+            for bar_object in one_minute_bars[2:]
+        )/one_minute_bars[1].high < 0.95
 
         return current_bar_is_highest_high and previous_bar_was_highest_high
 
@@ -320,7 +319,6 @@ class Evidence:
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         model_runner: model.runner.Runner,
-        get_only_statistics: bool = False,
     ) -> common.objects.Score:
         score = common.objects.Score(
             score=0.0,
@@ -371,41 +369,6 @@ class Evidence:
             for bar_object in one_minute_bars
             if bar_object.bar_time > highest_high_one_minute_bar.bar_time
         ) < 100000:
-            return score
-
-        if (
-            True
-            and get_only_statistics
-            and potential_confirmation_bar.bar_time < stock.expected_bar_time
-        ):
-            return score
-
-        if (
-            True
-            and get_only_statistics
-            and potential_confirmation_bar.bar_time == stock.expected_bar_time
-        ):
-            potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
-                day_timeframe_stock=stock,
-                one_minute_timeframe_stock=one_minute_timeframe_stock,
-                potential_confirmation_bar=potential_confirmation_bar,
-                highest_high_one_minute_bar=highest_high_one_minute_bar,
-                volume_sum_since_market_open=stock.volume_sum_since_market_open,
-                one_minute_bars=one_minute_bars,
-            )
-            with open(f"model/training/data/{stock.symbol_name}-{stock.expected_bar_time}.json", "wb") as f:
-                pickle.dump(
-                    {
-                        "day_timeframe_stock": stock,
-                        "one_minute_timeframe_stock": one_minute_timeframe_stock,
-                        "potential_confirmation_bar": potential_confirmation_bar,
-                        "highest_high_one_minute_bar": highest_high_one_minute_bar,
-                        "volume_sum_since_market_open": stock.volume_sum_since_market_open,
-                        "one_minute_bars": one_minute_bars,
-                    },
-                    f,
-                )
-            score.should_take_trade = True
             return score
 
         if not self._confirm(

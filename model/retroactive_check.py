@@ -219,6 +219,41 @@ def write_to_csv(
 
     t.close()
 
+def wait_for_collection_only(
+    symbols_data: list[dict[str,any]],
+    request_id_to_symbol: dict[int,common.objects.Stock],
+):
+    t = tqdm.tqdm(iterable=symbols_data)
+    already_finished: list[str] = []
+    while any(
+        symbol_data
+        for symbol_data in symbols_data
+        if symbol_data["collection_status"] == "in_progress"
+    ):
+        for _, symbol in request_id_to_symbol.items():
+            key = f"{symbol.symbol_name}-{symbol.expected_bar_time}"
+            if key in already_finished:
+                continue
+
+            finished_collection = len([
+                symbol_obj
+                for symbol_obj in request_id_to_symbol.values()
+                if symbol_obj.symbol_name == symbol.symbol_name
+                and symbol_obj.expected_bar_time == symbol.expected_bar_time
+                and symbol_obj.finished_collection
+            ]) == 2
+            relevant_symbol_data = [
+                symbol_data
+                for symbol_data in symbols_data
+                if symbol_data["symbol"] == symbol.symbol_name
+                and symbol_data["original_bar_time"] == symbol.specific_bar_time
+                and symbol_data["expected_confirmation_bar_time"] == symbol.expected_bar_time
+            ][0]
+            if finished_collection and relevant_symbol_data["collection_status"] != "done":
+                relevant_symbol_data["collection_status"] = "done"
+                already_finished.append(key)
+                t.update(1)
+
 def wait_for_collection_and_analysis(
     symbols_data: list[dict[str,any]],
     request_id_to_symbol: dict[int,common.objects.Stock],
@@ -230,13 +265,15 @@ def wait_for_collection_and_analysis(
         if symbol_data["actual_confirmation_bar_time"] == "in_progress"
     ):
         for _, symbol in request_id_to_symbol.items():
-            if symbol.symbol_name in already_finished:
+            key = f"{symbol.symbol_name}-{symbol.expected_bar_time}"
+            if key in already_finished:
                 continue
 
             finished_collection = len([
                 symbol_obj
                 for symbol_obj in request_id_to_symbol.values()
                 if symbol_obj.symbol_name == symbol.symbol_name
+                and symbol_obj.expected_bar_time == symbol.expected_bar_time
                 and symbol_obj.finished_collection
             ]) == 2
 
@@ -244,6 +281,7 @@ def wait_for_collection_and_analysis(
                 symbol_obj
                 for symbol_obj in request_id_to_symbol.values()
                 if symbol_obj.symbol_name == symbol.symbol_name
+                and symbol_obj.expected_bar_time == symbol.expected_bar_time
                 and symbol_obj.finished_analyze
             ]) == 2
 
@@ -272,7 +310,7 @@ def wait_for_collection_and_analysis(
                 relevant_symbol_data["collection_status"] == "done"
                 and relevant_symbol_data["analysis_status"] == "done"
             ):
-                already_finished.append(symbol.symbol_name)
+                already_finished.append(key)
 
 def wait_for_confirmation(
     results_queue: queue.Queue[dict[str,any]],
@@ -394,6 +432,7 @@ def run_retroactive_check():
         logger=logger_object,
         client_id=1,
         is_retro=True,
+        get_only_statistics=get_only_statistics,
     )
 
     threading.Thread(
@@ -411,39 +450,64 @@ def run_retroactive_check():
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
     )
-    analyzer_object = analyzer.analyzer.Analyzer(
-        bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
-        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
-        request_id_to_symbol=request_id_to_symbol,
-        tws_client=tws_client,
-        logger=logger_object,
-    )
-    # analyzer_object.confirmator_only = True
-
-    confirmator_object = buying_confirmator.confirmator.Confirmator(
-        tws_client=tws_client,
-        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
-        results_queue=results_queue,
-        request_id_to_symbol=request_id_to_symbol,
-        logger=logger_object,
-        should_run_model=should_run_model,
-        is_retro=True,
-        get_only_statistics=get_only_statistics,
-        # confirmation_only=True,
-    )
-
-    threading.Thread(
-        target=analyzer_object.analyze_data,
-        kwargs={
-            "is_retro": True,
-        },
-    ).start()
-
-    threading.Thread(
-        target=confirmator_object.confirm_data,
-    ).start()
-
     counter = [len(symbols)]
+
+    if not get_only_statistics:
+        analyzer_object = analyzer.analyzer.Analyzer(
+            bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+            waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+            request_id_to_symbol=request_id_to_symbol,
+            tws_client=tws_client,
+            logger=logger_object,
+        )
+        # analyzer_object.confirmator_only = True
+
+        confirmator_object = buying_confirmator.confirmator.Confirmator(
+            tws_client=tws_client,
+            waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+            results_queue=results_queue,
+            request_id_to_symbol=request_id_to_symbol,
+            logger=logger_object,
+            should_run_model=should_run_model,
+            is_retro=True,
+            # confirmation_only=True,
+        )
+
+        threading.Thread(
+            target=analyzer_object.analyze_data,
+            kwargs={
+                "is_retro": True,
+            },
+        ).start()
+
+        threading.Thread(
+            target=confirmator_object.confirm_data,
+        ).start()
+
+        threading.Thread(
+            target=wait_for_collection_and_analysis,
+            kwargs={
+                "symbols_data": symbols_data,
+                "request_id_to_symbol": request_id_to_symbol,
+            }
+        ).start()
+
+        threading.Thread(
+            target=wait_for_confirmation,
+            kwargs={
+                "results_queue": results_queue,
+                "symbols_data": symbols_data,
+            },
+        ).start()
+
+        threading.Thread(
+            target=write_to_csv,
+            kwargs={
+                "symbols_data": symbols_data,
+                "original_file_name": output_file_name,
+                "counter": counter,
+            },
+        ).start()
 
     for symbol in symbols:
         specific_bar_time = symbol.date_time.replace(hour=0, minute=0)
@@ -473,34 +537,18 @@ def run_retroactive_check():
             },
         )
 
-    threading.Thread(
-        target=wait_for_collection_and_analysis,
-        kwargs={
-            "symbols_data": symbols_data,
-            "request_id_to_symbol": request_id_to_symbol,
-        }
-    ).start()
-
-    threading.Thread(
-        target=wait_for_confirmation,
-        kwargs={
-            "results_queue": results_queue,
-            "symbols_data": symbols_data,
-        },
-    ).start()
-
-    threading.Thread(
-        target=write_to_csv,
-        kwargs={
-            "symbols_data": symbols_data,
-            "original_file_name": output_file_name,
-            "counter": counter,
-        },
-    ).start()
-
-    while True:
-        if counter[0] == 0:
-            break
+    if get_only_statistics:
+        threading.Thread(
+            target=wait_for_collection_only,
+            kwargs={
+                "symbols_data": symbols_data,
+                "request_id_to_symbol": request_id_to_symbol,
+            },
+        ).start()
+    else:
+        while True:
+            if counter[0] == 0:
+                break
 
     sys.exit(0)
 

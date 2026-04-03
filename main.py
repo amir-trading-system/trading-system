@@ -132,6 +132,7 @@ if __name__ == "__main__":
         logger=logger_object,
         client_id=0,
         is_retro=False,
+        get_only_statistics=False,
     )
     collector_obj = collector.collector.Collector(
         tws_client=tws_client,
