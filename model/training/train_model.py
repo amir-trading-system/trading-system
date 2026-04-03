@@ -112,8 +112,6 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_volume_per_minute_to_bar_volume_above_threshold",
             "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
             "feature_bars_without_movement_pct_above_threshold",
-            "feature_crossed_highest_high_of_the_day",
-            "feature_crossed_highest_high_of_post_pre_market",
             "feature_potential_bar_low_close_to_open",
             "feature_volume_average_goes_up_pct",
             "feature_overlapped_bars_since_market_open_pct",
@@ -131,6 +129,10 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_high_volume_bars_with_rejection_pct", #[8-0] [6-10]
             "feature_entry_strength_vs_avg", #[8-0] [6-10]
             "feature_volume_per_minute_to_bar_volume", #[8-0] [5-11]
+            "feature_crossed_highest_high",
+            "feature_entry_bar_volume_average_above_threshold",
+            "feature_volume_avergae_above_10000_pct_above_threshold",
+            "feature_crossed_highest_high_since_market_open",
         ]:
             final_shares_columns.append(feature)
 

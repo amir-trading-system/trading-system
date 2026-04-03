@@ -330,34 +330,6 @@ class Evidence:
         if potential_confirmation_bar.volume < 20000:
             return score
 
-        current_bar_09_30 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=9,
-            minute=30,
-        )
-
-        today_04_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=4,
-        )
-
-        volume_sum_since_4_am_today = sum(
-            bar_object.volume
-            for bar_object in one_minute_timeframe_stock.bars
-            if today_04_00 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
-        )
-        volume_sum_since_market_open = sum(
-            bar_object.volume
-            for bar_object in one_minute_timeframe_stock.bars
-            if current_bar_09_30 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
-        )
-        stock.volume_sum_since_4_am_today = volume_sum_since_4_am_today
-        stock.volume_sum_since_market_open = volume_sum_since_market_open
-
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=one_minute_bars,
@@ -398,10 +370,7 @@ class Evidence:
 
             msg = "Bar confirmed by model"
             if not score.should_take_trade:
-                if score.probability/score.threshold < 0.95:
-                    msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
-                else:
-                    score.should_take_trade = True
+                msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
 
             self.logger.info(
                 msg=msg,
@@ -424,6 +393,8 @@ class Evidence:
                 and score.should_take_trade
                 and potential_confirmation_bar.price_movement_statistics["feature_weak_bars_to_bars_since_highest_high_to_total_bars"] < 0.95
             )
+        else:
+            score.should_take_trade = True
 
         return score
 

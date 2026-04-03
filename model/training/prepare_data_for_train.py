@@ -42,12 +42,15 @@ def write_to_csv(
                     "feature_volume_per_minute_to_bar_volume_above_threshold",
                     "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
                     "feature_bars_without_movement_pct_above_threshold",
-                    "feature_crossed_highest_high_of_the_day",
-                    "feature_crossed_highest_high_of_post_pre_market",
                     "feature_potential_bar_low_close_to_open",
                     "feature_volume_average_goes_up_pct",
                     "feature_overlapped_bars_since_market_open_pct",
-                    "feature_previous_bar_is_the_highest_bar",
+                    "feature_crossed_highest_high",
+                    "feature_entry_bar_volume_average_above_threshold",
+                    "feature_volume_avergae_above_10000_pct_above_threshold",
+                    "feature_is_there_highest_high_after_market_open",
+                    "feature_distance_from_highest_high_since_market_open",
+                    "feature_crossed_highest_high_since_market_open",
                 ],
             )
             f.flush()
@@ -75,12 +78,14 @@ def write_to_csv(
         feature_volume_per_minute_to_bar_volume_above_threshold = 0
         feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = 0
         feature_bars_without_movement_pct_above_threshold = 0
-        feature_crossed_highest_high_of_the_day = 0
-        feature_crossed_highest_high_of_post_pre_market = 0
         feature_potential_bar_low_close_to_open = 0
         feature_volume_average_goes_up_pct = 0
         feature_overlapped_bars_since_market_open_pct = 0
-        feature_previous_bar_is_the_highest_bar = 0
+        feature_entry_bar_volume_average_above_threshold = 0
+        feature_volume_avergae_above_10000_pct_above_threshold = 0
+        feature_is_there_highest_high_after_market_open = 0
+        feature_distance_from_highest_high_since_market_open = 0
+        feature_crossed_highest_high_since_market_open = 0
 
         feature_has_positive_more_than_negative_bars = symbol_data["feature_has_positive_more_than_negative_bars"]
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
@@ -99,12 +104,15 @@ def write_to_csv(
         feature_volume_per_minute_to_bar_volume_above_threshold = symbol_data["feature_volume_per_minute_to_bar_volume_above_threshold"]
         feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = symbol_data["feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold"]
         feature_bars_without_movement_pct_above_threshold = symbol_data["feature_bars_without_movement_pct_above_threshold"]
-        feature_crossed_highest_high_of_the_day = symbol_data["feature_crossed_highest_high_of_the_day"]
-        feature_crossed_highest_high_of_post_pre_market = symbol_data["feature_crossed_highest_high_of_post_pre_market"]
         feature_potential_bar_low_close_to_open = symbol_data["feature_potential_bar_low_close_to_open"]
         feature_volume_average_goes_up_pct = symbol_data["feature_volume_average_goes_up_pct"]
         feature_overlapped_bars_since_market_open_pct = symbol_data["feature_overlapped_bars_since_market_open_pct"]
-        feature_previous_bar_is_the_highest_bar = symbol_data["feature_previous_bar_is_the_highest_bar"]
+        feature_crossed_highest_high = symbol_data["feature_crossed_highest_high"]
+        feature_entry_bar_volume_average_above_threshold = symbol_data["feature_entry_bar_volume_average_above_threshold"]
+        feature_volume_avergae_above_10000_pct_above_threshold = symbol_data["feature_volume_avergae_above_10000_pct_above_threshold"]
+        feature_is_there_highest_high_after_market_open = symbol_data["feature_is_there_highest_high_after_market_open"]
+        feature_distance_from_highest_high_since_market_open = symbol_data["feature_distance_from_highest_high_since_market_open"]
+        feature_crossed_highest_high_since_market_open = symbol_data["feature_crossed_highest_high_since_market_open"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -135,12 +143,15 @@ def write_to_csv(
                     feature_volume_per_minute_to_bar_volume_above_threshold,
                     feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold,
                     feature_bars_without_movement_pct_above_threshold,
-                    feature_crossed_highest_high_of_the_day,
-                    feature_crossed_highest_high_of_post_pre_market,
                     feature_potential_bar_low_close_to_open,
                     feature_volume_average_goes_up_pct,
                     feature_overlapped_bars_since_market_open_pct,
-                    feature_previous_bar_is_the_highest_bar,
+                    feature_crossed_highest_high,
+                    feature_entry_bar_volume_average_above_threshold,
+                    feature_volume_avergae_above_10000_pct_above_threshold,
+                    feature_is_there_highest_high_after_market_open,
+                    feature_distance_from_highest_high_since_market_open,
+                    feature_crossed_highest_high_since_market_open,
                 ]
             )
 
@@ -151,6 +162,8 @@ def load_data_for_training_model() -> list[dict[str, any]]:
     pickled_data: list[dict[str, any]] = []
     files = glob.glob("model/training/data/*")
     for file_path in files:
+        # if not file_path.endswith("ANTX-2026-03-09 11:57:00.json"):
+        #     continue
         with open(file_path, "rb") as f:
             obj = pickle.load(f)
             pickled_data.append(obj)

@@ -68,6 +68,7 @@ class DataExtractor:
         bars_ema_above_vwap_counter = 0
         positive_bars_close_strong_counter = 0
         volume_average_goes_up_counter = 0
+        volume_avergae_above_10000_counter = 0
 
         for bar_object in one_minute_bars:
             total_volume += bar_object.volume
@@ -87,6 +88,9 @@ class DataExtractor:
 
             if bar_object.bar_wick_percentage >= 0.5:
                 bars_with_at_least_50_pct_wick_counter += 1
+
+            if bar_object.volume_average > 10000:
+                volume_avergae_above_10000_counter += 1
 
             if bar_object.histogram > 0:
                 positive_histograms_sum += bar_object.histogram
@@ -295,9 +299,6 @@ class DataExtractor:
             for bar_object in last_10_bars
         )/len(last_10_bars)
 
-        feature_crossed_highest_high_of_the_day = potential_confirmation_bar.low < day_timeframe_stock.pre_market_one_minute_highest_high_bar.high < potential_confirmation_bar.high if day_timeframe_stock.pre_market_one_minute_highest_high_bar is not None else False
-        feature_crossed_highest_high_of_post_pre_market = potential_confirmation_bar.low < day_timeframe_stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close if day_timeframe_stock.pre_market_one_minute_highest_high_bar is not None else False
-
         feature_volume_average_goes_up_pct = volume_average_goes_up_counter/total_bars
         feature_overlapped_bars_since_market_open_pct = DataExtractor.overlapped_bars_since_market_open_pct(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
@@ -315,6 +316,55 @@ class DataExtractor:
         feature_bars_since_highest_high_to_total_bars_pct = len(bars_since_highest_high)/total_bars
         feature_weak_bars_to_bars_since_highest_high_to_total_bars = feature_weak_bars_since_highest_high_to_total_pct/feature_bars_since_highest_high_to_total_bars_pct if feature_bars_since_highest_high_to_total_bars_pct > 0 else 0
 
+        feature_crossed_highest_high = (
+            True
+            and potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.high
+            and (potential_confirmation_bar.high - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) > 0.3
+            and potential_confirmation_bar.low/potential_confirmation_bar.open_value >= 0.95
+            and potential_confirmation_bar.body_percentage > 0.5
+            and volume_sum_since_market_open > 500000
+            and not any(
+                bar_object
+                for bar_object in one_minute_bars[1:10]
+                if abs(bar_object.close - bar_object.open_value) > potential_confirmation_bar.close - potential_confirmation_bar.open_value
+                and bar_object.volume/potential_confirmation_bar.volume > 0.95
+            )
+        )
+
+        highest_high_bar_since_market_open = None
+        for bar_object in one_minute_bars[1:]:
+            previous_bar = one_minute_timeframe_stock.previous_bar(
+                bar_object=bar_object,
+            )
+            next_bar = one_minute_timeframe_stock.next_bar(
+                bar_object=bar_object,
+            )
+            if (
+                previous_bar is not None
+                and next_bar is not None
+                and bar_object.high >= previous_bar.high
+                and bar_object.high > next_bar.high
+                and bar_object.volume > bar_object.volume_average
+            ):
+                if (
+                    highest_high_bar_since_market_open is None
+                    or (
+                        highest_high_bar_since_market_open is not None
+                        and bar_object.high > highest_high_bar_since_market_open.high
+                    )
+                ):
+                    highest_high_bar_since_market_open = bar_object
+
+        feature_is_there_highest_high_after_market_open = highest_high_bar_since_market_open is not None
+        feature_distance_from_highest_high_since_market_open = highest_high_bar_since_market_open.index if highest_high_bar_since_market_open is not None else 0
+        feature_crossed_highest_high_since_market_open = (
+            True
+            and highest_high_bar_since_market_open is not None
+            and potential_confirmation_bar.low < highest_high_bar_since_market_open.high < potential_confirmation_bar.close
+            and highest_high_bar_since_market_open.index <= 60
+            and (potential_confirmation_bar.close - highest_high_bar_since_market_open.high)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) >= 0.25
+        )
+
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
             "feature_price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
@@ -326,25 +376,23 @@ class DataExtractor:
             "feature_strong_bars_above_volume_average_pct": feature_strong_bars_above_volume_average_pct,
             "feature_high_volume_bars_with_rejection_pct": feature_high_volume_bars_with_rejection_pct,
             "feature_volume_per_minute_to_bar_volume": round(volume_per_minute, 2)/potential_confirmation_bar.volume,
-            "feature_volume_per_minute_to_bar_volume_above_threshold": round(volume_per_minute, 2)/potential_confirmation_bar.volume > 0.18,
+            "feature_volume_per_minute_to_bar_volume_above_threshold": round(volume_per_minute, 2)/potential_confirmation_bar.volume > 0.2,
             "feature_bars_with_rejection_inside_entry_bar_range_pct": feature_bars_with_rejection_inside_entry_bar_range_pct,
             "feature_positive_vs_negative_volume": positive_volume_sum/negative_volume_sum if negative_volume_sum > 0 else 1,
             "feature_positive_vs_negative_movement": positive_movement/negative_movement if negative_movement > 0 else 1,
             "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold": feature_volume_before_middle_point_vs_after_middle_point_pct > 0.2,
             "feature_bars_without_movement_pct_above_threshold": bars_without_movement_counter/total_bars > 0.02,
             "feature_entry_strength_vs_avg": (potential_confirmation_bar.high - potential_confirmation_bar.low)/last_10_bars_range_average,
-            "feature_crossed_highest_high_of_the_day": feature_crossed_highest_high_of_the_day,
-            "feature_crossed_highest_high_of_post_pre_market": feature_crossed_highest_high_of_post_pre_market,
             "feature_potential_bar_low_close_to_open": potential_confirmation_bar.low/potential_confirmation_bar.open_value >= 0.99,
             "feature_volume_average_goes_up_pct": feature_volume_average_goes_up_pct,
             "feature_overlapped_bars_since_market_open_pct": feature_overlapped_bars_since_market_open_pct,
-            "feature_previous_bar_is_the_highest_bar": (
-                True
-                and previous_bar.high == highest_high_one_minute_bar.high
-                and previous_bar.close > previous_bar.open_value
-                and previous_bar.volume > previous_bar.volume_average
-            ),
             "feature_weak_bars_to_bars_since_highest_high_to_total_bars": feature_weak_bars_to_bars_since_highest_high_to_total_bars,
+            "feature_crossed_highest_high": feature_crossed_highest_high,
+            "feature_entry_bar_volume_average_above_threshold": potential_confirmation_bar.volume_average > 50000,
+            "feature_volume_avergae_above_10000_pct_above_threshold": volume_avergae_above_10000_counter/total_bars >= 0.8,
+            "feature_is_there_highest_high_after_market_open": feature_is_there_highest_high_after_market_open,
+            "feature_distance_from_highest_high_since_market_open": feature_distance_from_highest_high_since_market_open,
+            "feature_crossed_highest_high_since_market_open": feature_crossed_highest_high_since_market_open,
         }
 
         return features

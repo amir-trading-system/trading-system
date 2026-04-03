@@ -67,6 +67,12 @@ class Confirmator:
             )
             return True
 
+        today_04_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=4,
+        )
         today_09_30 = datetime.datetime(
             year=original_bar_to_confirm.bar_time.year,
             month=original_bar_to_confirm.bar_time.month,
@@ -88,6 +94,20 @@ class Confirmator:
             hour=12,
             minute=00,
         )
+        one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
+
+        volume_sum_since_4_am_today = sum(
+            bar_object.volume
+            for bar_object in one_minute_timeframe_stock.bars
+            if today_04_00 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
+        )
+        volume_sum_since_market_open = sum(
+            bar_object.volume
+            for bar_object in one_minute_timeframe_stock.bars
+            if today_09_30 <= bar_object.bar_time <= potential_confirmation_bar.bar_time
+        )
+        stock.volume_sum_since_4_am_today = volume_sum_since_4_am_today
+        stock.volume_sum_since_market_open = volume_sum_since_market_open
 
         should_wait_for_next_bar = (
             potential_confirmation_bar.bar_time < today_09_30

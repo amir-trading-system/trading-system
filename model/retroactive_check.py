@@ -59,19 +59,23 @@ def write_to_csv(
                     "feature_strong_bars_above_volume_average_pct",
                     "feature_high_volume_bars_with_rejection_pct",
                     "feature_volume_per_minute_to_bar_volume",
+                    "feature_volume_per_minute_to_bar_volume_above_threshold",
                     "feature_bars_with_rejection_inside_entry_bar_range_pct",
                     "feature_positive_vs_negative_volume",
                     "feature_positive_vs_negative_movement",
-                    "feature_entry_strength_vs_avg",
-                    "feature_volume_per_minute_to_bar_volume_above_threshold",
                     "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
                     "feature_bars_without_movement_pct_above_threshold",
-                    "feature_crossed_highest_high_of_the_day",
-                    "feature_crossed_highest_high_of_post_pre_market",
+                    "feature_entry_strength_vs_avg",
                     "feature_potential_bar_low_close_to_open",
                     "feature_volume_average_goes_up_pct",
                     "feature_overlapped_bars_since_market_open_pct",
-                    "feature_previous_bar_is_the_highest_bar",
+                    "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
+                    "feature_crossed_highest_high",
+                    "feature_entry_bar_volume_average_above_threshold",
+                    "feature_volume_avergae_above_10000_pct_above_threshold",
+                    "feature_is_there_highest_high_after_market_open",
+                    "feature_distance_from_highest_high_since_market_open",
+                    "feature_crossed_highest_high_since_market_open",
                 ],
             )
             f.flush()
@@ -99,19 +103,23 @@ def write_to_csv(
             feature_strong_bars_above_volume_average_pct = 0
             feature_high_volume_bars_with_rejection_pct = 0
             feature_volume_per_minute_to_bar_volume = 0
+            feature_volume_per_minute_to_bar_volume_above_threshold = 0
             feature_bars_with_rejection_inside_entry_bar_range_pct = 0
             feature_positive_vs_negative_volume = 0
             feature_positive_vs_negative_movement = 0
-            feature_entry_strength_vs_avg = 0
-            feature_volume_per_minute_to_bar_volume_above_threshold = 0
             feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = 0
             feature_bars_without_movement_pct_above_threshold = 0
-            feature_crossed_highest_high_of_the_day = 0
-            feature_crossed_highest_high_of_post_pre_market = 0
+            feature_entry_strength_vs_avg = 0
             feature_potential_bar_low_close_to_open = 0
             feature_volume_average_goes_up_pct = 0
             feature_overlapped_bars_since_market_open_pct = 0
-            feature_previous_bar_is_the_highest_bar = 0
+            feature_weak_bars_to_bars_since_highest_high_to_total_bars = 0
+            feature_crossed_highest_high = 0
+            feature_entry_bar_volume_average_above_threshold = 0
+            feature_volume_avergae_above_10000_pct_above_threshold = 0
+            feature_is_there_highest_high_after_market_open = 0
+            feature_distance_from_highest_high_since_market_open = 0
+            feature_crossed_highest_high_since_market_open = 0
 
             price_movement_statistics = symbol_data.get("price_movement_statistics", None)
             if price_movement_statistics:
@@ -125,19 +133,23 @@ def write_to_csv(
                 feature_strong_bars_above_volume_average_pct = price_movement_statistics["feature_strong_bars_above_volume_average_pct"]
                 feature_high_volume_bars_with_rejection_pct = price_movement_statistics["feature_high_volume_bars_with_rejection_pct"]
                 feature_volume_per_minute_to_bar_volume = price_movement_statistics["feature_volume_per_minute_to_bar_volume"]
+                feature_volume_per_minute_to_bar_volume_above_threshold = price_movement_statistics["feature_volume_per_minute_to_bar_volume_above_threshold"]
                 feature_bars_with_rejection_inside_entry_bar_range_pct = price_movement_statistics["feature_bars_with_rejection_inside_entry_bar_range_pct"]
                 feature_positive_vs_negative_volume = price_movement_statistics["feature_positive_vs_negative_volume"]
                 feature_positive_vs_negative_movement = price_movement_statistics["feature_positive_vs_negative_movement"]
-                feature_entry_strength_vs_avg = price_movement_statistics["feature_entry_strength_vs_avg"]
-                feature_volume_per_minute_to_bar_volume_above_threshold = price_movement_statistics["feature_volume_per_minute_to_bar_volume_above_threshold"]
                 feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = price_movement_statistics["feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold"]
                 feature_bars_without_movement_pct_above_threshold = price_movement_statistics["feature_bars_without_movement_pct_above_threshold"]
-                feature_crossed_highest_high_of_the_day = price_movement_statistics["feature_crossed_highest_high_of_the_day"]
-                feature_crossed_highest_high_of_post_pre_market = price_movement_statistics["feature_crossed_highest_high_of_post_pre_market"]
+                feature_entry_strength_vs_avg = price_movement_statistics["feature_entry_strength_vs_avg"]
                 feature_potential_bar_low_close_to_open = price_movement_statistics["feature_potential_bar_low_close_to_open"]
                 feature_volume_average_goes_up_pct = price_movement_statistics["feature_volume_average_goes_up_pct"]
                 feature_overlapped_bars_since_market_open_pct = price_movement_statistics["feature_overlapped_bars_since_market_open_pct"]
-                feature_previous_bar_is_the_highest_bar = price_movement_statistics["feature_previous_bar_is_the_highest_bar"]
+                feature_weak_bars_to_bars_since_highest_high_to_total_bars = price_movement_statistics["feature_weak_bars_to_bars_since_highest_high_to_total_bars"]
+                feature_crossed_highest_high = price_movement_statistics["feature_crossed_highest_high"]
+                feature_entry_bar_volume_average_above_threshold = price_movement_statistics["feature_entry_bar_volume_average_above_threshold"]
+                feature_volume_avergae_above_10000_pct_above_threshold = price_movement_statistics["feature_volume_avergae_above_10000_pct_above_threshold"]
+                feature_is_there_highest_high_after_market_open = price_movement_statistics["feature_is_there_highest_high_after_market_open"]
+                feature_distance_from_highest_high_since_market_open = price_movement_statistics["feature_distance_from_highest_high_since_market_open"]
+                feature_crossed_highest_high_since_market_open = price_movement_statistics["feature_crossed_highest_high_since_market_open"]
 
             collection_status = symbol_data["collection_status"]
             analysis_status = symbol_data["analysis_status"]
@@ -194,19 +206,23 @@ def write_to_csv(
                                 feature_strong_bars_above_volume_average_pct,
                                 feature_high_volume_bars_with_rejection_pct,
                                 feature_volume_per_minute_to_bar_volume,
+                                feature_volume_per_minute_to_bar_volume_above_threshold,
                                 feature_bars_with_rejection_inside_entry_bar_range_pct,
                                 feature_positive_vs_negative_volume,
                                 feature_positive_vs_negative_movement,
-                                feature_entry_strength_vs_avg,
-                                feature_volume_per_minute_to_bar_volume_above_threshold,
                                 feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold,
                                 feature_bars_without_movement_pct_above_threshold,
-                                feature_crossed_highest_high_of_the_day,
-                                feature_crossed_highest_high_of_post_pre_market,
+                                feature_entry_strength_vs_avg,
                                 feature_potential_bar_low_close_to_open,
                                 feature_volume_average_goes_up_pct,
                                 feature_overlapped_bars_since_market_open_pct,
-                                feature_previous_bar_is_the_highest_bar,
+                                feature_weak_bars_to_bars_since_highest_high_to_total_bars,
+                                feature_crossed_highest_high,
+                                feature_entry_bar_volume_average_above_threshold,
+                                feature_volume_avergae_above_10000_pct_above_threshold,
+                                feature_is_there_highest_high_after_market_open,
+                                feature_distance_from_highest_high_since_market_open,
+                                feature_crossed_highest_high_since_market_open,
                             ]
                         )
 
