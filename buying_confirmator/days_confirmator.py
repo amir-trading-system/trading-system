@@ -241,7 +241,7 @@ class Confirmator:
                 already_sent_buy_order_for_stock[unique_key_for_place_order] = True
                 bar_has_confirmed = True
 
-                if self.is_retro:
+                if self.is_retro or not self.model_runner.should_run_model:
                     return bar_has_confirmed
 
                 self.tws_client.place_buy_order(
