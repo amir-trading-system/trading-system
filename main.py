@@ -52,7 +52,7 @@ def initiate_potential_symbols(
                 [symbol, date] = line.split("--")
                 formatted_date = datetime.datetime.fromisoformat(date.replace("\n", ""))
                 if (formatted_date + datetime.timedelta(
-                    days=15,
+                    days=20,
                 )) >= datetime.datetime.now():
                     symbol_to_date[symbol] = formatted_date
         except FileNotFoundError as e:
