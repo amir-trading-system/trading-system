@@ -52,6 +52,15 @@ def write_to_csv(
                     "feature_distance_from_highest_high_since_market_open",
                     "feature_crossed_highest_high_since_market_open",
                     "feature_entry_bar_lowest_wick_to_bar_body_pct",
+                    "feature_entry_bar_volume",
+                    "feature_entry_volume_vs_total_volume",
+                    "feature_distance_from_highest_high",
+                    "feature_bars_with_rejection_since_market_open",
+                    "feature_entry_point_size_to_bars_size_average",
+                    "feature_volume_average_to_volume",
+                    "feature_entry_bar_has_highest_volume",
+                    "feature_entry_bar_is_biggest_bar",
+                    "feature_entry_bar_is_highest",
                 ],
             )
             f.flush()
@@ -88,6 +97,15 @@ def write_to_csv(
         feature_distance_from_highest_high_since_market_open = 0
         feature_crossed_highest_high_since_market_open = 0
         feature_entry_bar_lowest_wick_to_bar_body_pct = 0
+        feature_entry_bar_volume = 0
+        feature_entry_volume_vs_total_volume = 0
+        feature_distance_from_highest_high = 0
+        feature_bars_with_rejection_since_market_open = 0
+        feature_entry_point_size_to_bars_size_average = 0
+        feature_volume_average_to_volume = 0
+        feature_entry_bar_has_highest_volume = 0
+        feature_entry_bar_is_biggest_bar = 0
+        feature_entry_bar_is_highest = 0
 
         feature_has_positive_more_than_negative_bars = symbol_data["feature_has_positive_more_than_negative_bars"]
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
@@ -116,6 +134,15 @@ def write_to_csv(
         feature_distance_from_highest_high_since_market_open = symbol_data["feature_distance_from_highest_high_since_market_open"]
         feature_crossed_highest_high_since_market_open = symbol_data["feature_crossed_highest_high_since_market_open"]
         feature_entry_bar_lowest_wick_to_bar_body_pct = symbol_data["feature_entry_bar_lowest_wick_to_bar_body_pct"]
+        feature_entry_bar_volume = symbol_data["feature_entry_bar_volume"]
+        feature_entry_volume_vs_total_volume = symbol_data["feature_entry_volume_vs_total_volume"]
+        feature_distance_from_highest_high = symbol_data["feature_distance_from_highest_high"]
+        feature_bars_with_rejection_since_market_open = symbol_data["feature_bars_with_rejection_since_market_open"]
+        feature_entry_point_size_to_bars_size_average = symbol_data["feature_entry_point_size_to_bars_size_average"]
+        feature_volume_average_to_volume = symbol_data["feature_volume_average_to_volume"]
+        feature_entry_bar_has_highest_volume = symbol_data["feature_entry_bar_has_highest_volume"]
+        feature_entry_bar_is_biggest_bar = symbol_data["feature_entry_bar_is_biggest_bar"]
+        feature_entry_bar_is_highest = symbol_data["feature_entry_bar_is_highest"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -156,6 +183,15 @@ def write_to_csv(
                     feature_distance_from_highest_high_since_market_open,
                     feature_crossed_highest_high_since_market_open,
                     feature_entry_bar_lowest_wick_to_bar_body_pct,
+                    feature_entry_bar_volume,
+                    feature_entry_volume_vs_total_volume,
+                    feature_distance_from_highest_high,
+                    feature_bars_with_rejection_since_market_open,
+                    feature_entry_point_size_to_bars_size_average,
+                    feature_volume_average_to_volume,
+                    feature_entry_bar_has_highest_volume,
+                    feature_entry_bar_is_biggest_bar,
+                    feature_entry_bar_is_highest,
                 ]
             )
 

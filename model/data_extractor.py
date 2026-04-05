@@ -69,12 +69,18 @@ class DataExtractor:
         positive_bars_close_strong_counter = 0
         volume_average_goes_up_counter = 0
         volume_avergae_above_10000_counter = 0
+        bars_with_rejection_since_market_open = 0
+        bars_size_sum = 0
+        bars_size_average = 0
 
         for bar_object in one_minute_bars:
+            if bar_object.bar_time < potential_confirmation_bar.bar_time:
+                bars_size_sum += abs(bar_object.close - bar_object.open_value)
             total_volume += bar_object.volume
             is_positive = bar_object.close > bar_object.open_value
             above_volume_average = bar_object.volume > bar_object.volume_average
-            has_rejection = bar_object.bar_wick_percentage >= 0.5
+            above_vwap = bar_object.close > bar_object.vwap
+            above_9_ema = bar_object.close > bar_object.ema_9
 
             previous_bar = one_minute_timeframe_stock.previous_bar(
                 bar_object=bar_object,
@@ -83,8 +89,18 @@ class DataExtractor:
                 bar_object=bar_object,
             )
 
+            has_rejection = bar_object.bar_wick_percentage >= 0.5
             if bar_object.macd < bar_object.signal_line:
                 macd_under_signal_line_counter += 1
+
+            if (
+                True
+                and previous_bar is not None
+                and bar_object.bar_wick_percentage >= 0.1
+                and bar_object.volume > bar_object.volume_average
+                and previous_bar.high < bar_object.high
+            ):
+                bars_with_rejection_since_market_open += 1
 
             if bar_object.bar_wick_percentage >= 0.5:
                 bars_with_at_least_50_pct_wick_counter += 1
@@ -99,7 +115,6 @@ class DataExtractor:
 
             if is_positive:
                 positive_volume_sum += bar_object.volume
-                positive_bars_counter += 1
                 positive_movement += bar_object.close - bar_object.open_value
                 if bar_object.index - 5 < potential_confirmation_bar.index:
                     last_bars_positive_bars += 1
@@ -107,12 +122,15 @@ class DataExtractor:
                     strong_positive_bars_with_full_body_counter += 1
                 if bar_object.bar_wick_percentage <= 0.1:
                     positive_bars_close_strong_counter += 1
+                if bar_object.close > bar_object.vwap:
+                    positive_bars_counter += 1
             else:
                 negative_volume_sum += bar_object.volume
-                negative_bars_counter += 1
                 negative_movement += bar_object.open_value - bar_object.close
                 if bar_object.index - 5 < potential_confirmation_bar.index:
                     last_bars_negative_bars += 1
+                if bar_object.close > bar_object.vwap:
+                    negative_bars_counter += 1
 
             if previous_bar is not None:
                 if previous_bar.volume_average < bar_object.volume_average:
@@ -167,8 +185,8 @@ class DataExtractor:
                 and bar_object.close < potential_confirmation_bar.open_value
                 and bar_object.volume > bar_object.volume_average
                 and bar_object.close < bar_object.high
-                and bar_object.close > bar_object.vwap
-                and bar_object.close > bar_object.ema_9
+                and above_vwap
+                and above_9_ema
                 and bar_object.close > bar_object.ema_20
                 and previous_bar is not None
                 and next_bar is not None
@@ -241,6 +259,7 @@ class DataExtractor:
             for bar_object in one_minute_bars[1:]
             if bar_object.bar_time > highest_high_one_minute_bar.bar_time
         ]
+
         strong_entry_bar_points = 0
         if potential_confirmation_bar.body_percentage >= 0.9:
             strong_entry_bar_points += 2
@@ -284,6 +303,7 @@ class DataExtractor:
             )
 
         volume_to_volume_average_ratio_since_highest_high = 0
+
         for bar_object in bars_since_highest_high:
             volume_to_volume_average_ratio_since_highest_high += bar_object.volume/bar_object.volume_average
 
@@ -365,6 +385,11 @@ class DataExtractor:
             and (potential_confirmation_bar.close - highest_high_bar_since_market_open.high)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) >= 0.25
         )
 
+        bars_size_average = bars_size_sum/(total_bars-1) if total_bars > 1 else 1
+        feature_entry_bar_has_highest_volume = max(bar_object.volume for bar_object in one_minute_bars) == potential_confirmation_bar.volume
+        feature_entry_bar_is_biggest_bar = max(bar_object.high - bar_object.low for bar_object in one_minute_bars) == potential_confirmation_bar.high - potential_confirmation_bar.low
+        feature_entry_bar_is_highest = max(bar_object.high for bar_object in one_minute_bars) == potential_confirmation_bar.high
+
         features = {
             "feature_has_positive_more_than_negative_bars": positive_bars_counter > negative_bars_counter,
             "feature_price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
@@ -393,7 +418,16 @@ class DataExtractor:
             "feature_is_there_highest_high_after_market_open": feature_is_there_highest_high_after_market_open,
             "feature_distance_from_highest_high_since_market_open": feature_distance_from_highest_high_since_market_open,
             "feature_crossed_highest_high_since_market_open": feature_crossed_highest_high_since_market_open,
-            "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value)
+            "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value),
+            "feature_entry_bar_volume": potential_confirmation_bar.volume,
+            "feature_entry_volume_vs_total_volume": potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 1,
+            "feature_distance_from_highest_high": highest_high_bar_since_market_open.index if highest_high_bar_since_market_open is not None else 0,
+            "feature_bars_with_rejection_since_market_open": bars_with_rejection_since_market_open/total_bars,
+            "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average,
+            "feature_volume_average_to_volume": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
+            "feature_entry_bar_has_highest_volume": feature_entry_bar_has_highest_volume,
+            "feature_entry_bar_is_biggest_bar": feature_entry_bar_is_biggest_bar,
+            "feature_entry_bar_is_highest": feature_entry_bar_is_highest,
         }
 
         return features

@@ -76,6 +76,17 @@ def write_to_csv(
                     "feature_is_there_highest_high_after_market_open",
                     "feature_distance_from_highest_high_since_market_open",
                     "feature_crossed_highest_high_since_market_open",
+                    "feature_entry_bar_lowest_wick_to_bar_body_pct",
+                    "feature_entry_bar_volume",
+                    "feature_entry_volume_vs_total_volume",
+                    "feature_distance_from_highest_high",
+                    "feature_bars_with_rejection_since_market_open",
+                    "feature_entry_point_size_to_bars_size_average",
+                    "feature_volume_average_to_volume",
+                    "feature_entry_bar_has_highest_volume",
+                    "feature_entry_bar_is_biggest_bar",
+                    "feature_entry_bar_is_highest",
+                    "score",
                 ],
             )
             f.flush()
@@ -120,6 +131,16 @@ def write_to_csv(
             feature_is_there_highest_high_after_market_open = 0
             feature_distance_from_highest_high_since_market_open = 0
             feature_crossed_highest_high_since_market_open = 0
+            feature_entry_bar_lowest_wick_to_bar_body_pct = 0
+            feature_entry_bar_volume = 0
+            feature_entry_volume_vs_total_volume = 0
+            feature_distance_from_highest_high = 0
+            feature_bars_with_rejection_since_market_open = 0
+            feature_entry_point_size_to_bars_size_average = 0
+            feature_volume_average_to_volume = 0
+            feature_entry_bar_has_highest_volume = 0
+            feature_entry_bar_is_biggest_bar = 0
+            feature_entry_bar_is_highest = 0
 
             price_movement_statistics = symbol_data.get("price_movement_statistics", None)
             if price_movement_statistics:
@@ -150,6 +171,16 @@ def write_to_csv(
                 feature_is_there_highest_high_after_market_open = price_movement_statistics["feature_is_there_highest_high_after_market_open"]
                 feature_distance_from_highest_high_since_market_open = price_movement_statistics["feature_distance_from_highest_high_since_market_open"]
                 feature_crossed_highest_high_since_market_open = price_movement_statistics["feature_crossed_highest_high_since_market_open"]
+                feature_entry_bar_lowest_wick_to_bar_body_pct = price_movement_statistics["feature_entry_bar_lowest_wick_to_bar_body_pct"]
+                feature_entry_bar_volume = price_movement_statistics["feature_entry_bar_volume"]
+                feature_entry_volume_vs_total_volume = price_movement_statistics["feature_entry_volume_vs_total_volume"]
+                feature_distance_from_highest_high = price_movement_statistics["feature_distance_from_highest_high"]
+                feature_bars_with_rejection_since_market_open = price_movement_statistics["feature_bars_with_rejection_since_market_open"]
+                feature_entry_point_size_to_bars_size_average = price_movement_statistics["feature_entry_point_size_to_bars_size_average"]
+                feature_volume_average_to_volume = price_movement_statistics["feature_volume_average_to_volume"]
+                feature_entry_bar_has_highest_volume = price_movement_statistics["feature_entry_bar_has_highest_volume"]
+                feature_entry_bar_is_biggest_bar = price_movement_statistics["feature_entry_bar_is_biggest_bar"]
+                feature_entry_bar_is_highest = price_movement_statistics["feature_entry_bar_is_highest"]
 
             collection_status = symbol_data["collection_status"]
             analysis_status = symbol_data["analysis_status"]
@@ -223,6 +254,17 @@ def write_to_csv(
                                 feature_is_there_highest_high_after_market_open,
                                 feature_distance_from_highest_high_since_market_open,
                                 feature_crossed_highest_high_since_market_open,
+                                feature_entry_bar_lowest_wick_to_bar_body_pct,
+                                feature_entry_bar_volume,
+                                feature_entry_volume_vs_total_volume,
+                                feature_distance_from_highest_high,
+                                feature_bars_with_rejection_since_market_open,
+                                feature_entry_point_size_to_bars_size_average,
+                                feature_volume_average_to_volume,
+                                feature_entry_bar_has_highest_volume,
+                                feature_entry_bar_is_biggest_bar,
+                                feature_entry_bar_is_highest,
+                                symbol_data["score"],
                             ]
                         )
 
@@ -348,6 +390,7 @@ def wait_for_confirmation(
             relevant_symbol_data[0]["evidence_name"] = "no evidence"
             relevant_symbol_data[0]["collection_status"] = "done"
             relevant_symbol_data[0]["analysis_status"] = "done"
+            relevant_symbol_data[0]["score"] = confirmation_result["score"]
             relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result.get("price_movement_statistics", {})
             continue
 
@@ -357,6 +400,7 @@ def wait_for_confirmation(
                 relevant_symbol_data[0]["evidence_name"] = evidence_name
                 relevant_symbol_data[0]["collection_status"] = "done"
                 relevant_symbol_data[0]["analysis_status"] = "done"
+                relevant_symbol_data[0]["score"] = confirmation_result["score"]
                 relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result["price_movement_statistics"]
                 should_update_first_default = False
                 continue
@@ -372,6 +416,7 @@ def wait_for_confirmation(
                     "evidence_name": evidence_name,
                     "is_new": True,
                     "price_movement_statistics": confirmation_result["price_movement_statistics"],
+                    "score": confirmation_result["score"],
                     "result": "in_progress",
                 },
             )
@@ -419,11 +464,11 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = True
+    should_run_model = False
     symbols_data = []
     symbols = []
     output_file_name = "model/real_case_result.csv"
-    get_only_statistics = False
+    get_only_statistics = True
     # symbols = explore_past_potential_symbols()
 
     if not symbols:

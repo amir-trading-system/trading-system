@@ -363,7 +363,7 @@ class Evidence:
             one_minute_bars=one_minute_bars,
         )
 
-        if model_runner.should_run_model:
+        if model_runner.should_run_model and potential_confirmation_bar.price_movement_statistics != {}:
             score: common.objects.Score = model_runner.score_potential_confirmation_bar(
                 potential_confirmation_bar=potential_confirmation_bar,
             )

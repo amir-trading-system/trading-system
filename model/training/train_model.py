@@ -134,6 +134,7 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_volume_avergae_above_10000_pct_above_threshold",
             "feature_crossed_highest_high_since_market_open",
             "feature_entry_bar_lowest_wick_to_bar_body_pct",
+            "feature_entry_point_size_to_bars_size_average",
         ]:
             final_shares_columns.append(feature)
 

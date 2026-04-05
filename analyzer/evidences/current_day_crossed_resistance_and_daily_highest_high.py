@@ -74,10 +74,17 @@ class Evidence(
             and potential_confirmation_bar.high/resistance_level.high >= 0.9
         )
 
+        crossed_any_resistance_include_current_day_resistance = (
+            (
+                crossed_highest_high
+                and highest_than_any_resistance_level
+            )
+            or potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.close
+        )
+
         return (
             True
             and potential_confirmation_bar.close > potential_confirmation_bar.open_value
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and crossed_highest_high
-            and highest_than_any_resistance_level
+            and crossed_any_resistance_include_current_day_resistance
         )

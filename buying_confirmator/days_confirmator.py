@@ -63,6 +63,7 @@ class Confirmator:
                     "confirmation_bar_time": None,
                     "evidences": [],
                     "price_movement_statistics": {},
+                    "score": 0,
                 },
             )
             return True
@@ -135,6 +136,7 @@ class Confirmator:
         confirmed_evidences: list[str] = []
         stock_is_valid_for_evidence = False
         transmit_order = False
+        score: common.objects.Score = None
 
         for evidence in analyzer.evidences.__evidences__:
             evidence_obj = evidence(
@@ -182,7 +184,7 @@ class Confirmator:
                 model_runner=self.model_runner,
             )
 
-            if score.should_take_trade:
+            if score.should_take_trade and score.score > 0:
                 transmit_order = potential_confirmation_bar.bar_time >= datetime.datetime(
                     year=potential_confirmation_bar.bar_time.year,
                     month=potential_confirmation_bar.bar_time.month,
@@ -202,6 +204,7 @@ class Confirmator:
                     "confirmation_bar_time": entry_position_bar.bar_time,
                     "evidences": confirmed_evidences,
                     "price_movement_statistics": entry_position_bar.price_movement_statistics,
+                    "score": score.score if score is not None else 0,
                 },
             )
 

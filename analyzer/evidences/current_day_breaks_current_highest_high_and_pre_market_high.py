@@ -42,6 +42,7 @@ class Evidence(
     ) -> bool:
         above_post_pre_market_highest_high = (
             True
+            and stock.pre_market_one_minute_highest_high_bar is not None
             and potential_confirmation_bar.high > stock.pre_market_one_minute_highest_high_bar.high
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.volume > stock.pre_market_one_minute_highest_high_bar.volume
