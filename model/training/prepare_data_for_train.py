@@ -51,6 +51,7 @@ def write_to_csv(
                     "feature_is_there_highest_high_after_market_open",
                     "feature_distance_from_highest_high_since_market_open",
                     "feature_crossed_highest_high_since_market_open",
+                    "feature_entry_bar_lowest_wick_to_bar_body_pct",
                 ],
             )
             f.flush()
@@ -86,6 +87,7 @@ def write_to_csv(
         feature_is_there_highest_high_after_market_open = 0
         feature_distance_from_highest_high_since_market_open = 0
         feature_crossed_highest_high_since_market_open = 0
+        feature_entry_bar_lowest_wick_to_bar_body_pct = 0
 
         feature_has_positive_more_than_negative_bars = symbol_data["feature_has_positive_more_than_negative_bars"]
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
@@ -113,6 +115,7 @@ def write_to_csv(
         feature_is_there_highest_high_after_market_open = symbol_data["feature_is_there_highest_high_after_market_open"]
         feature_distance_from_highest_high_since_market_open = symbol_data["feature_distance_from_highest_high_since_market_open"]
         feature_crossed_highest_high_since_market_open = symbol_data["feature_crossed_highest_high_since_market_open"]
+        feature_entry_bar_lowest_wick_to_bar_body_pct = symbol_data["feature_entry_bar_lowest_wick_to_bar_body_pct"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -152,6 +155,7 @@ def write_to_csv(
                     feature_is_there_highest_high_after_market_open,
                     feature_distance_from_highest_high_since_market_open,
                     feature_crossed_highest_high_since_market_open,
+                    feature_entry_bar_lowest_wick_to_bar_body_pct,
                 ]
             )
 

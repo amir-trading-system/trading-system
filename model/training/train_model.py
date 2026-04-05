@@ -123,16 +123,17 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_histogram_negative_momentum_pct",
             "feature_bars_with_at_least_50_pct_wick_pct",
             "feature_bars_with_lower_volume_average_pct",
-            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open", #[6-2] [5-11]
+            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
             "feature_entry_bar_strengh_pct",
             "feature_strong_bars_above_volume_average_pct",
-            "feature_high_volume_bars_with_rejection_pct", #[8-0] [6-10]
-            "feature_entry_strength_vs_avg", #[8-0] [6-10]
-            "feature_volume_per_minute_to_bar_volume", #[8-0] [5-11]
+            "feature_high_volume_bars_with_rejection_pct",
+            "feature_entry_strength_vs_avg",
+            "feature_volume_per_minute_to_bar_volume",
             "feature_crossed_highest_high",
             "feature_entry_bar_volume_average_above_threshold",
             "feature_volume_avergae_above_10000_pct_above_threshold",
             "feature_crossed_highest_high_since_market_open",
+            "feature_entry_bar_lowest_wick_to_bar_body_pct",
         ]:
             final_shares_columns.append(feature)
 

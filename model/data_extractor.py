@@ -393,6 +393,7 @@ class DataExtractor:
             "feature_is_there_highest_high_after_market_open": feature_is_there_highest_high_after_market_open,
             "feature_distance_from_highest_high_since_market_open": feature_distance_from_highest_high_since_market_open,
             "feature_crossed_highest_high_since_market_open": feature_crossed_highest_high_since_market_open,
+            "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value)
         }
 
         return features

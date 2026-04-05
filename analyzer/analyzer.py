@@ -1,4 +1,5 @@
 import datetime
+import time
 import queue
 
 import copy
@@ -41,6 +42,20 @@ class Analyzer:
         self,
         stock: common.objects.Stock,
     ):
+        while not self.request_id_to_symbol[stock.one_minute_request_id].finished_collection:
+            self.logger.info(
+                msg="waiting for one minute request data to be sent from broker",
+                extra={
+                    "worker": "Analyzer",
+                    "symbol": stock.symbol_name,
+                    "timeframe": stock.timeframe,
+                    "timeframe_type": stock.timeframe_type.value,
+                    "bar_time": stock.specific_bar_time,
+                    "request_id": stock.request_id,
+                },
+            )
+            time.sleep(2)
+
         current_bar = stock.bars[0]
         if not stock.bars[0].ready_to_analyze and stock.bars[1].ready_to_analyze:
             current_bar = stock.bars[1]
