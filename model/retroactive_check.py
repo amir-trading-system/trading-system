@@ -49,7 +49,6 @@ def write_to_csv(
                     "expected_confirmation_bar_time",
                     "evidence",
                     "result",
-                    "feature_has_positive_more_than_negative_bars",
                     "feature_price_minus_vwap_at_entry",
                     "feature_histogram_negative_momentum_pct",
                     "feature_bars_with_at_least_50_pct_wick_pct",
@@ -59,14 +58,12 @@ def write_to_csv(
                     "feature_strong_bars_above_volume_average_pct",
                     "feature_high_volume_bars_with_rejection_pct",
                     "feature_volume_per_minute_to_bar_volume",
-                    "feature_volume_per_minute_to_bar_volume_above_threshold",
                     "feature_bars_with_rejection_inside_entry_bar_range_pct",
                     "feature_positive_vs_negative_volume",
                     "feature_positive_vs_negative_movement",
                     "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
                     "feature_bars_without_movement_pct_above_threshold",
                     "feature_entry_strength_vs_avg",
-                    "feature_potential_bar_low_close_to_open",
                     "feature_volume_average_goes_up_pct",
                     "feature_overlapped_bars_since_market_open_pct",
                     "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
@@ -104,7 +101,6 @@ def write_to_csv(
             symbol = symbol_data["symbol"]
             original_bar_time = symbol_data["original_bar_time"]
             result = symbol_data["result"]
-            feature_has_positive_more_than_negative_bars = 0
             feature_price_minus_vwap_at_entry = 0
             feature_histogram_negative_momentum_pct = 0
             feature_bars_with_at_least_50_pct_wick_pct = 0
@@ -114,14 +110,12 @@ def write_to_csv(
             feature_strong_bars_above_volume_average_pct = 0
             feature_high_volume_bars_with_rejection_pct = 0
             feature_volume_per_minute_to_bar_volume = 0
-            feature_volume_per_minute_to_bar_volume_above_threshold = 0
             feature_bars_with_rejection_inside_entry_bar_range_pct = 0
             feature_positive_vs_negative_volume = 0
             feature_positive_vs_negative_movement = 0
             feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = 0
             feature_bars_without_movement_pct_above_threshold = 0
             feature_entry_strength_vs_avg = 0
-            feature_potential_bar_low_close_to_open = 0
             feature_volume_average_goes_up_pct = 0
             feature_overlapped_bars_since_market_open_pct = 0
             feature_weak_bars_to_bars_since_highest_high_to_total_bars = 0
@@ -144,7 +138,6 @@ def write_to_csv(
 
             price_movement_statistics = symbol_data.get("price_movement_statistics", None)
             if price_movement_statistics:
-                feature_has_positive_more_than_negative_bars = price_movement_statistics["feature_has_positive_more_than_negative_bars"]
                 feature_price_minus_vwap_at_entry = price_movement_statistics["feature_price_minus_vwap_at_entry"]
                 feature_histogram_negative_momentum_pct = price_movement_statistics["feature_histogram_negative_momentum_pct"]
                 feature_bars_with_at_least_50_pct_wick_pct = price_movement_statistics["feature_bars_with_at_least_50_pct_wick_pct"]
@@ -154,14 +147,12 @@ def write_to_csv(
                 feature_strong_bars_above_volume_average_pct = price_movement_statistics["feature_strong_bars_above_volume_average_pct"]
                 feature_high_volume_bars_with_rejection_pct = price_movement_statistics["feature_high_volume_bars_with_rejection_pct"]
                 feature_volume_per_minute_to_bar_volume = price_movement_statistics["feature_volume_per_minute_to_bar_volume"]
-                feature_volume_per_minute_to_bar_volume_above_threshold = price_movement_statistics["feature_volume_per_minute_to_bar_volume_above_threshold"]
                 feature_bars_with_rejection_inside_entry_bar_range_pct = price_movement_statistics["feature_bars_with_rejection_inside_entry_bar_range_pct"]
                 feature_positive_vs_negative_volume = price_movement_statistics["feature_positive_vs_negative_volume"]
                 feature_positive_vs_negative_movement = price_movement_statistics["feature_positive_vs_negative_movement"]
                 feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = price_movement_statistics["feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold"]
                 feature_bars_without_movement_pct_above_threshold = price_movement_statistics["feature_bars_without_movement_pct_above_threshold"]
                 feature_entry_strength_vs_avg = price_movement_statistics["feature_entry_strength_vs_avg"]
-                feature_potential_bar_low_close_to_open = price_movement_statistics["feature_potential_bar_low_close_to_open"]
                 feature_volume_average_goes_up_pct = price_movement_statistics["feature_volume_average_goes_up_pct"]
                 feature_overlapped_bars_since_market_open_pct = price_movement_statistics["feature_overlapped_bars_since_market_open_pct"]
                 feature_weak_bars_to_bars_since_highest_high_to_total_bars = price_movement_statistics["feature_weak_bars_to_bars_since_highest_high_to_total_bars"]
@@ -227,7 +218,6 @@ def write_to_csv(
                                 expected_confirmation_bar_time,
                                 evidence_name,
                                 result,
-                                feature_has_positive_more_than_negative_bars,
                                 feature_price_minus_vwap_at_entry,
                                 feature_histogram_negative_momentum_pct,
                                 feature_bars_with_at_least_50_pct_wick_pct,
@@ -237,14 +227,12 @@ def write_to_csv(
                                 feature_strong_bars_above_volume_average_pct,
                                 feature_high_volume_bars_with_rejection_pct,
                                 feature_volume_per_minute_to_bar_volume,
-                                feature_volume_per_minute_to_bar_volume_above_threshold,
                                 feature_bars_with_rejection_inside_entry_bar_range_pct,
                                 feature_positive_vs_negative_volume,
                                 feature_positive_vs_negative_movement,
                                 feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold,
                                 feature_bars_without_movement_pct_above_threshold,
                                 feature_entry_strength_vs_avg,
-                                feature_potential_bar_low_close_to_open,
                                 feature_volume_average_goes_up_pct,
                                 feature_overlapped_bars_since_market_open_pct,
                                 feature_weak_bars_to_bars_since_highest_high_to_total_bars,
@@ -466,7 +454,13 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
 def run_retroactive_check():
     should_run_model = False
     symbols_data = []
-    symbols = []
+    symbols = [
+        common.objects.SymbolTest(
+            name="ELAB",
+            datetime_str="04.01.26T14:53:00",
+            is_positive=True,
+        ),
+    ]
     output_file_name = "model/real_case_result.csv"
     get_only_statistics = True
     # symbols = explore_past_potential_symbols()

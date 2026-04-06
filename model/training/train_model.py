@@ -27,6 +27,7 @@ TEST_SIZE = 0.30
 CV_SPLITS = 5
 CV_REPEATS = 10
 
+# THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 
 # Final stable feature filtering
@@ -109,32 +110,36 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
     final_shares_columns = []
     for feature in shared:
         if str(feature) in [
-            "feature_volume_per_minute_to_bar_volume_above_threshold",
             "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
             "feature_bars_without_movement_pct_above_threshold",
-            "feature_potential_bar_low_close_to_open",
             "feature_volume_average_goes_up_pct",
             "feature_overlapped_bars_since_market_open_pct",
             "feature_bars_with_rejection_inside_entry_bar_range_pct",
             "feature_positive_vs_negative_volume",
             "feature_positive_vs_negative_movement",
-            "feature_has_positive_more_than_negative_bars",
             "feature_price_minus_vwap_at_entry",
             "feature_histogram_negative_momentum_pct",
             "feature_bars_with_at_least_50_pct_wick_pct",
             "feature_bars_with_lower_volume_average_pct",
-            "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
-            "feature_entry_bar_strengh_pct",
-            "feature_strong_bars_above_volume_average_pct",
             "feature_high_volume_bars_with_rejection_pct",
             "feature_entry_strength_vs_avg",
             "feature_volume_per_minute_to_bar_volume",
             "feature_crossed_highest_high",
             "feature_entry_bar_volume_average_above_threshold",
             "feature_volume_avergae_above_10000_pct_above_threshold",
-            "feature_crossed_highest_high_since_market_open",
             "feature_entry_bar_lowest_wick_to_bar_body_pct",
             "feature_entry_point_size_to_bars_size_average",
+            "feature_volume_average_to_volume",
+            "feature_entry_bar_is_highest",
+            "feature_entry_bar_has_highest_volume",
+            "feature_entry_bar_is_biggest_bar",
+            "histogram_changed_directions_pct",
+            "feature_strong_negative_bars_pct",
+            "feature_rejected_pick_points_pct", #[11-4] [6-13]
+            # "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
+            # "feature_entry_bar_strengh_pct",
+            # "feature_strong_bars_above_volume_average_pct",
+            # "feature_crossed_highest_high_since_market_open",
         ]:
             final_shares_columns.append(feature)
 

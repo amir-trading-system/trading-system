@@ -185,13 +185,13 @@ class Confirmator:
             )
 
             if score.should_take_trade and score.score > 0:
-                transmit_order = potential_confirmation_bar.bar_time >= datetime.datetime(
-                    year=potential_confirmation_bar.bar_time.year,
-                    month=potential_confirmation_bar.bar_time.month,
-                    day=potential_confirmation_bar.bar_time.day,
-                    hour=9,
-                    minute=40,
-                )
+                # transmit_order = potential_confirmation_bar.bar_time >= datetime.datetime(
+                #     year=potential_confirmation_bar.bar_time.year,
+                #     month=potential_confirmation_bar.bar_time.month,
+                #     day=potential_confirmation_bar.bar_time.day,
+                #     hour=9,
+                #     minute=40,
+                # )
                 entry_position_bar = potential_confirmation_bar
                 confirmed_evidences.append(evidence.name)
                 break

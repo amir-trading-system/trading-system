@@ -25,7 +25,6 @@ def write_to_csv(
                     "symbol",
                     "original_bar_time",
                     "expected_confirmation_bar_time",
-                    "feature_has_positive_more_than_negative_bars",
                     "feature_price_minus_vwap_at_entry",
                     "feature_histogram_negative_momentum_pct",
                     "feature_bars_with_at_least_50_pct_wick_pct",
@@ -39,10 +38,8 @@ def write_to_csv(
                     "feature_positive_vs_negative_volume",
                     "feature_positive_vs_negative_movement",
                     "feature_entry_strength_vs_avg",
-                    "feature_volume_per_minute_to_bar_volume_above_threshold",
                     "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
                     "feature_bars_without_movement_pct_above_threshold",
-                    "feature_potential_bar_low_close_to_open",
                     "feature_volume_average_goes_up_pct",
                     "feature_overlapped_bars_since_market_open_pct",
                     "feature_crossed_highest_high",
@@ -61,6 +58,10 @@ def write_to_csv(
                     "feature_entry_bar_has_highest_volume",
                     "feature_entry_bar_is_biggest_bar",
                     "feature_entry_bar_is_highest",
+                    "histogram_changed_directions_pct",
+                    "feature_volume_average_goes_down_pct",
+                    "feature_strong_negative_bars_pct",
+                    "feature_rejected_pick_points_pct",
                 ],
             )
             f.flush()
@@ -71,7 +72,6 @@ def write_to_csv(
         symbol = stock_object.symbol_name
         original_bar_time = stock_object.specific_bar_time
 
-        feature_has_positive_more_than_negative_bars = False
         feature_price_minus_vwap_at_entry = 0
         feature_histogram_negative_momentum_pct = 0
         feature_bars_with_at_least_50_pct_wick_pct = 0
@@ -85,10 +85,8 @@ def write_to_csv(
         feature_positive_vs_negative_volume = 0
         feature_positive_vs_negative_movement = 0
         feature_entry_strength_vs_avg = 0
-        feature_volume_per_minute_to_bar_volume_above_threshold = 0
         feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = 0
         feature_bars_without_movement_pct_above_threshold = 0
-        feature_potential_bar_low_close_to_open = 0
         feature_volume_average_goes_up_pct = 0
         feature_overlapped_bars_since_market_open_pct = 0
         feature_entry_bar_volume_average_above_threshold = 0
@@ -106,8 +104,11 @@ def write_to_csv(
         feature_entry_bar_has_highest_volume = 0
         feature_entry_bar_is_biggest_bar = 0
         feature_entry_bar_is_highest = 0
+        histogram_changed_directions_pct = 0
+        feature_volume_average_goes_down_pct = 0
+        feature_strong_negative_bars_pct = 0
+        feature_rejected_pick_points_pct = 0
 
-        feature_has_positive_more_than_negative_bars = symbol_data["feature_has_positive_more_than_negative_bars"]
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
         feature_histogram_negative_momentum_pct = symbol_data["feature_histogram_negative_momentum_pct"]
         feature_bars_with_at_least_50_pct_wick_pct = symbol_data["feature_bars_with_at_least_50_pct_wick_pct"]
@@ -121,10 +122,8 @@ def write_to_csv(
         feature_positive_vs_negative_volume = symbol_data["feature_positive_vs_negative_volume"]
         feature_positive_vs_negative_movement = symbol_data["feature_positive_vs_negative_movement"]
         feature_entry_strength_vs_avg = symbol_data["feature_entry_strength_vs_avg"]
-        feature_volume_per_minute_to_bar_volume_above_threshold = symbol_data["feature_volume_per_minute_to_bar_volume_above_threshold"]
         feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = symbol_data["feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold"]
         feature_bars_without_movement_pct_above_threshold = symbol_data["feature_bars_without_movement_pct_above_threshold"]
-        feature_potential_bar_low_close_to_open = symbol_data["feature_potential_bar_low_close_to_open"]
         feature_volume_average_goes_up_pct = symbol_data["feature_volume_average_goes_up_pct"]
         feature_overlapped_bars_since_market_open_pct = symbol_data["feature_overlapped_bars_since_market_open_pct"]
         feature_crossed_highest_high = symbol_data["feature_crossed_highest_high"]
@@ -143,6 +142,10 @@ def write_to_csv(
         feature_entry_bar_has_highest_volume = symbol_data["feature_entry_bar_has_highest_volume"]
         feature_entry_bar_is_biggest_bar = symbol_data["feature_entry_bar_is_biggest_bar"]
         feature_entry_bar_is_highest = symbol_data["feature_entry_bar_is_highest"]
+        histogram_changed_directions_pct = symbol_data["histogram_changed_directions_pct"]
+        feature_volume_average_goes_down_pct = symbol_data["feature_volume_average_goes_down_pct"]
+        feature_strong_negative_bars_pct = symbol_data["feature_strong_negative_bars_pct"]
+        feature_rejected_pick_points_pct = symbol_data["feature_rejected_pick_points_pct"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -156,7 +159,6 @@ def write_to_csv(
                     symbol,
                     original_bar_time,
                     expected_confirmation_bar_time,
-                    feature_has_positive_more_than_negative_bars,
                     feature_price_minus_vwap_at_entry,
                     feature_histogram_negative_momentum_pct,
                     feature_bars_with_at_least_50_pct_wick_pct,
@@ -170,10 +172,8 @@ def write_to_csv(
                     feature_positive_vs_negative_volume,
                     feature_positive_vs_negative_movement,
                     feature_entry_strength_vs_avg,
-                    feature_volume_per_minute_to_bar_volume_above_threshold,
                     feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold,
                     feature_bars_without_movement_pct_above_threshold,
-                    feature_potential_bar_low_close_to_open,
                     feature_volume_average_goes_up_pct,
                     feature_overlapped_bars_since_market_open_pct,
                     feature_crossed_highest_high,
@@ -192,6 +192,10 @@ def write_to_csv(
                     feature_entry_bar_has_highest_volume,
                     feature_entry_bar_is_biggest_bar,
                     feature_entry_bar_is_highest,
+                    histogram_changed_directions_pct,
+                    feature_volume_average_goes_down_pct,
+                    feature_strong_negative_bars_pct,
+                    feature_rejected_pick_points_pct,
                 ]
             )
 
