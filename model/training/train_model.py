@@ -136,10 +136,10 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "histogram_changed_directions_pct",
             "feature_strong_negative_bars_pct",
             "feature_rejected_pick_points_pct", #[11-4] [6-13]
-            # "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
-            # "feature_entry_bar_strengh_pct",
-            # "feature_strong_bars_above_volume_average_pct",
-            # "feature_crossed_highest_high_since_market_open",
+            "feature_bars_with_ordered_indicators_pct",
+            "feature_stronger_than_previous_bars_pct",
+            "feature_price_action_is_stuck_pct",
+            "feature_bars_closed_above_half_of_bar_pct", #[12-3] [7-12]
         ]:
             final_shares_columns.append(feature)
 

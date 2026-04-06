@@ -29,9 +29,6 @@ def write_to_csv(
                     "feature_histogram_negative_momentum_pct",
                     "feature_bars_with_at_least_50_pct_wick_pct",
                     "feature_bars_with_lower_volume_average_pct",
-                    "feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open",
-                    "feature_entry_bar_strengh_pct",
-                    "feature_strong_bars_above_volume_average_pct",
                     "feature_high_volume_bars_with_rejection_pct",
                     "feature_volume_per_minute_to_bar_volume",
                     "feature_bars_with_rejection_inside_entry_bar_range_pct",
@@ -47,7 +44,6 @@ def write_to_csv(
                     "feature_volume_avergae_above_10000_pct_above_threshold",
                     "feature_is_there_highest_high_after_market_open",
                     "feature_distance_from_highest_high_since_market_open",
-                    "feature_crossed_highest_high_since_market_open",
                     "feature_entry_bar_lowest_wick_to_bar_body_pct",
                     "feature_entry_bar_volume",
                     "feature_entry_volume_vs_total_volume",
@@ -62,6 +58,10 @@ def write_to_csv(
                     "feature_volume_average_goes_down_pct",
                     "feature_strong_negative_bars_pct",
                     "feature_rejected_pick_points_pct",
+                    "feature_price_action_is_stuck_pct",
+                    "feature_bars_closed_above_half_of_bar_pct",
+                    "feature_stronger_than_previous_bars_pct",
+                    "feature_bars_with_ordered_indicators_pct",
                 ],
             )
             f.flush()
@@ -76,9 +76,6 @@ def write_to_csv(
         feature_histogram_negative_momentum_pct = 0
         feature_bars_with_at_least_50_pct_wick_pct = 0
         feature_bars_with_lower_volume_average_pct = 0
-        feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = False
-        feature_entry_bar_strengh_pct = 0
-        feature_strong_bars_above_volume_average_pct = 0
         feature_high_volume_bars_with_rejection_pct = 0
         feature_volume_per_minute_to_bar_volume = 0
         feature_bars_with_rejection_inside_entry_bar_range_pct = 0
@@ -93,7 +90,6 @@ def write_to_csv(
         feature_volume_avergae_above_10000_pct_above_threshold = 0
         feature_is_there_highest_high_after_market_open = 0
         feature_distance_from_highest_high_since_market_open = 0
-        feature_crossed_highest_high_since_market_open = 0
         feature_entry_bar_lowest_wick_to_bar_body_pct = 0
         feature_entry_bar_volume = 0
         feature_entry_volume_vs_total_volume = 0
@@ -108,14 +104,15 @@ def write_to_csv(
         feature_volume_average_goes_down_pct = 0
         feature_strong_negative_bars_pct = 0
         feature_rejected_pick_points_pct = 0
+        feature_price_action_is_stuck_pct = 0
+        feature_bars_closed_above_half_of_bar_pct = 0
+        feature_stronger_than_previous_bars_pct = 0
+        feature_bars_with_ordered_indicators_pct = 0
 
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
         feature_histogram_negative_momentum_pct = symbol_data["feature_histogram_negative_momentum_pct"]
         feature_bars_with_at_least_50_pct_wick_pct = symbol_data["feature_bars_with_at_least_50_pct_wick_pct"]
         feature_bars_with_lower_volume_average_pct = symbol_data["feature_bars_with_lower_volume_average_pct"]
-        feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open = symbol_data["feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open"]
-        feature_entry_bar_strengh_pct = symbol_data["feature_entry_bar_strengh_pct"]
-        feature_strong_bars_above_volume_average_pct = symbol_data["feature_strong_bars_above_volume_average_pct"]
         feature_high_volume_bars_with_rejection_pct = symbol_data["feature_high_volume_bars_with_rejection_pct"]
         feature_volume_per_minute_to_bar_volume = symbol_data["feature_volume_per_minute_to_bar_volume"]
         feature_bars_with_rejection_inside_entry_bar_range_pct = symbol_data["feature_bars_with_rejection_inside_entry_bar_range_pct"]
@@ -131,7 +128,6 @@ def write_to_csv(
         feature_volume_avergae_above_10000_pct_above_threshold = symbol_data["feature_volume_avergae_above_10000_pct_above_threshold"]
         feature_is_there_highest_high_after_market_open = symbol_data["feature_is_there_highest_high_after_market_open"]
         feature_distance_from_highest_high_since_market_open = symbol_data["feature_distance_from_highest_high_since_market_open"]
-        feature_crossed_highest_high_since_market_open = symbol_data["feature_crossed_highest_high_since_market_open"]
         feature_entry_bar_lowest_wick_to_bar_body_pct = symbol_data["feature_entry_bar_lowest_wick_to_bar_body_pct"]
         feature_entry_bar_volume = symbol_data["feature_entry_bar_volume"]
         feature_entry_volume_vs_total_volume = symbol_data["feature_entry_volume_vs_total_volume"]
@@ -146,6 +142,10 @@ def write_to_csv(
         feature_volume_average_goes_down_pct = symbol_data["feature_volume_average_goes_down_pct"]
         feature_strong_negative_bars_pct = symbol_data["feature_strong_negative_bars_pct"]
         feature_rejected_pick_points_pct = symbol_data["feature_rejected_pick_points_pct"]
+        feature_price_action_is_stuck_pct = symbol_data["feature_price_action_is_stuck_pct"]
+        feature_bars_closed_above_half_of_bar_pct = symbol_data["feature_bars_closed_above_half_of_bar_pct"]
+        feature_stronger_than_previous_bars_pct = symbol_data["feature_stronger_than_previous_bars_pct"]
+        feature_bars_with_ordered_indicators_pct = symbol_data["feature_bars_with_ordered_indicators_pct"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -163,9 +163,6 @@ def write_to_csv(
                     feature_histogram_negative_momentum_pct,
                     feature_bars_with_at_least_50_pct_wick_pct,
                     feature_bars_with_lower_volume_average_pct,
-                    feature_most_of_bars_with_volume_close_to_entry_point_than_to_market_open,
-                    feature_entry_bar_strengh_pct,
-                    feature_strong_bars_above_volume_average_pct,
                     feature_high_volume_bars_with_rejection_pct,
                     feature_volume_per_minute_to_bar_volume,
                     feature_bars_with_rejection_inside_entry_bar_range_pct,
@@ -181,7 +178,6 @@ def write_to_csv(
                     feature_volume_avergae_above_10000_pct_above_threshold,
                     feature_is_there_highest_high_after_market_open,
                     feature_distance_from_highest_high_since_market_open,
-                    feature_crossed_highest_high_since_market_open,
                     feature_entry_bar_lowest_wick_to_bar_body_pct,
                     feature_entry_bar_volume,
                     feature_entry_volume_vs_total_volume,
@@ -196,6 +192,10 @@ def write_to_csv(
                     feature_volume_average_goes_down_pct,
                     feature_strong_negative_bars_pct,
                     feature_rejected_pick_points_pct,
+                    feature_price_action_is_stuck_pct,
+                    feature_bars_closed_above_half_of_bar_pct,
+                    feature_stronger_than_previous_bars_pct,
+                    feature_bars_with_ordered_indicators_pct,
                 ]
             )
 

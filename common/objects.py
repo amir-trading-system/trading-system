@@ -107,7 +107,6 @@ class BarData:
             True
             and self.volume > self.volume_average
             and self.close > self.open_value
-            and (self.open_value - self.low)/(self.high - self.low) < 0.2
         )
 
     @property
