@@ -291,6 +291,7 @@ class Evidence:
 
     def highest_high_occurred_more_than_once_in_the_last_bars(
         self,
+        stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
     ) -> bool:
@@ -307,7 +308,9 @@ class Evidence:
             for bar_object in one_minute_bars[2:]
         )/one_minute_bars[1].high < 0.95
 
-        return current_bar_is_highest_high and previous_bar_was_highest_high
+        current_bar_crossed_stock_highest_high = potential_confirmation_bar.low < stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close
+
+        return current_bar_is_highest_high and previous_bar_was_highest_high and not current_bar_crossed_stock_highest_high
 
     def confirm(
         self,
@@ -331,6 +334,7 @@ class Evidence:
             return score
 
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
+            stock=stock,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=one_minute_bars,
         ):

@@ -118,6 +118,32 @@ class BarData:
 
         return (self.high - self.close)/(self.high - self.low)
 
+    @property
+    def is_positive(
+        self,
+    ) -> bool:
+        return self.close > self.open_value
+
+    @property
+    def above_9_ema(
+        self,
+    ) -> bool:
+        return (
+            True
+            and self.close > self.ema_9
+            and self.open_value > self.ema_9
+        )
+
+    @property
+    def above_vwap(
+        self,
+    ) -> bool:
+        return (
+            True
+            and self.close > self.vwap
+            and self.open_value > self.vwap
+        )
+
     def has_strong_rejection(
         self,
     ) -> bool:

@@ -133,13 +133,14 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_entry_bar_is_highest",
             "feature_entry_bar_has_highest_volume",
             "feature_entry_bar_is_biggest_bar",
-            "histogram_changed_directions_pct",
+            "feature_histogram_changed_directions_pct",
             "feature_strong_negative_bars_pct",
             "feature_rejected_pick_points_pct", #[11-4] [6-13]
             "feature_bars_with_ordered_indicators_pct",
             "feature_stronger_than_previous_bars_pct",
             "feature_price_action_is_stuck_pct",
             "feature_bars_closed_above_half_of_bar_pct", #[12-3] [7-12]
+            "feature_last_bars_positive_movement_pct",
         ]:
             final_shares_columns.append(feature)
 
@@ -444,7 +445,7 @@ feature_report_df, fold_report_df = run_feature_stability_cv(
     candidate_features,
 )
 
-selected_features = choose_stable_features(feature_report_df)
+selected_features = candidate_features
 
 print("\n================ FEATURE STABILITY REPORT ================\n")
 print(feature_report_df.head(50))
@@ -631,3 +632,14 @@ classified_row = classify_row(
     chosen_threshold,
 )
 print(classified_row)
+
+y_pred_proba = final_model.predict_proba(X_test_holdout)[:, 1]
+THRESHOLD = 0.60
+
+y_pred = (y_pred_proba >= THRESHOLD).astype(int)
+df_test = pd.DataFrame({
+    "label": y_test_holdout.values,
+    "probability": y_pred_proba,
+    "prediction": y_pred,
+})
+df_test.to_csv("model/training/test_predictions.csv", index=False)

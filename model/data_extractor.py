@@ -428,6 +428,19 @@ class DataExtractor:
                 ):
                     highest_high_bar_since_market_open = bar_object
 
+        last_bars_positive_movement = 0
+        last_bars_negative_movement = 0
+        for bar_object in one_minute_bars[1:15]:
+            if not bar_object.above_9_ema or not bar_object.above_vwap:
+                continue
+
+            if not bar_object.is_positive:
+                last_bars_negative_movement += bar_object.high - bar_object.low
+            else:
+                last_bars_negative_movement += (bar_object.high - bar_object.close) + (bar_object.open_value - bar_object.low)
+                last_bars_positive_movement += bar_object.close - bar_object.open_value
+
+        feature_last_bars_positive_movement_pct = last_bars_positive_movement/last_bars_negative_movement if last_bars_negative_movement > 0 else 1
         feature_is_there_highest_high_after_market_open = highest_high_bar_since_market_open is not None
         feature_distance_from_highest_high_since_market_open = highest_high_bar_since_market_open.index if highest_high_bar_since_market_open is not None else 0
 
@@ -467,7 +480,7 @@ class DataExtractor:
             "feature_entry_bar_has_highest_volume": feature_entry_bar_has_highest_volume,
             "feature_entry_bar_is_biggest_bar": feature_entry_bar_is_biggest_bar,
             "feature_entry_bar_is_highest": feature_entry_bar_is_highest,
-            "histogram_changed_directions_pct": histogram_changed_directions_counter/total_bars,
+            "feature_histogram_changed_directions_pct": histogram_changed_directions_counter/total_bars,
             "feature_volume_average_goes_down_pct": volume_average_goes_down_counter/total_bars,
             "feature_strong_negative_bars_pct": strong_negative_bars_counter/negative_bars_counter if negative_bars_counter > 0 else 0,
             "feature_rejected_pick_points_pct": rejected_pick_points_counter/pick_points_counter if pick_points_counter > 0 else 0,
@@ -475,6 +488,7 @@ class DataExtractor:
             "feature_bars_closed_above_half_of_bar_pct": bars_closed_above_half_of_bar_counter/total_bars,
             "feature_stronger_than_previous_bars_pct": stronger_than_previous_bars_counter/total_bars,
             "feature_bars_with_ordered_indicators_pct": bars_with_ordered_indicators_counter/total_bars,
+            "feature_last_bars_positive_movement_pct": feature_last_bars_positive_movement_pct,
         }
 
         return features

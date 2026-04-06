@@ -54,7 +54,7 @@ def write_to_csv(
                     "feature_entry_bar_has_highest_volume",
                     "feature_entry_bar_is_biggest_bar",
                     "feature_entry_bar_is_highest",
-                    "histogram_changed_directions_pct",
+                    "feature_histogram_changed_directions_pct",
                     "feature_volume_average_goes_down_pct",
                     "feature_strong_negative_bars_pct",
                     "feature_rejected_pick_points_pct",
@@ -62,6 +62,7 @@ def write_to_csv(
                     "feature_bars_closed_above_half_of_bar_pct",
                     "feature_stronger_than_previous_bars_pct",
                     "feature_bars_with_ordered_indicators_pct",
+                    "feature_last_bars_positive_movement_pct",
                 ],
             )
             f.flush()
@@ -100,7 +101,7 @@ def write_to_csv(
         feature_entry_bar_has_highest_volume = 0
         feature_entry_bar_is_biggest_bar = 0
         feature_entry_bar_is_highest = 0
-        histogram_changed_directions_pct = 0
+        feature_histogram_changed_directions_pct = 0
         feature_volume_average_goes_down_pct = 0
         feature_strong_negative_bars_pct = 0
         feature_rejected_pick_points_pct = 0
@@ -108,6 +109,7 @@ def write_to_csv(
         feature_bars_closed_above_half_of_bar_pct = 0
         feature_stronger_than_previous_bars_pct = 0
         feature_bars_with_ordered_indicators_pct = 0
+        feature_last_bars_positive_movement_pct = 0
 
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
         feature_histogram_negative_momentum_pct = symbol_data["feature_histogram_negative_momentum_pct"]
@@ -138,7 +140,7 @@ def write_to_csv(
         feature_entry_bar_has_highest_volume = symbol_data["feature_entry_bar_has_highest_volume"]
         feature_entry_bar_is_biggest_bar = symbol_data["feature_entry_bar_is_biggest_bar"]
         feature_entry_bar_is_highest = symbol_data["feature_entry_bar_is_highest"]
-        histogram_changed_directions_pct = symbol_data["histogram_changed_directions_pct"]
+        feature_histogram_changed_directions_pct = symbol_data["feature_histogram_changed_directions_pct"]
         feature_volume_average_goes_down_pct = symbol_data["feature_volume_average_goes_down_pct"]
         feature_strong_negative_bars_pct = symbol_data["feature_strong_negative_bars_pct"]
         feature_rejected_pick_points_pct = symbol_data["feature_rejected_pick_points_pct"]
@@ -146,6 +148,7 @@ def write_to_csv(
         feature_bars_closed_above_half_of_bar_pct = symbol_data["feature_bars_closed_above_half_of_bar_pct"]
         feature_stronger_than_previous_bars_pct = symbol_data["feature_stronger_than_previous_bars_pct"]
         feature_bars_with_ordered_indicators_pct = symbol_data["feature_bars_with_ordered_indicators_pct"]
+        feature_last_bars_positive_movement_pct = symbol_data["feature_last_bars_positive_movement_pct"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -188,7 +191,7 @@ def write_to_csv(
                     feature_entry_bar_has_highest_volume,
                     feature_entry_bar_is_biggest_bar,
                     feature_entry_bar_is_highest,
-                    histogram_changed_directions_pct,
+                    feature_histogram_changed_directions_pct,
                     feature_volume_average_goes_down_pct,
                     feature_strong_negative_bars_pct,
                     feature_rejected_pick_points_pct,
@@ -196,6 +199,7 @@ def write_to_csv(
                     feature_bars_closed_above_half_of_bar_pct,
                     feature_stronger_than_previous_bars_pct,
                     feature_bars_with_ordered_indicators_pct,
+                    feature_last_bars_positive_movement_pct,
                 ]
             )
 
