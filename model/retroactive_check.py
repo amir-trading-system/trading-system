@@ -473,7 +473,7 @@ def run_retroactive_check():
     symbols = [
         # common.objects.SymbolTest(
         #     name="BMEA",
-        #     datetime_str="04.07.26T15:15:00",
+        #     datetime_str="04.07.26T15:52:00",
         #     is_positive=False,
         # ),
     ]
