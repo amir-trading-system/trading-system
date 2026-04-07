@@ -51,6 +51,17 @@ class Evidence(
             bar_object.volume
             for bar_object in one_minute_bars
         ) >= 0.8
+        if not highest_volume_until_now_almost:
+            relevant_bars = [
+                bar_object
+                for bar_object in one_minute_bars[:30]
+                if bar_object.index > potential_confirmation_bar.index
+            ]
+            if relevant_bars:
+                highest_volume_until_now_almost = potential_confirmation_bar.volume > max(
+                    bar_object.volume
+                    for bar_object in relevant_bars
+                )
 
         highest_high_until_now = potential_confirmation_bar.high
         if len(one_minute_bars[1:]) > 0:

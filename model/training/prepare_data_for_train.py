@@ -66,7 +66,6 @@ def write_to_csv(
                     "feature_indecision_bars_pct",
                     "feature_negative_bars_with_positive_histogram_pct",
                     "feature_entry_bar_close_to_crossed_highest_high_pct",
-                    "feature_bar_getting_high_while_volume_getting_down",
                     "feature_bar_getting_high_while_9_ema_getting_down",
                     "feature_crossed_bar_with_big_resistance",
                 ],
@@ -119,7 +118,6 @@ def write_to_csv(
         feature_indecision_bars_pct = 0
         feature_negative_bars_with_positive_histogram_pct = 0
         feature_entry_bar_close_to_crossed_highest_high_pct = 0
-        feature_bar_getting_high_while_volume_getting_down = 0
         feature_bar_getting_high_while_9_ema_getting_down = 0
         feature_crossed_bar_with_big_resistance = 0
 
@@ -164,7 +162,6 @@ def write_to_csv(
         feature_indecision_bars_pct = symbol_data["feature_indecision_bars_pct"]
         feature_negative_bars_with_positive_histogram_pct = symbol_data["feature_negative_bars_with_positive_histogram_pct"]
         feature_entry_bar_close_to_crossed_highest_high_pct = symbol_data["feature_entry_bar_close_to_crossed_highest_high_pct"]
-        feature_bar_getting_high_while_volume_getting_down = symbol_data["feature_bar_getting_high_while_volume_getting_down"]
         feature_bar_getting_high_while_9_ema_getting_down = symbol_data["feature_bar_getting_high_while_9_ema_getting_down"]
         feature_crossed_bar_with_big_resistance = symbol_data["feature_crossed_bar_with_big_resistance"]
 
@@ -221,7 +218,6 @@ def write_to_csv(
                     feature_indecision_bars_pct,
                     feature_negative_bars_with_positive_histogram_pct,
                     feature_entry_bar_close_to_crossed_highest_high_pct,
-                    feature_bar_getting_high_while_volume_getting_down,
                     feature_bar_getting_high_while_9_ema_getting_down,
                     feature_crossed_bar_with_big_resistance,
                 ]

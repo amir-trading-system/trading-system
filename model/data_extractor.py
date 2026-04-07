@@ -455,17 +455,7 @@ class DataExtractor:
         feature_entry_bar_has_highest_volume = max(bar_object.volume for bar_object in one_minute_bars) == potential_confirmation_bar.volume
         feature_entry_bar_is_biggest_bar = max(bar_object.high - bar_object.low for bar_object in one_minute_bars) == potential_confirmation_bar.high - potential_confirmation_bar.low
         feature_entry_bar_is_highest = max(bar_object.high for bar_object in one_minute_bars) == potential_confirmation_bar.high
-        feature_bar_getting_high_while_volume_getting_down = any(
-            bar_object
-            for bar_object in one_minute_bars[1:20]
-            if bar_object.is_positive
-            and bar_object.above_9_ema
-            and bar_object.above_vwap
-            and bar_object.above_volume_average
-            and bar_object.high < potential_confirmation_bar.high
-            and bar_object.volume_average > potential_confirmation_bar.volume_average
-            and bar_object.volume > potential_confirmation_bar.volume
-        )
+
         feature_bar_getting_high_while_9_ema_getting_down = any(
             bar_object
             for bar_object in one_minute_bars[1:20]
@@ -529,7 +519,6 @@ class DataExtractor:
             "feature_indecision_bars_pct": indecision_bars_counter/total_bars,
             "feature_negative_bars_with_positive_histogram_pct": negative_bars_with_positive_histogram/negative_bars_counter if negative_bars_counter > 0 else 1,
             "feature_entry_bar_close_to_crossed_highest_high_pct": potential_confirmation_bar.close/highest_high_one_minute_bar.high,
-            "feature_bar_getting_high_while_volume_getting_down": feature_bar_getting_high_while_volume_getting_down,
             "feature_bar_getting_high_while_9_ema_getting_down": feature_bar_getting_high_while_9_ema_getting_down,
             "feature_crossed_bar_with_big_resistance": feature_crossed_bar_with_big_resistance,
         }

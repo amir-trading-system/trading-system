@@ -469,11 +469,10 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
 
 def run_retroactive_check():
     should_run_model = True
+    get_only_statistics = False
     symbols_data = []
     symbols = []
     output_file_name = "model/real_case_result.csv"
-    get_only_statistics = False
-    # symbols = explore_past_potential_symbols()
 
     if not symbols:
         output_file_name = ""
@@ -619,6 +618,6 @@ def run_retroactive_check():
 
 
 if __name__ == "__main__":
-    if os.path.exists(LOGS_PATH):
-        os.remove(LOGS_PATH)
+    # if os.path.exists(LOGS_PATH):
+    #     os.remove(LOGS_PATH)
     run_retroactive_check()
