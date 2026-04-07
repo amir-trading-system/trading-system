@@ -570,6 +570,11 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="FUBO",
+            datetime_str="04.06.26T10:03:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="FUBO",
             datetime_str="04.06.26T11:50:00",
             is_positive=False,
         ),
