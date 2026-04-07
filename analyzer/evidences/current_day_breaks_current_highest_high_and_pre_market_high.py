@@ -52,7 +52,9 @@ class Evidence(
             for bar_object in one_minute_bars
         ) >= 0.8
 
-        highest_high_until_now = max(b.high for b in one_minute_bars[1:])
+        highest_high_until_now = potential_confirmation_bar.high
+        if len(one_minute_bars[1:]) > 0:
+            highest_high_until_now = max(b.high for b in one_minute_bars[1:])
 
         crossed_highest_high = potential_confirmation_bar.low < highest_high_until_now < potential_confirmation_bar.close
         bar_bigger_than_previous_bars = not any(

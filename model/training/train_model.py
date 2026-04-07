@@ -27,7 +27,6 @@ TEST_SIZE = 0.30
 CV_SPLITS = 5
 CV_REPEATS = 10
 
-# THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 
 # Final stable feature filtering
@@ -111,36 +110,38 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
     for feature in shared:
         if str(feature) in [
             "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
-            "feature_bars_without_movement_pct_above_threshold",
             "feature_volume_average_goes_up_pct",
             "feature_overlapped_bars_since_market_open_pct",
-            "feature_bars_with_rejection_inside_entry_bar_range_pct",
             "feature_positive_vs_negative_volume",
+            "feature_bars_with_rejection_inside_entry_bar_range_pct",
+            "feature_volume_per_minute_to_bar_volume",
+            "feature_entry_point_size_to_bars_size_average",
+            "feature_rejected_pick_points_pct",
+            "feature_entry_bar_lowest_wick_to_bar_body_pct",
             "feature_positive_vs_negative_movement",
+            "feature_strong_negative_bars_pct",
+            "feature_price_action_is_stuck_pct",
             "feature_price_minus_vwap_at_entry",
             "feature_histogram_negative_momentum_pct",
             "feature_bars_with_at_least_50_pct_wick_pct",
             "feature_bars_with_lower_volume_average_pct",
             "feature_high_volume_bars_with_rejection_pct",
             "feature_entry_strength_vs_avg",
-            "feature_volume_per_minute_to_bar_volume",
             "feature_crossed_highest_high",
             "feature_entry_bar_volume_average_above_threshold",
             "feature_volume_avergae_above_10000_pct_above_threshold",
-            "feature_entry_bar_lowest_wick_to_bar_body_pct",
-            "feature_entry_point_size_to_bars_size_average",
             "feature_volume_average_to_volume",
-            "feature_entry_bar_is_highest",
-            "feature_entry_bar_has_highest_volume",
             "feature_entry_bar_is_biggest_bar",
             "feature_histogram_changed_directions_pct",
-            "feature_strong_negative_bars_pct",
-            "feature_rejected_pick_points_pct", #[11-4] [6-13]
             "feature_bars_with_ordered_indicators_pct",
-            "feature_stronger_than_previous_bars_pct",
-            "feature_price_action_is_stuck_pct",
-            "feature_bars_closed_above_half_of_bar_pct", #[12-3] [7-12]
+            "feature_bars_closed_above_half_of_bar_pct",
             "feature_last_bars_positive_movement_pct",
+            "feature_indecision_bars_pct",
+            "feature_negative_bars_with_positive_histogram_pct",
+            "feature_entry_bar_close_to_crossed_highest_high_pct",
+            "feature_bar_getting_high_while_volume_getting_down",
+            "feature_bar_getting_high_while_9_ema_getting_down",
+            "feature_crossed_bar_with_big_resistance",
         ]:
             final_shares_columns.append(feature)
 
@@ -643,3 +644,31 @@ df_test = pd.DataFrame({
     "prediction": y_pred,
 })
 df_test.to_csv("model/training/test_predictions.csv", index=False)
+
+
+# selected = []
+# remaining = candidate_features.copy()
+
+# while remaining:
+#     best_feature = None
+#     best_score = 0
+
+#     for f in remaining:
+#         trial = selected + [f]
+
+#         X_train = X_train_full[trial]
+#         X_test = X_test_holdout[trial]
+
+#         final_model.fit(X_train, y_train_full)
+#         score = final_model.score(X_test, y_test_holdout)
+
+#         if score > best_score:
+#             best_score = score
+#             best_feature = f
+
+#     if best_feature:
+#         selected.append(best_feature)
+#         remaining.remove(best_feature)
+#         print(f"Added {best_feature}, score={best_score}")
+#     else:
+#         break

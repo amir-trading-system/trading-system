@@ -119,6 +119,18 @@ class BarData:
         return (self.high - self.close)/(self.high - self.low)
 
     @property
+    def buyers_are_indecision(
+        self,
+    ) -> float:
+        return (
+            True
+            and self.above_volume_average
+            and self.close < self.high
+            and self.open_value > self.low
+            and self.body_percentage < 0.7
+        )
+
+    @property
     def is_positive(
         self,
     ) -> bool:
@@ -143,6 +155,12 @@ class BarData:
             and self.close > self.vwap
             and self.open_value > self.vwap
         )
+
+    @property
+    def above_volume_average(
+        self,
+    ) -> bool:
+        return self.volume > self.volume_average
 
     def has_strong_rejection(
         self,

@@ -312,6 +312,35 @@ class Evidence:
 
         return current_bar_is_highest_high and previous_bar_was_highest_high and not current_bar_crossed_stock_highest_high
 
+    def bar_has_potential(
+        self,
+        stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
+        highest_high_one_minute_bar: common.objects.BarData,
+    ) -> bool:
+        if potential_confirmation_bar.volume < 20000:
+            return False
+
+        if self.highest_high_occurred_more_than_once_in_the_last_bars(
+            stock=stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_bars=one_minute_bars,
+        ):
+            return False
+
+        if sum(
+            bar_object.volume
+            for bar_object in one_minute_bars
+            if bar_object.bar_time > highest_high_one_minute_bar.bar_time
+        ) < 100000:
+            return False
+
+        if potential_confirmation_bar.buyers_are_indecision:
+            return False
+
+        return True
+
     def confirm(
         self,
         stock: common.objects.Stock,
@@ -327,24 +356,15 @@ class Evidence:
             score=0.0,
             probability=0.0,
             threshold=0.0,
-            should_take_trade=False
+            should_take_trade=False,
         )
 
-        if potential_confirmation_bar.volume < 20000:
-            return score
-
-        if self.highest_high_occurred_more_than_once_in_the_last_bars(
+        if not self.bar_has_potential(
             stock=stock,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=one_minute_bars,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
         ):
-            return score
-
-        if sum(
-            bar_object.volume
-            for bar_object in one_minute_bars
-            if bar_object.bar_time > highest_high_one_minute_bar.bar_time
-        ) < 100000:
             return score
 
         if not self._confirm(
