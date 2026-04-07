@@ -22,6 +22,10 @@ class Handler(
         if bar_time:
             final_message += f"Bar Time: {bar_time}. "
 
+        entry_position_bar_time = record_as_dict.get("entry_position_bar_time")
+        if entry_position_bar_time:
+            final_message += f"Entry position bar time: {entry_position_bar_time}. "
+
         record.msg = f"{final_message}{record.getMessage()}"
 
         return super().emit(record)
