@@ -327,19 +327,7 @@ class Confirmator:
                 lowest_low_one_minute_bar = potential_confirmation_bar
 
             potential_confirmation_bar = stock.one_minute_bars_queue.get()
-            if potential_confirmation_bar.bar_time > most_updated_datetime:
-                self.logger.info(
-                    msg="Got potential bar to confirm",
-                    extra={
-                        "worker": "Confirmator",
-                        "symbol": original_bar_to_confirm.symbol,
-                        "timeframe": original_bar_to_confirm.timeframe,
-                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                        "bar_time": original_bar_to_confirm.bar_time,
-                        "request_id": stock.request_id,
-                    }
-                )
+
             if highest_high_one_minute_bar is None:
                 highest_high_one_minute_bar = potential_confirmation_bar
             if lowest_low_one_minute_bar is None:
@@ -371,24 +359,31 @@ class Confirmator:
             ):
                 continue
 
-            should_write_log = self.should_write_log(
-                most_updated_datetime=most_updated_datetime,
-                potential_confirmation_bar=potential_confirmation_bar,
-                original_bar_to_confirm=original_bar_to_confirm,
+            self.logger.info(
+                msg="Got potential bar to confirm",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "request_id": stock.request_id,
+                }
             )
-            if should_write_log:
-                self.logger.info(
-                    msg="Starting to confirm one minute bar for entry point",
-                    extra={
-                        "worker": "Confirmator",
-                        "symbol": original_bar_to_confirm.symbol,
-                        "timeframe": original_bar_to_confirm.timeframe,
-                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                        "bar_time": original_bar_to_confirm.bar_time,
-                        "request_id": stock.request_id,
-                    },
-                )
+
+            self.logger.info(
+                msg="Starting to confirm one minute bar for entry point",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "request_id": stock.request_id,
+                },
+            )
 
             if potential_confirmation_bar.bar_time == datetime.datetime(
                 year=original_bar_to_confirm.bar_time.year,
@@ -412,18 +407,17 @@ class Confirmator:
                 break
 
             most_updated_datetime = potential_confirmation_bar.bar_time
-            if should_write_log:
-                self.logger.info(
-                    msg="Entry point does not confirmed yet, waiting for next one",
-                    extra={
-                        "worker": "Confirmator",
-                        "symbol": original_bar_to_confirm.symbol,
-                        "timeframe": original_bar_to_confirm.timeframe,
-                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                        "bar_time": original_bar_to_confirm.bar_time,
-                        "request_id": stock.request_id,
-                    },
-                )
+            self.logger.info(
+                msg="Entry point does not confirmed yet, waiting for next one",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": original_bar_to_confirm.symbol,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "request_id": stock.request_id,
+                },
+            )
 
         return

@@ -38,6 +38,12 @@ MIN_SELECTED_FEATURES = 8
 # Optional hard rules for final decision layer
 USE_HARD_RULES = True
 
+# ---------------- NEW: threshold-selection logic ----------------
+MIN_POSITIVE_PASS_RATE = 0.40
+MIN_FALSE_POSITIVE_REJECT_RATE = 0.65
+TRADING_SCORE_FP_WEIGHT = 0.65
+TRADING_SCORE_POS_WEIGHT = 0.35
+
 # Output files
 TRAIN_SCORED_OUTPUT = "model/training/scored_training_dataset.csv"
 POSITIVE_SCORED_OUTPUT = "model/training/positive_results_scored.csv"
@@ -147,6 +153,28 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
     return final_shares_columns
 
 
+def compute_trading_score(positive_pass_rate, false_positive_reject_rate):
+    """
+    Trading-friendly threshold selection:
+    - require minimum useful recall
+    - require minimum useful bad-trade filtering
+    - then score thresholds with heavier weight on FP rejection
+    """
+    if np.isnan(positive_pass_rate) or np.isnan(false_positive_reject_rate):
+        return -1.0
+
+    if positive_pass_rate < MIN_POSITIVE_PASS_RATE:
+        return -1.0
+
+    if false_positive_reject_rate < MIN_FALSE_POSITIVE_REJECT_RATE:
+        return -1.0
+
+    return (
+        TRADING_SCORE_FP_WEIGHT * false_positive_reject_rate
+        + TRADING_SCORE_POS_WEIGHT * positive_pass_rate
+    )
+
+
 def evaluate_threshold_from_probs(y_true, probs, threshold):
     pred = (probs >= threshold).astype(int)
     tn, fp, fn, tp = confusion_matrix(y_true, pred, labels=[0, 1]).ravel()
@@ -154,12 +182,17 @@ def evaluate_threshold_from_probs(y_true, probs, threshold):
     positive_pass_rate = tp / (tp + fn) if (tp + fn) else np.nan
     false_positive_reject_rate = tn / (tn + fp) if (tn + fp) else np.nan
     balanced_score = np.nanmean([positive_pass_rate, false_positive_reject_rate])
+    trading_score = compute_trading_score(
+        positive_pass_rate=positive_pass_rate,
+        false_positive_reject_rate=false_positive_reject_rate,
+    )
 
     return {
         "threshold": float(threshold),
         "positive_pass_rate": float(positive_pass_rate),
         "false_positive_reject_rate": float(false_positive_reject_rate),
         "balanced_score": float(balanced_score),
+        "trading_score": float(trading_score),
         "tn": int(tn),
         "fp": int(fp),
         "fn": int(fn),
@@ -183,7 +216,23 @@ def train_rf_model(X_train: pd.DataFrame, y_train: pd.Series, random_state: int)
 
 def select_best_threshold(y_true, probs):
     results = [evaluate_threshold_from_probs(y_true, probs, th) for th in THRESHOLDS]
-    best = max(results, key=lambda x: x["balanced_score"])
+
+    valid_results = [r for r in results if r["trading_score"] >= 0]
+
+    if valid_results:
+        best = max(
+            valid_results,
+            key=lambda x: (
+                x["trading_score"],
+                x["false_positive_reject_rate"],
+                x["positive_pass_rate"],
+                -abs(x["threshold"] - 0.60),  # gentle tie-break toward middle thresholds
+            ),
+        )
+    else:
+        # Fallback: if no threshold passes the floors, choose the best balanced score
+        best = max(results, key=lambda x: x["balanced_score"])
+
     return best, results
 
 
@@ -248,6 +297,7 @@ def run_feature_stability_cv(X: pd.DataFrame, y: pd.Series, candidate_features: 
                 "positive_pass_rate": best_threshold_result["positive_pass_rate"],
                 "false_positive_reject_rate": best_threshold_result["false_positive_reject_rate"],
                 "balanced_score": best_threshold_result["balanced_score"],
+                "trading_score": best_threshold_result["trading_score"],
                 "tn": best_threshold_result["tn"],
                 "fp": best_threshold_result["fp"],
                 "fn": best_threshold_result["fn"],
@@ -360,7 +410,7 @@ def classify_row(row: pd.Series, features, model, imputer, threshold):
     prob = probability_from_row(row, features, model, imputer)
     score = round(prob * 100.0, 2)
 
-    rules_pass = bool(apply_hard_rules(pd.DataFrame([row]))[0])
+    rules_pass = bool(apply_hard_rules(pd.DataFrame([row])).iloc[0])
     passed = (prob >= threshold) and rules_pass
 
     if prob >= 0.85:
@@ -372,7 +422,7 @@ def classify_row(row: pd.Series, features, model, imputer, threshold):
     elif prob >= threshold:
         grade = "C"
     elif prob >= threshold - 0.03:
-        grade = "D"   # near-miss
+        grade = "D"
     else:
         grade = "REJECT"
 
@@ -492,6 +542,11 @@ chosen_threshold = float(fold_report_df["best_threshold"].median())
 print("\n================ CHOSEN THRESHOLD ================\n")
 print(f"Median best CV threshold: {chosen_threshold:.2f}")
 
+print("\n================ CV THRESHOLD SUMMARY ================\n")
+print(f"Mean trading score: {fold_report_df['trading_score'].mean():.4f}")
+print(f"Mean positive pass rate: {fold_report_df['positive_pass_rate'].mean():.4f}")
+print(f"Mean false positive reject rate: {fold_report_df['false_positive_reject_rate'].mean():.4f}")
+
 # ------------------------------------------------------------
 # FINAL HOLDOUT EVALUATION
 # ------------------------------------------------------------
@@ -526,7 +581,6 @@ print(final_feature_importance.head(100))
 # SCORE FULL DATASET + ORIGINAL FILES
 # ------------------------------------------------------------
 
-# fit scoring imputer/model on ALL DATA using selected features
 full_imputer = SimpleImputer(strategy="median")
 X_all_selected_imp = pd.DataFrame(
     full_imputer.fit_transform(X_all[selected_features]),
@@ -583,8 +637,14 @@ model_info = {
     "chosen_threshold": chosen_threshold,
     "cv_mean_balanced_score": float(fold_report_df["balanced_score"].mean()),
     "cv_std_balanced_score": float(fold_report_df["balanced_score"].std()),
+    "cv_mean_trading_score": float(fold_report_df["trading_score"].mean()),
+    "cv_std_trading_score": float(fold_report_df["trading_score"].std()),
     "cv_mean_positive_pass_rate": float(fold_report_df["positive_pass_rate"].mean()),
     "cv_mean_false_positive_reject_rate": float(fold_report_df["false_positive_reject_rate"].mean()),
+    "min_positive_pass_rate": MIN_POSITIVE_PASS_RATE,
+    "min_false_positive_reject_rate": MIN_FALSE_POSITIVE_REJECT_RATE,
+    "trading_score_fp_weight": TRADING_SCORE_FP_WEIGHT,
+    "trading_score_pos_weight": TRADING_SCORE_POS_WEIGHT,
     "final_holdout_threshold": chosen_threshold,
     "top_25_feature_importance": final_feature_importance.head(25).to_dict(),
     "random_state": RANDOM_STATE,
@@ -603,6 +663,10 @@ joblib.dump(
         "features": selected_features,
         "threshold": chosen_threshold,
         "use_hard_rules": USE_HARD_RULES,
+        "min_positive_pass_rate": MIN_POSITIVE_PASS_RATE,
+        "min_false_positive_reject_rate": MIN_FALSE_POSITIVE_REJECT_RATE,
+        "trading_score_fp_weight": TRADING_SCORE_FP_WEIGHT,
+        "trading_score_pos_weight": TRADING_SCORE_POS_WEIGHT,
     },
     BUNDLE_PATH,
 )
@@ -633,8 +697,12 @@ classified_row = classify_row(
 )
 print(classified_row)
 
-y_pred_proba = final_model.predict_proba(X_test_holdout)[:, 1]
-THRESHOLD = 0.60
+# ------------------------------------------------------------
+# SAVE HOLDOUT PREDICTIONS FOR DISTRIBUTION ANALYSIS
+# ------------------------------------------------------------
+
+y_pred_proba = final_model.predict_proba(X_test_selected_imp)[:, 1]
+THRESHOLD = chosen_threshold
 
 y_pred = (y_pred_proba >= THRESHOLD).astype(int)
 df_test = pd.DataFrame({
@@ -643,31 +711,3 @@ df_test = pd.DataFrame({
     "prediction": y_pred,
 })
 df_test.to_csv("model/training/test_predictions.csv", index=False)
-
-
-# selected = []
-# remaining = candidate_features.copy()
-
-# while remaining:
-#     best_feature = None
-#     best_score = 0
-
-#     for f in remaining:
-#         trial = selected + [f]
-
-#         X_train = X_train_full[trial]
-#         X_test = X_test_holdout[trial]
-
-#         final_model.fit(X_train, y_train_full)
-#         score = final_model.score(X_test, y_test_holdout)
-
-#         if score > best_score:
-#             best_score = score
-#             best_feature = f
-
-#     if best_feature:
-#         selected.append(best_feature)
-#         remaining.remove(best_feature)
-#         print(f"Added {best_feature}, score={best_score}")
-#     else:
-#         break
