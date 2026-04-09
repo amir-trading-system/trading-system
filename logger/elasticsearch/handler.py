@@ -67,6 +67,7 @@ class Handler(
             "score",
             "probability",
             "threshold",
+            "should_run_model",
         ]
 
         for field in fields:

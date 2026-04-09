@@ -378,6 +378,21 @@ class Evidence:
         ):
             return score
 
+        self.logger.info(
+            msg="Potential confirmation bar has passed static confirmation, waiting for model confirmation",
+            extra={
+                "worker": "Confirmator",
+                "symbol": stock.symbol_name,
+                "timeframe": original_bar_to_confirm.timeframe,
+                "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                "bar_time": original_bar_to_confirm.bar_time,
+                "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                "evidence_name": self.name,
+                "request_id": stock.request_id,
+                "should_run_model": 1 if model_runner.should_run_model else 0,
+            },
+        )
+
         potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
             day_timeframe_stock=stock,
             one_minute_timeframe_stock=one_minute_timeframe_stock,
@@ -387,7 +402,7 @@ class Evidence:
             one_minute_bars=one_minute_bars,
         )
 
-        if model_runner.should_run_model and potential_confirmation_bar.price_movement_statistics != {}:
+        if model_runner.should_run_model:
             score: common.objects.Score = model_runner.score_potential_confirmation_bar(
                 potential_confirmation_bar=potential_confirmation_bar,
             )
