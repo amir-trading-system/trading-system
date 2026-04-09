@@ -162,6 +162,12 @@ class BarData:
     ) -> bool:
         return self.volume > self.volume_average
 
+    @property
+    def str_bar_time(
+        self,
+    ) -> str:
+        return f"{self.bar_time.hour}:{self.bar_time.minute}"
+
     def has_strong_rejection(
         self,
     ) -> bool:
