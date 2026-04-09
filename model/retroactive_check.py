@@ -467,15 +467,15 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = True
-    get_only_statistics = False
+    should_run_model = False
+    get_only_statistics = True
     symbols_data = []
     symbols = [
-        common.objects.SymbolTest(
-            name="SKYQ",
-            datetime_str="04.08.26T13:33:00",
-            is_positive=False,
-        ),
+        # common.objects.SymbolTest(
+        #     name="SKYQ",
+        #     datetime_str="04.08.26T13:33:00",
+        #     is_positive=False,
+        # ),
     ]
     output_file_name = "model/real_case_result.csv"
 
