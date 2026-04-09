@@ -1,4 +1,5 @@
 import datetime
+import pickle
 import time
 import queue
 
@@ -10,13 +11,12 @@ import threading
 import alerter
 from tws import client
 import common
+import model
 
 from . import days_analyzer
 
 
 class Analyzer:
-    confirmator_only = False
-
     def __init__(
         self,
         bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock],
@@ -25,10 +25,12 @@ class Analyzer:
         logger: logging.Logger,
         tws_client: client.Client,
         alerter_object: alerter.alerter.Alerter = None,
+        get_only_statistics: bool = False,
     ):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.logger = logger
         self.request_id_to_symbol = request_id_to_symbol
+        self.get_only_statistics = get_only_statistics
 
         self.days_analyzer = days_analyzer.Analyzer(
             alerter_object=alerter_object,
@@ -54,7 +56,27 @@ class Analyzer:
                     "request_id": stock.request_id,
                 },
             )
-            time.sleep(2)
+            time.sleep(10)
+
+        stock.resistance_levels = self.get_resistance_levels(
+            stock=stock,
+            relevant_bars=stock.bars[1:],
+            current_bar=stock.bars[0],
+        )
+        if self.get_only_statistics:
+            one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
+            self.save_data_for_model_training(
+                request_id=stock.one_minute_request_id,
+                current_bar=[
+                    bar_object
+                    for bar_object in one_minute_timeframe_stock.bars
+                    if bar_object.bar_time == stock.expected_bar_time
+                ][0],
+            )
+            self.request_id_to_symbol[stock.request_id].finished_analyze = True
+            self.request_id_to_symbol[stock.one_minute_request_id].finished_analyze = True
+
+            return
 
         current_bar = stock.bars[0]
         if not stock.bars[0].ready_to_analyze and stock.bars[1].ready_to_analyze:
@@ -90,7 +112,6 @@ class Analyzer:
                 stock=stock,
                 current_bar=current_bar,
                 is_retro=for_specific_date,
-                confirmator_only=self.confirmator_only,
             )
 
     def analyze_data(
@@ -138,3 +159,137 @@ class Analyzer:
                     "stock": stock,
                 },
             ).start()
+
+    def save_data_for_model_training(
+        self,
+        request_id: int,
+        current_bar: common.objects.BarData,
+    ):
+        current_bar_09_30 = datetime.datetime(
+            year=current_bar.bar_time.year,
+            month=current_bar.bar_time.month,
+            day=current_bar.bar_time.day,
+            hour=9,
+            minute=30,
+        )
+        one_minute_timeframe_stock = self.request_id_to_symbol[request_id]
+        day_timeframe_stock = self.request_id_to_symbol[one_minute_timeframe_stock.day_request_id]
+
+        one_minute_bars: list[common.objects.BarData] = []
+        highest_high_one_minute_bar: common.objects.BarData = None
+        for bar_object in one_minute_timeframe_stock.bars:
+            if bar_object.bar_time >= datetime.datetime(
+                year=current_bar.bar_time.year,
+                month=current_bar.bar_time.month,
+                day=current_bar.bar_time.day,
+                hour=4,
+            ) and bar_object.bar_time < current_bar.bar_time:
+                if highest_high_one_minute_bar is None:
+                    highest_high_one_minute_bar = bar_object
+                elif bar_object.high > highest_high_one_minute_bar.high:
+                    highest_high_one_minute_bar = bar_object
+
+            if bar_object.bar_time >= current_bar_09_30:
+                one_minute_bars.append(bar_object)
+
+        volume_sum_since_market_open = sum(
+            bar_object.volume
+            for bar_object in one_minute_timeframe_stock.bars
+            if current_bar_09_30 <= bar_object.bar_time <= current_bar.bar_time
+        )
+
+        current_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
+            day_timeframe_stock=day_timeframe_stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=current_bar,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            volume_sum_since_market_open=volume_sum_since_market_open,
+            one_minute_bars=one_minute_bars,
+        )
+        day_timeframe_stock.resistance_levels = self.get_resistance_levels(
+            stock=day_timeframe_stock,
+            relevant_bars=day_timeframe_stock.bars[1:],
+            current_bar=day_timeframe_stock.bars[0],
+        )
+        with open(f"model/training/data/{day_timeframe_stock.symbol_name}-{day_timeframe_stock.expected_bar_time}.json", "wb") as f:
+            pickle.dump(
+                {
+                    "day_timeframe_stock": day_timeframe_stock,
+                    "one_minute_timeframe_stock": one_minute_timeframe_stock,
+                    "potential_confirmation_bar": current_bar,
+                    "highest_high_one_minute_bar": highest_high_one_minute_bar,
+                    "volume_sum_since_market_open": volume_sum_since_market_open,
+                    "one_minute_bars": one_minute_bars,
+                },
+                f,
+            )
+
+    def get_resistance_levels(
+        self,
+        stock: common.objects.Stock,
+        relevant_bars: list[common.objects.BarData],
+        current_bar: common.objects.BarData,
+    ) -> list[common.objects.BarData]:
+        resistance_levels: list[common.objects.BarData] = []
+        for bar_object in relevant_bars[:current_bar.index+40]:
+            if (
+                bar_object.vwap is None
+                or bar_object.ema_9 is None
+                or bar_object.ema_20 is None
+            ):
+                continue
+
+            previous_bar = stock.previous_bar(
+                bar_object=bar_object,
+            )
+            next_bar = stock.next_bar(
+                bar_object=bar_object,
+            )
+
+            high_pattern_one = (
+                True
+                and bar_object.high > bar_object.close
+                and bar_object.high > bar_object.open_value
+                and (bar_object.high - bar_object.close)/(bar_object.high - bar_object.low) >= 0.1
+                and bar_object.high > bar_object.ema_9
+                and bar_object.high > bar_object.ema_20
+                and bar_object.high > bar_object.vwap
+                and previous_bar is not None
+                and previous_bar.high < bar_object.high
+            )
+            high_pattern_two = (
+                True
+                and previous_bar is not None
+                and next_bar is not None
+                and previous_bar.high < bar_object.high > next_bar.high
+            )
+
+            if (
+                True
+                and (high_pattern_one or high_pattern_two)
+            ):
+                resistance_level = [
+                    r_l
+                    for r_l in resistance_levels
+                    if bar_object.high == r_l.high
+                ]
+                if not resistance_level:
+                    resistance_levels.append(bar_object)
+
+        resistance_levels = sorted(
+            resistance_levels,
+            key=lambda r_l: r_l.high,
+        )
+        temp_resistance_levels = [temp_r_l for temp_r_l in resistance_levels]
+        for i, resistance_level in enumerate(temp_resistance_levels):
+            if i+1 > len(resistance_levels) - 1:
+                continue
+
+            if resistance_level.high/resistance_levels[i+1].high >= 0.95:
+                resistance_levels = [
+                    r_l
+                    for r_l in resistance_levels
+                    if r_l.bar_time != resistance_level.bar_time
+                ]
+
+        return resistance_levels

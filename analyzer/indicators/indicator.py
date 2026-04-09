@@ -25,11 +25,9 @@ class Indicator:
     ) -> bool:
         evidence_object: analyzer.evidences.evidence.Evidence = self.evidence(
             logger=self.logger,
-        )
-        if not evidence_object.pre_process(
             stock=stock,
-            current_bar=current_bar,
-        ):
+        )
+        if not evidence_object.relevant_bars:
             return False
 
         result = evidence_object.find_evidence(

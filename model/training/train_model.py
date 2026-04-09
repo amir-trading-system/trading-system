@@ -148,6 +148,9 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_bar_getting_high_while_9_ema_getting_down",
             "feature_crossed_bar_with_big_resistance",
             "feature_total_volume",
+            "feature_crossed_any_resistance",
+            "feature_crossed_any_near_resistance",
+            "feature_entry_bar_closed_strong",
         ]:
             final_shares_columns.append(feature)
 

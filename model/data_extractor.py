@@ -351,16 +351,8 @@ class DataExtractor:
         crossed_any_resistance = any(
             r_l
             for r_l in day_timeframe_stock.resistance_levels
-            if potential_confirmation_bar.low < r_l.close < potential_confirmation_bar.close
+            if potential_confirmation_bar.low < r_l.high < potential_confirmation_bar.high
         )
-        if not crossed_any_resistance:
-            crossed_any_resistance = any(
-                [
-                    bar_object
-                    for bar_object in one_minute_bars
-                    if potential_confirmation_bar.low < bar_object.close < potential_confirmation_bar.close
-                ]
-            )
 
         volume_to_volume_average_ratio_since_highest_high = 0
 
@@ -468,12 +460,29 @@ class DataExtractor:
         feature_crossed_bar_with_big_resistance = any(
             bar_object
             for bar_object in one_minute_bars[1:]
-            if potential_confirmation_bar.low < bar_object.high < potential_confirmation_bar.high
-            and bar_object.bar_wick_percentage >= 0.4
-            and not bar_object.is_positive
+            if potential_confirmation_bar.low < bar_object.high < potential_confirmation_bar.close
             and bar_object.volume > bar_object.volume_average
-            and bar_object.high - bar_object.low > potential_confirmation_bar.high - potential_confirmation_bar.low
-            and bar_object.volume > potential_confirmation_bar.volume
+            and potential_confirmation_bar.bar_wick_percentage <= 0.3
+        )
+
+        crossed_any_near_resistance = any(
+            r_l
+            for r_l in day_timeframe_stock.resistance_levels
+            if potential_confirmation_bar.low < r_l.high < potential_confirmation_bar.close
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and r_l.index < 10
+        )
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+
+        feature_entry_bar_closed_strong = (
+            True
+            and previous_bar is not None
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and potential_confirmation_bar.volume > previous_bar.volume
+            and potential_confirmation_bar.body_percentage > 0.7
+            and potential_confirmation_bar.bar_wick_percentage < 0.2
         )
 
         features = {
@@ -502,7 +511,7 @@ class DataExtractor:
             "feature_entry_volume_vs_total_volume": potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 1,
             "feature_distance_from_highest_high": highest_high_bar_since_market_open.index if highest_high_bar_since_market_open is not None else 0,
             "feature_bars_with_rejection_since_market_open": bars_with_rejection_since_market_open/total_bars,
-            "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average,
+            "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average if bars_size_average else 0,
             "feature_volume_average_to_volume": potential_confirmation_bar.volume_average/potential_confirmation_bar.volume,
             "feature_entry_bar_has_highest_volume": feature_entry_bar_has_highest_volume,
             "feature_entry_bar_is_biggest_bar": feature_entry_bar_is_biggest_bar,
@@ -522,6 +531,9 @@ class DataExtractor:
             "feature_bar_getting_high_while_9_ema_getting_down": feature_bar_getting_high_while_9_ema_getting_down,
             "feature_crossed_bar_with_big_resistance": feature_crossed_bar_with_big_resistance,
             "feature_total_volume": total_volume,
+            "feature_crossed_any_resistance": crossed_any_resistance,
+            "feature_crossed_any_near_resistance": crossed_any_near_resistance,
+            "feature_entry_bar_closed_strong": feature_entry_bar_closed_strong,
         }
 
         return features

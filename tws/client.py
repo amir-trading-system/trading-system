@@ -22,7 +22,6 @@ class Client(client.EClient, wrapper.EWrapper):
         logger: logging.Logger,
         client_id: int,
         is_retro: bool,
-        get_only_statistics: bool = False,
     ):
         self.order_id: int = 0
         self.available_funds: float = 0.0
@@ -52,7 +51,6 @@ class Client(client.EClient, wrapper.EWrapper):
             request_id_to_symbol=request_id_to_symbol,
             ibapi_requests=self.ibapi_requests,
             logger=logger,
-            get_only_statistics=get_only_statistics,
         )
         self.is_retro = is_retro
 
@@ -197,6 +195,8 @@ class Client(client.EClient, wrapper.EWrapper):
         stock.arrange_data_for_analysis()
         stock.finished_collection = True
         unique_key = f"{stock.symbol_name}-{stock.specific_bar_time}"
+        if self.is_retro:
+            unique_key = f"{stock.symbol_name}-{stock.expected_bar_time}"
         if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
             self.bars_ready_to_analyze_queue.put(stock)
             self.already_monitored.add(unique_key)

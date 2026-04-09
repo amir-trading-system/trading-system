@@ -11,8 +11,10 @@ class Evidence:
     def __init__(
         self,
         logger: logging.Logger,
+        stock: common.objects.Stock,
     ):
         self.logger = logger
+        self.relevant_bars = stock.bars[1:]
 
     def is_potential_starting_bar(
         self,
@@ -57,7 +59,7 @@ class Evidence:
             and bar_object.histogram > 0
             and bar_object.volume/bar_object.volume_average > 7
             and max(
-                stock.bars[bar_object.index:],
+                stock.bars[bar_object.index:bar_object.index+20],
                 key=lambda bar_obj: bar_obj.volume
             ) == bar_object
         )
@@ -72,12 +74,13 @@ class Evidence:
             previous_bar = stock.previous_bar(
                 bar_object=bar_object,
             )
+            is_potential_starting_bar = self.is_potential_starting_bar(
+                stock=stock,
+                bar_object=bar_object
+            )
             potential_starting_bar = (
                 True
-                and self.is_potential_starting_bar(
-                    stock=stock,
-                    bar_object=bar_object
-                )
+                and is_potential_starting_bar
                 and (
                     not self.is_potential_starting_bar(
                         stock=stock,
@@ -134,23 +137,6 @@ class Evidence:
                 timeframe=top_bar.timeframe,
             )
 
-    def pre_process(
-        self,
-        stock: common.objects.Stock,
-        current_bar: common.objects.BarData,
-    ) -> bool:
-        self.relevant_bars = stock.bars[1:]
-        if len(self.relevant_bars) == 0:
-            return False
-
-        stock.resistance_levels = self.get_resistance_levels(
-            stock=stock,
-            relevant_bars=self.relevant_bars,
-            current_bar=current_bar,
-        )
-
-        return True
-
     def find_evidence(
         self,
         stock: common.objects.Stock,
@@ -159,76 +145,6 @@ class Evidence:
         is_retro: bool,
     ) -> bool:
         raise NotImplementedError()
-
-    def get_resistance_levels(
-        self,
-        stock: common.objects.Stock,
-        relevant_bars: list[common.objects.BarData],
-        current_bar: common.objects.BarData,
-    ) -> list[common.objects.BarData]:
-        resistance_levels: list[common.objects.BarData] = []
-        for bar_object in relevant_bars[:current_bar.index+40]:
-            if (
-                bar_object.vwap is None
-                or bar_object.ema_9 is None
-                or bar_object.ema_20 is None
-            ):
-                continue
-
-            previous_bar = stock.previous_bar(
-                bar_object=bar_object,
-            )
-            next_bar = stock.next_bar(
-                bar_object=bar_object,
-            )
-
-            high_pattern_one = (
-                True
-                and bar_object.high > bar_object.close
-                and bar_object.high > bar_object.open_value
-                and (bar_object.high - bar_object.close)/(bar_object.high - bar_object.low) >= 0.1
-                and bar_object.high > bar_object.ema_9
-                and bar_object.high > bar_object.ema_20
-                and bar_object.high > bar_object.vwap
-                and previous_bar is not None
-                and previous_bar.high < bar_object.high
-            )
-            high_pattern_two = (
-                True
-                and previous_bar is not None
-                and next_bar is not None
-                and previous_bar.high < bar_object.high > next_bar.high
-            )
-
-            if (
-                True
-                and (high_pattern_one or high_pattern_two)
-            ):
-                resistance_level = [
-                    r_l
-                    for r_l in resistance_levels
-                    if bar_object.high == r_l.high
-                ]
-                if not resistance_level:
-                    resistance_levels.append(bar_object)
-
-        resistance_levels = sorted(
-            resistance_levels,
-            key=lambda r_l: r_l.high,
-        )
-        temp_resistance_levels = [temp_r_l for temp_r_l in resistance_levels]
-        for i, resistance_level in enumerate(temp_resistance_levels):
-            if i+1 > len(resistance_levels) - 1:
-                continue
-
-            if resistance_level.high/resistance_levels[i+1].high >= 0.95:
-                resistance_levels = [
-                    r_l
-                    for r_l in resistance_levels
-                    if r_l.bar_time != resistance_level.bar_time
-                ]
-
-        return resistance_levels
 
     def crossed_resistance_level_strongly(
         self,
@@ -332,7 +248,7 @@ class Evidence:
         if sum(
             bar_object.volume
             for bar_object in one_minute_bars
-            if bar_object.bar_time > highest_high_one_minute_bar.bar_time
+            if bar_object.index > highest_high_one_minute_bar.index+1
         ) < 100000:
             return False
 

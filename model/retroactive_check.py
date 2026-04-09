@@ -280,7 +280,7 @@ def write_to_csv(
 
     t.close()
 
-def wait_for_collection_only(
+def wait_for_collection_and_analysis_only(
     symbols_data: list[dict[str,any]],
     request_id_to_symbol: dict[int,common.objects.Stock],
 ):
@@ -289,19 +289,19 @@ def wait_for_collection_only(
     while any(
         symbol_data
         for symbol_data in symbols_data
-        if symbol_data["collection_status"] == "in_progress"
+        if symbol_data["analysis_status"] == "in_progress"
     ):
         for _, symbol in request_id_to_symbol.items():
             key = f"{symbol.symbol_name}-{symbol.expected_bar_time}"
             if key in already_finished:
                 continue
 
-            finished_collection = len([
+            finished_analysis = len([
                 symbol_obj
                 for symbol_obj in request_id_to_symbol.values()
                 if symbol_obj.symbol_name == symbol.symbol_name
                 and symbol_obj.expected_bar_time == symbol.expected_bar_time
-                and symbol_obj.finished_collection
+                and symbol_obj.finished_analyze
             ]) == 2
             relevant_symbol_data = [
                 symbol_data
@@ -310,8 +310,8 @@ def wait_for_collection_only(
                 and symbol_data["original_bar_time"] == symbol.specific_bar_time
                 and symbol_data["expected_confirmation_bar_time"] == symbol.expected_bar_time
             ][0]
-            if finished_collection and relevant_symbol_data["collection_status"] != "done":
-                relevant_symbol_data["collection_status"] = "done"
+            if finished_analysis and relevant_symbol_data["analysis_status"] != "done":
+                relevant_symbol_data["analysis_status"] = "done"
                 already_finished.append(key)
                 t.update(1)
 
@@ -472,9 +472,9 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         # common.objects.SymbolTest(
-        #     name="ONCO",
-        #     datetime_str="04.09.26T10:56:00",
-        #     is_positive=False,
+        #     name="BBGI",
+        #     datetime_str="04.09.26T14:13:00",
+        #     is_positive=True,
         # ),
     ]
     output_file_name = "model/real_case_result.csv"
@@ -501,7 +501,6 @@ def run_retroactive_check():
         logger=logger_object,
         client_id=1,
         is_retro=True,
-        get_only_statistics=get_only_statistics,
     )
 
     threading.Thread(
@@ -519,18 +518,18 @@ def run_retroactive_check():
         request_id_to_symbol=request_id_to_symbol,
         logger=logger_object,
     )
+
+    analyzer_object = analyzer.analyzer.Analyzer(
+        bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
+        waiting_for_confirmation_queue=waiting_for_confirmation_queue,
+        request_id_to_symbol=request_id_to_symbol,
+        tws_client=tws_client,
+        logger=logger_object,
+        get_only_statistics=get_only_statistics,
+    )
     counter = [len(symbols)]
 
     if not get_only_statistics:
-        analyzer_object = analyzer.analyzer.Analyzer(
-            bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
-            waiting_for_confirmation_queue=waiting_for_confirmation_queue,
-            request_id_to_symbol=request_id_to_symbol,
-            tws_client=tws_client,
-            logger=logger_object,
-        )
-        # analyzer_object.confirmator_only = True
-
         confirmator_object = buying_confirmator.confirmator.Confirmator(
             tws_client=tws_client,
             waiting_for_confirmation_queue=waiting_for_confirmation_queue,
@@ -539,15 +538,7 @@ def run_retroactive_check():
             logger=logger_object,
             should_run_model=should_run_model,
             is_retro=True,
-            # confirmation_only=True,
         )
-
-        threading.Thread(
-            target=analyzer_object.analyze_data,
-            kwargs={
-                "is_retro": True,
-            },
-        ).start()
 
         threading.Thread(
             target=confirmator_object.confirm_data,
@@ -590,6 +581,13 @@ def run_retroactive_check():
             expected_bar_time=symbol.date_time,
             is_positive=symbol.is_positive,
         )
+        threading.Thread(
+            target=analyzer_object.analyze_data,
+            kwargs={
+                "is_retro": True,
+            },
+        ).start()
+
         symbols_data.append(
             {
                 "symbol": symbol.name,
@@ -608,7 +606,7 @@ def run_retroactive_check():
 
     if get_only_statistics:
         threading.Thread(
-            target=wait_for_collection_only,
+            target=wait_for_collection_and_analysis_only,
             kwargs={
                 "symbols_data": symbols_data,
                 "request_id_to_symbol": request_id_to_symbol,

@@ -69,6 +69,9 @@ def write_to_csv(
                     "feature_bar_getting_high_while_9_ema_getting_down",
                     "feature_crossed_bar_with_big_resistance",
                     "feature_total_volume",
+                    "feature_crossed_any_resistance",
+                    "feature_crossed_any_near_resistance",
+                    "feature_entry_bar_closed_strong",
                 ],
             )
             f.flush()
@@ -123,6 +126,9 @@ def write_to_csv(
         feature_bar_getting_high_while_9_ema_getting_down = symbol_data["feature_bar_getting_high_while_9_ema_getting_down"]
         feature_crossed_bar_with_big_resistance = symbol_data["feature_crossed_bar_with_big_resistance"]
         feature_total_volume = symbol_data["feature_total_volume"]
+        feature_crossed_any_resistance = symbol_data["feature_crossed_any_resistance"]
+        feature_crossed_any_near_resistance = symbol_data["feature_crossed_any_near_resistance"]
+        feature_entry_bar_closed_strong = symbol_data["feature_entry_bar_closed_strong"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -180,6 +186,9 @@ def write_to_csv(
                     feature_bar_getting_high_while_9_ema_getting_down,
                     feature_crossed_bar_with_big_resistance,
                     feature_total_volume,
+                    feature_crossed_any_resistance,
+                    feature_crossed_any_near_resistance,
+                    feature_entry_bar_closed_strong,
                 ]
             )
 

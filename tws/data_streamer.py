@@ -1,11 +1,9 @@
 import datetime
 import logging
-import pickle
 
 from ibapi import common as ibapi_common
 
 import common
-import model
 
 
 class DataStreamer():
@@ -16,12 +14,10 @@ class DataStreamer():
         request_id_to_symbol: dict[int, common.objects.Stock],
         ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
-        get_only_statistics: bool,
     ):
         self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
         self.logger = logger
-        self.get_only_statistics = get_only_statistics
 
     def insert_one_minute_bars_into_confirmation_queues(
         self,
@@ -148,12 +144,6 @@ class DataStreamer():
             current_bar=current_bar,
         )
 
-        if ibapi_request.is_one_minute_timeframe():
-            self.save_data_for_model_training(
-                request_id=request_id,
-                current_bar=current_bar,
-            )
-
     def update_current_symbol_data_state(
         self,
         request_id: int,
@@ -202,67 +192,3 @@ class DataStreamer():
                 enriched_bar=enriched_bar,
             )
             return
-
-    def save_data_for_model_training(
-        self,
-        request_id: int,
-        current_bar: common.objects.BarData,
-    ):
-        current_bar_09_30 = datetime.datetime(
-            year=current_bar.bar_time.year,
-            month=current_bar.bar_time.month,
-            day=current_bar.bar_time.day,
-            hour=9,
-            minute=30,
-        )
-        one_minute_timeframe_stock = self.request_id_to_symbol[request_id]
-        day_timeframe_stock = self.request_id_to_symbol[one_minute_timeframe_stock.day_request_id]
-
-        if (
-            True
-            and self.get_only_statistics
-            and current_bar.bar_time == day_timeframe_stock.expected_bar_time
-        ):
-            one_minute_bars: list[common.objects.BarData] = []
-            highest_high_one_minute_bar: common.objects.BarData = None
-            for bar_object in one_minute_timeframe_stock.bars:
-                if bar_object.bar_time >= datetime.datetime(
-                    year=current_bar.bar_time.year,
-                    month=current_bar.bar_time.month,
-                    day=current_bar.bar_time.day,
-                    hour=4,
-                ) and bar_object.bar_time < current_bar.bar_time:
-                    if highest_high_one_minute_bar is None:
-                        highest_high_one_minute_bar = bar_object
-                    elif bar_object.high > highest_high_one_minute_bar.high:
-                        highest_high_one_minute_bar = bar_object
-
-                if bar_object.bar_time >= current_bar_09_30:
-                    one_minute_bars.append(bar_object)
-
-            volume_sum_since_market_open = sum(
-                bar_object.volume
-                for bar_object in one_minute_timeframe_stock.bars
-                if current_bar_09_30 <= bar_object.bar_time <= current_bar.bar_time
-            )
-
-            current_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
-                day_timeframe_stock=day_timeframe_stock,
-                one_minute_timeframe_stock=one_minute_timeframe_stock,
-                potential_confirmation_bar=current_bar,
-                highest_high_one_minute_bar=highest_high_one_minute_bar,
-                volume_sum_since_market_open=volume_sum_since_market_open,
-                one_minute_bars=one_minute_bars,
-            )
-            with open(f"model/training/data/{day_timeframe_stock.symbol_name}-{day_timeframe_stock.expected_bar_time}.json", "wb") as f:
-                pickle.dump(
-                    {
-                        "day_timeframe_stock": day_timeframe_stock,
-                        "one_minute_timeframe_stock": one_minute_timeframe_stock,
-                        "potential_confirmation_bar": current_bar,
-                        "highest_high_one_minute_bar": highest_high_one_minute_bar,
-                        "volume_sum_since_market_open": volume_sum_since_market_open,
-                        "one_minute_bars": one_minute_bars,
-                    },
-                    f,
-                )

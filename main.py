@@ -132,7 +132,6 @@ if __name__ == "__main__":
         logger=logger_object,
         client_id=0,
         is_retro=False,
-        get_only_statistics=False,
     )
     collector_obj = collector.collector.Collector(
         tws_client=tws_client,
@@ -146,6 +145,7 @@ if __name__ == "__main__":
         alerter_object=alerter_object,
         tws_client=tws_client,
         logger=logger_object,
+        get_only_statistics=False,
     )
     confirmator_obj = buying_confirmator.confirmator.Confirmator(
         tws_client=tws_client,

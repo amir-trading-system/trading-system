@@ -46,7 +46,6 @@ class Analyzer:
         current_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
         is_retro: bool,
-        confirmator_only: bool,
     ):
         if self.should_write_log:
             self.logger.info(
@@ -99,14 +98,6 @@ class Analyzer:
                 )
                 self.has_indication.append(unique_key)
                 break
-            if confirmator_only:
-                self.waiting_for_confirmation_queue.put(
-                    {
-                        "bar_to_confirm": current_bar,
-                        "milestones": milestones,
-                    },
-                )
-                break
 
         self.request_id_to_symbol[stock.request_id].finished_analyze = True
         if self.should_write_log:
@@ -131,7 +122,6 @@ class Analyzer:
         stock: common.objects.Stock,
         current_bar: common.objects.BarData,
         is_retro: bool,
-        confirmator_only: bool,
     ):
         unique_key = current_bar.generate_unique_key()
         if unique_key in self.has_indication:
@@ -180,5 +170,4 @@ class Analyzer:
             current_bar=current_bar,
             milestones=milestones,
             is_retro=is_retro,
-            confirmator_only=confirmator_only,
         )

@@ -20,7 +20,6 @@ class Confirmator:
         should_run_model: bool,
         alerter_object: alerter.alerter.Alerter = None,
         is_retro: bool = False,
-        confirmation_only: bool = False,
     ):
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
         self.request_id_to_symbol = request_id_to_symbol
@@ -34,7 +33,6 @@ class Confirmator:
             logger=logger,
             results_queue=results_queue,
             alerter_object=alerter_object,
-            confirmation_only=confirmation_only,
         )
 
     def confirm_data(
