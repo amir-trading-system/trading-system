@@ -521,6 +521,7 @@ class DataExtractor:
             "feature_entry_bar_close_to_crossed_highest_high_pct": potential_confirmation_bar.close/highest_high_one_minute_bar.high,
             "feature_bar_getting_high_while_9_ema_getting_down": feature_bar_getting_high_while_9_ema_getting_down,
             "feature_crossed_bar_with_big_resistance": feature_crossed_bar_with_big_resistance,
+            "feature_total_volume": total_volume,
         }
 
         return features

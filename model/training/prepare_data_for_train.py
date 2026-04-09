@@ -68,6 +68,7 @@ def write_to_csv(
                     "feature_entry_bar_close_to_crossed_highest_high_pct",
                     "feature_bar_getting_high_while_9_ema_getting_down",
                     "feature_crossed_bar_with_big_resistance",
+                    "feature_total_volume",
                 ],
             )
             f.flush()
@@ -77,49 +78,6 @@ def write_to_csv(
 
         symbol = stock_object.symbol_name
         original_bar_time = stock_object.specific_bar_time
-
-        feature_price_minus_vwap_at_entry = 0
-        feature_histogram_negative_momentum_pct = 0
-        feature_bars_with_at_least_50_pct_wick_pct = 0
-        feature_bars_with_lower_volume_average_pct = 0
-        feature_high_volume_bars_with_rejection_pct = 0
-        feature_volume_per_minute_to_bar_volume = 0
-        feature_bars_with_rejection_inside_entry_bar_range_pct = 0
-        feature_positive_vs_negative_volume = 0
-        feature_positive_vs_negative_movement = 0
-        feature_entry_strength_vs_avg = 0
-        feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = 0
-        feature_bars_without_movement_pct_above_threshold = 0
-        feature_volume_average_goes_up_pct = 0
-        feature_overlapped_bars_since_market_open_pct = 0
-        feature_entry_bar_volume_average_above_threshold = 0
-        feature_volume_avergae_above_10000_pct_above_threshold = 0
-        feature_is_there_highest_high_after_market_open = 0
-        feature_distance_from_highest_high_since_market_open = 0
-        feature_entry_bar_lowest_wick_to_bar_body_pct = 0
-        feature_entry_bar_volume = 0
-        feature_entry_volume_vs_total_volume = 0
-        feature_distance_from_highest_high = 0
-        feature_bars_with_rejection_since_market_open = 0
-        feature_entry_point_size_to_bars_size_average = 0
-        feature_volume_average_to_volume = 0
-        feature_entry_bar_has_highest_volume = 0
-        feature_entry_bar_is_biggest_bar = 0
-        feature_entry_bar_is_highest = 0
-        feature_histogram_changed_directions_pct = 0
-        feature_volume_average_goes_down_pct = 0
-        feature_strong_negative_bars_pct = 0
-        feature_rejected_pick_points_pct = 0
-        feature_price_action_is_stuck_pct = 0
-        feature_bars_closed_above_half_of_bar_pct = 0
-        feature_stronger_than_previous_bars_pct = 0
-        feature_bars_with_ordered_indicators_pct = 0
-        feature_last_bars_positive_movement_pct = 0
-        feature_indecision_bars_pct = 0
-        feature_negative_bars_with_positive_histogram_pct = 0
-        feature_entry_bar_close_to_crossed_highest_high_pct = 0
-        feature_bar_getting_high_while_9_ema_getting_down = 0
-        feature_crossed_bar_with_big_resistance = 0
 
         feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
         feature_histogram_negative_momentum_pct = symbol_data["feature_histogram_negative_momentum_pct"]
@@ -164,6 +122,7 @@ def write_to_csv(
         feature_entry_bar_close_to_crossed_highest_high_pct = symbol_data["feature_entry_bar_close_to_crossed_highest_high_pct"]
         feature_bar_getting_high_while_9_ema_getting_down = symbol_data["feature_bar_getting_high_while_9_ema_getting_down"]
         feature_crossed_bar_with_big_resistance = symbol_data["feature_crossed_bar_with_big_resistance"]
+        feature_total_volume = symbol_data["feature_total_volume"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -220,6 +179,7 @@ def write_to_csv(
                     feature_entry_bar_close_to_crossed_highest_high_pct,
                     feature_bar_getting_high_while_9_ema_getting_down,
                     feature_crossed_bar_with_big_resistance,
+                    feature_total_volume,
                 ]
             )
 
