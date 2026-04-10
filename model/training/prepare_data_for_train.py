@@ -34,11 +34,12 @@ def write_to_csv(
                     "feature_bars_with_rejection_inside_entry_bar_range_pct",
                     "feature_positive_vs_negative_volume",
                     "feature_positive_vs_negative_movement",
-                    "feature_entry_strength_vs_avg",
                     "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
                     "feature_bars_without_movement_pct_above_threshold",
+                    "feature_entry_strength_vs_avg",
                     "feature_volume_average_goes_up_pct",
                     "feature_overlapped_bars_since_market_open_pct",
+                    "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
                     "feature_crossed_highest_high",
                     "feature_entry_bar_volume_average_above_threshold",
                     "feature_volume_avergae_above_10000_pct_above_threshold",
@@ -91,11 +92,12 @@ def write_to_csv(
         feature_bars_with_rejection_inside_entry_bar_range_pct = symbol_data["feature_bars_with_rejection_inside_entry_bar_range_pct"]
         feature_positive_vs_negative_volume = symbol_data["feature_positive_vs_negative_volume"]
         feature_positive_vs_negative_movement = symbol_data["feature_positive_vs_negative_movement"]
-        feature_entry_strength_vs_avg = symbol_data["feature_entry_strength_vs_avg"]
         feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold = symbol_data["feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold"]
         feature_bars_without_movement_pct_above_threshold = symbol_data["feature_bars_without_movement_pct_above_threshold"]
+        feature_entry_strength_vs_avg = symbol_data["feature_entry_strength_vs_avg"]
         feature_volume_average_goes_up_pct = symbol_data["feature_volume_average_goes_up_pct"]
         feature_overlapped_bars_since_market_open_pct = symbol_data["feature_overlapped_bars_since_market_open_pct"]
+        feature_weak_bars_to_bars_since_highest_high_to_total_bars = symbol_data["feature_weak_bars_to_bars_since_highest_high_to_total_bars"]
         feature_crossed_highest_high = symbol_data["feature_crossed_highest_high"]
         feature_entry_bar_volume_average_above_threshold = symbol_data["feature_entry_bar_volume_average_above_threshold"]
         feature_volume_avergae_above_10000_pct_above_threshold = symbol_data["feature_volume_avergae_above_10000_pct_above_threshold"]
@@ -156,6 +158,7 @@ def write_to_csv(
                     feature_bars_without_movement_pct_above_threshold,
                     feature_volume_average_goes_up_pct,
                     feature_overlapped_bars_since_market_open_pct,
+                    feature_weak_bars_to_bars_since_highest_high_to_total_bars,
                     feature_crossed_highest_high,
                     feature_entry_bar_volume_average_above_threshold,
                     feature_volume_avergae_above_10000_pct_above_threshold,

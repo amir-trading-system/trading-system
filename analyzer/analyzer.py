@@ -189,7 +189,7 @@ class Analyzer:
                 elif bar_object.high > highest_high_one_minute_bar.high:
                     highest_high_one_minute_bar = bar_object
 
-            if bar_object.bar_time >= current_bar_09_30:
+            if current_bar_09_30 <= bar_object.bar_time <=current_bar.bar_time:
                 one_minute_bars.append(bar_object)
 
         volume_sum_since_market_open = sum(

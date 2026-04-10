@@ -482,7 +482,7 @@ class DataExtractor:
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.volume > previous_bar.volume
             and potential_confirmation_bar.body_percentage > 0.7
-            and potential_confirmation_bar.bar_wick_percentage < 0.2
+            and potential_confirmation_bar.bar_wick_percentage < 0.3
         )
 
         features = {
