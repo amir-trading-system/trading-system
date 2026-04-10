@@ -81,6 +81,7 @@ class DataExtractor:
         bars_with_ordered_indicators_counter = 0
         indecision_bars_counter = 0
         negative_bars_with_positive_histogram = 0
+        highest_volume_average = 0
 
         for bar_object in one_minute_bars:
             if bar_object.bar_time < potential_confirmation_bar.bar_time:
@@ -90,6 +91,8 @@ class DataExtractor:
             above_volume_average = bar_object.volume > bar_object.volume_average
             above_vwap = bar_object.close > bar_object.vwap
             above_9_ema = bar_object.close > bar_object.ema_9
+            if bar_object.volume_average > highest_volume_average:
+                highest_volume_average = bar_object.volume_average
 
             previous_bar = one_minute_timeframe_stock.previous_bar(
                 bar_object=bar_object,
@@ -484,6 +487,9 @@ class DataExtractor:
             and potential_confirmation_bar.body_percentage > 0.7
             and potential_confirmation_bar.bar_wick_percentage < 0.3
         )
+        feature_current_macd_to_previous = 0
+        if previous_bar is not None:
+            feature_current_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd
 
         features = {
             "feature_price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
@@ -534,6 +540,8 @@ class DataExtractor:
             "feature_crossed_any_resistance": crossed_any_resistance,
             "feature_crossed_any_near_resistance": crossed_any_near_resistance,
             "feature_entry_bar_closed_strong": feature_entry_bar_closed_strong,
+            "feature_current_macd_to_previous": feature_current_macd_to_previous,
+            "feature_highest_volume_average_greater_than_entry_bar": highest_volume_average > potential_confirmation_bar.volume_average,
         }
 
         return features
