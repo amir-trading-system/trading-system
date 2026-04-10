@@ -126,7 +126,7 @@ class BarData:
             True
             and self.above_volume_average
             and self.close < self.high
-            and self.open_value > self.low
+            and self.low/self.open_value < 0.9
             and self.body_percentage < 0.7
         )
 

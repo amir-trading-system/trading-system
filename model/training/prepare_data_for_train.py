@@ -75,6 +75,11 @@ def write_to_csv(
                     "feature_entry_bar_closed_strong",
                     "feature_current_macd_to_previous",
                     "feature_highest_volume_average_greater_than_entry_bar",
+                    # "feature_highest_high_was_recently",
+                    # "feature_ema_9_crossed_down_ema_20_since_pullback",
+                    # "feature_bar_closed_under_vwap_during_pullback",
+                    # "feature_bar_histogram_changed_direction",
+                    "feature_entry_bar_shape_is_good",
                 ],
             )
             f.flush()
@@ -135,6 +140,11 @@ def write_to_csv(
         feature_entry_bar_closed_strong = symbol_data["feature_entry_bar_closed_strong"]
         feature_current_macd_to_previous = symbol_data["feature_current_macd_to_previous"]
         feature_highest_volume_average_greater_than_entry_bar = symbol_data["feature_highest_volume_average_greater_than_entry_bar"]
+        # feature_highest_high_was_recently = symbol_data["feature_highest_high_was_recently"]
+        # feature_ema_9_crossed_down_ema_20_since_pullback = symbol_data["feature_ema_9_crossed_down_ema_20_since_pullback"]
+        # feature_bar_closed_under_vwap_during_pullback = symbol_data["feature_bar_closed_under_vwap_during_pullback"]
+        # feature_bar_histogram_changed_direction = symbol_data["feature_bar_histogram_changed_direction"]
+        feature_entry_bar_shape_is_good = symbol_data["feature_entry_bar_shape_is_good"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -198,6 +208,11 @@ def write_to_csv(
                     feature_entry_bar_closed_strong,
                     feature_current_macd_to_previous,
                     feature_highest_volume_average_greater_than_entry_bar,
+                    # feature_highest_high_was_recently,
+                    # feature_ema_9_crossed_down_ema_20_since_pullback,
+                    # feature_bar_closed_under_vwap_during_pullback,
+                    # feature_bar_histogram_changed_direction,
+                    feature_entry_bar_shape_is_good,
                 ]
             )
 

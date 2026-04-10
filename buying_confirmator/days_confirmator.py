@@ -131,6 +131,24 @@ class Confirmator:
         if should_wait_for_next_bar and not bar_is_strong_than_before:
             return bar_has_confirmed
 
+        temp_one_minute_bars = sorted(
+            [
+                one_minute_bar
+                for one_minute_bar in one_minute_bars
+                if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
+            ],
+            key=lambda bar_object: bar_object.bar_time,
+            reverse=True
+        )
+
+        if not self.bar_has_potential(
+            stock=stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_bars=temp_one_minute_bars,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+        ):
+            return bar_has_confirmed
+
         confirmed_evidences: list[str] = []
         stock_is_valid_for_evidence = False
         transmit_order = False
@@ -155,16 +173,6 @@ class Confirmator:
                 is_retro=self.is_retro,
             ):
                 continue
-
-            temp_one_minute_bars = sorted(
-                [
-                    one_minute_bar
-                    for one_minute_bar in one_minute_bars
-                    if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
-                ],
-                key=lambda bar_object: bar_object.bar_time,
-                reverse=True
-            )
 
             one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
 
@@ -416,3 +424,55 @@ class Confirmator:
             )
 
         return
+
+    def bar_has_potential(
+        self,
+        stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
+        highest_high_one_minute_bar: common.objects.BarData,
+    ) -> bool:
+        if potential_confirmation_bar.volume < 20000:
+            return False
+
+        if self.highest_high_occurred_more_than_once_in_the_last_bars(
+            stock=stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_bars=one_minute_bars,
+        ):
+            return False
+
+        if sum(
+            bar_object.volume
+            for bar_object in one_minute_bars
+            if bar_object.index > highest_high_one_minute_bar.index+1
+        ) < 100000:
+            return False
+
+        if potential_confirmation_bar.buyers_are_indecision:
+            return False
+
+        return True
+
+    def highest_high_occurred_more_than_once_in_the_last_bars(
+        self,
+        stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
+    ) -> bool:
+        if len(one_minute_bars) < 3:
+            return False
+
+        current_bar_is_highest_high = max(
+            bar_object.high
+            for bar_object in one_minute_bars
+        ) == potential_confirmation_bar.high
+
+        previous_bar_was_highest_high = max(
+            bar_object.high
+            for bar_object in one_minute_bars[2:]
+        )/one_minute_bars[1].high < 0.95
+
+        current_bar_crossed_stock_highest_high = potential_confirmation_bar.low < stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close
+
+        return current_bar_is_highest_high and previous_bar_was_highest_high and not current_bar_crossed_stock_highest_high

@@ -181,6 +181,18 @@ class Client(client.EClient, wrapper.EWrapper):
         end: str,
     ):
         stock = self.request_id_to_symbol[reqId]
+        stock.arrange_data_for_analysis()
+        stock.finished_collection = True
+        unique_key = f"{stock.symbol_name}-{stock.specific_bar_time}"
+        if self.is_retro:
+            unique_key = f"{stock.symbol_name}-{stock.expected_bar_time}"
+        if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
+            self.bars_ready_to_analyze_queue.put(stock)
+            self.already_monitored.add(unique_key)
+
+        if self.is_retro and not stock.is_worth_to_monitor():
+            stock.finished_analyze = True
+
         self.logger.info(
             msg="Finished to collect data for symbol",
             extra={
@@ -191,18 +203,6 @@ class Client(client.EClient, wrapper.EWrapper):
                 "request_id": stock.request_id,
             }
         )
-
-        stock.arrange_data_for_analysis()
-        stock.finished_collection = True
-        unique_key = f"{stock.symbol_name}-{stock.specific_bar_time}"
-        if self.is_retro:
-            unique_key = f"{stock.symbol_name}-{stock.expected_bar_time}"
-        if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
-            self.bars_ready_to_analyze_queue.put(stock)
-            self.already_monitored.add(unique_key)
-            return
-        if self.is_retro and not stock.is_worth_to_monitor():
-            stock.finished_analyze = True
 
     def historicalDataUpdate(
         self,

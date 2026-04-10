@@ -491,6 +491,59 @@ class DataExtractor:
         if previous_bar is not None:
             feature_current_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd
 
+        ema_9_crossed_down_ema_20_since_pullback = any(
+            bar_object
+            for bar_object in bars_since_highest_high
+            if bar_object.ema_9 < bar_object.ema_20
+        )
+        bar_closed_under_vwap_during_pullback = any(
+            bar_object
+            for bar_object in bars_since_highest_high
+            if bar_object.close < bar_object.vwap
+        )
+
+        two_bars_back_bar = None
+        if previous_bar is not None:
+            two_bars_back_bar = one_minute_timeframe_stock.previous_bar(
+                bar_object=previous_bar,
+            )
+        feature_bar_histogram_changed_direction = (
+            True
+            and previous_bar is not None
+            and two_bars_back_bar is not None
+            and previous_bar.histogram < two_bars_back_bar.histogram
+            and previous_bar.histogram < potential_confirmation_bar.histogram
+        ) or (
+            True
+            and previous_bar is not None
+            and previous_bar.histogram > 0
+            and previous_bar.macd > 0
+            and previous_bar.histogram/potential_confirmation_bar.histogram < 0.5
+            and potential_confirmation_bar.ema_9 > potential_confirmation_bar.ema_20
+            and potential_confirmation_bar.ema_20 > potential_confirmation_bar.vwap
+            and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
+            and 0.95 < potential_confirmation_bar.ema_9/potential_confirmation_bar.open_value < 1.05
+        )
+        previous_bar_is_highest = False
+        if previous_bar is not None and previous_bar.is_after_market_open:
+            relevant_bars = [b for b in one_minute_bars if b.bar_time < previous_bar.bar_time]
+            if relevant_bars:
+                previous_bar_is_highest = max(
+                    b.high
+                    for b in relevant_bars
+                ) < previous_bar.high
+
+        feature_entry_bar_shape_is_good = (
+            True
+            and previous_bar.is_after_market_open
+            and not previous_bar_is_highest
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+            and potential_confirmation_bar.ema_9 > potential_confirmation_bar.ema_20
+            and potential_confirmation_bar.ema_20 > potential_confirmation_bar.vwap
+            and 0.95 < potential_confirmation_bar.ema_9/potential_confirmation_bar.open_value < 1.05
+            and potential_confirmation_bar.body_percentage > 0.5
+        )
+
         features = {
             "feature_price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
             "feature_histogram_negative_momentum_pct": feature_histogram_negative_momentum_pct,
@@ -542,6 +595,11 @@ class DataExtractor:
             "feature_entry_bar_closed_strong": feature_entry_bar_closed_strong,
             "feature_current_macd_to_previous": feature_current_macd_to_previous,
             "feature_highest_volume_average_greater_than_entry_bar": highest_volume_average > potential_confirmation_bar.volume_average,
+            "feature_highest_high_was_recently": highest_high_one_minute_bar.index < potential_confirmation_bar.index+30,
+            "feature_ema_9_crossed_down_ema_20_since_pullback": ema_9_crossed_down_ema_20_since_pullback,
+            "feature_bar_closed_under_vwap_during_pullback": bar_closed_under_vwap_during_pullback,
+            "feature_bar_histogram_changed_direction": feature_bar_histogram_changed_direction,
+            "feature_entry_bar_shape_is_good": feature_entry_bar_shape_is_good,
         }
 
         return features

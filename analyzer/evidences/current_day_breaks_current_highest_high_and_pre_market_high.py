@@ -70,8 +70,8 @@ class Evidence(
         crossed_highest_high = potential_confirmation_bar.low < highest_high_until_now < potential_confirmation_bar.close
         bar_bigger_than_previous_bars = not any(
             bar_object
-            for bar_object in one_minute_bars[1:20]
-            if abs(bar_object.close - bar_object.open_value) > potential_confirmation_bar.close - potential_confirmation_bar.open_value
+            for bar_object in one_minute_bars[1:10]
+            if (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/abs(bar_object.close - bar_object.open_value) < 0.8
         )
 
         confirmed_bar = (
