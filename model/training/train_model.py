@@ -113,46 +113,6 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
 
     final_shares_columns = []
     for feature in shared:
-        # if str(feature) in [
-        #     "feature_volume_before_middle_point_vs_after_middle_point_pct_above_threshold",
-        #     "feature_volume_average_goes_up_pct",
-        #     "feature_overlapped_bars_since_market_open_pct",
-        #     "feature_positive_vs_negative_volume",
-        #     "feature_bars_with_rejection_inside_entry_bar_range_pct",
-        #     "feature_volume_per_minute_to_bar_volume",
-        #     "feature_entry_point_size_to_bars_size_average",
-        #     "feature_rejected_pick_points_pct",
-        #     "feature_entry_bar_lowest_wick_to_bar_body_pct",
-        #     "feature_positive_vs_negative_movement",
-        #     "feature_strong_negative_bars_pct",
-        #     "feature_price_action_is_stuck_pct",
-        #     "feature_price_minus_vwap_at_entry",
-        #     "feature_histogram_negative_momentum_pct",
-        #     "feature_bars_with_at_least_50_pct_wick_pct",
-        #     "feature_bars_with_lower_volume_average_pct",
-        #     "feature_high_volume_bars_with_rejection_pct",
-        #     "feature_entry_strength_vs_avg",
-        #     "feature_crossed_highest_high",
-        #     "feature_volume_avergae_above_10000_pct_above_threshold",
-        #     "feature_volume_average_to_volume",
-        #     "feature_histogram_changed_directions_pct",
-        #     "feature_bars_with_ordered_indicators_pct",
-        #     "feature_bars_closed_above_half_of_bar_pct",
-        #     "feature_last_bars_positive_movement_pct",
-        #     "feature_indecision_bars_pct",
-        #     "feature_negative_bars_with_positive_histogram_pct",
-        #     "feature_entry_bar_close_to_crossed_highest_high_pct",
-        #     "feature_entry_bar_is_biggest_bar",
-        #     "feature_entry_bar_volume_average_above_threshold",
-        #     "feature_bar_getting_high_while_9_ema_getting_down",
-        #     "feature_crossed_bar_with_big_resistance",
-        #     "feature_total_volume",
-        #     "feature_crossed_any_resistance",
-        #     "feature_crossed_any_near_resistance",
-        #     "feature_entry_bar_closed_strong",
-        #     "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
-        # ]:
-
         if feature.startswith("feature_"):
             final_shares_columns.append(feature)
 
@@ -347,7 +307,6 @@ def choose_stable_features(feature_report_df: pd.DataFrame):
 
     return selected
 
-
 def apply_hard_rules(df: pd.DataFrame) -> pd.Series:
     """
     Return True for rows that are allowed to pass.
@@ -362,6 +321,8 @@ def apply_hard_rules(df: pd.DataFrame) -> pd.Series:
     weak_col = "feature_weak_bars_to_bars_since_highest_high_to_total_bars"
     if weak_col in df.columns:
         allowed &= df[weak_col].fillna(0) < 0.95
+    if "feature_volume_bigger_than_last_10_bars_pct" in df.columns:
+        allowed &= df["feature_volume_bigger_than_last_10_bars_pct"].fillna(0) >= 0.5
 
     return allowed
 

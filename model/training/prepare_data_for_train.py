@@ -79,7 +79,9 @@ def write_to_csv(
                     # "feature_ema_9_crossed_down_ema_20_since_pullback",
                     # "feature_bar_closed_under_vwap_during_pullback",
                     # "feature_bar_histogram_changed_direction",
+                    # "feature_bars_been_crossed_in_the_last_10_bars_pct",
                     "feature_entry_bar_shape_is_good",
+                    "feature_volume_bigger_than_last_10_bars_pct",
                 ],
             )
             f.flush()
@@ -144,7 +146,9 @@ def write_to_csv(
         # feature_ema_9_crossed_down_ema_20_since_pullback = symbol_data["feature_ema_9_crossed_down_ema_20_since_pullback"]
         # feature_bar_closed_under_vwap_during_pullback = symbol_data["feature_bar_closed_under_vwap_during_pullback"]
         # feature_bar_histogram_changed_direction = symbol_data["feature_bar_histogram_changed_direction"]
+        # feature_bars_been_crossed_in_the_last_10_bars_pct = symbol_data["feature_bars_been_crossed_in_the_last_10_bars_pct"]
         feature_entry_bar_shape_is_good = symbol_data["feature_entry_bar_shape_is_good"]
+        feature_volume_bigger_than_last_10_bars_pct = symbol_data["feature_volume_bigger_than_last_10_bars_pct"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -212,7 +216,9 @@ def write_to_csv(
                     # feature_ema_9_crossed_down_ema_20_since_pullback,
                     # feature_bar_closed_under_vwap_during_pullback,
                     # feature_bar_histogram_changed_direction,
+                    # feature_bars_been_crossed_in_the_last_10_bars_pct,
                     feature_entry_bar_shape_is_good,
+                    feature_volume_bigger_than_last_10_bars_pct,
                 ]
             )
 

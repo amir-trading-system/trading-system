@@ -82,6 +82,7 @@ class DataExtractor:
         indecision_bars_counter = 0
         negative_bars_with_positive_histogram = 0
         highest_volume_average = 0
+        bars_with_rejection_counter = 0
 
         for bar_object in one_minute_bars:
             if bar_object.bar_time < potential_confirmation_bar.bar_time:
@@ -118,6 +119,35 @@ class DataExtractor:
                 and (bar_object.high - bar_object.close)/(bar_object.high - bar_object.low) < 0.5
             ):
                 bars_closed_above_half_of_bar_counter += 1
+
+            if (
+                True
+                and previous_bar is not None
+                and next_bar is not None
+                and previous_bar.is_after_market_open
+                and bar_object.index - potential_confirmation_bar.index < 10
+                and bar_object.high > previous_bar.high
+                and bar_object.high > next_bar.high
+                and bar_object.volume > bar_object.volume_average
+                and bar_object.volume > next_bar.volume
+                and bar_object.volume > previous_bar.volume
+                and bar_object.bar_wick_percentage > 0.1
+            ):
+                bars_with_rejection_counter += 1
+
+            if (
+                True
+                and next_bar is not None
+                and bar_object.index - potential_confirmation_bar.index < 10
+                and not next_bar.is_positive
+                and bar_object.is_positive
+                and above_volume_average
+                and above_9_ema
+                and above_vwap
+                and next_bar.volume > next_bar.volume_average
+                and next_bar.close < bar_object.low
+            ):
+                bars_with_rejection_counter += 1
 
             if (
                 True
@@ -542,7 +572,17 @@ class DataExtractor:
             and potential_confirmation_bar.ema_20 > potential_confirmation_bar.vwap
             and 0.95 < potential_confirmation_bar.ema_9/potential_confirmation_bar.open_value < 1.05
             and potential_confirmation_bar.body_percentage > 0.5
+            and (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) < 0.4
+            and bars_with_rejection_counter < 3
         )
+
+        volume_bigger_than_last_bars_count = 0
+        bars_been_crossed_count = 0
+        for bar_object in one_minute_bars[1:11]:
+            if bar_object.volume < potential_confirmation_bar.volume:
+                volume_bigger_than_last_bars_count += 1
+            if potential_confirmation_bar.open_value < bar_object.high < potential_confirmation_bar.high:
+                bars_been_crossed_count += 1
 
         features = {
             "feature_price_minus_vwap_at_entry": potential_confirmation_bar.close - potential_confirmation_bar.vwap,
@@ -600,6 +640,8 @@ class DataExtractor:
             "feature_bar_closed_under_vwap_during_pullback": bar_closed_under_vwap_during_pullback,
             "feature_bar_histogram_changed_direction": feature_bar_histogram_changed_direction,
             "feature_entry_bar_shape_is_good": feature_entry_bar_shape_is_good,
+            "feature_volume_bigger_than_last_10_bars_pct": volume_bigger_than_last_bars_count/10,
+            "feature_bars_been_crossed_in_the_last_10_bars_pct": bars_been_crossed_count/10,
         }
 
         return features
