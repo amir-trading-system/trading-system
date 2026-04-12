@@ -201,7 +201,7 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         common.objects.SymbolTest(
             name="SMX",
             datetime_str="02.06.26T10:16:00",
-            is_positive=False,
+            is_positive=True,
         ),
         common.objects.SymbolTest(
             name="QVCGP",

@@ -20,7 +20,7 @@ POSITIVE_CSV = "model/training/positive_results.csv"
 FALSE_POSITIVE_CSV = "model/training/false_positive_results.csv"
 
 RANDOM_STATE = 42
-TEST_SIZE = 0.30
+TEST_SIZE = 0.3
 
 # CV for feature stability + threshold tuning
 CV_SPLITS = 5
@@ -639,17 +639,6 @@ joblib.dump(
     },
     BUNDLE_PATH,
 )
-
-print("\n================ FILES SAVED ================\n")
-print(TRAIN_SCORED_OUTPUT)
-print(POSITIVE_SCORED_OUTPUT)
-print(FALSE_POSITIVE_SCORED_OUTPUT)
-print(CV_FEATURE_REPORT_OUTPUT)
-print(CV_FOLD_REPORT_OUTPUT)
-print(MODEL_INFO_OUTPUT)
-print(MODEL_PATH)
-print(IMPUTER_PATH)
-print(BUNDLE_PATH)
 
 # ------------------------------------------------------------
 # SAMPLE LIVE OUTPUT

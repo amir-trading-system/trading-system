@@ -5,28 +5,6 @@ import common
 
 class DataExtractor:
     @staticmethod
-    def overlapped_bars_since_market_open_pct(
-        one_minute_timeframe_stock: common.objects.Stock,
-        one_minute_bars: list[common.objects.BarData],
-    ) -> float:
-        overlapped_bars_counter = 0
-
-        for bar_object in one_minute_bars:
-            previous_bar = one_minute_timeframe_stock.previous_bar(
-                bar_object=bar_object,
-            )
-
-            if (
-                True
-                and previous_bar is not None
-                and previous_bar.low <= bar_object.open_value <= previous_bar.high
-                and previous_bar.low <= bar_object.close <= previous_bar.high
-            ):
-                overlapped_bars_counter += 1
-
-        return overlapped_bars_counter/len(one_minute_bars)
-
-    @staticmethod
     def extract_features_from_symbol_data(
         day_timeframe_stock: common.objects.Stock,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -36,6 +14,8 @@ class DataExtractor:
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
         total_bars = len(one_minute_bars)
+        minutes_since_market_open = ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30
+
         total_volume = 0
         positive_volume_sum = 0
         negative_volume_sum = 0
@@ -43,12 +23,10 @@ class DataExtractor:
         negative_movement = 0
         positive_histograms_sum = 0
         negative_histograms_sum = 0
-
         positive_bars_counter = 0
         negative_bars_counter = 0
         last_bars_positive_bars = 0
         last_bars_negative_bars = 0
-
         bars_with_at_least_50_pct_wick_counter = 0
         strong_positive_bars_with_full_body_counter = 0
         bars_with_negative_momentum_histogram_counter = 0
@@ -83,6 +61,13 @@ class DataExtractor:
         negative_bars_with_positive_histogram = 0
         highest_volume_average = 0
         bars_with_rejection_counter = 0
+        overlapped_bars_counter = 0
+        volume_sum_from_market_start_to_middle_point = 0
+        volume_sum_from_middle_point_to_entry_point = 0
+        bars_since_highest_high: list[common.objects.BarData] = []
+        volume_to_volume_average_ratio_since_highest_high = 0
+        last_10_bars_range_sum = 0
+        weak_bars_since_highest_high = 0
 
         for bar_object in one_minute_bars:
             if bar_object.bar_time < potential_confirmation_bar.bar_time:
@@ -134,6 +119,19 @@ class DataExtractor:
                 and bar_object.bar_wick_percentage > 0.1
             ):
                 bars_with_rejection_counter += 1
+
+            if (
+                True
+                and previous_bar is not None
+                and previous_bar.low <= bar_object.open_value <= previous_bar.high
+                and previous_bar.low <= bar_object.close <= previous_bar.high
+            ):
+                overlapped_bars_counter += 1
+
+            if bar_object.index <= potential_confirmation_bar.index + round(minutes_since_market_open/2):
+                volume_sum_from_middle_point_to_entry_point += bar_object.volume
+            else:
+                volume_sum_from_market_start_to_middle_point += bar_object.volume
 
             if (
                 True
@@ -191,6 +189,17 @@ class DataExtractor:
                 and bar_object.histogram < next_bar.histogram
             ):
                 histogram_changed_directions_counter += 1
+
+            if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time:
+                bars_since_highest_high.append(bar_object)
+                volume_to_volume_average_ratio_since_highest_high += bar_object.volume/bar_object.volume_average
+                if (
+                    True
+                    and bar_object.ema_9 < bar_object.vwap
+                    and bar_object.close < bar_object.vwap
+                    and bar_object.volume/bar_object.volume_average <= 1.1
+                ):
+                    weak_bars_since_highest_high += 1
 
             if (
                 True
@@ -341,6 +350,9 @@ class DataExtractor:
             ):
                 bars_ema_above_vwap_counter += 1
 
+            if bar_object.bar_time + datetime.timedelta(minutes=10) >= potential_confirmation_bar.bar_time:
+                last_10_bars_range_sum += bar_object.high - bar_object.low
+
         feature_bars_with_rejection_inside_entry_bar_range_pct = 0
         max_bars_since_first_breakout_attempt = 0
         if bars_with_rejection_inside_entry_bar_range:
@@ -352,19 +364,6 @@ class DataExtractor:
 
             feature_bars_with_rejection_inside_entry_bar_range_pct = breakout_attempts_total_bars/max_bars_since_first_breakout_attempt
 
-        minutes_since_market_open = ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30
-
-        volume_sum_from_middle_point_to_entry_point = sum(
-            bar_object.volume
-            for bar_object in one_minute_bars
-            if bar_object.index <= potential_confirmation_bar.index + round(minutes_since_market_open/2)
-        )
-        volume_sum_from_market_start_to_middle_point = sum(
-            bar_object.volume
-            for bar_object in one_minute_bars
-            if bar_object.index > potential_confirmation_bar.index + round(minutes_since_market_open/2)
-        )
-
         feature_volume_before_middle_point_vs_after_middle_point_pct = volume_sum_from_market_start_to_middle_point/volume_sum_from_middle_point_to_entry_point
         feature_histogram_negative_momentum_pct = bars_with_negative_momentum_histogram_counter/total_bars
         feature_bars_with_at_least_50_pct_wick_pct = bars_with_at_least_50_pct_wick_counter/total_bars
@@ -372,52 +371,20 @@ class DataExtractor:
         feature_high_volume_bars_with_rejection_pct = high_volume_bars_with_rejection_counter/bars_above_volume_average_counter
         volume_per_minute = volume_sum_since_market_open/minutes_since_market_open if minutes_since_market_open > 0 else 1
 
-        previous_bar = one_minute_timeframe_stock.previous_bar(
+        previous_bar_to_entry_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
         )
-        bars_since_highest_high = [
-            bar_object
-            for bar_object in one_minute_bars[1:]
-            if bar_object.bar_time > highest_high_one_minute_bar.bar_time
-        ]
 
         crossed_any_resistance = any(
             r_l
             for r_l in day_timeframe_stock.resistance_levels
             if potential_confirmation_bar.low < r_l.high < potential_confirmation_bar.high
         )
-
-        volume_to_volume_average_ratio_since_highest_high = 0
-
-        for bar_object in bars_since_highest_high:
-            volume_to_volume_average_ratio_since_highest_high += bar_object.volume/bar_object.volume_average
-
-        last_10_bars = [
-            bar_object
-            for bar_object
-            in one_minute_bars
-            if bar_object.bar_time + datetime.timedelta(minutes=10) > potential_confirmation_bar.bar_time
-        ]
-
-        last_10_bars_range_average = sum(
-            bar_object.high - bar_object.low
-            for bar_object in last_10_bars
-        )/len(last_10_bars)
+        last_10_bars_range_average = last_10_bars_range_sum/10
 
         feature_volume_average_goes_up_pct = volume_average_goes_up_counter/total_bars
-        feature_overlapped_bars_since_market_open_pct = DataExtractor.overlapped_bars_since_market_open_pct(
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            one_minute_bars=one_minute_bars,
-        )
-        feature_weak_bars_since_highest_high_to_total_pct = len(
-            [
-                bar_object
-                for bar_object in bars_since_highest_high
-                if bar_object.ema_9 < bar_object.vwap
-                and bar_object.close < bar_object.vwap
-                and bar_object.volume/bar_object.volume_average <= 1.1
-            ]
-        )/len(bars_since_highest_high) if bars_since_highest_high else 0
+        feature_overlapped_bars_since_market_open_pct = overlapped_bars_counter/len(one_minute_bars)
+        feature_weak_bars_since_highest_high_to_total_pct = weak_bars_since_highest_high/len(bars_since_highest_high) if bars_since_highest_high else 0
         feature_bars_since_highest_high_to_total_bars_pct = len(bars_since_highest_high)/total_bars
         feature_weak_bars_to_bars_since_highest_high_to_total_bars = feature_weak_bars_since_highest_high_to_total_pct/feature_bars_since_highest_high_to_total_bars_pct if feature_bars_since_highest_high_to_total_bars_pct > 0 else 0
 
@@ -505,21 +472,18 @@ class DataExtractor:
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and r_l.index < 10
         )
-        previous_bar = one_minute_timeframe_stock.previous_bar(
-            bar_object=potential_confirmation_bar,
-        )
 
         feature_entry_bar_closed_strong = (
             True
-            and previous_bar is not None
+            and previous_bar_to_entry_bar is not None
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and potential_confirmation_bar.volume > previous_bar.volume
+            and potential_confirmation_bar.volume > previous_bar_to_entry_bar.volume
             and potential_confirmation_bar.body_percentage > 0.7
             and potential_confirmation_bar.bar_wick_percentage < 0.3
         )
         feature_current_macd_to_previous = 0
-        if previous_bar is not None:
-            feature_current_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd
+        if previous_bar_to_entry_bar is not None:
+            feature_current_macd_to_previous = potential_confirmation_bar.macd/previous_bar_to_entry_bar.macd
 
         ema_9_crossed_down_ema_20_since_pullback = any(
             bar_object
@@ -533,39 +497,39 @@ class DataExtractor:
         )
 
         two_bars_back_bar = None
-        if previous_bar is not None:
+        if previous_bar_to_entry_bar is not None:
             two_bars_back_bar = one_minute_timeframe_stock.previous_bar(
-                bar_object=previous_bar,
+                bar_object=previous_bar_to_entry_bar,
             )
         feature_bar_histogram_changed_direction = (
             True
-            and previous_bar is not None
+            and previous_bar_to_entry_bar is not None
             and two_bars_back_bar is not None
-            and previous_bar.histogram < two_bars_back_bar.histogram
-            and previous_bar.histogram < potential_confirmation_bar.histogram
+            and previous_bar_to_entry_bar.histogram < two_bars_back_bar.histogram
+            and previous_bar_to_entry_bar.histogram < potential_confirmation_bar.histogram
         ) or (
             True
-            and previous_bar is not None
-            and previous_bar.histogram > 0
-            and previous_bar.macd > 0
-            and previous_bar.histogram/potential_confirmation_bar.histogram < 0.5
+            and previous_bar_to_entry_bar is not None
+            and previous_bar_to_entry_bar.histogram > 0
+            and previous_bar_to_entry_bar.macd > 0
+            and previous_bar_to_entry_bar.histogram/potential_confirmation_bar.histogram < 0.5
             and potential_confirmation_bar.ema_9 > potential_confirmation_bar.ema_20
             and potential_confirmation_bar.ema_20 > potential_confirmation_bar.vwap
             and potential_confirmation_bar.close > potential_confirmation_bar.ema_9
             and 0.95 < potential_confirmation_bar.ema_9/potential_confirmation_bar.open_value < 1.05
         )
         previous_bar_is_highest = False
-        if previous_bar is not None and previous_bar.is_after_market_open:
-            relevant_bars = [b for b in one_minute_bars if b.bar_time < previous_bar.bar_time]
+        if previous_bar_to_entry_bar is not None and previous_bar_to_entry_bar.is_after_market_open:
+            relevant_bars = [b for b in one_minute_bars if b.bar_time < previous_bar_to_entry_bar.bar_time]
             if relevant_bars:
                 previous_bar_is_highest = max(
                     b.high
                     for b in relevant_bars
-                ) < previous_bar.high
+                ) < previous_bar_to_entry_bar.high
 
         feature_entry_bar_shape_is_good = (
             True
-            and previous_bar.is_after_market_open
+            and previous_bar_to_entry_bar.is_after_market_open
             and not previous_bar_is_highest
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.ema_9 > potential_confirmation_bar.ema_20

@@ -472,15 +472,10 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         # common.objects.SymbolTest(
-        #     name="SKYQ",
-        #     datetime_str="04.10.26T11:29:00",
+        #     name="SMX",
+        #     datetime_str="02.06.26T10:16:00",
         #     is_positive=True,
         # ),
-        common.objects.SymbolTest(
-            name="SIDU",
-            datetime_str="04.10.26T10:36:00",
-            is_positive=False,
-        ),
     ]
     output_file_name = "model/real_case_result.csv"
 
