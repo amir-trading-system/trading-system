@@ -6,6 +6,7 @@ from collections import defaultdict
 import joblib
 import numpy as np
 import pandas as pd
+import shap
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -668,4 +669,5 @@ df_test = pd.DataFrame({
     "probability": y_pred_proba,
     "prediction": y_pred,
 })
+
 df_test.to_csv("model/training/test_predictions.csv", index=False)
