@@ -45,13 +45,13 @@ def write_to_csv(
                     "feature_entry_bar_shape_is_good",
                     "feature_crossed_highest_high",
 
+                    # "feature_entry_bar_is_biggest_bar",
                     # "feature_volume_per_minute_to_bar_volume",
                     # "feature_volume_average_to_volume",
                     # "feature_last_bars_positive_movement_pct",
                     # "feature_bars_with_lower_volume_average_pct",
                     # "feature_bars_with_ordered_indicators_pct",
                     # "feature_bars_closed_above_half_of_bar_pct",
-
                     # "feature_price_minus_vwap_at_entry",
                     # "feature_negative_bars_with_positive_histogram_pct",
                     # "feature_positive_vs_negative_movement",
@@ -72,8 +72,8 @@ def write_to_csv(
                     # "feature_weak_bars_to_bars_since_highest_high_to_total_bars",
                     # "feature_entry_bar_volume_average_above_threshold",
                     # "feature_is_there_highest_high_after_market_open",
+
                     # "feature_entry_bar_has_highest_volume",
-                    # "feature_entry_bar_is_biggest_bar",
                     # "feature_entry_bar_is_highest",
                     # "feature_volume_average_goes_down_pct",
                     # "feature_stronger_than_previous_bars_pct",
@@ -114,13 +114,13 @@ def write_to_csv(
         feature_entry_bar_shape_is_good = symbol_data["feature_entry_bar_shape_is_good"]
         feature_crossed_highest_high = symbol_data["feature_crossed_highest_high"]
 
+        # feature_entry_bar_is_biggest_bar = symbol_data["feature_entry_bar_is_biggest_bar"]
         # feature_volume_per_minute_to_bar_volume = symbol_data["feature_volume_per_minute_to_bar_volume"]
         # feature_volume_average_to_volume = symbol_data["feature_volume_average_to_volume"]
         # feature_last_bars_positive_movement_pct = symbol_data["feature_last_bars_positive_movement_pct"]
         # feature_bars_with_lower_volume_average_pct = symbol_data["feature_bars_with_lower_volume_average_pct"]
         # feature_bars_with_ordered_indicators_pct = symbol_data["feature_bars_with_ordered_indicators_pct"]
         # feature_bars_closed_above_half_of_bar_pct = symbol_data["feature_bars_closed_above_half_of_bar_pct"]
-
         # feature_price_minus_vwap_at_entry = symbol_data["feature_price_minus_vwap_at_entry"]
         # feature_negative_bars_with_positive_histogram_pct = symbol_data["feature_negative_bars_with_positive_histogram_pct"]
         # feature_positive_vs_negative_movement = symbol_data["feature_positive_vs_negative_movement"]
@@ -142,7 +142,6 @@ def write_to_csv(
         # feature_entry_bar_volume_average_above_threshold = symbol_data["feature_entry_bar_volume_average_above_threshold"]
         # feature_is_there_highest_high_after_market_open = symbol_data["feature_is_there_highest_high_after_market_open"]
         # feature_entry_bar_has_highest_volume = symbol_data["feature_entry_bar_has_highest_volume"]
-        # feature_entry_bar_is_biggest_bar = symbol_data["feature_entry_bar_is_biggest_bar"]
         # feature_entry_bar_is_highest = symbol_data["feature_entry_bar_is_highest"]
         # feature_volume_average_goes_down_pct = symbol_data["feature_volume_average_goes_down_pct"]
         # feature_stronger_than_previous_bars_pct = symbol_data["feature_stronger_than_previous_bars_pct"]
@@ -186,13 +185,13 @@ def write_to_csv(
                     feature_entry_bar_shape_is_good,
                     feature_crossed_highest_high,
 
+                    # feature_entry_bar_is_biggest_bar,
                     # feature_volume_per_minute_to_bar_volume,
                     # feature_volume_average_to_volume,
                     # feature_last_bars_positive_movement_pct,
                     # feature_bars_with_lower_volume_average_pct,
                     # feature_bars_with_ordered_indicators_pct,
                     # feature_bars_closed_above_half_of_bar_pct,
-
                     # feature_price_minus_vwap_at_entry,
                     # feature_negative_bars_with_positive_histogram_pct,
                     # feature_positive_vs_negative_movement,
@@ -214,7 +213,6 @@ def write_to_csv(
                     # feature_entry_bar_volume_average_above_threshold,
                     # feature_is_there_highest_high_after_market_open,
                     # feature_entry_bar_has_highest_volume,
-                    # feature_entry_bar_is_biggest_bar,
                     # feature_entry_bar_is_highest,
                     # feature_volume_average_goes_down_pct,
                     # feature_stronger_than_previous_bars_pct,
