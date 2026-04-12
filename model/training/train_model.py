@@ -317,13 +317,6 @@ def apply_hard_rules(df: pd.DataFrame) -> pd.Series:
     if not USE_HARD_RULES:
         return allowed
 
-    # Example from your recent filter idea.
-    weak_col = "feature_weak_bars_to_bars_since_highest_high_to_total_bars"
-    if weak_col in df.columns:
-        allowed &= df[weak_col].fillna(0) < 0.95
-    if "feature_volume_bigger_than_last_10_bars_pct" in df.columns:
-        allowed &= df["feature_volume_bigger_than_last_10_bars_pct"].fillna(0) >= 0.5
-
     return allowed
 
 

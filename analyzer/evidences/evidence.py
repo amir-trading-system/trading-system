@@ -283,11 +283,6 @@ class Evidence:
                     "threshold": score.threshold,
                 },
             )
-            score.should_take_trade = (
-                True
-                and score.should_take_trade
-                and potential_confirmation_bar.price_movement_statistics["feature_weak_bars_to_bars_since_highest_high_to_total_bars"] < 0.95
-            )
         else:
             score.should_take_trade = True
 

@@ -23,6 +23,7 @@ class Evidence(
                 for resistance_level in stock.resistance_levels
                 if resistance_level.high > current_bar.low
                 and resistance_level.index - 10 <= current_bar.index
+                and resistance_level.volume > resistance_level.volume_average
             )
         )
 

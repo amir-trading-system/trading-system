@@ -33,6 +33,7 @@ def get_stocks_list_from_nasdaq() -> Generator[Any, Any, Any]:
     stocks_data = stocks_list_response.json()
 
     list_to_return: list[dict[str,any]] = []
+    t = tqdm.tqdm(stocks_data['data']['rows'])
     for symbol in stocks_data['data']['rows']:
         list_to_return.append(
             {
@@ -41,6 +42,7 @@ def get_stocks_list_from_nasdaq() -> Generator[Any, Any, Any]:
                 'price': symbol['lastsale']
             },
         )
+        t.update(1)
         if len(list_to_return) == 1000:
             yield list_to_return
             list_to_return = []

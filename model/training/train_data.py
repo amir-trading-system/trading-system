@@ -359,6 +359,11 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             is_positive=False,
         ),
         common.objects.SymbolTest(
+            name="DXST",
+            datetime_str="03.10.26T10:15:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
             name="PLYX",
             datetime_str="03.10.26T14:06:00",
             is_positive=False,
@@ -366,6 +371,11 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         common.objects.SymbolTest(
             name="ACXP",
             datetime_str="03.11.26T10:03:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="SXTP",
+            datetime_str="03.11.26T12:23:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -460,7 +470,7 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="BIAF",
-            datetime_str="03.23.26T10:45:00",
+            datetime_str="03.23.26T10:42:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -551,6 +561,11 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         common.objects.SymbolTest(
             name="ELAB",
             datetime_str="04.01.26T14:53:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="SWMR",
+            datetime_str="04.02.26T10:22:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -722,6 +737,11 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             name="SIDU",
             datetime_str="04.10.26T10:36:00",
             is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="UCAR",
+            datetime_str="04.10.26T10:51:00",
+            is_positive=True,
         ),
         common.objects.SymbolTest(
             name="SKYQ",
