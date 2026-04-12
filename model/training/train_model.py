@@ -6,7 +6,6 @@ from collections import defaultdict
 import joblib
 import numpy as np
 import pandas as pd
-import shap
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
