@@ -444,7 +444,7 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
             datetime_str=date,
         )
         for symbol, date in stock_finder.get_dynamic_symbols_data_from_period(
-            period="6mo",
+            period="2mo",
         ).items()
     ]
 
@@ -470,13 +470,14 @@ def run_retroactive_check():
     should_run_model = False
     get_only_statistics = True
     symbols_data = []
-    symbols = [
-        # common.objects.SymbolTest(
-        #     name="SMX",
-        #     datetime_str="02.06.26T10:16:00",
-        #     is_positive=True,
-        # ),
-    ]
+    # symbols = [
+    #     common.objects.SymbolTest(
+    #         name="AIXI",
+    #         datetime_str="04.06.26T14:52:00",
+    #         is_positive=True,
+    #     ),
+    # ]
+    symbols = explore_past_potential_symbols()
     output_file_name = "model/real_case_result.csv"
 
     if not symbols:
