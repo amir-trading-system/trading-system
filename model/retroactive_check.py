@@ -394,13 +394,13 @@ def run_retroactive_check():
     should_run_model = False
     get_only_statistics = True
     symbols_data = []
-    # symbols = [
-    #     common.objects.SymbolTest(
-    #         name="MBAI",
-    #         datetime_str="01.26.26T11:41:00",
-    #         is_positive=False,
-    #     ),
-    # ]
+    symbols = [
+        # common.objects.SymbolTest(
+        #     name="SIDU",
+        #     datetime_str="04.13.26T13:48:00",
+        #     is_positive=True,
+        # ),
+    ]
     # symbols = explore_past_potential_symbols()
     output_file_name = "model/real_case_result.csv"
 

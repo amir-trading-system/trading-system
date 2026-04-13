@@ -1,6 +1,3 @@
 Need to do the following:
- -         common.objects.SymbolTest(
-              name="SXTP",
-              datetime_str="03.11.26T12:23:00",
-              is_positive=True,
-          ), - should work - current_day_breaks_last_post_and_pre_market_high
+ - RECT - check retroactive - Fixed.
+ - RECT - check why id didnt continue to analyze - Fixed.

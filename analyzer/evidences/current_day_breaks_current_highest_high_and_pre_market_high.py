@@ -54,7 +54,7 @@ class Evidence(
         if not highest_volume_until_now_almost:
             relevant_bars = [
                 bar_object
-                for bar_object in one_minute_bars[:30]
+                for bar_object in one_minute_bars[2:30]
                 if bar_object.index > potential_confirmation_bar.index
             ]
             if relevant_bars:
@@ -70,7 +70,7 @@ class Evidence(
         crossed_highest_high = potential_confirmation_bar.low < highest_high_until_now < potential_confirmation_bar.close
         bar_bigger_than_previous_bars = not any(
             bar_object
-            for bar_object in one_minute_bars[1:10]
+            for bar_object in one_minute_bars[2:10]
             if abs(bar_object.close - bar_object.open_value) > 0
             and (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/abs(bar_object.close - bar_object.open_value) < 0.8
         )

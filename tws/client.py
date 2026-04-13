@@ -183,7 +183,7 @@ class Client(client.EClient, wrapper.EWrapper):
         stock = self.request_id_to_symbol[reqId]
         stock.arrange_data_for_analysis()
         stock.finished_collection = True
-        unique_key = f"{stock.symbol_name}-{stock.specific_bar_time}"
+        unique_key = stock.symbol_name
         if self.is_retro:
             unique_key = f"{stock.symbol_name}-{stock.expected_bar_time}"
         if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
@@ -215,10 +215,8 @@ class Client(client.EClient, wrapper.EWrapper):
         )
         stock = self.request_id_to_symbol[reqId]
 
-        unique_key = f"{stock.symbol_name}-{stock.specific_bar_time}"
-        if stock.is_worth_to_monitor() and not unique_key in self.already_monitored:
+        if stock.is_worth_to_monitor():
             self.bars_ready_to_analyze_queue.put(stock)
-            self.already_monitored.add(unique_key)
 
     def accountSummary(
         self,
