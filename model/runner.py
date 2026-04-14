@@ -12,10 +12,10 @@ class Runner:
     ):
         self.should_run_model = should_run_model
         if should_run_model:
-            self.model = joblib.load("model/prod/trade_model.pkl")
-            self.imputer = joblib.load("model/prod/trade_imputer.pkl")
+            self.model = joblib.load("model/prod/stable/trade_model.pkl")
+            self.imputer = joblib.load("model/prod/stable/trade_imputer.pkl")
 
-            bundle = joblib.load("model/prod/trade_model_bundle.pkl")
+            bundle = joblib.load("model/prod/stable/trade_model_bundle.pkl")
             self.features = bundle["features"]
             self.threshold = bundle["threshold"]
 

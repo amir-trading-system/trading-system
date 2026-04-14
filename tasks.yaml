@@ -1,3 +1,4 @@
 Need to do the following:
  - RECT - check retroactive - Fixed.
  - RECT - check why id didnt continue to analyze - Fixed.
+ - check for each potential stock in the list if its tradeable
