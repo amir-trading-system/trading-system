@@ -317,6 +317,36 @@ def apply_hard_rules(df: pd.DataFrame) -> pd.Series:
     if not USE_HARD_RULES:
         return allowed
 
+    # if "hard_rule_reason" not in df.columns:
+    #     df["hard_rule_reason"] = ""
+
+    # # Rule 1: High late momentum score
+    # if "feature_late_momentum_score" in df.columns:
+    #     mask = (
+    #         (df["feature_late_momentum_score"] > 0.00025) &
+    #         (df["feature_entry_volume_vs_total_volume"] > 0.15)
+    #     )
+    #     allowed &= ~mask
+    #     df.loc[mask, "hard_rule_reason"] += "late_momentum_score;"
+
+    # # Rule 2: Crowded entry near highs
+    # if (
+    #     "feature_entry_volume_vs_total_volume" in df.columns and
+    #     "feature_distance_from_highest_high" in df.columns
+    # ):
+    #     mask = (
+    #         (df["feature_entry_volume_vs_total_volume"] > 0.15) &
+    #         (df["feature_distance_from_highest_high"] < 450)
+    #     )
+    #     allowed &= ~mask
+    #     df.loc[mask, "hard_rule_reason"] += "crowded_entry_near_high;"
+
+    # # Rule 3: Extreme late volume spike
+    # if "feature_late_volume_spike" in df.columns:
+    #     mask = df["feature_late_volume_spike"] > 0.18
+    #     allowed &= ~mask
+    #     df.loc[mask, "hard_rule_reason"] += "late_volume_spike;"
+
     return allowed
 
 

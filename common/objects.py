@@ -119,6 +119,18 @@ class BarData:
         return (self.high - self.close)/(self.high - self.low)
 
     @property
+    def bar_lower_wick_percentage(
+        self,
+    ) -> float:
+        if self.high - self.low <= 0.0:
+            return 0.0
+
+        if self.is_positive:
+            return (self.open_value - self.low)/(self.high - self.low)
+        else:
+            return (self.close - self.low)/(self.high - self.low)
+
+    @property
     def buyers_are_indecision(
         self,
     ) -> float:

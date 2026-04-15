@@ -279,7 +279,7 @@ class DataExtractor:
                 ):
                     highest_high_bar_since_market_open = bar_object
 
-        feature_distance_from_highest_high_since_market_open = highest_high_bar_since_market_open.index if highest_high_bar_since_market_open is not None else 0
+        feature_distance_from_highest_high_since_market_open = highest_high_bar_since_market_open.index - potential_confirmation_bar.index if highest_high_bar_since_market_open is not None else 0
         bars_size_average = bars_size_sum/(total_bars-1) if total_bars > 1 else 1
         feature_current_macd_to_previous = 0
         if previous_bar_to_entry_bar is not None:
@@ -316,7 +316,7 @@ class DataExtractor:
             "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) if potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0 else 0,
             "feature_entry_bar_volume": potential_confirmation_bar.volume,
             "feature_entry_volume_vs_total_volume": potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 1,
-            "feature_distance_from_highest_high": highest_high_bar_since_market_open.index if highest_high_bar_since_market_open is not None else 0,
+            "feature_distance_from_highest_high": highest_high_bar_since_market_open.index - potential_confirmation_bar.index if highest_high_bar_since_market_open is not None else 0,
             "feature_bars_with_rejection_since_market_open": bars_with_rejection_since_market_open/total_bars,
             "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average if bars_size_average else 0,
             "feature_histogram_changed_directions_pct": histogram_changed_directions_counter/total_bars,
