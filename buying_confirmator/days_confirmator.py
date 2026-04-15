@@ -245,10 +245,11 @@ class Confirmator:
                     },
                 )
 
+                if bar_has_confirmed:
+                    break
+
             else:
                 score.should_take_trade = True
-
-            break
 
         if entry_position_bar is not None:
             self.results_queue.put(
@@ -446,6 +447,10 @@ class Confirmator:
                     "entry_position_bar_time": potential_confirmation_bar.bar_time,
                     "bar_time": original_bar_to_confirm.bar_time,
                     "request_id": stock.request_id,
+                    "high": potential_confirmation_bar.high,
+                    "low": potential_confirmation_bar.low,
+                    "open": potential_confirmation_bar.open_value,
+                    "close": potential_confirmation_bar.close,
                 },
             )
 
@@ -493,9 +498,6 @@ class Confirmator:
         one_minute_bars: list[common.objects.BarData],
         highest_high_one_minute_bar: common.objects.BarData,
     ) -> bool:
-        if potential_confirmation_bar.volume < 20000:
-            return False
-
         if potential_confirmation_bar.high - potential_confirmation_bar.low <= 0.05:
             return False
 
