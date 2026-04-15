@@ -391,14 +391,14 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = False
-    get_only_statistics = True
+    should_run_model = True
+    get_only_statistics = False
     symbols_data = []
     symbols = [
         # common.objects.SymbolTest(
-        #     name="SIDU",
-        #     datetime_str="04.13.26T13:48:00",
-        #     is_positive=True,
+        #     name="ARAI",
+        #     datetime_str="04.14.26T10:48:00",
+        #     is_positive=False,
         # ),
     ]
     # symbols = explore_past_potential_symbols()

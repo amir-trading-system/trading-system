@@ -508,8 +508,15 @@ class Stock:
             self.total_volume = current_bar.volume
             self.total_price_volume = hlc3 * current_bar.volume
         else:
-            self.total_volume += current_bar.volume
-            self.total_price_volume += hlc3 * current_bar.volume
+            if (
+                len(self.bars) > 0
+                and self.bars[0].bar_time.day != current_bar.bar_time.day
+            ):
+                self.total_volume = 0
+                self.total_price_volume = 0
+            else:
+                self.total_volume += current_bar.volume
+                self.total_price_volume += hlc3 * current_bar.volume
 
         if self.total_volume > 0:
             current_bar.vwap = self.total_price_volume / self.total_volume
