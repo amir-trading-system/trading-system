@@ -5,117 +5,119 @@ Total candidate features: 18
 ================ FEATURE STABILITY REPORT ================
 
                                               feature  mean_importance  std_importance  top_k_frequency
-4                  feature_distance_from_highest_high         0.096301        0.013939              1.0
-5   feature_distance_from_highest_high_since_marke...         0.096170        0.016013              1.0
-0          feature_bars_with_at_least_50_pct_wick_pct         0.081940        0.017968              1.0
-1       feature_bars_with_rejection_since_market_open         0.074159        0.019929              1.0
-12           feature_histogram_changed_directions_pct         0.068745        0.014089              1.0
-16                   feature_strong_negative_bars_pct         0.067434        0.020432              1.0
-17                               feature_total_volume         0.061925        0.013464              1.0
-3                    feature_current_macd_to_previous         0.051238        0.011106              1.0
-11               feature_entry_volume_vs_total_volume         0.049846        0.008618              1.0
-9                            feature_entry_bar_volume         0.048224        0.007975              1.0
-15                  feature_price_action_is_stuck_pct         0.047362        0.007753              1.0
-6   feature_entry_bar_close_to_crossed_highest_hig...         0.045216        0.008366              1.0
-14                feature_positive_vs_negative_volume         0.043626        0.006027              1.0
-7       feature_entry_bar_lowest_wick_to_bar_body_pct         0.042300        0.009389              1.0
-13      feature_overlapped_bars_since_market_open_pct         0.041079        0.006725              1.0
-10      feature_entry_point_size_to_bars_size_average         0.037408        0.006608              1.0
-8                     feature_entry_bar_shape_is_good         0.032138        0.012378              1.0
-2                        feature_crossed_highest_high         0.014891        0.007976              1.0
+4                  feature_distance_from_highest_high         0.135363        0.020302              1.0
+5   feature_distance_from_highest_high_since_marke...         0.134766        0.019059              1.0
+16                   feature_strong_negative_bars_pct         0.070826        0.019393              1.0
+3                    feature_current_macd_to_previous         0.069620        0.016106              1.0
+6   feature_entry_bar_close_to_crossed_highest_hig...         0.054044        0.012824              1.0
+12           feature_histogram_changed_directions_pct         0.052573        0.014428              1.0
+1       feature_bars_with_rejection_since_market_open         0.051654        0.013675              1.0
+17                               feature_total_volume         0.050455        0.009464              1.0
+14                feature_positive_vs_negative_volume         0.050349        0.011822              1.0
+0          feature_bars_with_at_least_50_pct_wick_pct         0.050015        0.012582              1.0
+9                            feature_entry_bar_volume         0.045104        0.007746              1.0
+15                  feature_price_action_is_stuck_pct         0.040925        0.007908              1.0
+7       feature_entry_bar_lowest_wick_to_bar_body_pct         0.037064        0.008491              1.0
+11               feature_entry_volume_vs_total_volume         0.036219        0.007260              1.0
+10      feature_entry_point_size_to_bars_size_average         0.035200        0.006268              1.0
+13      feature_overlapped_bars_since_market_open_pct         0.031805        0.005120              1.0
+2                        feature_crossed_highest_high         0.030009        0.015305              1.0
+8                     feature_entry_bar_shape_is_good         0.024009        0.010443              1.0
 
 Selected stable features:
 - feature_distance_from_highest_high
 - feature_distance_from_highest_high_since_market_open
-- feature_bars_with_at_least_50_pct_wick_pct
-- feature_bars_with_rejection_since_market_open
-- feature_histogram_changed_directions_pct
 - feature_strong_negative_bars_pct
-- feature_total_volume
 - feature_current_macd_to_previous
-- feature_entry_volume_vs_total_volume
+- feature_entry_bar_close_to_crossed_highest_high_pct
+- feature_histogram_changed_directions_pct
+- feature_bars_with_rejection_since_market_open
+- feature_total_volume
+- feature_positive_vs_negative_volume
+- feature_bars_with_at_least_50_pct_wick_pct
 - feature_entry_bar_volume
 - feature_price_action_is_stuck_pct
-- feature_entry_bar_close_to_crossed_highest_high_pct
-- feature_positive_vs_negative_volume
 - feature_entry_bar_lowest_wick_to_bar_body_pct
-- feature_overlapped_bars_since_market_open_pct
+- feature_entry_volume_vs_total_volume
 - feature_entry_point_size_to_bars_size_average
+- feature_overlapped_bars_since_market_open_pct
+- feature_crossed_highest_high
 - feature_entry_bar_shape_is_good
 
 ================ CV FOLD REPORT ================
 
-           fold  best_threshold  positive_pass_rate  false_positive_reject_rate  balanced_score  trading_score         tn         fp         fn         tp
-count  50.00000       50.000000           50.000000                   50.000000       50.000000      50.000000  50.000000  50.000000  50.000000  50.000000
-mean   25.50000        0.561000            0.579545                    0.724091        0.651818       0.642341   8.260000   3.140000   4.960000   6.840000
-std    14.57738        0.058283            0.179577                    0.116352        0.087337       0.249173   1.411469   1.324957   2.118529   2.131972
-min     1.00000        0.500000            0.333333                    0.454545        0.458333      -1.000000   5.000000   0.000000   0.000000   4.000000
-25%    13.25000        0.500000            0.416667                    0.636364        0.599432       0.617803   7.000000   2.000000   3.000000   5.000000
-50%    25.50000        0.550000            0.564394                    0.727273        0.636364       0.676136   8.000000   3.000000   5.000000   6.500000
-75%    37.75000        0.600000            0.750000                    0.818182        0.700758       0.722917   9.000000   4.000000   7.000000   9.000000
-max    50.00000        0.700000            1.000000                    1.000000        0.867424       0.882197  11.000000   6.000000   8.000000  11.000000
+           fold  best_threshold  positive_pass_rate  false_positive_reject_rate  balanced_score  trading_score         tn         fp        fn         tp
+count  50.00000       50.000000           50.000000                   50.000000       50.000000      50.000000  50.000000  50.000000  50.00000  50.000000
+mean   25.50000        0.599000            0.553182                    0.837576        0.695379       0.738038   9.540000   1.860000   5.26000   6.540000
+std    14.57738        0.077255            0.188762                    0.107084        0.087699       0.074120   1.232386   1.245564   2.22059   2.287589
+min     1.00000        0.500000            0.333333                    0.583333        0.484848       0.530303   7.000000   0.000000   1.00000   4.000000
+25%    13.25000        0.500000            0.363636                    0.750000        0.640152       0.707576   9.000000   1.000000   3.00000   4.000000
+50%    25.50000        0.600000            0.522727                    0.833333        0.685606       0.747917  10.000000   2.000000   5.50000   6.000000
+75%    37.75000        0.650000            0.727273                    0.914773        0.772727       0.790057  10.750000   3.000000   7.00000   8.000000
+max    50.00000        0.750000            0.916667                    1.000000        0.912879       0.911742  12.000000   5.000000   8.00000  11.000000
 
 ================ CHOSEN THRESHOLD ================
 
-Median best CV threshold: 0.55
+Median best CV threshold: 0.60
 
 ================ CV THRESHOLD SUMMARY ================
 
-Mean trading score: 0.6423
-Mean positive pass rate: 0.5795
-Mean false positive reject rate: 0.7241
+Mean trading score: 0.7380
+Mean positive pass rate: 0.5532
+Mean false positive reject rate: 0.8376
 
 ================ HOLDOUT TEST REPORT (threshold=0.50) ================
 
               precision    recall  f1-score   support
 
-           0     0.6957    0.6400    0.6667        25
-           1     0.6667    0.7200    0.6923        25
+           0     0.5652    0.5200    0.5417        25
+           1     0.5714    0.6154    0.5926        26
 
-    accuracy                         0.6800        50
-   macro avg     0.6812    0.6800    0.6795        50
-weighted avg     0.6812    0.6800    0.6795        50
+    accuracy                         0.5686        51
+   macro avg     0.5683    0.5677    0.5671        51
+weighted avg     0.5684    0.5686    0.5676        51
 
 Confusion matrix:
-[[16  9]
- [ 7 18]]
+[[13 12]
+ [10 16]]
 
-================ HOLDOUT TEST REPORT (threshold=0.55) ================
+================ HOLDOUT TEST REPORT (threshold=0.60) ================
 
               precision    recall  f1-score   support
 
-           0     0.6538    0.6800    0.6667        25
-           1     0.6667    0.6400    0.6531        25
+           0     0.5806    0.7200    0.6429        25
+           1     0.6500    0.5000    0.5652        26
 
-    accuracy                         0.6600        50
-   macro avg     0.6603    0.6600    0.6599        50
-weighted avg     0.6603    0.6600    0.6599        50
+    accuracy                         0.6078        51
+   macro avg     0.6153    0.6100    0.6040        51
+weighted avg     0.6160    0.6078    0.6033        51
 
 Confusion matrix:
-[[17  8]
- [ 9 16]]
+[[18  7]
+ [13 13]]
 
 ================ FINAL FEATURE IMPORTANCE ================
 
-feature_distance_from_highest_high_since_market_open    0.106416
-feature_distance_from_highest_high                      0.096780
-feature_bars_with_at_least_50_pct_wick_pct              0.084841
-feature_histogram_changed_directions_pct                0.069287
-feature_total_volume                                    0.066503
-feature_strong_negative_bars_pct                        0.065679
-feature_bars_with_rejection_since_market_open           0.064847
-feature_entry_bar_volume                                0.053932
-feature_entry_volume_vs_total_volume                    0.051712
-feature_price_action_is_stuck_pct                       0.048342
-feature_current_macd_to_previous                        0.046549
-feature_positive_vs_negative_volume                     0.046123
-feature_entry_bar_close_to_crossed_highest_high_pct     0.045183
-feature_overlapped_bars_since_market_open_pct           0.039579
-feature_entry_bar_lowest_wick_to_bar_body_pct           0.038738
-feature_entry_point_size_to_bars_size_average           0.038065
-feature_entry_bar_shape_is_good                         0.037424
+feature_distance_from_highest_high                      0.141251
+feature_distance_from_highest_high_since_market_open    0.139379
+feature_strong_negative_bars_pct                        0.071744
+feature_current_macd_to_previous                        0.067783
+feature_histogram_changed_directions_pct                0.059016
+feature_bars_with_rejection_since_market_open           0.051081
+feature_bars_with_at_least_50_pct_wick_pct              0.050948
+feature_total_volume                                    0.050714
+feature_entry_bar_close_to_crossed_highest_high_pct     0.049436
+feature_positive_vs_negative_volume                     0.048348
+feature_entry_bar_volume                                0.045798
+feature_price_action_is_stuck_pct                       0.043029
+feature_entry_volume_vs_total_volume                    0.035733
+feature_entry_bar_lowest_wick_to_bar_body_pct           0.032144
+feature_overlapped_bars_since_market_open_pct           0.030759
+feature_entry_point_size_to_bars_size_average           0.029307
+feature_crossed_highest_high                            0.029211
+feature_entry_bar_shape_is_good                         0.024321
 dtype: float64
 
 ================ SAMPLE LIVE OUTPUT ================
 
-{'probability': 0.768734, 'score': 76.87, 'threshold': 0.55, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A'}
+{'probability': 0.714148, 'score': 71.41, 'threshold': 0.6, 'rules_pass': True, 'pass_recommended': True, 'grade': 'B'}

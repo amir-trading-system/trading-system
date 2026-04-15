@@ -654,6 +654,11 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             is_positive=True,
         ),
         common.objects.SymbolTest(
+            name="SIDU",
+            datetime_str="04.06.26T10:59:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
             name="FUBO",
             datetime_str="04.06.26T11:50:00",
             is_positive=False,
@@ -816,6 +821,21 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         common.objects.SymbolTest(
             name="SKYQ",
             datetime_str="04.10.26T11:29:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="RMSG",
+            datetime_str="04.13.26T11:45:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="SIDU",
+            datetime_str="04.13.26T13:48:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="ARAI",
+            datetime_str="04.14.26T14:29:00",
             is_positive=True,
         ),
     ]

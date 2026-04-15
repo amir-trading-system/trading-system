@@ -438,6 +438,9 @@ class Confirmator:
         if potential_confirmation_bar.high - potential_confirmation_bar.low <= 0.05:
             return False
 
+        if potential_confirmation_bar.open_value - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.open_value:
+            return False
+
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
             stock=stock,
             potential_confirmation_bar=potential_confirmation_bar,
