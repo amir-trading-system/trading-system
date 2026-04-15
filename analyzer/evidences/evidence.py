@@ -2,7 +2,6 @@ import datetime
 import logging
 
 import common
-import model
 
 class Evidence:
     name: str = ""
@@ -208,94 +207,10 @@ class Evidence:
     def confirm(
         self,
         stock: common.objects.Stock,
-        one_minute_timeframe_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         milestones: common.objects.Milestones,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
-        model_runner: model.runner.Runner,
-    ) -> common.objects.Score:
-        score = common.objects.Score(
-            score=0.0,
-            probability=0.0,
-            threshold=0.0,
-            should_take_trade=False,
-        )
-
-        if not self._confirm(
-            stock=stock,
-            original_bar_to_confirm=original_bar_to_confirm,
-            potential_confirmation_bar=potential_confirmation_bar,
-            milestones=milestones,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            one_minute_bars=one_minute_bars,
-            volume_sum_since_market_open=stock.volume_sum_since_market_open,
-        ):
-            return score
-
-        self.logger.info(
-            msg="Potential confirmation bar has passed static confirmation, waiting for model confirmation",
-            extra={
-                "worker": "Confirmator",
-                "symbol": stock.symbol_name,
-                "timeframe": original_bar_to_confirm.timeframe,
-                "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                "bar_time": original_bar_to_confirm.bar_time,
-                "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                "evidence_name": self.name,
-                "request_id": stock.request_id,
-                "should_run_model": 1 if model_runner.should_run_model else 0,
-            },
-        )
-
-        potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
-            day_timeframe_stock=stock,
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            potential_confirmation_bar=potential_confirmation_bar,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            volume_sum_since_market_open=stock.volume_sum_since_market_open,
-            one_minute_bars=one_minute_bars,
-        )
-
-        if model_runner.should_run_model:
-            score: common.objects.Score = model_runner.score_potential_confirmation_bar(
-                potential_confirmation_bar=potential_confirmation_bar,
-            )
-
-            msg = "Bar confirmed by model"
-            if not score.should_take_trade:
-                msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
-
-            self.logger.info(
-                msg=msg,
-                extra={
-                    "worker": "Confirmator",
-                    "symbol": stock.symbol_name,
-                    "timeframe": original_bar_to_confirm.timeframe,
-                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                    "bar_time": original_bar_to_confirm.bar_time,
-                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                    "evidence_name": self.name,
-                    "request_id": stock.request_id,
-                    "score": score.score,
-                    "probability": score.probability,
-                    "threshold": score.threshold,
-                },
-            )
-        else:
-            score.should_take_trade = True
-
-        return score
-
-    def _confirm(
-        self,
-        stock: common.objects.Stock,
-        original_bar_to_confirm: common.objects.BarData,
-        potential_confirmation_bar: common.objects.BarData,
-        milestones: common.objects.Milestones,
-        highest_high_one_minute_bar: common.objects.BarData,
-        one_minute_bars: list[common.objects.BarData],
-        volume_sum_since_market_open: float,
     ) -> bool:
         raise NotImplementedError()

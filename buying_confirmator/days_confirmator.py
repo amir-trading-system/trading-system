@@ -43,6 +43,7 @@ class Confirmator:
         bar_has_confirmed: bool = False
         entry_position_bar: common.objects.BarData = None
         one_minute_bars.append(potential_confirmation_bar)
+        confirmed_evidence: str = ""
 
         if (
             True
@@ -59,7 +60,7 @@ class Confirmator:
                     "symbol": stock.symbol_name,
                     "original_bar_time": original_bar_to_confirm.bar_time,
                     "confirmation_bar_time": None,
-                    "evidences": [],
+                    "evidences": "",
                     "price_movement_statistics": {},
                     "score": 0,
                 },
@@ -149,10 +150,14 @@ class Confirmator:
         ):
             return bar_has_confirmed
 
-        confirmed_evidences: list[str] = []
         stock_is_valid_for_evidence = False
         transmit_order = False
-        score: common.objects.Score = None
+        score = common.objects.Score(
+            score=0.0,
+            probability=0.0,
+            threshold=0.0,
+            should_take_trade=False,
+        )
 
         for evidence in analyzer.evidences.__evidences__:
             evidence_obj = evidence(
@@ -176,42 +181,87 @@ class Confirmator:
 
             one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
 
-            score = evidence_obj.confirm(
+            if not evidence_obj.confirm(
                 stock=stock,
-                one_minute_timeframe_stock=one_minute_timeframe_stock,
                 original_bar_to_confirm=original_bar_to_confirm,
                 potential_confirmation_bar=potential_confirmation_bar,
                 milestones=milestones,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
                 one_minute_bars=temp_one_minute_bars,
-                model_runner=self.model_runner,
+            ):
+                continue
+
+            self.logger.info(
+                msg="Potential confirmation bar has passed static confirmation, waiting for model confirmation",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": stock.symbol_name,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "evidence_name": evidence_obj.name,
+                    "request_id": stock.request_id,
+                },
             )
 
-            if score.should_take_trade and score.score > 0:
-                # transmit_order = potential_confirmation_bar.bar_time >= datetime.datetime(
-                #     year=potential_confirmation_bar.bar_time.year,
-                #     month=potential_confirmation_bar.bar_time.month,
-                #     day=potential_confirmation_bar.bar_time.day,
-                #     hour=9,
-                #     minute=40,
-                # )
-                entry_position_bar = potential_confirmation_bar
-                confirmed_evidences.append(evidence.name)
-                break
+            potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
+                day_timeframe_stock=stock,
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=potential_confirmation_bar,
+                highest_high_one_minute_bar=highest_high_one_minute_bar,
+                volume_sum_since_market_open=stock.volume_sum_since_market_open,
+                one_minute_bars=one_minute_bars,
+            )
 
-        if confirmed_evidences:
+            if self.model_runner.should_run_model:
+                score: common.objects.Score = self.model_runner.score_potential_confirmation_bar(
+                    potential_confirmation_bar=potential_confirmation_bar,
+                )
+
+                msg = "Bar confirmed by model"
+                if not score.should_take_trade:
+                    msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
+                    bar_has_confirmed = False
+                else:
+                    bar_has_confirmed = True
+                    entry_position_bar = potential_confirmation_bar
+                    confirmed_evidence = evidence_obj.name
+
+                self.logger.info(
+                    msg=msg,
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": stock.symbol_name,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                        "evidence_name": evidence_obj.name,
+                        "request_id": stock.request_id,
+                        "score": score.score,
+                        "probability": score.probability,
+                        "threshold": score.threshold,
+                    },
+                )
+
+            else:
+                score.should_take_trade = True
+
+            break
+
+        if entry_position_bar is not None:
             self.results_queue.put(
                 {
                     "symbol": stock.symbol_name,
                     "original_bar_time": original_bar_to_confirm.bar_time,
                     "confirmation_bar_time": entry_position_bar.bar_time,
-                    "evidences": confirmed_evidences,
+                    "evidences": confirmed_evidence,
                     "price_movement_statistics": entry_position_bar.price_movement_statistics,
                     "score": score.score if score is not None else 0,
                 },
             )
 
-        for evidence_name in confirmed_evidences:
             self.logger.info(
                 "Bar has confirmed",
                 extra={
@@ -221,7 +271,7 @@ class Confirmator:
                     "timeframe_type": original_bar_to_confirm.timeframe_type.value,
                     "entry_position_bar_time": entry_position_bar.bar_time,
                     "bar_time": original_bar_to_confirm.bar_time,
-                    "evidence_name": evidence_name,
+                    "evidence_name": confirmed_evidence,
                     "request_id": stock.request_id,
                 },
             )
@@ -232,7 +282,7 @@ class Confirmator:
                     stock=stock,
                     original_bar=original_bar_to_confirm,
                     entry_position_bar=entry_position_bar,
-                    evidence_name=evidence_name,
+                    evidence_name=confirmed_evidence,
                     is_retro=self.is_retro,
                     request_id=stock.request_id,
                     transmit=transmit_order,
@@ -249,6 +299,17 @@ class Confirmator:
 
                 if self.is_retro or not self.model_runner.should_run_model:
                     return bar_has_confirmed
+
+                if score.should_take_trade and score.score > 0:
+                    # transmit_order = potential_confirmation_bar.bar_time >= datetime.datetime(
+                    #     year=potential_confirmation_bar.bar_time.year,
+                    #     month=potential_confirmation_bar.bar_time.month,
+                    #     day=potential_confirmation_bar.bar_time.day,
+                    #     hour=9,
+                    #     minute=40,
+                    # )
+                    # need to remove it
+                    transmit_order = False
 
                 self.tws_client.place_buy_order(
                     symbol=original_bar_to_confirm.symbol,

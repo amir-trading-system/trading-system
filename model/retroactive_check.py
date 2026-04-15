@@ -321,32 +321,31 @@ def wait_for_confirmation(
             relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result.get("price_movement_statistics", {})
             continue
 
-        for evidence_name in confirmation_result["evidences"]:
-            if should_update_first_default and relevant_symbol_data:
-                relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
-                relevant_symbol_data[0]["evidence_name"] = evidence_name
-                relevant_symbol_data[0]["collection_status"] = "done"
-                relevant_symbol_data[0]["analysis_status"] = "done"
-                relevant_symbol_data[0]["score"] = confirmation_result["score"]
-                relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result["price_movement_statistics"]
-                should_update_first_default = False
-                continue
+        if should_update_first_default and relevant_symbol_data:
+            relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
+            relevant_symbol_data[0]["evidence_name"] = confirmation_result["evidences"]
+            relevant_symbol_data[0]["collection_status"] = "done"
+            relevant_symbol_data[0]["analysis_status"] = "done"
+            relevant_symbol_data[0]["score"] = confirmation_result["score"]
+            relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result["price_movement_statistics"]
+            should_update_first_default = False
+            continue
 
-            symbols_data.append(
-                {
-                    "symbol": confirmation_result["symbol"],
-                    "collection_status": "done",
-                    "analysis_status": "done",
-                    "original_bar_time": confirmation_result["original_bar_time"],
-                    "actual_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
-                    "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
-                    "evidence_name": evidence_name,
-                    "is_new": True,
-                    "price_movement_statistics": confirmation_result["price_movement_statistics"],
-                    "score": confirmation_result["score"],
-                    "result": "in_progress",
-                },
-            )
+        symbols_data.append(
+            {
+                "symbol": confirmation_result["symbol"],
+                "collection_status": "done",
+                "analysis_status": "done",
+                "original_bar_time": confirmation_result["original_bar_time"],
+                "actual_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
+                "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
+                "evidence_name": confirmation_result["evidences"],
+                "is_new": True,
+                "price_movement_statistics": confirmation_result["price_movement_statistics"],
+                "score": confirmation_result["score"],
+                "result": "in_progress",
+            },
+        )
 
 def flush_logs():
     last_time_flushed = datetime.datetime.now()
@@ -396,8 +395,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         # common.objects.SymbolTest(
-        #     name="JEM",
-        #     datetime_str="04.08.26T10:59:00",
+        #     name="BIRD",
+        #     datetime_str="04.15.26T10:33:00",
         #     is_positive=True,
         # ),
     ]

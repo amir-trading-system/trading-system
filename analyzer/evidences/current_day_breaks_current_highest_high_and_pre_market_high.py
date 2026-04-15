@@ -30,7 +30,7 @@ class Evidence(
 
         return current_bar_has_highest_high_to_break or current_bar_is_strong
 
-    def _confirm(
+    def confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
@@ -38,7 +38,6 @@ class Evidence(
         milestones: common.objects.Milestones,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
-        volume_sum_since_market_open: float,
     ) -> bool:
         above_post_pre_market_highest_high = (
             True

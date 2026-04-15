@@ -40,7 +40,7 @@ class Evidence(
 
         return current_day_comes_after_9_ema_retracement
 
-    def _confirm(
+    def confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
@@ -48,7 +48,6 @@ class Evidence(
         milestones: common.objects.Milestones,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
-        volume_sum_since_market_open: float,
     ) -> bool:
         current_day_is_strong = (
             True

@@ -46,7 +46,7 @@ class Evidence(
 
         return current_day_comes_after_strong_day
 
-    def _confirm(
+    def confirm(
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
@@ -54,7 +54,6 @@ class Evidence(
         milestones: common.objects.Milestones,
         highest_high_one_minute_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
-        volume_sum_since_market_open: float,
     ) -> bool:
         current_bar_highest_from_post_pre_market = stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close
 
