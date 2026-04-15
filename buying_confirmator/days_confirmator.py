@@ -438,7 +438,7 @@ class Confirmator:
         if potential_confirmation_bar.high - potential_confirmation_bar.low <= 0.05:
             return False
 
-        if potential_confirmation_bar.open_value - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.open_value:
+        if potential_confirmation_bar.low - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.low:
             return False
 
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
@@ -446,16 +446,6 @@ class Confirmator:
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=one_minute_bars,
         ):
-            return False
-
-        if len(
-            [
-                bar_object
-                for bar_object in one_minute_bars
-                if bar_object.is_after_market_open
-                and bar_object.open_value > bar_object.vwap
-            ]
-        ) < 10:
             return False
 
         if sum(

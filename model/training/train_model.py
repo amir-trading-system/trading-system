@@ -40,8 +40,8 @@ USE_HARD_RULES = True
 # ---------------- NEW: threshold-selection logic ----------------
 MIN_POSITIVE_PASS_RATE = 0.30
 MIN_FALSE_POSITIVE_REJECT_RATE = 0.55
-TRADING_SCORE_FP_WEIGHT = 0.65
-TRADING_SCORE_POS_WEIGHT = 0.35
+TRADING_SCORE_FP_WEIGHT = 0.60
+TRADING_SCORE_POS_WEIGHT = 0.40
 
 # Output files
 TRAIN_SCORED_OUTPUT = "model/training/scored_training_dataset.csv"
