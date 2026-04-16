@@ -306,6 +306,7 @@ class DataExtractor:
             and (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) < 0.4
             and bars_with_rejection_counter < 3
         )
+        feature_late_volume_spike = potential_confirmation_bar.volume/total_volume
 
         features = {
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
@@ -326,6 +327,8 @@ class DataExtractor:
             "feature_total_volume": total_volume,
             "feature_current_macd_to_previous": feature_current_macd_to_previous,
             "feature_entry_bar_shape_is_good": feature_entry_bar_shape_is_good,
+            "feature_late_volume_spike": feature_late_volume_spike,
+            "feature_late_momentum_score": feature_late_volume_spike/highest_high_one_minute_bar.index if highest_high_one_minute_bar else 0,
         }
 
         return features

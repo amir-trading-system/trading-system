@@ -2,6 +2,7 @@ import concurrent.futures
 import csv
 import pickle
 import glob
+import pandas as pd
 
 import common
 from ..import data_extractor
@@ -44,6 +45,8 @@ def write_to_csv(
                     "feature_current_macd_to_previous",
                     "feature_entry_bar_shape_is_good",
                     "feature_crossed_highest_high",
+                    "feature_late_volume_spike",
+                    "feature_late_momentum_score",
                 ],
             )
             f.flush()
@@ -72,6 +75,8 @@ def write_to_csv(
         feature_current_macd_to_previous = symbol_data["feature_current_macd_to_previous"]
         feature_entry_bar_shape_is_good = symbol_data["feature_entry_bar_shape_is_good"]
         feature_crossed_highest_high = symbol_data["feature_crossed_highest_high"]
+        feature_late_volume_spike = symbol_data["feature_late_volume_spike"]
+        feature_late_momentum_score = symbol_data["feature_late_momentum_score"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -103,6 +108,8 @@ def write_to_csv(
                     feature_current_macd_to_previous,
                     feature_entry_bar_shape_is_good,
                     feature_crossed_highest_high,
+                    feature_late_volume_spike,
+                    feature_late_momentum_score,
                 ]
             )
 
@@ -136,7 +143,6 @@ def load_data_for_training_model() -> list[dict[str, any]]:
         pickled_data.append(pickled_object)
 
     return pickled_data
-
 
 if __name__ == '__main__':
     symbols_data_parameters: list[dict[str, any]] = []
