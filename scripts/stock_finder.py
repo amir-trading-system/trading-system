@@ -127,7 +127,7 @@ def get_dynamic_symbols_data_from_period(
                     if not price.get("low", None):
                         continue
                     ratio = (price["high"] - price["low"])/price["low"]
-                    if ratio < 0.3 or price["high"] < price["low"]:
+                    if ratio < 0.2 or price["high"] < price["low"]:
                         continue
                     symbol_to_date[symbol] = date.strftime("%m.%d.%yT%H:%M:%S")
 

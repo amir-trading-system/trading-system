@@ -432,7 +432,7 @@ class Confirmator:
                         month=date_now.month,
                         day=date_now.day,
                         hour=date_now.hour,
-                        minute=date_now.minute,
+                        minute=date_now.minute-1 if date_now.minute > 0 else 59,
                     )
                 )
             ):

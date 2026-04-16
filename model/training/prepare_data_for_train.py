@@ -32,7 +32,6 @@ def write_to_csv(
                     "feature_distance_from_highest_high_since_market_open",
                     "feature_entry_bar_lowest_wick_to_bar_body_pct",
                     "feature_entry_bar_volume",
-                    "feature_entry_volume_vs_total_volume",
                     "feature_distance_from_highest_high",
                     "feature_bars_with_rejection_since_market_open",
                     "feature_entry_point_size_to_bars_size_average",
@@ -42,10 +41,11 @@ def write_to_csv(
                     "feature_entry_bar_close_to_crossed_highest_high_pct",
                     "feature_total_volume",
                     "feature_current_macd_to_previous",
-                    "feature_entry_bar_shape_is_good",
-                    "feature_crossed_highest_high",
                     "feature_late_volume_spike",
                     "feature_late_momentum_score",
+                    "feature_entry_bar_price_action_to_total_price_pct",
+                    "feature_entry_volume_vs_total_volume",
+                    "feature_entry_bar_price_action_pct_to_volume_pct",
                 ],
             )
             f.flush()
@@ -62,7 +62,6 @@ def write_to_csv(
         feature_distance_from_highest_high_since_market_open = symbol_data["feature_distance_from_highest_high_since_market_open"]
         feature_entry_bar_lowest_wick_to_bar_body_pct = symbol_data["feature_entry_bar_lowest_wick_to_bar_body_pct"]
         feature_entry_bar_volume = symbol_data["feature_entry_bar_volume"]
-        feature_entry_volume_vs_total_volume = symbol_data["feature_entry_volume_vs_total_volume"]
         feature_distance_from_highest_high = symbol_data["feature_distance_from_highest_high"]
         feature_bars_with_rejection_since_market_open = symbol_data["feature_bars_with_rejection_since_market_open"]
         feature_entry_point_size_to_bars_size_average = symbol_data["feature_entry_point_size_to_bars_size_average"]
@@ -72,10 +71,11 @@ def write_to_csv(
         feature_entry_bar_close_to_crossed_highest_high_pct = symbol_data["feature_entry_bar_close_to_crossed_highest_high_pct"]
         feature_total_volume = symbol_data["feature_total_volume"]
         feature_current_macd_to_previous = symbol_data["feature_current_macd_to_previous"]
-        feature_entry_bar_shape_is_good = symbol_data["feature_entry_bar_shape_is_good"]
-        feature_crossed_highest_high = symbol_data["feature_crossed_highest_high"]
         feature_late_volume_spike = symbol_data["feature_late_volume_spike"]
         feature_late_momentum_score = symbol_data["feature_late_momentum_score"]
+        feature_entry_bar_price_action_to_total_price_pct = symbol_data["feature_entry_bar_price_action_to_total_price_pct"]
+        feature_entry_volume_vs_total_volume = symbol_data["feature_entry_volume_vs_total_volume"]
+        feature_entry_bar_price_action_pct_to_volume_pct = symbol_data["feature_entry_bar_price_action_pct_to_volume_pct"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -95,7 +95,6 @@ def write_to_csv(
                     feature_distance_from_highest_high_since_market_open,
                     feature_entry_bar_lowest_wick_to_bar_body_pct,
                     feature_entry_bar_volume,
-                    feature_entry_volume_vs_total_volume,
                     feature_distance_from_highest_high,
                     feature_bars_with_rejection_since_market_open,
                     feature_entry_point_size_to_bars_size_average,
@@ -105,10 +104,11 @@ def write_to_csv(
                     feature_entry_bar_close_to_crossed_highest_high_pct,
                     feature_total_volume,
                     feature_current_macd_to_previous,
-                    feature_entry_bar_shape_is_good,
-                    feature_crossed_highest_high,
                     feature_late_volume_spike,
                     feature_late_momentum_score,
+                    feature_entry_bar_price_action_to_total_price_pct,
+                    feature_entry_volume_vs_total_volume,
+                    feature_entry_bar_price_action_pct_to_volume_pct,
                 ]
             )
 

@@ -240,21 +240,6 @@ class DataExtractor:
         )
         feature_overlapped_bars_since_market_open_pct = overlapped_bars_counter/len(one_minute_bars)
 
-        feature_crossed_highest_high = (
-            True
-            and potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.high
-            and (potential_confirmation_bar.high - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.low) > 0.3
-            and potential_confirmation_bar.low/potential_confirmation_bar.open_value >= 0.95
-            and potential_confirmation_bar.body_percentage > 0.5
-            and volume_sum_since_market_open > 500000
-            and not any(
-                bar_object
-                for bar_object in one_minute_bars[1:10]
-                if abs(bar_object.close - bar_object.open_value) > potential_confirmation_bar.close - potential_confirmation_bar.open_value
-                and bar_object.volume/potential_confirmation_bar.volume > 0.95
-            )
-        )
-
         highest_high_bar_since_market_open = None
         for bar_object in one_minute_bars[1:]:
             previous_bar = one_minute_timeframe_stock.previous_bar(
@@ -307,16 +292,16 @@ class DataExtractor:
             and bars_with_rejection_counter < 3
         )
         feature_late_volume_spike = potential_confirmation_bar.volume/total_volume
+        feature_entry_volume_vs_total_volume = potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 0
+        feature_entry_bar_price_action_to_total_price_pct = (potential_confirmation_bar.high - potential_confirmation_bar.low)/potential_confirmation_bar.close
 
         features = {
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
             "feature_positive_vs_negative_volume": positive_volume_sum/negative_volume_sum if negative_volume_sum > 0 else 1,
             "feature_overlapped_bars_since_market_open_pct": feature_overlapped_bars_since_market_open_pct,
-            "feature_crossed_highest_high": feature_crossed_highest_high,
             "feature_distance_from_highest_high_since_market_open": feature_distance_from_highest_high_since_market_open,
             "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) if potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0 else 0,
             "feature_entry_bar_volume": potential_confirmation_bar.volume,
-            "feature_entry_volume_vs_total_volume": potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 1,
             "feature_distance_from_highest_high": highest_high_bar_since_market_open.index - potential_confirmation_bar.index if highest_high_bar_since_market_open is not None else 0,
             "feature_bars_with_rejection_since_market_open": bars_with_rejection_since_market_open/total_bars,
             "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average if bars_size_average else 0,
@@ -329,6 +314,9 @@ class DataExtractor:
             "feature_entry_bar_shape_is_good": feature_entry_bar_shape_is_good,
             "feature_late_volume_spike": feature_late_volume_spike,
             "feature_late_momentum_score": feature_late_volume_spike/highest_high_one_minute_bar.index if highest_high_one_minute_bar else 0,
+            "feature_entry_bar_price_action_to_total_price_pct": feature_entry_bar_price_action_to_total_price_pct,
+            "feature_entry_volume_vs_total_volume": feature_entry_volume_vs_total_volume,
+            "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_to_total_price_pct/feature_entry_volume_vs_total_volume if feature_entry_volume_vs_total_volume > 0 else 0,
         }
 
         return features
