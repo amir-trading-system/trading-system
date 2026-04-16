@@ -37,7 +37,7 @@ class Evidence(
             and potential_confirmation_bar.above_9_ema
             and potential_confirmation_bar.above_volume_average
             and potential_confirmation_bar.above_vwap
-            and potential_confirmation_bar.body_percentage > 0.5
+            and potential_confirmation_bar.body_percentage > 0.4
             and potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.close
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
             and potential_confirmation_bar.volume_average/potential_confirmation_bar.volume <= 0.5

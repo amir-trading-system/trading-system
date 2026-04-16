@@ -439,19 +439,6 @@ class Confirmator:
                 continue
 
             self.logger.info(
-                msg="Got potential bar to confirm",
-                extra={
-                    "worker": "Confirmator",
-                    "symbol": original_bar_to_confirm.symbol,
-                    "timeframe": original_bar_to_confirm.timeframe,
-                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                    "bar_time": original_bar_to_confirm.bar_time,
-                    "request_id": stock.request_id,
-                }
-            )
-
-            self.logger.info(
                 msg="Starting to confirm one minute bar for entry point",
                 extra={
                     "worker": "Confirmator",

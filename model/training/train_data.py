@@ -74,13 +74,18 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             is_positive=False,
         ),
         common.objects.SymbolTest(
+            name="INBS",
+            datetime_str="01.05.26T10:10:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
             name="JCSE",
             datetime_str="01.05.26T11:43:00",
             is_positive=False,
         ),
         common.objects.SymbolTest(
             name="INBS",
-            datetime_str="01.05.26T12:29:00",
+            datetime_str="01.05.26T12:22:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -120,12 +125,17 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="PRFX",
-            datetime_str="01.16.26T10:45:00",
+            datetime_str="01.16.26T10:46:00",
             is_positive=False,
         ),
         common.objects.SymbolTest(
             name="POLA",
             datetime_str="01.20.26T10:02:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="GITS",
+            datetime_str="01.21.26T10:02:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -140,12 +150,7 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="BGL",
-            datetime_str="01.22.26T11:42:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="BGL",
-            datetime_str="01.22.26T14:24:00",
+            datetime_str="01.22.26T14:07:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -165,34 +170,15 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="MBAI",
-            datetime_str="01.26.26T10:22:00",
+            datetime_str="01.26.26T11:13:00",
             is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="MBAI",
-            datetime_str="01.26.26T11:41:00",
-            is_positive=False,
         ),
         common.objects.SymbolTest(
             name="DRMA",
-            datetime_str="01.26.26T12:19:00",
+            datetime_str="01.26.26T12:17:00",
             is_positive=True,
         ),
-        common.objects.SymbolTest(
-            name="XTKG",
-            datetime_str="01.26.26T14:11:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="MOVE",
-            datetime_str="01.27.26T10:04:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="GITS",
-            datetime_str="01.27.26T10:05:00",
-            is_positive=True,
-        ),
+        ## continue from here
         common.objects.SymbolTest(
             name="XHLD",
             datetime_str="01.27.26T15:36:00",
