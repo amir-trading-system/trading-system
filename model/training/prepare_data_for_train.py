@@ -2,7 +2,6 @@ import concurrent.futures
 import csv
 import pickle
 import glob
-import pandas as pd
 
 import common
 from ..import data_extractor

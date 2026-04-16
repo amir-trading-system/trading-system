@@ -214,6 +214,20 @@ class Confirmator:
                 one_minute_bars=one_minute_bars,
             )
 
+            total_volume = potential_confirmation_bar.price_movement_statistics.get("feature_total_volume")
+            if (
+                True
+                and total_volume is not None
+            ):
+                if (
+                    total_volume < 500000
+                    or (
+                        potential_confirmation_bar.volume/total_volume < 0.02
+                        and potential_confirmation_bar.volume < 50000
+                    )
+                ):
+                    return bar_has_confirmed
+
             if self.model_runner.should_run_model:
                 score: common.objects.Score = self.model_runner.score_potential_confirmation_bar(
                     potential_confirmation_bar=potential_confirmation_bar,
@@ -504,6 +518,13 @@ class Confirmator:
         if potential_confirmation_bar.low - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.low:
             return False
 
+        if (
+            True
+            and highest_high_one_minute_bar is not None
+            and highest_high_one_minute_bar.high > potential_confirmation_bar.high
+        ):
+            return False
+
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
             stock=stock,
             potential_confirmation_bar=potential_confirmation_bar,
@@ -511,14 +532,23 @@ class Confirmator:
         ):
             return False
 
-        if sum(
-            bar_object.volume
-            for bar_object in one_minute_bars
-            if bar_object.index > highest_high_one_minute_bar.index+1
-        ) < 100000:
+        if potential_confirmation_bar.buyers_are_indecision:
             return False
 
-        if potential_confirmation_bar.buyers_are_indecision:
+        if any(
+            r_l
+            for r_l in stock.resistance_levels
+            if r_l.high > potential_confirmation_bar.high
+            and potential_confirmation_bar.high/r_l.high > 0.9
+            and potential_confirmation_bar.bar_wick_percentage > 0.4
+        ):
+            return False
+
+        if (
+            True
+            and len(stock.bars) > 1
+            and stock.bars[1].high > potential_confirmation_bar.high
+        ):
             return False
 
         return True

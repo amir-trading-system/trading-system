@@ -367,7 +367,7 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
             datetime_str=date,
         )
         for symbol, date in stock_finder.get_dynamic_symbols_data_from_period(
-            period="3mo",
+            period="1mo",
         ).items()
     ]
 
@@ -395,8 +395,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         # common.objects.SymbolTest(
-        #     name="XNDU",
-        #     datetime_str="04.15.26T14:43:00",
+        #     name="SATL",
+        #     datetime_str="03.23.26T10:07:00",
         #     is_positive=True,
         # ),
     ]
