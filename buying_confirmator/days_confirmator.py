@@ -499,10 +499,22 @@ class Confirmator:
         one_minute_bars: list[common.objects.BarData],
         highest_high_one_minute_bar: common.objects.BarData,
     ) -> bool:
+        crossed_any_resistance = any(
+            r_l
+            for r_l in stock.resistance_levels
+            if potential_confirmation_bar.low < r_l.high < potential_confirmation_bar.close
+        )
+        crossed_highest_high = potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.close
+
         if potential_confirmation_bar.high - potential_confirmation_bar.low <= 0.05:
             return False
 
-        if potential_confirmation_bar.low - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.low:
+        if (
+            True
+            and potential_confirmation_bar.low - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.low
+            and not crossed_any_resistance
+            and not crossed_highest_high
+        ):
             return False
 
         if (
@@ -510,6 +522,9 @@ class Confirmator:
             and highest_high_one_minute_bar is not None
             and highest_high_one_minute_bar.high > potential_confirmation_bar.high
         ):
+            return False
+
+        if stock.last_post_pre_one_minute_highest_high > potential_confirmation_bar.high:
             return False
 
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
