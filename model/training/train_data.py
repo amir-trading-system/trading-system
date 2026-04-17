@@ -178,7 +178,6 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             datetime_str="01.26.26T12:17:00",
             is_positive=True,
         ),
-        ## continue from here
         common.objects.SymbolTest(
             name="XHLD",
             datetime_str="01.27.26T15:36:00",
@@ -196,32 +195,27 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="FEED",
-            datetime_str="01.29.26T09:47:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="CATX",
-            datetime_str="01.29.26T12:22:00",
+            datetime_str="01.28.26T10:51:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
             name="FEED",
-            datetime_str="01.30.26T09:57:00",
+            datetime_str="01.29.26T09:40:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
-            name="ROMA",
-            datetime_str="02.02.26T10:00:00",
-            is_positive=False,
+            name="CATX",
+            datetime_str="01.29.26T11:30:00",
+            is_positive=True,
         ),
         common.objects.SymbolTest(
-            name="JLHL",
-            datetime_str="02.02.26T10:46:00",
-            is_positive=False,
+            name="FEED",
+            datetime_str="01.30.26T10:07:00",
+            is_positive=True,
         ),
         common.objects.SymbolTest(
             name="CATX",
-            datetime_str="02.02.26T10:48:00",
+            datetime_str="02.02.26T10:22:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -250,15 +244,21 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             is_positive=True,
         ),
         common.objects.SymbolTest(
+            name="NCI",
+            datetime_str="02.11.26T15:01:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
             name="RIME",
             datetime_str="02.13.26T14:11:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
-            name="ATOM",
-            datetime_str="02.17.26T12:27:00",
+            name="RIME",
+            datetime_str="02.13.26T15:47:00",
             is_positive=True,
         ),
+        ## continue from here
         common.objects.SymbolTest(
             name="MLEC",
             datetime_str="02.18.26T10:09:00",

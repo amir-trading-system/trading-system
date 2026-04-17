@@ -534,7 +534,7 @@ class Confirmator:
         if (
             True
             and len(stock.bars) > 1
-            and stock.bars[1].high > potential_confirmation_bar.high
+            and stock.bars[1].close > potential_confirmation_bar.high
         ):
             return False
 
