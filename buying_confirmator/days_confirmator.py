@@ -524,7 +524,7 @@ class Confirmator:
         ):
             return False
 
-        if stock.last_post_pre_one_minute_highest_high > potential_confirmation_bar.high:
+        if stock.pre_market_one_minute_highest_high_bar.high > potential_confirmation_bar.high:
             return False
 
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
