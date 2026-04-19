@@ -18,7 +18,6 @@ class Collector:
 
     def collect_data(
         self,
-        specific_bar_time: datetime.datetime = None,
     ):
         while True:
             symbol = self.tws_client.symbols_to_collect_queue.get()
@@ -44,8 +43,8 @@ class Collector:
                     timeframe=timeframe_input.timeframe,
                     timeframe_type=timeframe_input.timeframe_type,
                     one_minute_bars_queue=queue.Queue(),
-                    specific_bar_time=specific_bar_time,
-                    expected_bar_time=specific_bar_time,
+                    specific_bar_time=None,
+                    expected_bar_time=None,
                 )
                 if timeframe_input.timeframe_type == common.objects.TimeframeType.DAY:
                     day_timeframe_request_id = next_request_id
@@ -56,7 +55,7 @@ class Collector:
                     symbol=symbol,
                     timeframe=timeframe_input.timeframe,
                     timeframe_type=timeframe_input.timeframe_type,
-                    specific_bar_time=specific_bar_time,
+                    specific_bar_time=None,
                     request_id=next_request_id,
                 )
 
