@@ -558,16 +558,10 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             datetime_str="03.25.26T10:41:00",
             is_positive=False,
         ),
-        ## continue from here
         common.objects.SymbolTest(
             name="NXTT",
             datetime_str="03.25.26T15:04:00",
             is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="NAVN",
-            datetime_str="03.26.26T09:50:00",
-            is_positive=False,
         ),
         common.objects.SymbolTest(
             name="EEIQ",
@@ -581,12 +575,17 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="NXTT",
-            datetime_str="03.27.26T10:13:00",
+            datetime_str="03.27.26T11:54:00",
             is_positive=False,
         ),
         common.objects.SymbolTest(
             name="ARTL",
-            datetime_str="03.27.26T12:22:00",
+            datetime_str="03.27.26T12:33:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="SST",
+            datetime_str="03.27.26T11:30:00",
             is_positive=False,
         ),
         common.objects.SymbolTest(
@@ -611,7 +610,7 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="MASK",
-            datetime_str="03.31.26T09:54:00",
+            datetime_str="03.31.26T09:55:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
@@ -626,7 +625,17 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="ELAB",
-            datetime_str="04.01.26T10:33:00",
+            datetime_str="04.01.26T14:53:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="AGPU",
+            datetime_str="04.01.26T10:13:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="AGPU",
+            datetime_str="04.01.26T10:26:00",
             is_positive=False,
         ),
         common.objects.SymbolTest(
@@ -655,39 +664,19 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             is_positive=True,
         ),
         common.objects.SymbolTest(
-            name="SIDU",
-            datetime_str="04.02.26T11:57:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="FUBO",
-            datetime_str="04.06.26T10:03:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
             name="SMX",
             datetime_str="04.06.26T10:09:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(
             name="SIDU",
-            datetime_str="04.06.26T10:59:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="FUBO",
-            datetime_str="04.06.26T11:50:00",
+            datetime_str="04.06.26T09:42:00",
             is_positive=False,
         ),
         common.objects.SymbolTest(
             name="SKYQ",
             datetime_str="04.06.26T13:43:00",
             is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AIXI",
-            datetime_str="04.06.26T14:52:00",
-            is_positive=True,
         ),
         common.objects.SymbolTest(
             name="SKYQ",
@@ -699,6 +688,7 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
             datetime_str="04.07.26T10:15:00",
             is_positive=False,
         ),
+        ## continue from here
         common.objects.SymbolTest(
             name="TMDE",
             datetime_str="04.07.26T10:16:00",
@@ -842,11 +832,6 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         common.objects.SymbolTest(
             name="RMSG",
             datetime_str="04.13.26T11:45:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="SIDU",
-            datetime_str="04.13.26T13:48:00",
             is_positive=True,
         ),
         common.objects.SymbolTest(

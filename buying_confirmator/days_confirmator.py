@@ -504,6 +504,7 @@ class Confirmator:
         one_minute_bars: list[common.objects.BarData],
         highest_high: float,
     ) -> bool:
+        highest_high = round(highest_high, 2)
         if potential_confirmation_bar.close < 1.0:
             return False
 
@@ -512,7 +513,7 @@ class Confirmator:
             for r_l in stock.resistance_levels
             if potential_confirmation_bar.low < r_l.high < potential_confirmation_bar.close
         )
-        crossed_highest_high = potential_confirmation_bar.low < highest_high < potential_confirmation_bar.close
+        crossed_highest_high = round(potential_confirmation_bar.low, 2) < highest_high < round(potential_confirmation_bar.close, 2)
 
         if potential_confirmation_bar.bar_time < datetime.datetime(
             year=potential_confirmation_bar.bar_time.year,
@@ -534,7 +535,7 @@ class Confirmator:
         ):
             return False
 
-        if highest_high >= potential_confirmation_bar.close:
+        if highest_high >= round(potential_confirmation_bar.close, 2):
             return False
 
         if self.highest_high_occurred_more_than_once_in_the_last_bars(

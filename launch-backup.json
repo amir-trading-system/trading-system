@@ -27,7 +27,7 @@
         },
 
         {
-            "name": "columns editor",
+            "name": "train model",
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,

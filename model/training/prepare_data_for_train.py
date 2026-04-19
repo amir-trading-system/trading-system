@@ -41,7 +41,6 @@ def write_to_csv(
                     "feature_total_volume",
                     "feature_current_macd_to_previous",
                     "feature_late_volume_spike",
-                    "feature_late_momentum_score",
                     "feature_entry_bar_price_action_to_total_price_pct",
                     "feature_entry_volume_vs_total_volume",
                     "feature_entry_bar_price_action_pct_to_volume_pct",
@@ -72,7 +71,6 @@ def write_to_csv(
         feature_total_volume = symbol_data["feature_total_volume"]
         feature_current_macd_to_previous = symbol_data["feature_current_macd_to_previous"]
         feature_late_volume_spike = symbol_data["feature_late_volume_spike"]
-        feature_late_momentum_score = symbol_data["feature_late_momentum_score"]
         feature_entry_bar_price_action_to_total_price_pct = symbol_data["feature_entry_bar_price_action_to_total_price_pct"]
         feature_entry_volume_vs_total_volume = symbol_data["feature_entry_volume_vs_total_volume"]
         feature_entry_bar_price_action_pct_to_volume_pct = symbol_data["feature_entry_bar_price_action_pct_to_volume_pct"]
@@ -106,7 +104,6 @@ def write_to_csv(
                     feature_total_volume,
                     feature_current_macd_to_previous,
                     feature_late_volume_spike,
-                    feature_late_momentum_score,
                     feature_entry_bar_price_action_to_total_price_pct,
                     feature_entry_volume_vs_total_volume,
                     feature_entry_bar_price_action_pct_to_volume_pct,

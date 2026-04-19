@@ -324,7 +324,6 @@ class DataExtractor:
             "feature_current_macd_to_previous": feature_current_macd_to_previous,
             "feature_entry_bar_shape_is_good": feature_entry_bar_shape_is_good,
             "feature_late_volume_spike": feature_late_volume_spike,
-            "feature_late_momentum_score": feature_late_volume_spike/highest_high_one_minute_bar.index if highest_high_one_minute_bar else 0,
             "feature_entry_bar_price_action_to_total_price_pct": feature_entry_bar_price_action_to_total_price_pct,
             "feature_entry_volume_vs_total_volume": feature_entry_volume_vs_total_volume,
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_to_total_price_pct/feature_entry_volume_vs_total_volume if feature_entry_volume_vs_total_volume > 0 else 0,
