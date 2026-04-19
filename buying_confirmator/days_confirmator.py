@@ -142,11 +142,21 @@ class Confirmator:
             reverse=True
         )
 
+        final_highest_high_one_minute_bar: common.objects.BarData = None
+        if stock.pre_market_one_minute_highest_high_bar is not None:
+            final_highest_high_one_minute_bar = stock.pre_market_one_minute_highest_high_bar
+        if (
+            True
+            and highest_high_one_minute_bar is not None
+            and highest_high_one_minute_bar.high > final_highest_high_one_minute_bar.high
+        ):
+            final_highest_high_one_minute_bar = highest_high_one_minute_bar
+
         if not self.bar_has_potential(
             stock=stock,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=temp_one_minute_bars,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            highest_high_one_minute_bar=final_highest_high_one_minute_bar,
         ):
             return bar_has_confirmed
 
@@ -504,7 +514,11 @@ class Confirmator:
             for r_l in stock.resistance_levels
             if potential_confirmation_bar.low < r_l.high < potential_confirmation_bar.close
         )
-        crossed_highest_high = potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.close
+        crossed_highest_high = (
+            True
+            and highest_high_one_minute_bar is not None
+            and potential_confirmation_bar.low < highest_high_one_minute_bar.high < potential_confirmation_bar.close
+        )
 
         if potential_confirmation_bar.high - potential_confirmation_bar.low <= 0.05:
             return False
@@ -520,7 +534,7 @@ class Confirmator:
         if (
             True
             and highest_high_one_minute_bar is not None
-            and highest_high_one_minute_bar.high > potential_confirmation_bar.high
+            and highest_high_one_minute_bar.high >= potential_confirmation_bar.high
         ):
             return False
 

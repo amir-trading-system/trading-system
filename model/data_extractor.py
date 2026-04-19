@@ -1,3 +1,4 @@
+import copy
 import datetime
 
 import common
@@ -264,7 +265,6 @@ class DataExtractor:
                 ):
                     highest_high_bar_since_market_open = bar_object
 
-        feature_distance_from_highest_high_since_market_open = highest_high_bar_since_market_open.index - potential_confirmation_bar.index if highest_high_bar_since_market_open is not None else 0
         bars_size_average = bars_size_sum/(total_bars-1) if total_bars > 1 else 1
         feature_current_macd_to_previous = 0
         if previous_bar_to_entry_bar is not None:
@@ -295,11 +295,22 @@ class DataExtractor:
         feature_entry_volume_vs_total_volume = potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 0
         feature_entry_bar_price_action_to_total_price_pct = (potential_confirmation_bar.high - potential_confirmation_bar.low)/potential_confirmation_bar.close
 
+        potential_resistances = copy.deepcopy(day_timeframe_stock.resistance_levels)
+        potential_resistances.append(highest_high_one_minute_bar)
+        crossed_resistance = [
+            r_l
+            for r_l in potential_resistances
+            if potential_confirmation_bar.low < r_l.high < potential_confirmation_bar.close
+        ]
+
+        feature_distance_between_highest_high_to_entry_bar_high = 0
+        if crossed_resistance:
+            feature_distance_between_highest_high_to_entry_bar_high = (potential_confirmation_bar.high - crossed_resistance[0].high)/(potential_confirmation_bar.high - potential_confirmation_bar.low)
+
         features = {
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
             "feature_positive_vs_negative_volume": positive_volume_sum/negative_volume_sum if negative_volume_sum > 0 else 1,
             "feature_overlapped_bars_since_market_open_pct": feature_overlapped_bars_since_market_open_pct,
-            "feature_distance_from_highest_high_since_market_open": feature_distance_from_highest_high_since_market_open,
             "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) if potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0 else 0,
             "feature_entry_bar_volume": potential_confirmation_bar.volume,
             "feature_distance_from_highest_high": highest_high_bar_since_market_open.index - potential_confirmation_bar.index if highest_high_bar_since_market_open is not None else 0,
@@ -317,6 +328,8 @@ class DataExtractor:
             "feature_entry_bar_price_action_to_total_price_pct": feature_entry_bar_price_action_to_total_price_pct,
             "feature_entry_volume_vs_total_volume": feature_entry_volume_vs_total_volume,
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_to_total_price_pct/feature_entry_volume_vs_total_volume if feature_entry_volume_vs_total_volume > 0 else 0,
+            "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
+            "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
         }
 
         return features
