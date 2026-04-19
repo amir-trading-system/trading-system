@@ -38,14 +38,14 @@ class Scanner():
                 tag_value.TagValue("volumeAbove", "500000"),
                 tag_value.TagValue("priceAbove", "0.5"),
                 tag_value.TagValue("priceBelow", "30"),
-                tag_value.TagValue("marketCapBelow1e6", "500000000"),
+                tag_value.TagValue("marketCapBelow1e6", "500"),
             ]
 
         return [
             tag_value.TagValue("volumeAbove", "200000"),
             tag_value.TagValue("priceAbove", "1"),
             tag_value.TagValue("priceBelow", "100"),
-            tag_value.TagValue("marketCapBelow1e6", "500000000"),
+            tag_value.TagValue("marketCapBelow1e6", "500"),
             tag_value.TagValue("changePercAbove", "20")
         ]
 
