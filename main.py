@@ -83,9 +83,7 @@ def run_bot(
     a_obj: analyzer.analyzer.Analyzer,
     co_obj: buying_confirmator.confirmator.Confirmator,
 ):
-    tws_client_obj.start_scanner(
-        for_upside_potential=False,
-    )
+    tws_client_obj.start_scanner()
 
     threading.Thread(
         target=c_obj.collect_data,

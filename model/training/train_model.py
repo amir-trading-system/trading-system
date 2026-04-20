@@ -38,10 +38,10 @@ MIN_SELECTED_FEATURES = 8
 USE_HARD_RULES = True
 
 # ---------------- NEW: threshold-selection logic ----------------
-MIN_POSITIVE_PASS_RATE = 0.30
-MIN_FALSE_POSITIVE_REJECT_RATE = 0.55
-TRADING_SCORE_FP_WEIGHT = 0.60
-TRADING_SCORE_POS_WEIGHT = 0.40
+MIN_POSITIVE_PASS_RATE = 0.50
+MIN_FALSE_POSITIVE_REJECT_RATE = 0.45
+TRADING_SCORE_FP_WEIGHT = 0.5
+TRADING_SCORE_POS_WEIGHT = 0.5
 
 # Output files
 TRAIN_SCORED_OUTPUT = "model/training/scored_training_dataset.csv"
@@ -468,78 +468,6 @@ for f in selected_features:
 print("\n================ CV FOLD REPORT ================\n")
 print(fold_report_df.describe(include="all"))
 
-# # ------------------------------------------------------------
-# # VISUALIZE THRESHOLD CHOICES ACROSS CV FOLDS
-# # ------------------------------------------------------------
-# import matplotlib.pyplot as plt
-
-# print("\n================ THRESHOLD CHOICE COUNTS ================\n")
-# print(fold_report_df["best_threshold"].value_counts().sort_index())
-
-# # 1) Histogram of chosen thresholds
-# plt.figure(figsize=(8, 5))
-# fold_report_df["best_threshold"].plot(
-#     kind="hist",
-#     bins=len(sorted(fold_report_df["best_threshold"].unique())),
-#     rwidth=0.9,
-# )
-# plt.xlabel("Best threshold chosen in fold")
-# plt.ylabel("Number of folds")
-# plt.title("Distribution of chosen thresholds across CV folds")
-# plt.show()
-
-# # 2) Trading score by chosen threshold
-# threshold_summary = (
-#     fold_report_df.groupby("best_threshold", as_index=False)
-#     .agg(
-#         folds=("fold", "count"),
-#         mean_trading_score=("trading_score", "mean"),
-#         mean_positive_pass_rate=("positive_pass_rate", "mean"),
-#         mean_false_positive_reject_rate=("false_positive_reject_rate", "mean"),
-#         mean_balanced_score=("balanced_score", "mean"),
-#     )
-#     .sort_values("best_threshold")
-# )
-
-# print("\n================ THRESHOLD SUMMARY BY CHOSEN THRESHOLD ================\n")
-# print(threshold_summary.to_string(index=False))
-
-# plt.figure(figsize=(8, 5))
-# plt.plot(
-#     threshold_summary["best_threshold"],
-#     threshold_summary["mean_trading_score"],
-#     marker="o",
-# )
-# plt.xlabel("Chosen threshold")
-# plt.ylabel("Mean trading score")
-# plt.title("Mean trading score by chosen CV threshold")
-# plt.grid(True, alpha=0.3)
-# plt.show()
-
-# # 3) Positive pass rate vs FP reject rate by chosen threshold
-# plt.figure(figsize=(8, 5))
-# for _, row in threshold_summary.iterrows():
-#     plt.scatter(
-#         row["mean_false_positive_reject_rate"],
-#         row["mean_positive_pass_rate"],
-#         s=80,
-#     )
-#     plt.annotate(
-#         f"{row['best_threshold']:.2f}\n(n={int(row['folds'])})",
-#         (
-#             row["mean_false_positive_reject_rate"],
-#             row["mean_positive_pass_rate"],
-#         ),
-#         xytext=(5, 5),
-#         textcoords="offset points",
-#     )
-
-# plt.xlabel("Mean false positive reject rate")
-# plt.ylabel("Mean positive pass rate")
-# plt.title("CV threshold tradeoff map")
-# plt.grid(True, alpha=0.3)
-# plt.show()
-
 # ------------------------------------------------------------
 # TRAIN FINAL MODEL ON TRAINING SET USING STABLE FEATURES
 # ------------------------------------------------------------
@@ -571,7 +499,7 @@ final_model = train_rf_model(
 # CHOOSE THRESHOLD ON TRAINING SET OUT-OF-FOLD STYLE SUMMARY
 # ------------------------------------------------------------
 
-chosen_threshold = float(fold_report_df["best_threshold"].median())
+chosen_threshold = float(fold_report_df["best_threshold"].min())
 
 print("\n================ CHOSEN THRESHOLD ================\n")
 print(f"Median best CV threshold: {chosen_threshold:.2f}")

@@ -270,27 +270,6 @@ class DataExtractor:
         if previous_bar_to_entry_bar is not None:
             feature_current_macd_to_previous = potential_confirmation_bar.macd/previous_bar_to_entry_bar.macd
 
-        previous_bar_is_highest = False
-        if previous_bar_to_entry_bar is not None and previous_bar_to_entry_bar.is_after_market_open:
-            relevant_bars = [b for b in one_minute_bars if b.bar_time < previous_bar_to_entry_bar.bar_time]
-            if relevant_bars:
-                previous_bar_is_highest = max(
-                    b.high
-                    for b in relevant_bars
-                ) < previous_bar_to_entry_bar.high
-
-        feature_entry_bar_shape_is_good = (
-            True
-            and previous_bar_to_entry_bar.is_after_market_open
-            and not previous_bar_is_highest
-            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-            and potential_confirmation_bar.ema_9 > potential_confirmation_bar.ema_20
-            and potential_confirmation_bar.ema_20 > potential_confirmation_bar.vwap
-            and 0.95 < potential_confirmation_bar.ema_9/potential_confirmation_bar.open_value < 1.05
-            and potential_confirmation_bar.body_percentage > 0.5
-            and (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) < 0.4
-            and bars_with_rejection_counter < 3
-        )
         feature_late_volume_spike = potential_confirmation_bar.volume/total_volume
         feature_entry_volume_vs_total_volume = potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 0
         feature_entry_bar_price_action_to_total_price_pct = (potential_confirmation_bar.high - potential_confirmation_bar.low)/potential_confirmation_bar.close
@@ -307,6 +286,13 @@ class DataExtractor:
         if crossed_resistance:
             feature_distance_between_highest_high_to_entry_bar_high = (potential_confirmation_bar.high - crossed_resistance[0].high)/(potential_confirmation_bar.high - potential_confirmation_bar.low)
 
+        feature_price_action_is_stuck_pct = price_action_is_stuck_counter/total_bars
+        feature_entry_bar_price_action_pct_to_volume_pct = feature_entry_bar_price_action_to_total_price_pct/feature_entry_volume_vs_total_volume if feature_entry_volume_vs_total_volume > 0 else 0
+        feature_strong_negative_bars_pct = strong_negative_bars_counter/negative_bars_counter if negative_bars_counter > 0 else 0
+        feature_histogram_changed_directions_pct = histogram_changed_directions_counter/total_bars
+        feature_bars_with_rejection_since_market_open = bars_with_rejection_since_market_open/total_bars
+        total_bars_since_4_am = ((potential_confirmation_bar.bar_time.hour - 4) * 60) + potential_confirmation_bar.bar_time.minute
+
         features = {
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
             "feature_positive_vs_negative_volume": positive_volume_sum/negative_volume_sum if negative_volume_sum > 0 else 1,
@@ -314,21 +300,21 @@ class DataExtractor:
             "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) if potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0 else 0,
             "feature_entry_bar_volume": potential_confirmation_bar.volume,
             "feature_distance_from_highest_high": highest_high_bar_since_market_open.index - potential_confirmation_bar.index if highest_high_bar_since_market_open is not None else 0,
-            "feature_bars_with_rejection_since_market_open": bars_with_rejection_since_market_open/total_bars,
+            "feature_bars_with_rejection_since_market_open": feature_bars_with_rejection_since_market_open,
             "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average if bars_size_average else 0,
-            "feature_histogram_changed_directions_pct": histogram_changed_directions_counter/total_bars,
-            "feature_strong_negative_bars_pct": strong_negative_bars_counter/negative_bars_counter if negative_bars_counter > 0 else 0,
-            "feature_price_action_is_stuck_pct": price_action_is_stuck_counter/total_bars,
+            "feature_histogram_changed_directions_pct": feature_histogram_changed_directions_pct,
+            "feature_strong_negative_bars_pct": feature_strong_negative_bars_pct,
+            "feature_price_action_is_stuck_pct": feature_price_action_is_stuck_pct,
             "feature_entry_bar_close_to_crossed_highest_high_pct": potential_confirmation_bar.close/highest_high_one_minute_bar.high,
             "feature_total_volume": total_volume,
             "feature_current_macd_to_previous": feature_current_macd_to_previous,
-            "feature_entry_bar_shape_is_good": feature_entry_bar_shape_is_good,
             "feature_late_volume_spike": feature_late_volume_spike,
             "feature_entry_bar_price_action_to_total_price_pct": feature_entry_bar_price_action_to_total_price_pct,
             "feature_entry_volume_vs_total_volume": feature_entry_volume_vs_total_volume,
-            "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_to_total_price_pct/feature_entry_volume_vs_total_volume if feature_entry_volume_vs_total_volume > 0 else 0,
+            "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
             "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
             "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
+            "feature_highest_high_index": (highest_high_one_minute_bar.index - potential_confirmation_bar.index)/total_bars_since_4_am,
         }
 
         return features
