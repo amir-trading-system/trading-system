@@ -241,11 +241,11 @@ class Client(client.EClient, wrapper.EWrapper):
             return 0
 
         pct = 0
-        if 50 < score.score <= 60:
+        if 50 < score.score < 60:
             pct = 0.2
-        if 60 < score.score <= 70:
+        if 60 <= score.score < 70:
             pct = 0.4
-        if score.score > 70:
+        if score.score >= 70:
             pct = 0.5
 
         quantity = math.floor((self.available_funds * pct) / current_price)

@@ -755,13 +755,18 @@ def get_tagged_data() -> list[common.objects.SymbolTest]:
         ),
         common.objects.SymbolTest(
             name="BIRD",
-            datetime_str="04.15.26T11:08:00",
-            is_positive=True,
+            datetime_str="04.15.26T09:46:00",
+            is_positive=False,
         ),
         common.objects.SymbolTest(
             name="MNTS",
             datetime_str="04.15.26T10:56:00",
             is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="BIRD",
+            datetime_str="04.15.26T11:08:00",
+            is_positive=True,
         ),
         common.objects.SymbolTest(
             name="ASTI",

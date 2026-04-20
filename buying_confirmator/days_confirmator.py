@@ -240,8 +240,6 @@ class Confirmator:
 
                 msg = "Bar confirmed by model"
 
-                if potential_confirmation_bar.str_bar_time != "16:0":
-                    continue
                 if not score.should_take_trade:
                     msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
                     bar_has_confirmed = False
@@ -565,6 +563,19 @@ class Confirmator:
             and len(stock.bars) > 1
             and stock.bars[1].close > potential_confirmation_bar.high
         ):
+            return False
+
+        last_bars = [
+            bar_object
+            for bar_object in one_minute_bars[1:]
+        ]
+        if len(
+            [
+                bar_object
+                for bar_object in last_bars
+                if bar_object.volume < 1000
+            ]
+        ) >= 5:
             return False
 
         return True
