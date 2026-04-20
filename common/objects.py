@@ -155,7 +155,10 @@ class BarData:
         return (
             True
             and self.close > self.ema_9
-            and self.open_value > self.ema_9
+            and (
+                self.open_value > self.ema_9
+                or self.open_value/self.ema_9 >= 0.98
+            )
         )
 
     @property
