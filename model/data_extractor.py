@@ -48,6 +48,7 @@ class DataExtractor:
         overlapped_bars_counter = 0
         bars_since_highest_high: list[common.objects.BarData] = []
         volume_to_volume_average_ratio_since_highest_high = 0
+        starting_bar = one_minute_bars[-1]
 
         for bar_object in one_minute_bars:
             if bar_object.bar_time < potential_confirmation_bar.bar_time:
@@ -265,6 +266,21 @@ class DataExtractor:
                 ):
                     highest_high_bar_since_market_open = bar_object
 
+        feature_fibonacci_retracement = 0
+        bars_since_highest_high_since_market_open = [
+            bar_object
+            for bar_object in one_minute_bars
+            if highest_high_bar_since_market_open is not None
+            and bar_object.index < highest_high_bar_since_market_open.index
+        ]
+        if bars_since_highest_high_since_market_open:
+            lowest_low_since_highest_high_since_market_open = min(
+                bar_object.low
+                for bar_object in bars_since_highest_high_since_market_open
+            )
+            fibonacci_retracement = (highest_high_bar_since_market_open.high - lowest_low_since_highest_high_since_market_open)/(highest_high_bar_since_market_open.high - starting_bar.low)
+            feature_fibonacci_retracement = min(fibonacci_retracement,1)
+
         bars_size_average = bars_size_sum/(total_bars-1) if total_bars > 1 else 1
         feature_current_macd_to_previous = 0
         if previous_bar_to_entry_bar is not None:
@@ -313,6 +329,7 @@ class DataExtractor:
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
             "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
             "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
+            "feature_fibonacci_retracement": feature_fibonacci_retracement,
         }
 
         return features

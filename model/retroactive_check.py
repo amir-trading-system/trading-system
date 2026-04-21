@@ -403,9 +403,9 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="FNKO",
-            datetime_str="02.20.26T10:21:00",
-            is_positive=False,
+            name="SST",
+            datetime_str="04.20.26T10:09:00",
+            is_positive=True,
         ),
     ]
     # symbols = explore_past_potential_symbols()

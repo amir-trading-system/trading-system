@@ -29,7 +29,6 @@ def write_to_csv(
                     "feature_bars_with_at_least_50_pct_wick_pct",
                     "feature_positive_vs_negative_volume",
                     "feature_overlapped_bars_since_market_open_pct",
-                    "feature_entry_bar_lowest_wick_to_bar_body_pct",
                     "feature_entry_bar_volume",
                     "feature_distance_from_highest_high",
                     "feature_bars_with_rejection_since_market_open",
@@ -46,6 +45,7 @@ def write_to_csv(
                     "feature_entry_bar_price_action_pct_to_volume_pct",
                     "feature_bars_above_vwap_pct",
                     "feature_distance_between_highest_high_to_entry_bar_high",
+                    "feature_fibonacci_retracement",
                 ],
             )
             f.flush()
@@ -59,7 +59,6 @@ def write_to_csv(
         feature_bars_with_at_least_50_pct_wick_pct = symbol_data["feature_bars_with_at_least_50_pct_wick_pct"]
         feature_positive_vs_negative_volume = symbol_data["feature_positive_vs_negative_volume"]
         feature_overlapped_bars_since_market_open_pct = symbol_data["feature_overlapped_bars_since_market_open_pct"]
-        feature_entry_bar_lowest_wick_to_bar_body_pct = symbol_data["feature_entry_bar_lowest_wick_to_bar_body_pct"]
         feature_entry_bar_volume = symbol_data["feature_entry_bar_volume"]
         feature_distance_from_highest_high = symbol_data["feature_distance_from_highest_high"]
         feature_bars_with_rejection_since_market_open = symbol_data["feature_bars_with_rejection_since_market_open"]
@@ -76,6 +75,7 @@ def write_to_csv(
         feature_entry_bar_price_action_pct_to_volume_pct = symbol_data["feature_entry_bar_price_action_pct_to_volume_pct"]
         feature_bars_above_vwap_pct = symbol_data["feature_bars_above_vwap_pct"]
         feature_distance_between_highest_high_to_entry_bar_high = symbol_data["feature_distance_between_highest_high_to_entry_bar_high"]
+        feature_fibonacci_retracement = symbol_data["feature_fibonacci_retracement"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -92,7 +92,6 @@ def write_to_csv(
                     feature_bars_with_at_least_50_pct_wick_pct,
                     feature_positive_vs_negative_volume,
                     feature_overlapped_bars_since_market_open_pct,
-                    feature_entry_bar_lowest_wick_to_bar_body_pct,
                     feature_entry_bar_volume,
                     feature_distance_from_highest_high,
                     feature_bars_with_rejection_since_market_open,
@@ -109,6 +108,7 @@ def write_to_csv(
                     feature_entry_bar_price_action_pct_to_volume_pct,
                     feature_bars_above_vwap_pct,
                     feature_distance_between_highest_high_to_entry_bar_high,
+                    feature_fibonacci_retracement,
                 ]
             )
 
