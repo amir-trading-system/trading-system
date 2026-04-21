@@ -291,7 +291,6 @@ class DataExtractor:
         feature_strong_negative_bars_pct = strong_negative_bars_counter/negative_bars_counter if negative_bars_counter > 0 else 0
         feature_histogram_changed_directions_pct = histogram_changed_directions_counter/total_bars
         feature_bars_with_rejection_since_market_open = bars_with_rejection_since_market_open/total_bars
-        total_bars_since_4_am = ((potential_confirmation_bar.bar_time.hour - 4) * 60) + potential_confirmation_bar.bar_time.minute
 
         features = {
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
@@ -314,7 +313,6 @@ class DataExtractor:
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
             "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
             "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
-            "feature_highest_high_index": (highest_high_one_minute_bar.index - potential_confirmation_bar.index)/total_bars_since_4_am,
         }
 
         return features

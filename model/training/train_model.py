@@ -499,7 +499,7 @@ final_model = train_rf_model(
 # CHOOSE THRESHOLD ON TRAINING SET OUT-OF-FOLD STYLE SUMMARY
 # ------------------------------------------------------------
 
-chosen_threshold = float(fold_report_df["best_threshold"].min())
+chosen_threshold = float(fold_report_df["best_threshold"].median())
 
 print("\n================ CHOSEN THRESHOLD ================\n")
 print(f"Median best CV threshold: {chosen_threshold:.2f}")
@@ -530,6 +530,8 @@ print(confusion_matrix(y_test_holdout, test_pred_best))
 # ------------------------------------------------------------
 # FINAL FEATURE IMPORTANCE
 # ------------------------------------------------------------
+
+chosen_threshold = float(fold_report_df["best_threshold"].min())
 
 final_feature_importance = pd.Series(
     final_model.feature_importances_,

@@ -525,9 +525,6 @@ class Confirmator:
         ):
             return False
 
-        if potential_confirmation_bar.high - potential_confirmation_bar.low <= 0.05:
-            return False
-
         if (
             True
             and potential_confirmation_bar.low - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.low
@@ -536,7 +533,7 @@ class Confirmator:
         ):
             return False
 
-        if highest_high >= round(potential_confirmation_bar.close, 2):
+        if highest_high >= potential_confirmation_bar.close:
             return False
 
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
