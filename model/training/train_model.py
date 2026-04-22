@@ -16,6 +16,7 @@ from sklearn.model_selection import RepeatedStratifiedKFold, train_test_split
 # CONFIG
 # ============================================================
 
+pd.set_option('display.max_colwidth', None)
 POSITIVE_CSV = "model/training/positive_results.csv"
 FALSE_POSITIVE_CSV = "model/training/false_positive_results.csv"
 
