@@ -398,15 +398,15 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = False
-    get_only_statistics = True
+    should_run_model = True
+    get_only_statistics = False
     symbols_data = []
     symbols = [
-        # common.objects.SymbolTest(
-        #     name="BNAI",
-        #     datetime_str="01.23.26T10:32:00",
-        #     is_positive=True,
-        # ),
+        common.objects.SymbolTest(
+            name="PRFX",
+            datetime_str="01.16.26T10:45:00",
+            is_positive=False,
+        ),
     ]
     # symbols = explore_past_potential_symbols()
     output_file_name = "model/real_case_result.csv"

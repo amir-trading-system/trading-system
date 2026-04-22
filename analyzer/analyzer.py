@@ -191,7 +191,7 @@ class Analyzer:
             relevant_bars=day_timeframe_stock.bars[1:],
             current_bar=day_timeframe_stock.bars[0],
         )
-        with open(f"model/training/data/{day_timeframe_stock.symbol_name}-{day_timeframe_stock.expected_bar_time}.json", "wb") as f:
+        with open(f"model/training/data/next_training/{day_timeframe_stock.symbol_name}-{day_timeframe_stock.expected_bar_time}.json", "wb") as f:
             pickle.dump(
                 {
                     "day_timeframe_stock": day_timeframe_stock,

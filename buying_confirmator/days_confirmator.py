@@ -67,27 +67,6 @@ class Confirmator:
             )
             return True
 
-        today_09_30 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=9,
-            minute=30,
-        )
-        today_10_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=10,
-            minute=00,
-        )
-        today_12_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=12,
-            minute=00,
-        )
         one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
         highest_high_one_minute_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
             current_one_minute_bar=potential_confirmation_bar,
@@ -99,29 +78,6 @@ class Confirmator:
         stock.volume_sum_since_market_open = one_minute_timeframe_stock.get_volume_sum_since_market_open(
             current_one_minute_bar=potential_confirmation_bar,
         )
-
-        should_wait_for_next_bar = (
-            potential_confirmation_bar.bar_time < today_09_30
-            or potential_confirmation_bar.volume < 20000
-            or stock.volume_sum_since_market_open < 100000
-            or (
-                today_10_00 <= potential_confirmation_bar.bar_time <= today_12_00
-                and stock.volume_sum_since_market_open < 500000
-            )
-            or (
-                potential_confirmation_bar.bar_time > today_12_00
-                and stock.volume_sum_since_market_open < 1000000
-            )
-        )
-
-        bar_is_strong_than_before = (
-            True
-            and potential_confirmation_bar.bar_up_percentage >= 0.03
-            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-        )
-
-        if should_wait_for_next_bar and not bar_is_strong_than_before:
-            return bar_has_confirmed
 
         temp_one_minute_bars = sorted(
             [
@@ -140,6 +96,7 @@ class Confirmator:
 
         if not self.bar_has_potential(
             stock=stock,
+            original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=temp_one_minute_bars,
             highest_high=highest_high,
@@ -216,7 +173,7 @@ class Confirmator:
                 and total_volume is not None
             ):
                 if (
-                    total_volume < 500000
+                    total_volume < 300000
                     or (
                         potential_confirmation_bar.volume/total_volume < 0.02
                         and potential_confirmation_bar.volume < 50000
@@ -256,8 +213,7 @@ class Confirmator:
                     },
                 )
 
-                if bar_has_confirmed:
-                    break
+                break
 
             else:
                 score.should_take_trade = True
@@ -493,10 +449,33 @@ class Confirmator:
     def bar_has_potential(
         self,
         stock: common.objects.Stock,
+        original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         highest_high: float,
     ) -> bool:
+        today_09_30 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=9,
+            minute=30,
+        )
+        today_10_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=10,
+            minute=00,
+        )
+        today_12_00 = datetime.datetime(
+            year=original_bar_to_confirm.bar_time.year,
+            month=original_bar_to_confirm.bar_time.month,
+            day=original_bar_to_confirm.bar_time.day,
+            hour=12,
+            minute=00,
+        )
+
         highest_high = round(highest_high, 2)
         if potential_confirmation_bar.close < 1.0:
             return False
@@ -518,6 +497,29 @@ class Confirmator:
             return False
 
         if not crossed_highest_high:
+            return False
+
+        should_wait_for_next_bar = (
+            potential_confirmation_bar.bar_time < today_09_30
+            or potential_confirmation_bar.volume < 20000
+            or stock.volume_sum_since_market_open < 100000
+            or (
+                today_10_00 <= potential_confirmation_bar.bar_time <= today_12_00
+                and stock.volume_sum_since_market_open < 500000
+            )
+            or (
+                potential_confirmation_bar.bar_time > today_12_00
+                and stock.volume_sum_since_market_open < 1000000
+            )
+        )
+
+        bar_is_strong_than_before = (
+            True
+            and potential_confirmation_bar.bar_up_percentage >= 0.03
+            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
+        )
+
+        if should_wait_for_next_bar and not bar_is_strong_than_before:
             return False
 
         if (
@@ -555,19 +557,6 @@ class Confirmator:
             and len(stock.bars) > 1
             and stock.bars[1].close > potential_confirmation_bar.high
         ):
-            return False
-
-        last_bars = [
-            bar_object
-            for bar_object in one_minute_bars[1:]
-        ]
-        if len(
-            [
-                bar_object
-                for bar_object in last_bars
-                if bar_object.volume < 1000
-            ]
-        ) >= 5:
             return False
 
         return True

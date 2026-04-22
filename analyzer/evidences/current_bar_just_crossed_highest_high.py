@@ -18,7 +18,6 @@ class Evidence(
             True
             and current_bar.close > current_bar.open_value
             and (current_bar.body_percentage > 0.7 or is_retro)
-            and current_bar.volume > milestones.previous_bar.bar_object.volume
         )
 
         return current_bar_is_strong

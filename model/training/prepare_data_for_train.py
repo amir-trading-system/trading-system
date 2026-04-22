@@ -35,7 +35,6 @@ def write_to_csv(
                     "feature_distance_from_highest_high",
                     "feature_bars_with_rejection_since_market_open",
                     "feature_entry_point_size_to_bars_size_average",
-                    # "feature_strong_negative_bars_pct",
                     "feature_price_action_is_stuck_pct",
                     "feature_entry_bar_close_to_crossed_highest_high_pct",
                     "feature_total_volume",
@@ -47,9 +46,7 @@ def write_to_csv(
                     "feature_entry_bar_lowest_wick_to_bar_body_pct",
                     "feature_positive_bars_above_volume_average_pct",
                     "feature_uptrend_bars_pct",
-                    # "feature_late_volume_spike",
                     "feature_entry_volume_vs_total_volume",
-                    # "feature_positive_bars_close_strong_pct",
                 ],
             )
             f.flush()
@@ -69,19 +66,16 @@ def write_to_csv(
         feature_bars_with_rejection_since_market_open = symbol_data["feature_bars_with_rejection_since_market_open"]
         feature_entry_point_size_to_bars_size_average = symbol_data["feature_entry_point_size_to_bars_size_average"]
         feature_histogram_changed_directions_pct = symbol_data["feature_histogram_changed_directions_pct"]
-        feature_strong_negative_bars_pct = symbol_data["feature_strong_negative_bars_pct"]
         feature_price_action_is_stuck_pct = symbol_data["feature_price_action_is_stuck_pct"]
         feature_entry_bar_close_to_crossed_highest_high_pct = symbol_data["feature_entry_bar_close_to_crossed_highest_high_pct"]
         feature_total_volume = symbol_data["feature_total_volume"]
         feature_current_macd_to_previous = symbol_data["feature_current_macd_to_previous"]
-        feature_late_volume_spike = symbol_data["feature_late_volume_spike"]
         feature_entry_bar_price_action_to_total_price_pct = symbol_data["feature_entry_bar_price_action_to_total_price_pct"]
         feature_entry_volume_vs_total_volume = symbol_data["feature_entry_volume_vs_total_volume"]
         feature_entry_bar_price_action_pct_to_volume_pct = symbol_data["feature_entry_bar_price_action_pct_to_volume_pct"]
         feature_bars_above_vwap_pct = symbol_data["feature_bars_above_vwap_pct"]
         feature_distance_between_highest_high_to_entry_bar_high = symbol_data["feature_distance_between_highest_high_to_entry_bar_high"]
         feature_entry_bar_lowest_wick_to_bar_body_pct = symbol_data["feature_entry_bar_lowest_wick_to_bar_body_pct"]
-        feature_positive_bars_close_strong_pct = symbol_data["feature_positive_bars_close_strong_pct"]
         feature_positive_bars_above_volume_average_pct = symbol_data["feature_positive_bars_above_volume_average_pct"]
         feature_uptrend_bars_pct = symbol_data["feature_uptrend_bars_pct"]
 
@@ -106,7 +100,6 @@ def write_to_csv(
                     feature_distance_from_highest_high,
                     feature_bars_with_rejection_since_market_open,
                     feature_entry_point_size_to_bars_size_average,
-                    # feature_strong_negative_bars_pct,
                     feature_price_action_is_stuck_pct,
                     feature_entry_bar_close_to_crossed_highest_high_pct,
                     feature_total_volume,
@@ -118,9 +111,7 @@ def write_to_csv(
                     feature_entry_bar_lowest_wick_to_bar_body_pct,
                     feature_positive_bars_above_volume_average_pct,
                     feature_uptrend_bars_pct,
-                    # feature_late_volume_spike,
                     feature_entry_volume_vs_total_volume,
-                    # feature_positive_bars_close_strong_pct,
                 ]
             )
 
@@ -137,7 +128,7 @@ def load_pickle_data(
 
 def load_data_for_training_model() -> list[dict[str, any]]:
     pickled_data: list[dict[str, any]] = []
-    files = glob.glob("model/training/data/*")
+    files = glob.glob("model/training/data/*.json")
     futures = []
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=10,

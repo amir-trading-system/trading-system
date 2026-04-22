@@ -1,3 +1,6 @@
 Need to do the following:
- - RETO - 04.15.25T10:49:00 - check retroactive.
- - MNTS - 04.15.25T10:56:00 - check retroactive.
+ - add 2 columns (not features):
+   - gains until now (potential_confirmation_bar.close - original_bar_to_confirm.low)/original_bar_to_confirm.open_value
+   - previous_volume/current_volume
+
+ - wait for another 20 new cases and then run the model training.
