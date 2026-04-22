@@ -165,37 +165,17 @@ class Analyzer:
         request_id: int,
         current_bar: common.objects.BarData,
     ):
-        current_bar_09_30 = datetime.datetime(
-            year=current_bar.bar_time.year,
-            month=current_bar.bar_time.month,
-            day=current_bar.bar_time.day,
-            hour=9,
-            minute=30,
-        )
         one_minute_timeframe_stock = self.request_id_to_symbol[request_id]
         day_timeframe_stock = self.request_id_to_symbol[one_minute_timeframe_stock.day_request_id]
 
-        one_minute_bars: list[common.objects.BarData] = []
-        highest_high_one_minute_bar: common.objects.BarData = None
-        for bar_object in one_minute_timeframe_stock.bars:
-            if bar_object.bar_time >= datetime.datetime(
-                year=current_bar.bar_time.year,
-                month=current_bar.bar_time.month,
-                day=current_bar.bar_time.day,
-                hour=4,
-            ) and bar_object.bar_time < current_bar.bar_time:
-                if highest_high_one_minute_bar is None:
-                    highest_high_one_minute_bar = bar_object
-                elif bar_object.high > highest_high_one_minute_bar.high:
-                    highest_high_one_minute_bar = bar_object
-
-            if current_bar_09_30 <= bar_object.bar_time <=current_bar.bar_time:
-                one_minute_bars.append(bar_object)
-
-        volume_sum_since_market_open = sum(
-            bar_object.volume
-            for bar_object in one_minute_timeframe_stock.bars
-            if current_bar_09_30 <= bar_object.bar_time <= current_bar.bar_time
+        highest_high_one_minute_bar: common.objects.BarData = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
+            current_one_minute_bar=current_bar,
+        )
+        one_minute_bars: list[common.objects.BarData] = one_minute_timeframe_stock.get_one_minutes_bars_since_market_open(
+            current_one_minute_bar=current_bar,
+        )
+        volume_sum_since_market_open = one_minute_timeframe_stock.get_volume_sum_since_market_open(
+            current_one_minute_bar=current_bar,
         )
 
         current_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(

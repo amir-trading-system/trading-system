@@ -249,31 +249,9 @@ class DataExtractor:
         )
         feature_overlapped_bars_since_market_open_pct = overlapped_bars_counter/len(one_minute_bars)
 
-        ## check BATL - 04-21-2026 - what is the highest high.
-        highest_high_bar_since_market_open = None
-        for bar_object in one_minute_bars[1:]:
-            previous_bar = one_minute_timeframe_stock.previous_bar(
-                bar_object=bar_object,
-            )
-            next_bar = one_minute_timeframe_stock.next_bar(
-                bar_object=bar_object,
-            )
-            if (
-                previous_bar is not None
-                and next_bar is not None
-                and bar_object.high >= previous_bar.high
-                and bar_object.high > next_bar.high
-                and bar_object.volume > bar_object.volume_average
-            ):
-                if (
-                    highest_high_bar_since_market_open is None
-                    or (
-                        highest_high_bar_since_market_open is not None
-                        and bar_object.high > highest_high_bar_since_market_open.high
-                    )
-                ):
-                    highest_high_bar_since_market_open = bar_object
-
+        highest_high_one_minute_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
+            current_one_minute_bar=potential_confirmation_bar,
+        )
         bars_size_average = bars_size_sum/(total_bars-1) if total_bars > 1 else 1
         feature_current_macd_to_previous = 0
         if previous_bar_to_entry_bar is not None:
@@ -302,13 +280,13 @@ class DataExtractor:
         feature_bars_with_rejection_since_market_open = bars_with_rejection_since_market_open/total_bars
 
         features = {
-            "highest_high_bar_since_market_open": highest_high_bar_since_market_open if highest_high_bar_since_market_open is not None else False,
+            "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
             "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
             "feature_positive_vs_negative_volume": positive_volume_sum/negative_volume_sum if negative_volume_sum > 0 else 1,
             "feature_overlapped_bars_since_market_open_pct": feature_overlapped_bars_since_market_open_pct,
             "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) if potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0 else 0,
             "feature_entry_bar_volume": potential_confirmation_bar.volume,
-            "feature_distance_from_highest_high": highest_high_bar_since_market_open.index - potential_confirmation_bar.index if highest_high_bar_since_market_open is not None else 0,
+            "feature_distance_from_highest_high": highest_high_one_minute_bar.index - potential_confirmation_bar.index if highest_high_one_minute_bar is not None else 0,
             "feature_bars_with_rejection_since_market_open": feature_bars_with_rejection_since_market_open,
             "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average if bars_size_average else 0,
             "feature_histogram_changed_directions_pct": feature_histogram_changed_directions_pct,
@@ -326,7 +304,6 @@ class DataExtractor:
             "feature_positive_bars_close_strong_pct": positive_bars_close_strong_counter/positive_bars_counter,
             "feature_positive_bars_above_volume_average_pct": positive_bars_above_volume_average_counter/positive_bars_counter,
             "feature_uptrend_bars_pct": uptrend_bars_counter/total_bars,
-            "feature_crossed_highest_high_bar_since_market_open": potential_confirmation_bar.low < highest_high_bar_since_market_open.high < potential_confirmation_bar.close if highest_high_bar_since_market_open is not None else False,
         }
 
         return features

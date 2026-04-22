@@ -374,6 +374,98 @@ class Stock:
             and self.bars[0].volume >= 500000
         )
 
+    # // Gets the highest high since 04:00 AM of current bar.
+    # // Excluding bars with reports, usually between 08:00 Am to 08:05 AM.
+    def get_highest_high_one_minute_bar(
+        self,
+        current_one_minute_bar: BarData,
+    ) -> BarData:
+        highest_high_one_minute_bar: BarData = None
+        for bar_object in self.bars:
+            if datetime.datetime(
+                year=current_one_minute_bar.bar_time.year,
+                month=current_one_minute_bar.bar_time.month,
+                day=current_one_minute_bar.bar_time.day,
+                hour=8,
+            ) <= bar_object.bar_time <= datetime.datetime(
+                year=current_one_minute_bar.bar_time.year,
+                month=current_one_minute_bar.bar_time.month,
+                day=current_one_minute_bar.bar_time.day,
+                hour=8,
+                minute=5,
+            ):
+                continue
+
+            if bar_object.bar_time >= datetime.datetime(
+                year=current_one_minute_bar.bar_time.year,
+                month=current_one_minute_bar.bar_time.month,
+                day=current_one_minute_bar.bar_time.day,
+                hour=4,
+            ) and bar_object.bar_time < current_one_minute_bar.bar_time - datetime.timedelta(minutes=1):
+                if (
+                    highest_high_one_minute_bar is None
+                    or (
+                        highest_high_one_minute_bar is not None
+                        and bar_object.high > highest_high_one_minute_bar.high
+                    )
+                ):
+                    highest_high_one_minute_bar = bar_object
+
+        return highest_high_one_minute_bar
+
+    def get_one_minutes_bars_since_market_open(
+        self,
+        current_one_minute_bar: BarData,
+    ) -> list[BarData]:
+        current_bar_09_30 = datetime.datetime(
+            year=current_one_minute_bar.bar_time.year,
+            month=current_one_minute_bar.bar_time.month,
+            day=current_one_minute_bar.bar_time.day,
+            hour=9,
+            minute=30,
+        )
+
+        return [
+            bar_object
+            for bar_object in self.bars
+            if current_bar_09_30 <= bar_object.bar_time <= current_one_minute_bar.bar_time
+        ]
+
+    def get_volume_sum_since_market_open(
+        self,
+        current_one_minute_bar: BarData,
+    ) -> float:
+        current_bar_09_30 = datetime.datetime(
+            year=current_one_minute_bar.bar_time.year,
+            month=current_one_minute_bar.bar_time.month,
+            day=current_one_minute_bar.bar_time.day,
+            hour=9,
+            minute=30,
+        )
+
+        return sum(
+            bar_object.volume
+            for bar_object in self.bars
+            if current_bar_09_30 <= bar_object.bar_time <= current_one_minute_bar.bar_time
+        )
+
+    def get_volume_sum_since_04_am_today(
+        self,
+        current_one_minute_bar: BarData,
+    ) -> float:
+        current_bar_04_am = datetime.datetime(
+            year=current_one_minute_bar.bar_time.year,
+            month=current_one_minute_bar.bar_time.month,
+            day=current_one_minute_bar.bar_time.day,
+            hour=4,
+        )
+
+        return sum(
+            bar_object.volume
+            for bar_object in self.bars
+            if current_bar_04_am <= bar_object.bar_time <= current_one_minute_bar.bar_time
+        )
+
     def _filter_ignored_bars(
         self,
         bars: list[BarData],
