@@ -428,7 +428,7 @@ class Confirmator:
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
                 already_sent_buy_order_for_stock=already_sent_buy_order_for_stock,
             ):
-                break
+                continue
 
             most_updated_datetime = potential_confirmation_bar.bar_time
             self.logger.info(
