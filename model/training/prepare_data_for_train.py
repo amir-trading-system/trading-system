@@ -26,26 +26,31 @@ def write_to_csv(
                     "symbol",
                     "original_bar_time",
                     "expected_confirmation_bar_time",
+                    "highest_high_bar_since_market_open",
+                    "feature_histogram_changed_directions_pct",
+                    "feature_entry_bar_volume",
+                    "feature_overlapped_bars_since_market_open_pct",
                     "feature_bars_with_at_least_50_pct_wick_pct",
                     "feature_positive_vs_negative_volume",
-                    "feature_overlapped_bars_since_market_open_pct",
-                    "feature_entry_bar_volume",
                     "feature_distance_from_highest_high",
                     "feature_bars_with_rejection_since_market_open",
                     "feature_entry_point_size_to_bars_size_average",
-                    "feature_histogram_changed_directions_pct",
                     "feature_strong_negative_bars_pct",
                     "feature_price_action_is_stuck_pct",
                     "feature_entry_bar_close_to_crossed_highest_high_pct",
                     "feature_total_volume",
                     "feature_current_macd_to_previous",
-                    "feature_late_volume_spike",
                     "feature_entry_bar_price_action_to_total_price_pct",
-                    "feature_entry_volume_vs_total_volume",
                     "feature_entry_bar_price_action_pct_to_volume_pct",
                     "feature_bars_above_vwap_pct",
                     "feature_distance_between_highest_high_to_entry_bar_high",
-                    "feature_fibonacci_retracement",
+                    "feature_entry_bar_lowest_wick_to_bar_body_pct",
+                    "feature_positive_bars_above_volume_average_pct",
+                    "feature_uptrend_bars_pct",
+                    "feature_late_volume_spike",
+                    "feature_entry_volume_vs_total_volume",
+                    "feature_positive_bars_close_strong_pct",
+                    "feature_crossed_highest_high_bar_since_market_open",
                 ],
             )
             f.flush()
@@ -55,6 +60,7 @@ def write_to_csv(
 
         symbol = stock_object.symbol_name
         original_bar_time = stock_object.specific_bar_time
+        highest_high_bar_since_market_open = symbol_data["highest_high_bar_since_market_open"]
 
         feature_bars_with_at_least_50_pct_wick_pct = symbol_data["feature_bars_with_at_least_50_pct_wick_pct"]
         feature_positive_vs_negative_volume = symbol_data["feature_positive_vs_negative_volume"]
@@ -75,7 +81,11 @@ def write_to_csv(
         feature_entry_bar_price_action_pct_to_volume_pct = symbol_data["feature_entry_bar_price_action_pct_to_volume_pct"]
         feature_bars_above_vwap_pct = symbol_data["feature_bars_above_vwap_pct"]
         feature_distance_between_highest_high_to_entry_bar_high = symbol_data["feature_distance_between_highest_high_to_entry_bar_high"]
-        feature_fibonacci_retracement = symbol_data["feature_fibonacci_retracement"]
+        feature_entry_bar_lowest_wick_to_bar_body_pct = symbol_data["feature_entry_bar_lowest_wick_to_bar_body_pct"]
+        feature_positive_bars_close_strong_pct = symbol_data["feature_positive_bars_close_strong_pct"]
+        feature_positive_bars_above_volume_average_pct = symbol_data["feature_positive_bars_above_volume_average_pct"]
+        feature_uptrend_bars_pct = symbol_data["feature_uptrend_bars_pct"]
+        feature_crossed_highest_high_bar_since_market_open = symbol_data["feature_crossed_highest_high_bar_since_market_open"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -89,26 +99,31 @@ def write_to_csv(
                     symbol,
                     original_bar_time,
                     expected_confirmation_bar_time,
+                    highest_high_bar_since_market_open,
+                    feature_histogram_changed_directions_pct,
+                    feature_entry_bar_volume,
+                    feature_overlapped_bars_since_market_open_pct,
                     feature_bars_with_at_least_50_pct_wick_pct,
                     feature_positive_vs_negative_volume,
-                    feature_overlapped_bars_since_market_open_pct,
-                    feature_entry_bar_volume,
                     feature_distance_from_highest_high,
                     feature_bars_with_rejection_since_market_open,
                     feature_entry_point_size_to_bars_size_average,
-                    feature_histogram_changed_directions_pct,
                     feature_strong_negative_bars_pct,
                     feature_price_action_is_stuck_pct,
                     feature_entry_bar_close_to_crossed_highest_high_pct,
                     feature_total_volume,
                     feature_current_macd_to_previous,
-                    feature_late_volume_spike,
                     feature_entry_bar_price_action_to_total_price_pct,
-                    feature_entry_volume_vs_total_volume,
                     feature_entry_bar_price_action_pct_to_volume_pct,
                     feature_bars_above_vwap_pct,
                     feature_distance_between_highest_high_to_entry_bar_high,
-                    feature_fibonacci_retracement,
+                    feature_entry_bar_lowest_wick_to_bar_body_pct,
+                    feature_positive_bars_above_volume_average_pct,
+                    feature_uptrend_bars_pct,
+                    feature_late_volume_spike,
+                    feature_entry_volume_vs_total_volume,
+                    feature_positive_bars_close_strong_pct,
+                    feature_crossed_highest_high_bar_since_market_open,
                 ]
             )
 
