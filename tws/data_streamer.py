@@ -152,7 +152,6 @@ class DataStreamer():
         stock = self.request_id_to_symbol[request_id]
         stock.arrange_data_for_analysis()
         relevant_symbol_bars = stock.bars
-        previous_bar = None
 
         ibapi_request = self.ibapi_requests.get(request_id, None)
         if ibapi_request is None:
@@ -170,26 +169,26 @@ class DataStreamer():
             enriched_bar = stock.enrich_bar(
                 current_bar=relevant_symbol_bars[0],
             )
+
+            if ibapi_request.is_one_minute_timeframe() and enriched_bar:
+                relevant_symbol_bars[0].ready_to_analyze = True
+                self.insert_one_minute_bars_into_confirmation_queues(
+                    one_minute_stock=stock,
+                    enriched_bar=relevant_symbol_bars[0],
+                )
+                return
         else:
             enriched_bar = stock.enrich_bar(
                 current_bar=current_bar,
             )
             if enriched_bar:
+                enriched_bar.ready_to_analyze = True
                 stock.bars.append(enriched_bar)
                 stock.arrange_data_for_analysis()
-                previous_bar = stock.previous_bar(
-                    bar_object=enriched_bar,
-                )
 
-                if previous_bar is not None:
-                    previous_bar.ready_to_analyze = True
-                    previous_bar.collection_finished_time = datetime.datetime.now()
-
-            if stock.is_one_minute_timeframe() and enriched_bar is not None:
-                if previous_bar is not None:
-                    self.insert_one_minute_bars_into_confirmation_queues(
-                        one_minute_stock=stock,
-                        enriched_bar=previous_bar,
-                    )
-
-                return
+        if stock.is_one_minute_timeframe() and enriched_bar is not None:
+            self.insert_one_minute_bars_into_confirmation_queues(
+                one_minute_stock=stock,
+                enriched_bar=enriched_bar,
+            )
+            return
