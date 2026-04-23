@@ -46,6 +46,7 @@ class BarData:
         is_after_market_open: bool = None,
         ready_to_analyze: bool = False,
         price_movement_statistics: dict[str, float] = {},
+        collection_finished_time: datetime.datetime = None,
     ):
         self.symbol = symbol
         self.timeframe = timeframe
@@ -85,6 +86,7 @@ class BarData:
             hour=9,
             minute=30,
         )
+        self.collection_finished_time = collection_finished_time
 
     @property
     def body_percentage(

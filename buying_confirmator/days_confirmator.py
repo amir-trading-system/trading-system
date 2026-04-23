@@ -406,6 +406,7 @@ class Confirmator:
                     "low": potential_confirmation_bar.low,
                     "open": potential_confirmation_bar.open_value,
                     "close": potential_confirmation_bar.close,
+                    "collection_finished_time": potential_confirmation_bar.collection_finished_time,
                 },
             )
 

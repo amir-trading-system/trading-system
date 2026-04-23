@@ -68,6 +68,7 @@ class Handler(
             "probability",
             "threshold",
             "should_run_model",
+            "collection_finished_time",
         ]
 
         for field in fields:

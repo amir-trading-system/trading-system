@@ -183,6 +183,7 @@ class DataStreamer():
 
                 if previous_bar is not None:
                     previous_bar.ready_to_analyze = True
+                    previous_bar.collection_finished_time = datetime.datetime.now()
 
             if stock.is_one_minute_timeframe() and enriched_bar is not None:
                 if previous_bar is not None:
