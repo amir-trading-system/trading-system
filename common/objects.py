@@ -38,6 +38,7 @@ class BarData:
         ema_20: float = 0.0,
         ema_12: float = 0.0,
         ema_26: float = 0.0,
+        ema_200: float = 0.0,
         histogram: float = 0.0,
         macd: float = 0.0,
         signal_line: float = 0.0,
@@ -62,6 +63,7 @@ class BarData:
         self.ema_20 = ema_20
         self.ema_12 = ema_12
         self.ema_26 = ema_26
+        self.ema_200 = ema_200
         self.histogram = histogram
         self.macd = macd
         self.signal_line = signal_line
@@ -505,6 +507,7 @@ class Stock:
             previous_ema_12 = 0.0
             previous_ema_20 = 0.0
             previous_ema_26 = 0.0
+            previous_ema_200 = 0.0
         else:
             previous_bar = None
             if self.bars[0].bar_time < current_bar.bar_time or len(self.bars) == 1:
@@ -516,6 +519,7 @@ class Stock:
             previous_ema_20 = previous_bar.ema_20
             previous_ema_12 = previous_bar.ema_12
             previous_ema_26 = previous_bar.ema_26
+            previous_ema_200 = previous_bar.ema_200
 
         current_length = len(self.bars)
         current_bar.ema_9 = self.calculate_ema(
@@ -542,6 +546,14 @@ class Stock:
             previous_ema=previous_ema_26,
             current_length=current_length,
         )
+        if self.is_day_timeframe():
+            current_bar.ema_200 = self.calculate_ema(
+                period=200,
+                close=current_bar.close,
+                previous_ema=previous_ema_200,
+                current_length=current_length,
+            )
+
         current_bar.volume_average = self.calculate_volume_average(
             current_bar=current_bar,
             period=20,
