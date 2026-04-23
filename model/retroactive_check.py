@@ -49,6 +49,7 @@ def write_to_csv(
                         "analysis_status",
                         "actual_confirmation_bar_time",
                         "expected_confirmation_bar_time",
+                        "highest_high_one_minute_bar_time",
                         "evidence",
                         "result",
                         "feature_bars_with_at_least_50_pct_wick_pct",
@@ -71,100 +72,116 @@ def write_to_csv(
                         "feature_entry_bar_price_action_pct_to_volume_pct",
                         "feature_bars_above_vwap_pct",
                         "feature_distance_between_highest_high_to_entry_bar_high",
+                        "feature_positive_bars_above_volume_average_pct",
+                        "feature_uptrend_bars_pct",
+                        "feature_volume_quality",
+                        "gains_until_entry_bar",
                         "score",
                     ],
                 )
                 f.flush()
 
-    while any(
-        s_data
-        for s_data in symbols_data
-        if s_data["result"] != "done"
-        and s_data["result"] != "failed"
-    ):
-        for symbol_data in sorted(
-            symbols_data,
-            key=lambda symbol_data: symbol_data["symbol"],
+    while True:
+        while any(
+            s_data
+            for s_data in symbols_data
+            if s_data["result"] != "done"
+            and s_data["result"] != "failed"
         ):
-            symbol = symbol_data["symbol"]
-            original_bar_time = symbol_data["original_bar_time"]
-            result = symbol_data["result"]
-            feature_bars_with_at_least_50_pct_wick_pct = 0
-            feature_positive_vs_negative_volume = 0
-            feature_overlapped_bars_since_market_open_pct = 0
-            feature_entry_bar_lowest_wick_to_bar_body_pct = 0
-            feature_entry_bar_volume = 0
-            feature_distance_from_highest_high = 0
-            feature_bars_with_rejection_since_market_open = 0
-            feature_entry_point_size_to_bars_size_average = 0
-            feature_histogram_changed_directions_pct = 0
-            feature_strong_negative_bars_pct = 0
-            feature_price_action_is_stuck_pct = 0
-            feature_entry_bar_close_to_crossed_highest_high_pct = 0
-            feature_total_volume = 0
-            feature_current_macd_to_previous = 0
-            feature_late_volume_spike = 0
-            feature_entry_bar_price_action_to_total_price_pct = 0
-            feature_entry_volume_vs_total_volume = 0
-            feature_entry_bar_price_action_pct_to_volume_pct = 0
-            feature_bars_above_vwap_pct = 0
-            feature_distance_between_highest_high_to_entry_bar_high = 0
-
-            price_movement_statistics = symbol_data.get("price_movement_statistics", None)
-            if price_movement_statistics:
-                feature_bars_with_at_least_50_pct_wick_pct = price_movement_statistics["feature_bars_with_at_least_50_pct_wick_pct"]
-                feature_positive_vs_negative_volume = price_movement_statistics["feature_positive_vs_negative_volume"]
-                feature_overlapped_bars_since_market_open_pct = price_movement_statistics["feature_overlapped_bars_since_market_open_pct"]
-                feature_entry_bar_lowest_wick_to_bar_body_pct = price_movement_statistics["feature_entry_bar_lowest_wick_to_bar_body_pct"]
-                feature_entry_bar_volume = price_movement_statistics["feature_entry_bar_volume"]
-                feature_distance_from_highest_high = price_movement_statistics["feature_distance_from_highest_high"]
-                feature_bars_with_rejection_since_market_open = price_movement_statistics["feature_bars_with_rejection_since_market_open"]
-                feature_entry_point_size_to_bars_size_average = price_movement_statistics["feature_entry_point_size_to_bars_size_average"]
-                feature_histogram_changed_directions_pct = price_movement_statistics["feature_histogram_changed_directions_pct"]
-                feature_strong_negative_bars_pct = price_movement_statistics["feature_strong_negative_bars_pct"]
-                feature_price_action_is_stuck_pct = price_movement_statistics["feature_price_action_is_stuck_pct"]
-                feature_entry_bar_close_to_crossed_highest_high_pct = price_movement_statistics["feature_entry_bar_close_to_crossed_highest_high_pct"]
-                feature_total_volume = price_movement_statistics["feature_total_volume"]
-                feature_current_macd_to_previous = price_movement_statistics["feature_current_macd_to_previous"]
-                feature_late_volume_spike = price_movement_statistics["feature_late_volume_spike"]
-                feature_entry_bar_price_action_to_total_price_pct = price_movement_statistics["feature_entry_bar_price_action_to_total_price_pct"]
-                feature_entry_volume_vs_total_volume = price_movement_statistics["feature_entry_volume_vs_total_volume"]
-                feature_entry_bar_price_action_pct_to_volume_pct = price_movement_statistics["feature_entry_bar_price_action_pct_to_volume_pct"]
-                feature_bars_above_vwap_pct = price_movement_statistics["feature_bars_above_vwap_pct"]
-                feature_distance_between_highest_high_to_entry_bar_high = price_movement_statistics["feature_distance_between_highest_high_to_entry_bar_high"]
-
-            collection_status = symbol_data["collection_status"]
-            analysis_status = symbol_data["analysis_status"]
-
-            evidence_name = symbol_data["evidence_name"]
-            if symbol_data["is_new"]:
-                evidence_name = f"{evidence_name} - NEW"
-                symbol = f"{symbol} - NEW"
-
-            actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
-            expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
-
-            if (
-                True
-                and result != "done"
-                and result != "failed"
-                and collection_status == "done"
-                and analysis_status == "done"
-                and actual_confirmation_bar_time != "in_progress"
+            for symbol_data in sorted(
+                symbols_data,
+                key=lambda symbol_data: symbol_data["symbol"],
             ):
-                if actual_confirmation_bar_time == expected_confirmation_bar_time or evidence_name == "no evidence":
-                    result = "done"
-                    symbol_data["result"] = "done"
-                else:
-                    result = "failed"
-                    symbol_data["result"] = "failed"
+                symbol = symbol_data["symbol"]
+                original_bar_time = symbol_data["original_bar_time"]
+                result = symbol_data["result"]
+                feature_bars_with_at_least_50_pct_wick_pct = 0
+                feature_positive_vs_negative_volume = 0
+                feature_overlapped_bars_since_market_open_pct = 0
+                feature_entry_bar_lowest_wick_to_bar_body_pct = 0
+                feature_entry_bar_volume = 0
+                feature_distance_from_highest_high = 0
+                feature_bars_with_rejection_since_market_open = 0
+                feature_entry_point_size_to_bars_size_average = 0
+                feature_histogram_changed_directions_pct = 0
+                feature_strong_negative_bars_pct = 0
+                feature_price_action_is_stuck_pct = 0
+                feature_entry_bar_close_to_crossed_highest_high_pct = 0
+                feature_total_volume = 0
+                feature_current_macd_to_previous = 0
+                feature_late_volume_spike = 0
+                feature_entry_bar_price_action_to_total_price_pct = 0
+                feature_entry_volume_vs_total_volume = 0
+                feature_entry_bar_price_action_pct_to_volume_pct = 0
+                feature_bars_above_vwap_pct = 0
+                feature_distance_between_highest_high_to_entry_bar_high = 0
+                feature_positive_bars_above_volume_average_pct = 0
+                feature_uptrend_bars_pct = 0
+                feature_volume_quality = 0
+                gains_until_entry_bar = 0
 
-                if not symbol.endswith("NEW") and evidence_name != "no evidence":
-                    file_name = "model/positive_results.csv"
-                    if not symbol_data["is_positive"]:
-                        file_name = "model/false_positive_results.csv"
-                    if original_file_name != "":
-                        file_name = original_file_name
+                price_movement_statistics = symbol_data.get("price_movement_statistics", None)
+                if price_movement_statistics:
+                    feature_bars_with_at_least_50_pct_wick_pct = price_movement_statistics["feature_bars_with_at_least_50_pct_wick_pct"]
+                    feature_positive_vs_negative_volume = price_movement_statistics["feature_positive_vs_negative_volume"]
+                    feature_overlapped_bars_since_market_open_pct = price_movement_statistics["feature_overlapped_bars_since_market_open_pct"]
+                    feature_entry_bar_lowest_wick_to_bar_body_pct = price_movement_statistics["feature_entry_bar_lowest_wick_to_bar_body_pct"]
+                    feature_entry_bar_volume = price_movement_statistics["feature_entry_bar_volume"]
+                    feature_distance_from_highest_high = price_movement_statistics["feature_distance_from_highest_high"]
+                    feature_bars_with_rejection_since_market_open = price_movement_statistics["feature_bars_with_rejection_since_market_open"]
+                    feature_entry_point_size_to_bars_size_average = price_movement_statistics["feature_entry_point_size_to_bars_size_average"]
+                    feature_histogram_changed_directions_pct = price_movement_statistics["feature_histogram_changed_directions_pct"]
+                    feature_strong_negative_bars_pct = price_movement_statistics["feature_strong_negative_bars_pct"]
+                    feature_price_action_is_stuck_pct = price_movement_statistics["feature_price_action_is_stuck_pct"]
+                    feature_entry_bar_close_to_crossed_highest_high_pct = price_movement_statistics["feature_entry_bar_close_to_crossed_highest_high_pct"]
+                    feature_total_volume = price_movement_statistics["feature_total_volume"]
+                    feature_current_macd_to_previous = price_movement_statistics["feature_current_macd_to_previous"]
+                    feature_late_volume_spike = price_movement_statistics["feature_late_volume_spike"]
+                    feature_entry_bar_price_action_to_total_price_pct = price_movement_statistics["feature_entry_bar_price_action_to_total_price_pct"]
+                    feature_entry_volume_vs_total_volume = price_movement_statistics["feature_entry_volume_vs_total_volume"]
+                    feature_entry_bar_price_action_pct_to_volume_pct = price_movement_statistics["feature_entry_bar_price_action_pct_to_volume_pct"]
+                    feature_bars_above_vwap_pct = price_movement_statistics["feature_bars_above_vwap_pct"]
+                    feature_distance_between_highest_high_to_entry_bar_high = price_movement_statistics["feature_distance_between_highest_high_to_entry_bar_high"]
+                    feature_positive_bars_above_volume_average_pct = price_movement_statistics["feature_positive_bars_above_volume_average_pct"]
+                    feature_uptrend_bars_pct = price_movement_statistics["feature_uptrend_bars_pct"]
+                    feature_volume_quality = price_movement_statistics["feature_volume_quality"]
+                    gains_until_entry_bar = price_movement_statistics["gains_until_entry_bar"]
+
+                collection_status = symbol_data["collection_status"]
+                analysis_status = symbol_data["analysis_status"]
+
+                evidence_name = symbol_data["evidence_name"]
+                if symbol_data["is_new"]:
+                    evidence_name = f"{evidence_name} - NEW"
+                    symbol = f"{symbol} - NEW"
+
+                actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
+                expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
+                highest_high_one_minute_bar_time = symbol_data["highest_high_one_minute_bar_time"]
+
+                if (
+                    True
+                    and result != "done"
+                    and result != "failed"
+                    and float(symbol_data["score"]) > 0
+                    and actual_confirmation_bar_time != "in_progress"
+                ):
+                    if actual_confirmation_bar_time == expected_confirmation_bar_time or evidence_name == "no evidence":
+                        result = "done"
+                        symbol_data["result"] = "done"
+                    else:
+                        result = "failed"
+                        symbol_data["result"] = "failed"
+
+                    if not symbol.endswith("NEW") and evidence_name != "no evidence":
+                        file_name = "model/positive_results.csv"
+                        if not symbol_data["is_positive"]:
+                            file_name = "model/false_positive_results.csv"
+                        if original_file_name != "":
+                            file_name = original_file_name
+
+                    if symbol.endswith("NEW"):
+                        result = "failed"
 
                     if not get_only_statistics:
                         with open(file_name, mode="a") as f:
@@ -177,6 +194,7 @@ def write_to_csv(
                                     analysis_status,
                                     actual_confirmation_bar_time,
                                     expected_confirmation_bar_time,
+                                    highest_high_one_minute_bar_time,
                                     evidence_name,
                                     result,
                                     feature_bars_with_at_least_50_pct_wick_pct,
@@ -199,18 +217,22 @@ def write_to_csv(
                                     feature_entry_bar_price_action_pct_to_volume_pct,
                                     feature_bars_above_vwap_pct,
                                     feature_distance_between_highest_high_to_entry_bar_high,
+                                    feature_positive_bars_above_volume_average_pct,
+                                    feature_uptrend_bars_pct,
+                                    feature_volume_quality,
+                                    gains_until_entry_bar,
                                     symbol_data["score"],
                                 ]
                             )
 
                             f.flush()
-                    t.update(1)
+                        t.update(1)
 
-                    counter[0] -= 1
+                        counter[0] -= 1
 
-        time.sleep(2)
+            time.sleep(2)
 
-    t.close()
+        t.close()
 
 def wait_for_collection_and_analysis_only(
     symbols_data: list[dict[str,any]],
@@ -316,11 +338,17 @@ def wait_for_confirmation(
             for symbol_data in symbols_data
             if symbol_data["symbol"] == confirmation_result["symbol"]
             and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
-            and symbol_data["evidence_name"] == "in_progress"
         ]
-        should_update_first_default = True
+        if any(
+            symbol_data
+            for symbol_data in relevant_symbol_data
+            if symbol_data["evidence_name"] == "in_progress"
+        ):
+            should_update_first_default = True
+        else:
+            should_update_first_default = False
 
-        if not confirmation_result["evidences"]:
+        if not confirmation_result["evidences"] and relevant_symbol_data:
             relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
             relevant_symbol_data[0]["evidence_name"] = "no evidence"
             relevant_symbol_data[0]["collection_status"] = "done"
@@ -375,7 +403,7 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
             datetime_str=date,
         )
         for symbol, date in stock_finder.get_dynamic_symbols_data_from_period(
-            period="3mo",
+            period="2mo",
         ).items()
     ]
 
@@ -403,9 +431,39 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="SKLZ",
-            datetime_str="04.23.26T12:31:00",
+            name="MNTS",
+            datetime_str="04.16.26T14:56:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="RFIL",
+            datetime_str="03.17.26T10:47:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="SYNX",
+            datetime_str="03.06.26T11:22:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="GNPX",
+            datetime_str="02.23.26T10:25:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="ALDX",
+            datetime_str="03.23.26T14:39:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="NAMM",
+            datetime_str="02.25.26T13:29:00",
             is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="NAMM",
+            datetime_str="02.25.26T11:19:00",
+            is_positive=False,
         ),
     ]
     # symbols = explore_past_potential_symbols()
@@ -534,6 +592,7 @@ def run_retroactive_check():
                 "price_movement_statistics": {},
                 "result": "in_progress",
                 "is_positive": symbol.is_positive,
+                "score": 0,
             },
         )
 

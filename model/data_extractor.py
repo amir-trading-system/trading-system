@@ -309,10 +309,10 @@ class DataExtractor:
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
             "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
             "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
-            "feature_positive_bars_close_strong_pct": positive_bars_close_strong_counter/positive_bars_counter,
             "feature_positive_bars_above_volume_average_pct": positive_bars_above_volume_average_counter/positive_bars_counter,
             "feature_uptrend_bars_pct": uptrend_bars_counter/total_bars,
-            "feature_volume_quality": (potential_confirmation_bar.volume/highest_volume_until_now) * feature_entry_bar_price_action_pct_to_volume_pct,
+            "feature_volume_quality": (potential_confirmation_bar.volume/highest_volume_until_now) * feature_entry_bar_price_action_pct_to_volume_pct if highest_volume_until_now > 0 else 0,
+            "gains_until_entry_bar": (previous_bar_to_entry_bar.close - day_timeframe_stock.bars[1].close)/day_timeframe_stock.bars[1].close if previous_bar_to_entry_bar is not None and len(day_timeframe_stock.bars) > 1 else 0,
         }
 
         return features

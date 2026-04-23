@@ -90,7 +90,7 @@ class Confirmator:
         )
 
         highest_high: float = max(
-            highest_high_one_minute_bar.high,
+            highest_high_one_minute_bar.high if highest_high_one_minute_bar is not None else 0,
             stock.last_post_pre_one_minute_highest_high,
         )
 
