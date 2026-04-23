@@ -49,6 +49,7 @@ class DataExtractor:
         positive_bars_above_volume_average_counter = 0
         uptrend_bars_counter = 0
         bars_since_highest_high: list[common.objects.BarData] = []
+        highest_volume_until_now = 0
 
         for bar_object in one_minute_bars:
             if bar_object.bar_time < potential_confirmation_bar.bar_time:
@@ -242,6 +243,13 @@ class DataExtractor:
             ):
                 uptrend_bars_counter += 1
 
+            if (
+                True
+                and bar_object.index > potential_confirmation_bar.index
+                and bar_object.volume > highest_volume_until_now
+            ):
+                highest_volume_until_now = bar_object.volume
+
         feature_bars_with_at_least_50_pct_wick_pct = bars_with_at_least_50_pct_wick_counter/total_bars
 
         previous_bar_to_entry_bar = one_minute_timeframe_stock.previous_bar(
@@ -304,6 +312,7 @@ class DataExtractor:
             "feature_positive_bars_close_strong_pct": positive_bars_close_strong_counter/positive_bars_counter,
             "feature_positive_bars_above_volume_average_pct": positive_bars_above_volume_average_counter/positive_bars_counter,
             "feature_uptrend_bars_pct": uptrend_bars_counter/total_bars,
+            "feature_volume_quality": (potential_confirmation_bar.volume/highest_volume_until_now) * feature_entry_bar_price_action_pct_to_volume_pct,
         }
 
         return features
