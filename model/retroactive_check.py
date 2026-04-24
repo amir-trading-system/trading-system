@@ -465,6 +465,31 @@ def run_retroactive_check():
             datetime_str="02.25.26T11:19:00",
             is_positive=False,
         ),
+        common.objects.SymbolTest(
+            name="ANTX",
+            datetime_str="03.12.26T13:00:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="ANTX",
+            datetime_str="03.12.26T14:35:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="BMEA",
+            datetime_str="04.07.26T13:06:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="AGIG",
+            datetime_str="03.05.26T11:20:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="AGIG",
+            datetime_str="03.05.26T13:57:00",
+            is_positive=False,
+        ),
     ]
     # symbols = explore_past_potential_symbols()
     output_file_name = "model/real_case_result.csv"
