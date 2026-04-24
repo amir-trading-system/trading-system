@@ -556,9 +556,16 @@ class Confirmator:
         if (
             True
             and len(stock.bars) > 1
-            and stock.bars[1].close > potential_confirmation_bar.high
+            and (
+                stock.bars[1].close > potential_confirmation_bar.high
+                or 0.9 < potential_confirmation_bar.high/stock.bars[1].high <= 1
+            )
         ):
             return False
+
+        # need to check it carefully
+        # if 0.95 <= potential_confirmation_bar.high/original_bar_to_confirm.ema_20 <= 1.05:
+        #     return False
 
         return True
 

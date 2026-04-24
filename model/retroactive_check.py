@@ -431,63 +431,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="MNTS",
-            datetime_str="04.16.26T14:56:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="RFIL",
-            datetime_str="03.17.26T10:47:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="SYNX",
-            datetime_str="03.06.26T11:22:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="GNPX",
-            datetime_str="02.23.26T10:25:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="ALDX",
-            datetime_str="03.23.26T14:39:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="NAMM",
-            datetime_str="02.25.26T13:29:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="NAMM",
-            datetime_str="02.25.26T11:19:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="ANTX",
-            datetime_str="03.12.26T13:00:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="ANTX",
-            datetime_str="03.12.26T14:35:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="BMEA",
-            datetime_str="04.07.26T13:06:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="AGIG",
-            datetime_str="03.05.26T11:20:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AGIG",
-            datetime_str="03.05.26T13:57:00",
+            name="ELPW",
+            datetime_str="04.22.26T09:54:00",
             is_positive=False,
         ),
     ]
