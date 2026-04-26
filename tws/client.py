@@ -255,10 +255,9 @@ class Client(client.EClient, wrapper.EWrapper):
         self.place_order(
             symbol=symbol,
             order_action="BUY",
-            order_type="LMT",
+            order_type="MKT",
             quantity=quantity,
             transmit=transmit,
-            price=price,
         )
 
         return quantity

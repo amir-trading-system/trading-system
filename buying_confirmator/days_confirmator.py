@@ -278,13 +278,12 @@ class Confirmator:
                     # need to remove it
                     transmit_order = False
 
-                # need to wait until I have the right bar.
-                # self.tws_client.place_buy_order(
-                #     symbol=original_bar_to_confirm.symbol,
-                #     price=entry_position_bar.close,
-                #     transmit=transmit_order,
-                #     score=score,
-                # )
+                self.tws_client.place_buy_order(
+                    symbol=original_bar_to_confirm.symbol,
+                    price=potential_confirmation_bar.close,
+                    transmit=transmit_order,
+                    score=score,
+                )
 
         return bar_has_confirmed
 
