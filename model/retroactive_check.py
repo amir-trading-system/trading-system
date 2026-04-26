@@ -431,9 +431,9 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="ELPW",
-            datetime_str="04.22.26T09:54:00",
-            is_positive=False,
+            name="ATOM",
+            datetime_str="04.24.26T11:30:00",
+            is_positive=True,
         ),
     ]
     # symbols = explore_past_potential_symbols()

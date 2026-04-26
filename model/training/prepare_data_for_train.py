@@ -48,7 +48,6 @@ def write_to_csv(
                     "feature_uptrend_bars_pct",
                     "feature_entry_volume_vs_total_volume",
                     "feature_volume_quality",
-                    "gains_until_entry_bar",
                 ],
             )
             f.flush()
@@ -81,7 +80,6 @@ def write_to_csv(
         feature_positive_bars_above_volume_average_pct = symbol_data["feature_positive_bars_above_volume_average_pct"]
         feature_uptrend_bars_pct = symbol_data["feature_uptrend_bars_pct"]
         feature_volume_quality = symbol_data["feature_volume_quality"]
-        gains_until_entry_bar = symbol_data["gains_until_entry_bar"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -117,7 +115,6 @@ def write_to_csv(
                     feature_uptrend_bars_pct,
                     feature_entry_volume_vs_total_volume,
                     feature_volume_quality,
-                    gains_until_entry_bar,
                 ]
             )
 

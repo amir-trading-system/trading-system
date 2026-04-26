@@ -1,6 +1,6 @@
 Need to do the following:
- - add 2 columns (not features):
-   - gains until now (potential_confirmation_bar.close - original_bar_to_confirm.low)/original_bar_to_confirm.open_value
-   - previous_volume/current_volume
-
- - wait for another 20 new cases and then run the model training.
+ Implementation:
+  - Dont get in on the current "entry bar", just d othe following after confirming breakout:
+   - keep wait for retest crossed area again (lets say +0.10$).
+   - wait for buyers (most of body is lower wick for example/strong high volume bar etc')
+  - Check this on p/FP cases (need to filter most of FP for example and leave most of positive cases).

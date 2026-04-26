@@ -227,7 +227,7 @@ class Client(client.EClient, wrapper.EWrapper):
     def place_buy_order(
         self,
         symbol: str,
-        current_price: float,
+        price: float,
         transmit: bool,
         score: common.objects.Score,
     ) -> int:
@@ -242,7 +242,7 @@ class Client(client.EClient, wrapper.EWrapper):
         if score.score >= 70:
             pct = 0.5
 
-        quantity = math.floor((self.available_funds * pct) / current_price)
+        quantity = math.floor((self.available_funds * pct) / price)
         if quantity == 0:
             self.logger.info(
                 msg="Not enough available funds to buy stock",
@@ -255,9 +255,10 @@ class Client(client.EClient, wrapper.EWrapper):
         self.place_order(
             symbol=symbol,
             order_action="BUY",
-            order_type="MKT",
+            order_type="LMT",
             quantity=quantity,
             transmit=transmit,
+            price=price,
         )
 
         return quantity
@@ -312,7 +313,9 @@ class Client(client.EClient, wrapper.EWrapper):
         order_object.orderType = order_type
         order_object.totalQuantity = decimal.Decimal(quantity)
         order_object.transmit = transmit
-        if price is not None:
+        if order_type == "LMT":
+            if price is None:
+                raise ValueError("Limit order requires a price")
             order_object.lmtPrice = price
 
         self.placeOrder(
