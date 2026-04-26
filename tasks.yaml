@@ -1,4 +1,15 @@
 Need to do the following:
+Two main options for positive cases:
+ - if bars after confirmation bar has low volume and does not going down towards emas zone - False positive.
+ - option 1:
+   - if bars are goes down towards emas zone/towards previous highest high:
+     - if keeps close between them and does not goes down further - can be positive - wait for volume confirmation - positive.
+     - if close crossed ema_20 - False positive.
+ - options 2:
+   - too strong - bar after crossed bar is strong as well and keeps up + volume confirmation - should be quick trend - positive.
+
+
+
  Implementation:
   - Dont get in on the current "entry bar", just d othe following after confirming breakout:
    - keep wait for retest crossed area again (lets say +0.10$).
