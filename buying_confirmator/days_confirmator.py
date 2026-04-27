@@ -199,7 +199,7 @@ class Confirmator:
 
         if entry_position_bar is not None:
             self.logger.info(
-                "Bar has confirmed, waiting for volume confirmation for palceing order",
+                "Bar has confirmed, waiting for volume confirmation for placing order",
                 extra={
                     "worker": "Confirmator",
                     "symbol": original_bar_to_confirm.symbol,
@@ -270,17 +270,28 @@ class Confirmator:
             for bar_object in one_minute_timeframe_stock.bars
             if potential_confirmation_bar.bar_time < bar_object.bar_time < current_bar.bar_time
         ]
+        if not relevant_bars:
+            return order_has_been_placed
 
         if any(
             bar_object
             for bar_object in relevant_bars
-            if (
-                bar_object.close < bar_object.ema_20
-                or bar_object.close < previous_highest_high
-            )
+            if bar_object.close < previous_highest_high
         ):
             # meaning that this trend is not relevant anymore - not a real trend.
             return True
+
+        had_pullback = False
+        if any(
+            bar_object
+            for bar_object in relevant_bars
+            if (
+                True
+                and bar_object.low <= bar_object.ema_9
+            )
+        ):
+            # meaning that this trend is healthy.
+            had_pullback = True
 
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=current_bar,
@@ -288,12 +299,17 @@ class Confirmator:
 
         validation_for_placing_order = (
             True
+            and current_bar.is_positive
+            and current_bar.volume > current_bar.volume_average
+            and current_bar.low > current_bar.ema_20
+            and current_bar.ema_9 > current_bar.ema_20
+            and current_bar.ema_20 > current_bar.vwap
             and previous_bar is not None
             and current_bar.volume > previous_bar.volume
-            and current_bar.close > previous_bar.close
-            and current_bar.histogram > 0
+            and current_bar.high > previous_bar.high
+            and had_pullback
             and current_bar.macd > 0
-            and current_bar.body_percentage > 0.6
+            and current_bar.body_percentage > 0.5
             and any(
                 bar_object
                 for bar_object in relevant_bars
@@ -308,11 +324,6 @@ class Confirmator:
                 for bar_object in relevant_bars
                 if not bar_object.is_positive
             )
-            and current_bar.is_positive
-            and current_bar.volume > current_bar.volume_average
-            and current_bar.low > current_bar.ema_9
-            and current_bar.ema_9 > current_bar.ema_20
-            and current_bar.ema_20 > current_bar.vwap
         )
 
         if validation_for_placing_order:
