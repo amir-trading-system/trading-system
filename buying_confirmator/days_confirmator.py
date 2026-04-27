@@ -209,6 +209,7 @@ class Confirmator:
                     "bar_time": original_bar_to_confirm.bar_time,
                     "evidence_name": confirmed_evidence,
                     "request_id": stock.request_id,
+                    "score": score.score,
                 },
             )
 
@@ -287,7 +288,10 @@ class Confirmator:
             for bar_object in relevant_bars
             if (
                 True
-                and bar_object.low <= bar_object.ema_9
+                and (
+                    bar_object.low <= bar_object.ema_9
+                    or not bar_object.is_positive
+                )
             )
         ):
             # meaning that this trend is healthy.
@@ -303,7 +307,6 @@ class Confirmator:
             and current_bar.volume > current_bar.volume_average
             and current_bar.low > current_bar.ema_20
             and current_bar.ema_9 > current_bar.ema_20
-            and current_bar.ema_20 > current_bar.vwap
             and previous_bar is not None
             and current_bar.volume > previous_bar.volume
             and current_bar.high > previous_bar.high
@@ -352,6 +355,19 @@ class Confirmator:
                         "bar_to_place_order_time": current_bar.bar_time,
                         "price_movement_statistics": potential_confirmation_bar.price_movement_statistics,
                         "score": score.score if score is not None else 0,
+                    },
+                )
+                self.logger.info(
+                    "Bar has confirmed by model and order has been placed",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": original_bar_to_confirm.symbol,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                        "entry_position_bar_time": current_bar.bar_time,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "request_id": one_minute_timeframe_stock.request_id,
+                        "score": score.score,
                     },
                 )
 

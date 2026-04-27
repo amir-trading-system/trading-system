@@ -49,6 +49,7 @@ def write_to_csv(
                         "analysis_status",
                         "actual_confirmation_bar_time",
                         "expected_confirmation_bar_time",
+                        "bar_to_place_order_time",
                         "highest_high_one_minute_bar_time",
                         "result",
                         "feature_bars_with_at_least_50_pct_wick_pct",
@@ -153,6 +154,7 @@ def write_to_csv(
 
                 actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
                 expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
+                bar_to_place_order_time = symbol_data["bar_to_place_order_time"]
 
                 if (
                     True
@@ -189,6 +191,7 @@ def write_to_csv(
                                     analysis_status,
                                     actual_confirmation_bar_time,
                                     expected_confirmation_bar_time,
+                                    bar_to_place_order_time,
                                     highest_high_one_minute_bar_time,
                                     result,
                                     feature_bars_with_at_least_50_pct_wick_pct,
@@ -405,8 +408,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="ATOM",
-            datetime_str="04.24.26T11:30:00",
+            name="UCAR",
+            datetime_str="04.27.26T11:08:00",
             is_positive=True,
         ),
     ]
@@ -416,8 +419,8 @@ def run_retroactive_check():
     if not symbols:
         output_file_name = ""
         symbols = training.train_data.get_tagged_data()
-        get_only_statistics = True
-        should_run_model = False
+        get_only_statistics = False
+        should_run_model = True
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
@@ -531,6 +534,7 @@ def run_retroactive_check():
                 "original_bar_time": specific_bar_time,
                 "actual_confirmation_bar_time": "in_progress",
                 "expected_confirmation_bar_time": symbol.date_time,
+                "bar_to_place_order_time": "in_progress",
                 "is_new": False,
                 "price_movement_statistics": {},
                 "result": "in_progress",
