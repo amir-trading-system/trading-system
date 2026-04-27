@@ -586,7 +586,6 @@ class Stock:
         close: float,
         previous_ema: float,
         current_length: int,
-        is_for_signal_line: bool = False,
     ):
         ema_result = 0.0
         if current_length+1 < period:
@@ -598,17 +597,8 @@ class Stock:
                 if bar_object.index <= period
             ) + close
 
-            if is_for_signal_line:
-                sum_close = sum(
-                    bar_object.macd
-                    for bar_object in self.bars
-                    if bar_object.index <= period
-                ) + close
-
             return sum_close / period
 
-        if is_for_signal_line:
-            previous_ema = sum(a.macd for a in self.bars[:period]) / period
         alpha = 2/(period+1)
         ema_result = alpha * close + (1-alpha) * previous_ema
 
