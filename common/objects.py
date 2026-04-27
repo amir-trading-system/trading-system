@@ -604,6 +604,31 @@ class Stock:
 
         return ema_result
 
+    def calculate_signal_line(
+        self,
+        current_macd: float,
+        current_length: int,
+    ) -> float:
+        period = 9
+        ema_result = 0.0
+        if current_length+1 < period:
+            return ema_result
+        if current_length+1 == period:
+            sum_close = sum(
+                bar_object.macd
+                for bar_object in self.bars
+                if bar_object.index <= period
+            ) + current_macd
+
+            return sum_close / period
+
+        previous_ema = sum(a.macd for a in self.bars[:period]) / period
+
+        alpha = 2/(period+1)
+        ema_result = alpha * current_macd + (1-alpha) * previous_ema
+
+        return ema_result
+
     def calculate_volume_average(
         self,
         current_bar: BarData,
@@ -662,14 +687,17 @@ class Stock:
             current_length=current_length,
         )
 
-        current_bar.macd = ema_12 - ema_26
-        current_bar.signal_line = self.calculate_ema(
-            period=9,
-            close=current_bar.macd,
-            previous_ema=previous_ema_12-previous_ema_26,
-            current_length=current_length,
+        previous_bar = self.previous_bar(
+            bar_object=current_bar,
         )
-        current_bar.histogram = current_bar.macd - current_bar.signal_line
+
+        if previous_bar is not None:
+            current_bar.macd = ema_12 - ema_26
+            current_bar.signal_line = self.calculate_signal_line(
+                current_macd=current_bar.macd,
+                current_length=current_length,
+            )
+            current_bar.histogram = current_bar.macd - current_bar.signal_line
 
 class IbAPIRequest:
     def __init__(

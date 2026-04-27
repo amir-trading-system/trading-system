@@ -44,7 +44,6 @@ class Handler:
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
         evidence_name: str,
-        transmit: bool,
     ) -> str:
         crossed_resistance_bar_time = None
         for resistance_level in stock.resistance_levels:
@@ -60,7 +59,6 @@ class Handler:
             <b>Original bar to confirm Time:</b> <code>{original_bar.bar_time}</code>
             <b>Original bar to confirm Timeframe:</b> <code>{original_bar.timeframe}</code>
             <b>Resistance Crossed bar time:</b> <code>{crossed_resistance_bar_time if crossed_resistance_bar_time is not None else ""}</code>
-            <b>Auto Transmit:</b> <code>{transmit}</code>
         """
 
     def _send_message(

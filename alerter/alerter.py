@@ -25,7 +25,6 @@ class Alerter:
         evidence_name: str,
         is_retro: bool,
         request_id: int,
-        transmit: bool,
     ):
         telegram_handler: telegram.Handler = telegram.Handler(
             configuration=self.configuration,
@@ -36,7 +35,6 @@ class Alerter:
             original_bar=original_bar,
             entry_position_bar=entry_position_bar,
             evidence_name=evidence_name,
-            transmit=transmit,
         )
 
         threading.Thread(

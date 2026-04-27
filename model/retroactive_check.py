@@ -50,7 +50,6 @@ def write_to_csv(
                         "actual_confirmation_bar_time",
                         "expected_confirmation_bar_time",
                         "highest_high_one_minute_bar_time",
-                        "evidence",
                         "result",
                         "feature_bars_with_at_least_50_pct_wick_pct",
                         "feature_positive_vs_negative_volume",
@@ -75,7 +74,6 @@ def write_to_csv(
                         "feature_positive_bars_above_volume_average_pct",
                         "feature_uptrend_bars_pct",
                         "feature_volume_quality",
-                        "gains_until_entry_bar",
                         "score",
                     ],
                 )
@@ -95,6 +93,7 @@ def write_to_csv(
                 symbol = symbol_data["symbol"]
                 original_bar_time = symbol_data["original_bar_time"]
                 result = symbol_data["result"]
+                highest_high_one_minute_bar_time = None
                 feature_bars_with_at_least_50_pct_wick_pct = 0
                 feature_positive_vs_negative_volume = 0
                 feature_overlapped_bars_since_market_open_pct = 0
@@ -118,7 +117,6 @@ def write_to_csv(
                 feature_positive_bars_above_volume_average_pct = 0
                 feature_uptrend_bars_pct = 0
                 feature_volume_quality = 0
-                gains_until_entry_bar = 0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
@@ -145,19 +143,16 @@ def write_to_csv(
                     feature_positive_bars_above_volume_average_pct = price_movement_statistics["feature_positive_bars_above_volume_average_pct"]
                     feature_uptrend_bars_pct = price_movement_statistics["feature_uptrend_bars_pct"]
                     feature_volume_quality = price_movement_statistics["feature_volume_quality"]
-                    gains_until_entry_bar = price_movement_statistics["gains_until_entry_bar"]
+                    highest_high_one_minute_bar_time = price_movement_statistics["highest_high_one_minute_bar_time"]
 
                 collection_status = symbol_data["collection_status"]
                 analysis_status = symbol_data["analysis_status"]
 
-                evidence_name = symbol_data["evidence_name"]
                 if symbol_data["is_new"]:
-                    evidence_name = f"{evidence_name} - NEW"
                     symbol = f"{symbol} - NEW"
 
                 actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
                 expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
-                highest_high_one_minute_bar_time = symbol_data["highest_high_one_minute_bar_time"]
 
                 if (
                     True
@@ -166,14 +161,14 @@ def write_to_csv(
                     and float(symbol_data["score"]) > 0
                     and actual_confirmation_bar_time != "in_progress"
                 ):
-                    if actual_confirmation_bar_time == expected_confirmation_bar_time or evidence_name == "no evidence":
+                    if actual_confirmation_bar_time == expected_confirmation_bar_time:
                         result = "done"
                         symbol_data["result"] = "done"
                     else:
                         result = "failed"
                         symbol_data["result"] = "failed"
 
-                    if not symbol.endswith("NEW") and evidence_name != "no evidence":
+                    if not symbol.endswith("NEW"):
                         file_name = "model/positive_results.csv"
                         if not symbol_data["is_positive"]:
                             file_name = "model/false_positive_results.csv"
@@ -195,7 +190,6 @@ def write_to_csv(
                                     actual_confirmation_bar_time,
                                     expected_confirmation_bar_time,
                                     highest_high_one_minute_bar_time,
-                                    evidence_name,
                                     result,
                                     feature_bars_with_at_least_50_pct_wick_pct,
                                     feature_positive_vs_negative_volume,
@@ -220,7 +214,6 @@ def write_to_csv(
                                     feature_positive_bars_above_volume_average_pct,
                                     feature_uptrend_bars_pct,
                                     feature_volume_quality,
-                                    gains_until_entry_bar,
                                     symbol_data["score"],
                                 ]
                             )
@@ -319,7 +312,6 @@ def wait_for_collection_and_analysis(
                 and not symbol.is_worth_to_monitor()
             ):
                 relevant_symbol_data["actual_confirmation_bar_time"] = "Does not qualify"
-                relevant_symbol_data["evidence_name"] = "Does not qualify"
 
             if (
                 relevant_symbol_data["collection_status"] == "done"
@@ -339,32 +331,14 @@ def wait_for_confirmation(
             if symbol_data["symbol"] == confirmation_result["symbol"]
             and symbol_data["original_bar_time"] == confirmation_result["original_bar_time"]
         ]
-        if any(
-            symbol_data
-            for symbol_data in relevant_symbol_data
-            if symbol_data["evidence_name"] == "in_progress"
-        ):
-            should_update_first_default = True
-        else:
-            should_update_first_default = False
 
-        if not confirmation_result["evidences"] and relevant_symbol_data:
+        if relevant_symbol_data:
             relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
-            relevant_symbol_data[0]["evidence_name"] = "no evidence"
+            relevant_symbol_data[0]["bar_to_place_order_time"] = confirmation_result["bar_to_place_order_time"]
             relevant_symbol_data[0]["collection_status"] = "done"
             relevant_symbol_data[0]["analysis_status"] = "done"
             relevant_symbol_data[0]["score"] = confirmation_result["score"]
             relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result.get("price_movement_statistics", {})
-            continue
-
-        if should_update_first_default and relevant_symbol_data:
-            relevant_symbol_data[0]["actual_confirmation_bar_time"] = confirmation_result["confirmation_bar_time"]
-            relevant_symbol_data[0]["evidence_name"] = confirmation_result["evidences"]
-            relevant_symbol_data[0]["collection_status"] = "done"
-            relevant_symbol_data[0]["analysis_status"] = "done"
-            relevant_symbol_data[0]["score"] = confirmation_result["score"]
-            relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result["price_movement_statistics"]
-            should_update_first_default = False
             continue
 
         symbols_data.append(
@@ -375,7 +349,7 @@ def wait_for_confirmation(
                 "original_bar_time": confirmation_result["original_bar_time"],
                 "actual_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
                 "expected_confirmation_bar_time": confirmation_result["confirmation_bar_time"],
-                "evidence_name": confirmation_result["evidences"],
+                "bar_to_place_order_time": confirmation_result["bar_to_place_order_time"],
                 "is_new": True,
                 "price_movement_statistics": confirmation_result["price_movement_statistics"],
                 "score": confirmation_result["score"],
@@ -426,8 +400,8 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = False
-    get_only_statistics = True
+    should_run_model = True
+    get_only_statistics = False
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
@@ -557,7 +531,6 @@ def run_retroactive_check():
                 "original_bar_time": specific_bar_time,
                 "actual_confirmation_bar_time": "in_progress",
                 "expected_confirmation_bar_time": symbol.date_time,
-                "evidence_name": "in_progress",
                 "is_new": False,
                 "price_movement_statistics": {},
                 "result": "in_progress",
