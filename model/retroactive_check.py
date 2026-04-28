@@ -403,14 +403,14 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = True
-    get_only_statistics = False
+    should_run_model = False
+    get_only_statistics = True
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="SWMR",
-            datetime_str="04.02.26T10:22:00",
-            is_positive=True,
+            name="BIYA",
+            datetime_str="04.28.26T10:25:00",
+            is_positive=False,
         ),
     ]
     # symbols = explore_past_potential_symbols()

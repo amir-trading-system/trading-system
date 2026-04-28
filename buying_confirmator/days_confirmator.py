@@ -557,6 +557,7 @@ class Confirmator:
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=current_bar,
         )
+        distance_from_ema_9 = current_bar.low - current_bar.ema_9
 
         validation_for_placing_order = (
             True
@@ -565,6 +566,10 @@ class Confirmator:
             and current_bar.low > current_bar.ema_20
             and current_bar.ema_9 > current_bar.ema_20
             and current_bar.high - current_bar.low > current_bar.low - current_bar.ema_9
+            and (
+                distance_from_ema_9/current_bar.low < 0.02
+                or distance_from_ema_9 <= 0.05
+            )
             and previous_bar is not None
             and current_bar.volume > previous_bar.volume
             and had_pullback
