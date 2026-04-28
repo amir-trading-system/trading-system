@@ -14,91 +14,12 @@ class DataStreamer():
         request_id_to_symbol: dict[int, common.objects.Stock],
         ibapi_requests: dict[int,common.objects.IbAPIRequest],
         logger: logging.Logger,
+        is_retro: bool,
     ):
         self.ibapi_requests = ibapi_requests
         self.request_id_to_symbol = request_id_to_symbol
         self.logger = logger
-
-    def insert_one_minute_bars_into_confirmation_queues(
-        self,
-        one_minute_stock: common.objects.Stock,
-        enriched_bar: common.objects.BarData,
-    ):
-        specific_bar_time = one_minute_stock.specific_bar_time
-
-        current_session_date = datetime.datetime.fromtimestamp(0)
-        previous_session_date = datetime.datetime.fromtimestamp(0)
-        if specific_bar_time is not None:
-            current_session_date = specific_bar_time
-            previous_session_date = current_session_date - datetime.timedelta(
-                days=1,
-            )
-        else:
-            date_now = datetime.datetime.now()
-            current_session_date = datetime.datetime(
-                year=date_now.year,
-                month=date_now.month,
-                day=date_now.day,
-            )
-            previous_session_date = current_session_date - datetime.timedelta(
-                days=1,
-            )
-
-        while previous_session_date.weekday() > 4:
-            previous_session_date -= datetime.timedelta(
-                days=1,
-            )
-
-        day_timeframe_stock = self.request_id_to_symbol[one_minute_stock.day_request_id]
-
-        if specific_bar_time is not None and day_timeframe_stock.specific_bar_time != specific_bar_time:
-            return
-
-        if (
-            True
-            and enriched_bar.bar_time >= datetime.datetime(
-                year=previous_session_date.year,
-                month=previous_session_date.month,
-                day=previous_session_date.day,
-                hour=16,
-                minute=0,
-            )
-            and enriched_bar.bar_time < datetime.datetime(
-                year=current_session_date.year,
-                month=current_session_date.month,
-                day=current_session_date.day,
-                hour=9,
-                minute=30,
-            )
-        ):
-            day_timeframe_stock.post_pre_market_volume_sum += enriched_bar.volume
-            day_timeframe_stock.last_post_pre_one_minute_highest_high = max(
-                day_timeframe_stock.last_post_pre_one_minute_highest_high,
-                enriched_bar.high,
-            )
-            if enriched_bar.bar_time >= datetime.datetime(
-                year=current_session_date.year,
-                month=current_session_date.month,
-                day=current_session_date.day,
-                hour=4,
-            ):
-                if (
-                    day_timeframe_stock.pre_market_one_minute_highest_high_bar is None
-                    or (
-                        day_timeframe_stock.pre_market_one_minute_highest_high_bar is not None
-                        and day_timeframe_stock.pre_market_one_minute_highest_high_bar.high < enriched_bar.high
-                    )
-                ):
-                    day_timeframe_stock.pre_market_one_minute_highest_high_bar = enriched_bar
-
-        if enriched_bar.bar_time >= datetime.datetime(
-            year=current_session_date.year,
-            month=current_session_date.month,
-            day=current_session_date.day,
-            hour=9,
-            minute=30,
-        ):
-            day_timeframe_stock.one_minute_bars_queue.put(enriched_bar)
+        self.is_retro = is_retro
 
     def on_historical_data(
         self,
@@ -192,3 +113,91 @@ class DataStreamer():
                 enriched_bar=enriched_bar,
             )
             return
+
+    def insert_one_minute_bars_into_confirmation_queues(
+        self,
+        one_minute_stock: common.objects.Stock,
+        enriched_bar: common.objects.BarData,
+    ):
+        date_now = datetime.datetime.now()
+        specific_bar_time = one_minute_stock.specific_bar_time
+
+        current_session_date = datetime.datetime.fromtimestamp(0)
+        previous_session_date = datetime.datetime.fromtimestamp(0)
+        if specific_bar_time is not None:
+            current_session_date = specific_bar_time
+            previous_session_date = current_session_date - datetime.timedelta(
+                days=1,
+            )
+        else:
+            current_session_date = datetime.datetime(
+                year=date_now.year,
+                month=date_now.month,
+                day=date_now.day,
+            )
+            previous_session_date = current_session_date - datetime.timedelta(
+                days=1,
+            )
+
+        while previous_session_date.weekday() > 4:
+            previous_session_date -= datetime.timedelta(
+                days=1,
+            )
+
+        day_timeframe_stock = self.request_id_to_symbol[one_minute_stock.day_request_id]
+
+        if specific_bar_time is not None and day_timeframe_stock.specific_bar_time != specific_bar_time:
+            return
+
+        if (
+            True
+            and enriched_bar.bar_time >= datetime.datetime(
+                year=previous_session_date.year,
+                month=previous_session_date.month,
+                day=previous_session_date.day,
+                hour=16,
+                minute=0,
+            )
+            and enriched_bar.bar_time < datetime.datetime(
+                year=current_session_date.year,
+                month=current_session_date.month,
+                day=current_session_date.day,
+                hour=9,
+                minute=30,
+            )
+        ):
+            day_timeframe_stock.post_pre_market_volume_sum += enriched_bar.volume
+            day_timeframe_stock.last_post_pre_one_minute_highest_high = max(
+                day_timeframe_stock.last_post_pre_one_minute_highest_high,
+                enriched_bar.high,
+            )
+            if enriched_bar.bar_time >= datetime.datetime(
+                year=current_session_date.year,
+                month=current_session_date.month,
+                day=current_session_date.day,
+                hour=4,
+            ):
+                if (
+                    day_timeframe_stock.pre_market_one_minute_highest_high_bar is None
+                    or (
+                        day_timeframe_stock.pre_market_one_minute_highest_high_bar is not None
+                        and day_timeframe_stock.pre_market_one_minute_highest_high_bar.high < enriched_bar.high
+                    )
+                ):
+                    day_timeframe_stock.pre_market_one_minute_highest_high_bar = enriched_bar
+
+        if (
+            True
+            and not self.is_retro
+            and 3 <= date_now.second < 50
+        ):
+            return
+
+        if enriched_bar.bar_time >= datetime.datetime(
+            year=current_session_date.year,
+            month=current_session_date.month,
+            day=current_session_date.day,
+            hour=9,
+            minute=30,
+        ):
+            day_timeframe_stock.one_minute_bars_queue.put(enriched_bar)

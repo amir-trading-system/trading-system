@@ -51,6 +51,7 @@ class Client(client.EClient, wrapper.EWrapper):
             request_id_to_symbol=request_id_to_symbol,
             ibapi_requests=self.ibapi_requests,
             logger=logger,
+            is_retro=is_retro,
         )
         self.is_retro = is_retro
 
