@@ -568,13 +568,13 @@ class Confirmator:
             and current_bar.high - current_bar.low > current_bar.low - current_bar.ema_9
             and (
                 distance_from_ema_9/current_bar.low < 0.02
-                or distance_from_ema_9 <= 0.05
+                or distance_from_ema_9 <= 0.1
             )
             and previous_bar is not None
             and current_bar.volume > previous_bar.volume
             and had_pullback
             and current_bar.macd > 0
-            and current_bar.body_percentage > 0.5
+            and current_bar.body_percentage > 0.4
             and any(
                 bar_object
                 for bar_object in relevant_bars

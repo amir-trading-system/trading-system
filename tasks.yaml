@@ -1,27 +1,2 @@
 Need to do the following:
-Two main options for positive cases:
- - if bars after confirmation bar has low volume and does not going down towards emas zone - False positive.
- - option 1:
-   - if bars are goes down towards emas zone/towards previous highest high:
-     - if keeps close between them and does not goes down further - can be positive - wait for volume confirmation - positive.
-     - if close crossed ema_20 - False positive.
- - options 2:
-   - too strong - bar after crossed bar is strong as well and keeps up + volume confirmation - should be quick trend - positive.
-
-
-
- Implementation:
-  - Dont get in on the current "entry bar", just d othe following after confirming breakout:
-   - keep wait for retest crossed area again (lets say +0.10$).
-   - wait for buyers (most of body is lower wick for example/strong high volume bar etc')
-  - Check this on p/FP cases (need to filter most of FP for example and leave most of positive cases).
-
-Conditions for place order:
- - has already confirmation bar.
- - since confirmation bar there was no breaking down (close) from previous highest high before confirmation bar.
- - previous or current bar has low between ema_9 to ema_20.
- - close needs to be highesr than ema_9 and ema_20.
-  - ema_9 > ema_20 > vwap.
- - there was one of the following:
-   - low of previous bar very close to previous highest high and has buyers (has low wick) && current bar is positive.
-   - current bar is very close to previous highest high and is positive and has buyers (strong volume or low wick).
+ - Consider adding that the confirmation level 2 has histogram bigger than previous bar.
