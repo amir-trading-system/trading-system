@@ -532,8 +532,6 @@ print(confusion_matrix(y_test_holdout, test_pred_best))
 # FINAL FEATURE IMPORTANCE
 # ------------------------------------------------------------
 
-chosen_threshold = float(fold_report_df["best_threshold"].min())
-
 final_feature_importance = pd.Series(
     final_model.feature_importances_,
     index=selected_features,
