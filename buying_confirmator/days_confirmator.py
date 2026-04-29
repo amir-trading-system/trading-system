@@ -534,6 +534,7 @@ class Confirmator:
             bar_object
             for bar_object in relevant_bars
             if bar_object.close < previous_highest_high
+            and bar_object.close < bar_object.ema_20
         ):
             # meaning that this trend is not relevant anymore - not a real trend.
             return True

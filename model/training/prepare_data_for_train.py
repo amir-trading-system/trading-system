@@ -27,16 +27,18 @@ def write_to_csv(
                     "original_bar_time",
                     "expected_confirmation_bar_time",
                     "highest_high_one_minute_bar_time",
-                    "feature_histogram_changed_directions_pct",
-                    "feature_distance_from_highest_high",
                     "feature_total_volume",
                     "feature_entry_bar_price_action_pct_to_volume_pct",
                     "feature_distance_between_highest_high_to_entry_bar_high",
                     "feature_positive_bars_above_volume_average_pct",
                     "feature_volume_quality",
                     "feature_price_action_is_stuck_pct",
-                    "feature_entry_bar_buyers_vs_sellers_pct",
                     "feature_previous_historgam_to_current_histogram",
+                    "feature_efficiency_balance",
+                    "feature_trap_signal",
+                    "feature_clean_move",
+                    "feature_fake_momentum",
+                    "feature_structure_adjusted_strength",
                 ],
             )
             f.flush()
@@ -48,16 +50,18 @@ def write_to_csv(
         original_bar_time = stock_object.specific_bar_time
         highest_high_one_minute_bar_time = symbol_data["highest_high_one_minute_bar_time"]
 
-        feature_distance_from_highest_high = symbol_data["feature_distance_from_highest_high"]
-        feature_histogram_changed_directions_pct = symbol_data["feature_histogram_changed_directions_pct"]
         feature_price_action_is_stuck_pct = symbol_data["feature_price_action_is_stuck_pct"]
         feature_total_volume = symbol_data["feature_total_volume"]
         feature_entry_bar_price_action_pct_to_volume_pct = symbol_data["feature_entry_bar_price_action_pct_to_volume_pct"]
         feature_distance_between_highest_high_to_entry_bar_high = symbol_data["feature_distance_between_highest_high_to_entry_bar_high"]
         feature_positive_bars_above_volume_average_pct = symbol_data["feature_positive_bars_above_volume_average_pct"]
         feature_volume_quality = symbol_data["feature_volume_quality"]
-        feature_entry_bar_buyers_vs_sellers_pct = symbol_data["feature_entry_bar_buyers_vs_sellers_pct"]
         feature_previous_historgam_to_current_histogram = symbol_data["feature_previous_historgam_to_current_histogram"]
+        feature_efficiency_balance = symbol_data["feature_efficiency_balance"]
+        feature_trap_signal = symbol_data["feature_trap_signal"]
+        feature_clean_move = symbol_data["feature_clean_move"]
+        feature_fake_momentum = symbol_data["feature_fake_momentum"]
+        feature_structure_adjusted_strength = symbol_data["feature_structure_adjusted_strength"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -72,16 +76,18 @@ def write_to_csv(
                     original_bar_time,
                     expected_confirmation_bar_time,
                     highest_high_one_minute_bar_time,
-                    feature_histogram_changed_directions_pct,
-                    feature_distance_from_highest_high,
                     feature_total_volume,
                     feature_entry_bar_price_action_pct_to_volume_pct,
                     feature_distance_between_highest_high_to_entry_bar_high,
                     feature_positive_bars_above_volume_average_pct,
                     feature_volume_quality,
                     feature_price_action_is_stuck_pct,
-                    feature_entry_bar_buyers_vs_sellers_pct,
                     feature_previous_historgam_to_current_histogram,
+                    feature_efficiency_balance,
+                    feature_trap_signal,
+                    feature_clean_move,
+                    feature_fake_momentum,
+                    feature_structure_adjusted_strength,
                 ]
             )
 

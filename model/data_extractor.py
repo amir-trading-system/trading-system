@@ -5,6 +5,26 @@ import common
 
 
 class DataExtractor:
+    @staticmethod
+    def safe_div(
+        numerator: float,
+        denominator: float,
+        default: float = 0.0,
+    ) -> float:
+        if denominator is None or denominator == 0:
+            return default
+        return numerator / denominator
+
+    @staticmethod
+    def pct_diff(
+        current: float,
+        previous: float,
+    ) -> float:
+        if previous is None or previous == 0:
+            return 0.0
+        return ((current - previous) / previous) * 100
+
+
     #pylint:disable=W0613
     @staticmethod
     def extract_features_from_symbol_data(
@@ -32,7 +52,6 @@ class DataExtractor:
         bars_with_highest_volume: list[common.objects.BarData] = []
         bars_ema_above_vwap_counter = 0
         positive_bars_close_strong_counter = 0
-        histogram_changed_directions_counter = 0
         price_action_is_stuck_counter = 0
         highest_volume_average = 0
         bars_with_rejection_counter = 0
@@ -84,14 +103,6 @@ class DataExtractor:
                 and next_bar.close < bar_object.low
             ):
                 bars_with_rejection_counter += 1
-
-            if (
-                previous_bar is not None
-                and next_bar is not None
-                and bar_object.histogram < previous_bar.histogram
-                and bar_object.histogram < next_bar.histogram
-            ):
-                histogram_changed_directions_counter += 1
 
             if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time:
                 bars_since_highest_high.append(bar_object)
@@ -214,20 +225,26 @@ class DataExtractor:
 
         feature_price_action_is_stuck_pct = price_action_is_stuck_counter/total_bars
         feature_entry_bar_price_action_pct_to_volume_pct = feature_entry_bar_price_action_to_total_price_pct/feature_entry_volume_vs_total_volume if feature_entry_volume_vs_total_volume > 0 else 0
-        feature_histogram_changed_directions_pct = histogram_changed_directions_counter/total_bars
+
+        feature_volume_quality = (potential_confirmation_bar.volume/highest_volume_until_now) * feature_entry_bar_price_action_pct_to_volume_pct if highest_volume_until_now > 0 else 0
+        entry_bar_buyers_vs_sellers_pct = (potential_confirmation_bar.close - potential_confirmation_bar.low)/(potential_confirmation_bar.high - potential_confirmation_bar.low)
+        feature_positive_bars_above_volume_average_pct = positive_bars_above_volume_average_counter/positive_bars_counter
+        feature_volume_multiply_price_action = feature_volume_quality * feature_entry_bar_price_action_pct_to_volume_pct
 
         features = {
             "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
-            "feature_distance_from_highest_high": highest_high_one_minute_bar.index - potential_confirmation_bar.index if highest_high_one_minute_bar is not None else 0,
-            "feature_histogram_changed_directions_pct": feature_histogram_changed_directions_pct,
             "feature_price_action_is_stuck_pct": feature_price_action_is_stuck_pct,
             "feature_total_volume": total_volume,
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
             "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
-            "feature_positive_bars_above_volume_average_pct": positive_bars_above_volume_average_counter/positive_bars_counter,
-            "feature_volume_quality": (potential_confirmation_bar.volume/highest_volume_until_now) * feature_entry_bar_price_action_pct_to_volume_pct if highest_volume_until_now > 0 else 0,
-            "feature_entry_bar_buyers_vs_sellers_pct": (potential_confirmation_bar.close - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.close) if (potential_confirmation_bar.high - potential_confirmation_bar.close) > 0 else 1,
+            "feature_positive_bars_above_volume_average_pct": feature_positive_bars_above_volume_average_pct,
+            "feature_volume_quality": feature_volume_quality,
             "feature_previous_historgam_to_current_histogram": previous_bar_to_entry_bar.histogram/potential_confirmation_bar.histogram if previous_bar_to_entry_bar is not None else 0,
+            "feature_efficiency_balance": feature_entry_bar_price_action_pct_to_volume_pct/(1+feature_price_action_is_stuck_pct),
+            "feature_trap_signal": entry_bar_buyers_vs_sellers_pct/(feature_volume_quality + 1e-6),
+            "feature_clean_move": feature_entry_bar_price_action_pct_to_volume_pct * (1 - feature_price_action_is_stuck_pct),
+            "feature_fake_momentum": feature_entry_bar_price_action_pct_to_volume_pct / (feature_positive_bars_above_volume_average_pct + 1e-6),
+            "feature_structure_adjusted_strength": feature_volume_multiply_price_action * feature_distance_between_highest_high_to_entry_bar_high,
         }
 
         return features
