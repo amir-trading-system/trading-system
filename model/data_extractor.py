@@ -18,15 +18,11 @@ class DataExtractor:
         total_bars = len(one_minute_bars)
 
         total_volume = 0
-        positive_volume_sum = 0
-        negative_volume_sum = 0
         positive_histograms_sum = 0
         negative_histograms_sum = 0
         positive_bars_counter = 0
-        negative_bars_counter = 0
         last_bars_positive_bars = 0
         last_bars_negative_bars = 0
-        bars_with_at_least_50_pct_wick_counter = 0
         strong_positive_bars_with_full_body_counter = 0
         macd_under_signal_line_counter = 0
         ema_9_keeps_going_up_counter = 0
@@ -34,26 +30,17 @@ class DataExtractor:
         bars_after_strong_bars_that_continues_trend_counter = 0
         bars_with_rejection_inside_entry_bar_range: list[common.objects.BarData] = []
         bars_with_highest_volume: list[common.objects.BarData] = []
-        bars_above_vwap_counter = 0
         bars_ema_above_vwap_counter = 0
         positive_bars_close_strong_counter = 0
-        bars_with_rejection_since_market_open = 0
-        bars_size_sum = 0
-        bars_size_average = 0
         histogram_changed_directions_counter = 0
-        strong_negative_bars_counter = 0
         price_action_is_stuck_counter = 0
         highest_volume_average = 0
         bars_with_rejection_counter = 0
-        overlapped_bars_counter = 0
         positive_bars_above_volume_average_counter = 0
-        uptrend_bars_counter = 0
         bars_since_highest_high: list[common.objects.BarData] = []
         highest_volume_until_now = 0
 
         for bar_object in one_minute_bars:
-            if bar_object.bar_time < potential_confirmation_bar.bar_time:
-                bars_size_sum += abs(bar_object.close - bar_object.open_value)
             total_volume += bar_object.volume
             is_positive = bar_object.close > bar_object.open_value
             above_volume_average = bar_object.volume > bar_object.volume_average
@@ -86,14 +73,6 @@ class DataExtractor:
 
             if (
                 True
-                and previous_bar is not None
-                and previous_bar.low <= bar_object.open_value <= previous_bar.high
-                and previous_bar.low <= bar_object.close <= previous_bar.high
-            ):
-                overlapped_bars_counter += 1
-
-            if (
-                True
                 and next_bar is not None
                 and bar_object.index - potential_confirmation_bar.index < 10
                 and not next_bar.is_positive
@@ -123,33 +102,14 @@ class DataExtractor:
                 and bar_object.volume > bar_object.volume_average
             ):
                 if (
-                    previous_bar.high > bar_object.high
-                    and bar_object.high/previous_bar.high >= 0.98
-                ):
-                    price_action_is_stuck_counter += 1
-                if (
-                    previous_bar.high < bar_object.high
-                    and (
-                        previous_bar.high/bar_object.high >= 0.98
-                        or previous_bar.high/bar_object.close >= 0.98
-                    )
+                    True
+                    and previous_bar.low <= bar_object.close <= previous_bar.high
+                    and previous_bar.low <= bar_object.open_value <= previous_bar.high
                 ):
                     price_action_is_stuck_counter += 1
 
             if bar_object.macd < bar_object.signal_line:
                 macd_under_signal_line_counter += 1
-
-            if (
-                True
-                and previous_bar is not None
-                and bar_object.bar_wick_percentage >= 0.1
-                and bar_object.volume > bar_object.volume_average
-                and previous_bar.high < bar_object.high
-            ):
-                bars_with_rejection_since_market_open += 1
-
-            if bar_object.bar_wick_percentage >= 0.5:
-                bars_with_at_least_50_pct_wick_counter += 1
 
             if bar_object.histogram > 0:
                 positive_histograms_sum += bar_object.histogram
@@ -158,7 +118,6 @@ class DataExtractor:
 
             if is_positive:
                 positive_bars_counter += 1
-                positive_volume_sum += bar_object.volume
                 if bar_object.index - 5 < potential_confirmation_bar.index:
                     last_bars_positive_bars += 1
                 if bar_object.body_percentage >= 0.75:
@@ -168,18 +127,8 @@ class DataExtractor:
                 if bar_object.above_volume_average:
                     positive_bars_above_volume_average_counter += 1
             else:
-                negative_volume_sum += bar_object.volume
                 if bar_object.index - 5 < potential_confirmation_bar.index:
                     last_bars_negative_bars += 1
-                if bar_object.close > bar_object.vwap:
-                    negative_bars_counter += 1
-                if (
-                    True
-                    and bar_object.high > bar_object.vwap
-                    and above_volume_average
-                    and bar_object.body_percentage > 0.3
-                ):
-                    strong_negative_bars_counter += 1
 
             if previous_bar is not None:
                 if previous_bar.ema_9 < bar_object.ema_9:
@@ -225,9 +174,6 @@ class DataExtractor:
             ):
                 bars_with_rejection_inside_entry_bar_range.append(bar_object)
 
-            if bar_object.close > bar_object.vwap:
-                bars_above_vwap_counter += 1
-
             if (
                 True
                 and bar_object.ema_9 > bar_object.vwap
@@ -238,34 +184,19 @@ class DataExtractor:
 
             if (
                 True
-                and previous_bar is not None
-                and previous_bar.low < bar_object.low
-            ):
-                uptrend_bars_counter += 1
-
-            if (
-                True
                 and bar_object.index > potential_confirmation_bar.index
                 and bar_object.volume > highest_volume_until_now
             ):
                 highest_volume_until_now = bar_object.volume
 
-        feature_bars_with_at_least_50_pct_wick_pct = bars_with_at_least_50_pct_wick_counter/total_bars
-
         previous_bar_to_entry_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
         )
-        feature_overlapped_bars_since_market_open_pct = overlapped_bars_counter/len(one_minute_bars)
 
         highest_high_one_minute_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
             current_one_minute_bar=potential_confirmation_bar,
         )
-        bars_size_average = bars_size_sum/(total_bars-1) if total_bars > 1 else 1
-        feature_current_macd_to_previous = 0
-        if previous_bar_to_entry_bar is not None:
-            feature_current_macd_to_previous = potential_confirmation_bar.macd/previous_bar_to_entry_bar.macd
 
-        feature_late_volume_spike = potential_confirmation_bar.volume/total_volume
         feature_entry_volume_vs_total_volume = potential_confirmation_bar.volume/(total_volume - potential_confirmation_bar.volume) if (total_volume - potential_confirmation_bar.volume) > 0 else 0
         feature_entry_bar_price_action_to_total_price_pct = (potential_confirmation_bar.high - potential_confirmation_bar.low)/potential_confirmation_bar.close
 
@@ -283,35 +214,20 @@ class DataExtractor:
 
         feature_price_action_is_stuck_pct = price_action_is_stuck_counter/total_bars
         feature_entry_bar_price_action_pct_to_volume_pct = feature_entry_bar_price_action_to_total_price_pct/feature_entry_volume_vs_total_volume if feature_entry_volume_vs_total_volume > 0 else 0
-        feature_strong_negative_bars_pct = strong_negative_bars_counter/negative_bars_counter if negative_bars_counter > 0 else 0
         feature_histogram_changed_directions_pct = histogram_changed_directions_counter/total_bars
-        feature_bars_with_rejection_since_market_open = bars_with_rejection_since_market_open/total_bars
 
         features = {
             "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
-            "feature_bars_with_at_least_50_pct_wick_pct": feature_bars_with_at_least_50_pct_wick_pct,
-            "feature_positive_vs_negative_volume": positive_volume_sum/negative_volume_sum if negative_volume_sum > 0 else 1,
-            "feature_overlapped_bars_since_market_open_pct": feature_overlapped_bars_since_market_open_pct,
-            "feature_entry_bar_lowest_wick_to_bar_body_pct": (potential_confirmation_bar.open_value - potential_confirmation_bar.low)/(potential_confirmation_bar.close - potential_confirmation_bar.open_value) if potential_confirmation_bar.close - potential_confirmation_bar.open_value > 0 else 0,
-            "feature_entry_bar_volume": potential_confirmation_bar.volume,
             "feature_distance_from_highest_high": highest_high_one_minute_bar.index - potential_confirmation_bar.index if highest_high_one_minute_bar is not None else 0,
-            "feature_bars_with_rejection_since_market_open": feature_bars_with_rejection_since_market_open,
-            "feature_entry_point_size_to_bars_size_average": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/bars_size_average if bars_size_average else 0,
             "feature_histogram_changed_directions_pct": feature_histogram_changed_directions_pct,
-            "feature_strong_negative_bars_pct": feature_strong_negative_bars_pct,
             "feature_price_action_is_stuck_pct": feature_price_action_is_stuck_pct,
-            "feature_entry_bar_close_to_crossed_highest_high_pct": potential_confirmation_bar.close/highest_high_one_minute_bar.high,
             "feature_total_volume": total_volume,
-            "feature_current_macd_to_previous": feature_current_macd_to_previous,
-            "feature_late_volume_spike": feature_late_volume_spike,
-            "feature_entry_bar_price_action_to_total_price_pct": feature_entry_bar_price_action_to_total_price_pct,
-            "feature_entry_volume_vs_total_volume": feature_entry_volume_vs_total_volume,
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
-            "feature_bars_above_vwap_pct": bars_above_vwap_counter/total_bars,
             "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
             "feature_positive_bars_above_volume_average_pct": positive_bars_above_volume_average_counter/positive_bars_counter,
-            "feature_uptrend_bars_pct": uptrend_bars_counter/total_bars,
             "feature_volume_quality": (potential_confirmation_bar.volume/highest_volume_until_now) * feature_entry_bar_price_action_pct_to_volume_pct if highest_volume_until_now > 0 else 0,
+            "feature_entry_bar_buyers_vs_sellers_pct": (potential_confirmation_bar.close - highest_high_one_minute_bar.high)/(potential_confirmation_bar.high - potential_confirmation_bar.close) if (potential_confirmation_bar.high - potential_confirmation_bar.close) > 0 else 1,
+            "feature_previous_historgam_to_current_histogram": previous_bar_to_entry_bar.histogram/potential_confirmation_bar.histogram if previous_bar_to_entry_bar is not None else 0,
         }
 
         return features

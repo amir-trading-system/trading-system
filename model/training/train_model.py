@@ -32,7 +32,7 @@ THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 # Final stable feature filtering
 MIN_MEAN_IMPORTANCE = 0.02
 MIN_TOP_K_FREQUENCY = 0.5
-TOP_K_FOR_STABILITY = 20
+TOP_K_FOR_STABILITY = 10
 MIN_SELECTED_FEATURES = 8
 
 # Optional hard rules for final decision layer

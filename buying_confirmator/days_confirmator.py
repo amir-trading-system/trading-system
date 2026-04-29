@@ -220,7 +220,7 @@ class Confirmator:
         ):
             return (
                 score,
-                highest_high_one_minute_bar.high,
+                highest_high,
             )
 
         stock_is_valid_for_evidence = False
@@ -565,16 +565,13 @@ class Confirmator:
             and current_bar.volume > current_bar.volume_average
             and current_bar.low > current_bar.ema_20
             and current_bar.ema_9 > current_bar.ema_20
-            and current_bar.high - current_bar.low > current_bar.low - current_bar.ema_9
-            and (
-                distance_from_ema_9/current_bar.low < 0.02
-                or distance_from_ema_9 <= 0.1
-            )
+            and current_bar.high - current_bar.low > distance_from_ema_9
             and previous_bar is not None
             and current_bar.volume > previous_bar.volume
             and had_pullback
             and current_bar.macd > 0
             and current_bar.body_percentage > 0.4
+            and distance_from_ema_9/(current_bar.high - current_bar.low) < 0.5
             and any(
                 bar_object
                 for bar_object in relevant_bars
@@ -594,6 +591,14 @@ class Confirmator:
         )
 
         if validation_for_placing_order:
+            if not any(
+                    bar_object
+                    for bar_object in relevant_bars
+                    if not bar_object.is_positive
+            ) and current_bar.index + 1 < potential_confirmation_bar.index:
+                # meaning there is no pullback basically
+                return True
+
             unique_key_for_place_order = original_bar_to_confirm.symbol
             if self.is_retro:
                 unique_key_for_place_order = f"{original_bar_to_confirm.symbol}-{day_timeframe_stock.specific_bar_time}"
