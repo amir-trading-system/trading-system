@@ -394,6 +394,12 @@ class Confirmator:
             minute=00,
         )
 
+        if (
+            potential_confirmation_bar.close < original_bar_to_confirm.ema_9
+            or potential_confirmation_bar.close < original_bar_to_confirm.ema_20
+        ):
+            return False
+
         highest_high = round(highest_high, 2)
         if potential_confirmation_bar.close < 1.0:
             return False
@@ -609,6 +615,13 @@ class Confirmator:
                 already_sent_buy_order_for_stock[unique_key_for_place_order] = True
 
                 if not self.is_retro:
+                    transmit = transmit and potential_confirmation_bar.bar_time < datetime.datetime(
+                        year=potential_confirmation_bar.bar_time.year,
+                        month=potential_confirmation_bar.bar_time.month,
+                        day=potential_confirmation_bar.bar_time.day,
+                        hour=15,
+                        minute=20,
+                    )
                     self.tws_client.place_buy_order(
                         symbol=original_bar_to_confirm.symbol,
                         price=potential_confirmation_bar.close,

@@ -52,16 +52,15 @@ def write_to_csv(
                         "bar_to_place_order_time",
                         "highest_high_one_minute_bar_time",
                         "result",
-                        "feature_histogram_changed_directions_pct",
-                        "feature_distance_from_highest_high",
                         "feature_total_volume",
                         "feature_entry_bar_price_action_pct_to_volume_pct",
-                        "feature_distance_between_highest_high_to_entry_bar_high",
-                        "feature_positive_bars_above_volume_average_pct",
-                        "feature_volume_quality",
-                        "feature_price_action_is_stuck_pct",
-                        "feature_entry_bar_buyers_vs_sellers_pct",
-                        "feature_previous_historgam_to_current_histogram",
+                        "feature_trap_signal",
+                        "feature_clean_move",
+                        "feature_fake_momentum",
+                        "feature_structure_adjusted_strength",
+                        "feature_structure_compression_edge",
+                        "feature_momentum_structure_alignment",
+                        "feature_clean_vs_trap_strength",
                         "score",
                     ],
                 )
@@ -82,29 +81,27 @@ def write_to_csv(
                 original_bar_time = symbol_data["original_bar_time"]
                 result = symbol_data["result"]
                 highest_high_one_minute_bar_time = None
-                feature_histogram_changed_directions_pct = 0
-                feature_distance_from_highest_high = 0
                 feature_total_volume = 0
                 feature_entry_bar_price_action_pct_to_volume_pct = 0
-                feature_distance_between_highest_high_to_entry_bar_high = 0
-                feature_positive_bars_above_volume_average_pct = 0
-                feature_volume_quality = 0
-                feature_price_action_is_stuck_pct = 0
-                feature_entry_bar_buyers_vs_sellers_pct = 0
-                feature_previous_historgam_to_current_histogram = 0
+                feature_trap_signal = 0
+                feature_clean_move = 0
+                feature_fake_momentum = 0
+                feature_structure_adjusted_strength = 0
+                feature_structure_compression_edge = 0
+                feature_momentum_structure_alignment = 0
+                feature_clean_vs_trap_strength = 0
 
                 price_movement_statistics = symbol_data.get("price_movement_statistics", None)
                 if price_movement_statistics:
-                    feature_histogram_changed_directions_pct = price_movement_statistics["feature_histogram_changed_directions_pct"]
-                    feature_distance_from_highest_high = price_movement_statistics["feature_distance_from_highest_high"]
                     feature_total_volume = price_movement_statistics["feature_total_volume"]
                     feature_entry_bar_price_action_pct_to_volume_pct = price_movement_statistics["feature_entry_bar_price_action_pct_to_volume_pct"]
-                    feature_distance_between_highest_high_to_entry_bar_high = price_movement_statistics["feature_distance_between_highest_high_to_entry_bar_high"]
-                    feature_positive_bars_above_volume_average_pct = price_movement_statistics["feature_positive_bars_above_volume_average_pct"]
-                    feature_volume_quality = price_movement_statistics["feature_volume_quality"]
-                    feature_price_action_is_stuck_pct = price_movement_statistics["feature_price_action_is_stuck_pct"]
-                    feature_entry_bar_buyers_vs_sellers_pct = price_movement_statistics["feature_entry_bar_buyers_vs_sellers_pct"]
-                    feature_previous_historgam_to_current_histogram = price_movement_statistics["feature_previous_historgam_to_current_histogram"]
+                    feature_trap_signal = price_movement_statistics["feature_trap_signal"]
+                    feature_clean_move = price_movement_statistics["feature_clean_move"]
+                    feature_fake_momentum = price_movement_statistics["feature_fake_momentum"]
+                    feature_structure_adjusted_strength = price_movement_statistics["feature_structure_adjusted_strength"]
+                    feature_structure_compression_edge = price_movement_statistics["feature_structure_compression_edge"]
+                    feature_momentum_structure_alignment = price_movement_statistics["feature_momentum_structure_alignment"]
+                    feature_clean_vs_trap_strength = price_movement_statistics["feature_clean_vs_trap_strength"]
                     highest_high_one_minute_bar_time = price_movement_statistics["highest_high_one_minute_bar_time"]
 
                 collection_status = symbol_data["collection_status"]
@@ -155,17 +152,15 @@ def write_to_csv(
                                     bar_to_place_order_time,
                                     highest_high_one_minute_bar_time,
                                     result,
-                                    feature_histogram_changed_directions_pct,
-                                    feature_distance_from_highest_high,
                                     feature_total_volume,
                                     feature_entry_bar_price_action_pct_to_volume_pct,
-                                    feature_distance_between_highest_high_to_entry_bar_high,
-                                    feature_positive_bars_above_volume_average_pct,
-                                    feature_volume_quality,
-                                    feature_price_action_is_stuck_pct,
-                                    feature_entry_bar_buyers_vs_sellers_pct,
-                                    feature_previous_historgam_to_current_histogram,
-                                    feature_volume_quality,
+                                    feature_trap_signal,
+                                    feature_clean_move,
+                                    feature_fake_momentum,
+                                    feature_structure_adjusted_strength,
+                                    feature_structure_compression_edge,
+                                    feature_momentum_structure_alignment,
+                                    feature_clean_vs_trap_strength,
                                     symbol_data["score"],
                                 ]
                             )
@@ -329,7 +324,7 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
             datetime_str=date,
         )
         for symbol, date in stock_finder.get_dynamic_symbols_data_from_period(
-            period="1mo",
+            period="2mo",
         ).items()
     ]
 
@@ -352,14 +347,14 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = False
-    get_only_statistics = True
+    should_run_model = True
+    get_only_statistics = False
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="VELO",
-            datetime_str="04.21.26T10:15:00",
-            is_positive=True,
+            name="ATOM",
+            datetime_str="04.30.26T14:15:00",
+            is_positive=False,
         ),
     ]
     # symbols = explore_past_potential_symbols()
