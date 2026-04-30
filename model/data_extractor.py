@@ -1,6 +1,8 @@
 import copy
 import datetime
 
+import numpy as np
+
 import common
 
 
@@ -34,8 +36,10 @@ class DataExtractor:
         highest_high_one_minute_bar: common.objects.BarData,
         volume_sum_since_market_open: float,
         one_minute_bars: list[common.objects.BarData],
+        for_training: bool = False,
     ) -> dict[str, float]:
         total_bars = len(one_minute_bars)
+        bars_since_highest_high_data: list[dict[str, any]] = []
 
         total_volume = 0
         positive_histograms_sum = 0
@@ -58,6 +62,8 @@ class DataExtractor:
         positive_bars_above_volume_average_counter = 0
         bars_since_highest_high: list[common.objects.BarData] = []
         highest_volume_until_now = 0
+        lowest_low_since_highest_high = 100
+        lowest_histogram_since_highest_high = -100
 
         for bar_object in one_minute_bars:
             total_volume += bar_object.volume
@@ -104,8 +110,31 @@ class DataExtractor:
             ):
                 bars_with_rejection_counter += 1
 
+            if highest_high_one_minute_bar.bar_time <= bar_object.bar_time <= potential_confirmation_bar.bar_time and for_training:
+                bars_since_highest_high_data.append(
+                    {
+                        "bar_timestamp": bar_object.bar_time.timestamp(),
+                        "open": bar_object.open_value,
+                        "high": bar_object.high,
+                        "low": bar_object.low,
+                        "close": bar_object.close,
+                        "volume": bar_object.volume,
+                        "volume_average": bar_object.volume_average,
+                        "vwap": bar_object.vwap,
+                        "ema_9": bar_object.ema_9,
+                        "ema_20": bar_object.ema_20,
+                        "macd": bar_object.macd,
+                        "signal_line": bar_object.signal_line,
+                        "histogram": bar_object.histogram,
+                    },
+                )
+
             if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time:
                 bars_since_highest_high.append(bar_object)
+                if bar_object.low < lowest_low_since_highest_high:
+                    lowest_low_since_highest_high = bar_object.low
+                if bar_object.histogram < lowest_histogram_since_highest_high:
+                    lowest_histogram_since_highest_high = bar_object.histogram
 
             if (
                 True
@@ -200,10 +229,6 @@ class DataExtractor:
             ):
                 highest_volume_until_now = bar_object.volume
 
-        previous_bar_to_entry_bar = one_minute_timeframe_stock.previous_bar(
-            bar_object=potential_confirmation_bar,
-        )
-
         highest_high_one_minute_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
             current_one_minute_bar=potential_confirmation_bar,
         )
@@ -230,21 +255,43 @@ class DataExtractor:
         entry_bar_buyers_vs_sellers_pct = (potential_confirmation_bar.close - potential_confirmation_bar.low)/(potential_confirmation_bar.high - potential_confirmation_bar.low)
         feature_positive_bars_above_volume_average_pct = positive_bars_above_volume_average_counter/positive_bars_counter
         feature_volume_multiply_price_action = feature_volume_quality * feature_entry_bar_price_action_pct_to_volume_pct
+        feature_efficiency_balance = feature_entry_bar_price_action_pct_to_volume_pct/(1+feature_price_action_is_stuck_pct)
+        feature_clean_move = feature_entry_bar_price_action_pct_to_volume_pct * (1 - feature_price_action_is_stuck_pct)
+        feature_trap_signal = entry_bar_buyers_vs_sellers_pct/(feature_volume_quality + 1e-6)
+        feature_structure_adjusted_strength = feature_volume_multiply_price_action * feature_distance_between_highest_high_to_entry_bar_high
+        feature_fake_momentum = feature_entry_bar_price_action_pct_to_volume_pct / (feature_positive_bars_above_volume_average_pct + 1e-6)
+
+        pullback_volumes = [
+            bar_object.volume
+            for bar_object in bars_since_highest_high
+        ]
+        feature_pullback_volume_compression = np.mean(pullback_volumes)/highest_high_one_minute_bar.volume if highest_high_one_minute_bar is not None else 0
+        feature_volume_compression_distance = abs(feature_pullback_volume_compression - 0.4)
+        feature_compression_score = min(feature_volume_compression_distance, 1)
+        feature_momentum_structure_alignment = feature_structure_adjusted_strength/ (1+feature_fake_momentum)
+        feature_clean_vs_trap_strength = feature_clean_move / (1 + feature_trap_signal)
+        feature_structure_compression_edge = feature_structure_adjusted_strength/ (1+ feature_compression_score)
+        feature_structure_minus_compression = feature_structure_adjusted_strength - feature_compression_score
+        feature_structure_compression_stability = feature_structure_compression_edge + feature_structure_minus_compression
+        feature_structure_volume_confirmation = feature_structure_adjusted_strength * np.log1p(total_volume)
 
         features = {
+            "bars_since_highest_high_data": bars_since_highest_high_data,
             "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
-            "feature_price_action_is_stuck_pct": feature_price_action_is_stuck_pct,
             "feature_total_volume": total_volume,
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
-            "feature_distance_between_highest_high_to_entry_bar_high": feature_distance_between_highest_high_to_entry_bar_high,
-            "feature_positive_bars_above_volume_average_pct": feature_positive_bars_above_volume_average_pct,
             "feature_volume_quality": feature_volume_quality,
-            "feature_previous_historgam_to_current_histogram": previous_bar_to_entry_bar.histogram/potential_confirmation_bar.histogram if previous_bar_to_entry_bar is not None else 0,
-            "feature_efficiency_balance": feature_entry_bar_price_action_pct_to_volume_pct/(1+feature_price_action_is_stuck_pct),
-            "feature_trap_signal": entry_bar_buyers_vs_sellers_pct/(feature_volume_quality + 1e-6),
-            "feature_clean_move": feature_entry_bar_price_action_pct_to_volume_pct * (1 - feature_price_action_is_stuck_pct),
+            "feature_efficiency_balance": feature_efficiency_balance,
+            "feature_trap_signal": feature_trap_signal,
+            "feature_clean_move": feature_clean_move,
             "feature_fake_momentum": feature_entry_bar_price_action_pct_to_volume_pct / (feature_positive_bars_above_volume_average_pct + 1e-6),
-            "feature_structure_adjusted_strength": feature_volume_multiply_price_action * feature_distance_between_highest_high_to_entry_bar_high,
+            "feature_structure_adjusted_strength": feature_structure_adjusted_strength,
+            "feature_structure_compression_edge": feature_structure_compression_edge,
+            "feature_structure_minus_compression": feature_structure_adjusted_strength - feature_compression_score,
+            "feature_momentum_structure_alignment": feature_momentum_structure_alignment,
+            "feature_clean_vs_trap_strength": feature_clean_vs_trap_strength,
+            "feature_structure_compression_stability": feature_structure_compression_stability,
+            "feature_structure_volume_confirmation": feature_structure_volume_confirmation,
         }
 
         return features

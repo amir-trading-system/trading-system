@@ -2,6 +2,7 @@ import concurrent.futures
 import csv
 import pickle
 import glob
+import json
 
 import common
 from ..import data_extractor
@@ -14,6 +15,8 @@ FALSE_POSITIVE_FILE_NAME = "model/training/false_positive_results.csv"
 def write_to_csv(
     symbols_data: list[dict[str, any]],
 ):
+    bars_since_highest_high_data: list[dict[str, any]] = []
+
     file_names = [
         POSITIVE_FILE_NAME,
         FALSE_POSITIVE_FILE_NAME,
@@ -29,16 +32,13 @@ def write_to_csv(
                     "highest_high_one_minute_bar_time",
                     "feature_total_volume",
                     "feature_entry_bar_price_action_pct_to_volume_pct",
-                    "feature_distance_between_highest_high_to_entry_bar_high",
-                    "feature_positive_bars_above_volume_average_pct",
-                    "feature_volume_quality",
-                    "feature_price_action_is_stuck_pct",
-                    "feature_previous_historgam_to_current_histogram",
-                    "feature_efficiency_balance",
                     "feature_trap_signal",
                     "feature_clean_move",
                     "feature_fake_momentum",
                     "feature_structure_adjusted_strength",
+                    "feature_structure_compression_edge",
+                    "feature_momentum_structure_alignment",
+                    "feature_clean_vs_trap_strength",
                 ],
             )
             f.flush()
@@ -46,22 +46,27 @@ def write_to_csv(
     for symbol_data in symbols_data:
         stock_object: common.objects.Stock = symbol_data["stock"]
 
+        bars_since_highest_high_data.append(
+            {
+                "symbol": stock_object.symbol_name,
+                "label": 1 if stock_object.is_positive else 0,
+                "bars": symbol_data["bars_since_highest_high_data"],
+            }
+        )
+
         symbol = stock_object.symbol_name
         original_bar_time = stock_object.specific_bar_time
         highest_high_one_minute_bar_time = symbol_data["highest_high_one_minute_bar_time"]
 
-        feature_price_action_is_stuck_pct = symbol_data["feature_price_action_is_stuck_pct"]
         feature_total_volume = symbol_data["feature_total_volume"]
         feature_entry_bar_price_action_pct_to_volume_pct = symbol_data["feature_entry_bar_price_action_pct_to_volume_pct"]
-        feature_distance_between_highest_high_to_entry_bar_high = symbol_data["feature_distance_between_highest_high_to_entry_bar_high"]
-        feature_positive_bars_above_volume_average_pct = symbol_data["feature_positive_bars_above_volume_average_pct"]
-        feature_volume_quality = symbol_data["feature_volume_quality"]
-        feature_previous_historgam_to_current_histogram = symbol_data["feature_previous_historgam_to_current_histogram"]
-        feature_efficiency_balance = symbol_data["feature_efficiency_balance"]
         feature_trap_signal = symbol_data["feature_trap_signal"]
         feature_clean_move = symbol_data["feature_clean_move"]
         feature_fake_momentum = symbol_data["feature_fake_momentum"]
         feature_structure_adjusted_strength = symbol_data["feature_structure_adjusted_strength"]
+        feature_structure_compression_edge = symbol_data["feature_structure_compression_edge"]
+        feature_momentum_structure_alignment = symbol_data["feature_momentum_structure_alignment"]
+        feature_clean_vs_trap_strength = symbol_data["feature_clean_vs_trap_strength"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -78,20 +83,20 @@ def write_to_csv(
                     highest_high_one_minute_bar_time,
                     feature_total_volume,
                     feature_entry_bar_price_action_pct_to_volume_pct,
-                    feature_distance_between_highest_high_to_entry_bar_high,
-                    feature_positive_bars_above_volume_average_pct,
-                    feature_volume_quality,
-                    feature_price_action_is_stuck_pct,
-                    feature_previous_historgam_to_current_histogram,
-                    feature_efficiency_balance,
                     feature_trap_signal,
                     feature_clean_move,
                     feature_fake_momentum,
                     feature_structure_adjusted_strength,
+                    feature_structure_compression_edge,
+                    feature_momentum_structure_alignment,
+                    feature_clean_vs_trap_strength,
                 ]
             )
 
             f.flush()
+
+    with open("model/training/bars_since_highest_high_data.json", "w") as f:
+        f.write(json.dumps(bars_since_highest_high_data))
 
 
 def load_pickle_data(
@@ -133,6 +138,7 @@ if __name__ == '__main__':
             highest_high_one_minute_bar=data["highest_high_one_minute_bar"],
             volume_sum_since_market_open=data["volume_sum_since_market_open"],
             one_minute_bars=data["one_minute_bars"],
+            for_training=True,
         )
         symbol_data_parameters["stock"] = data["day_timeframe_stock"]
         symbols_data_parameters.append(symbol_data_parameters)
