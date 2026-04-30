@@ -572,7 +572,7 @@ class Confirmator:
             and had_pullback
             and current_bar.macd > 0
             and current_bar.body_percentage > 0.4
-            and distance_from_ema_9/(current_bar.high - current_bar.low) < 0.5
+            and distance_from_ema_9/(current_bar.high - current_bar.low) < 0.45
             and any(
                 bar_object
                 for bar_object in relevant_bars

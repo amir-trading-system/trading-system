@@ -189,7 +189,7 @@ class DataStreamer():
         if (
             True
             and not self.is_retro
-            and 3 <= date_now.second < 50
+            and 3 <= date_now.second < 57
         ):
             return
 
