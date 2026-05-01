@@ -139,7 +139,7 @@ class Client(client.EClient, wrapper.EWrapper):
         shares_outstanding_element = parsed_fundamental_data.find(".//SharesOut")
         if shares_outstanding_element is not None:
             available_float = float(shares_outstanding_element.attrib.get("TotalFloat", 0))
-            if available_float >= 20000000:
+            if available_float >= 40000000:
                 return super().fundamentalData(reqId, data)
 
         contract = self.request_id_to_contract[reqId]

@@ -265,7 +265,7 @@ class DataExtractor:
             bar_object.volume
             for bar_object in bars_since_highest_high
         ]
-        feature_pullback_volume_compression = np.mean(pullback_volumes)/highest_high_one_minute_bar.volume if highest_high_one_minute_bar is not None else 0
+        feature_pullback_volume_compression = np.mean(pullback_volumes)/highest_high_one_minute_bar.volume if highest_high_one_minute_bar is not None and len(pullback_volumes) > 0 else 0
         feature_volume_compression_distance = abs(feature_pullback_volume_compression - 0.4)
         feature_compression_score = min(feature_volume_compression_distance, 1)
         feature_momentum_structure_alignment = feature_structure_adjusted_strength/ (1+feature_fake_momentum)
