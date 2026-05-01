@@ -5,22 +5,22 @@ Total candidate features: 9
 ================ FEATURE STABILITY REPORT ================
 
                                             feature  mean_importance  std_importance  top_k_frequency
-8                               feature_trap_signal         0.171645        0.022493              1.0
-6                feature_structure_compression_edge         0.127725        0.015785              1.0
-4              feature_momentum_structure_alignment         0.121381        0.019638              1.0
-7                              feature_total_volume         0.108406        0.015716              1.0
-5               feature_structure_adjusted_strength         0.106522        0.015418              1.0
-2  feature_entry_bar_price_action_pct_to_volume_pct         0.104003        0.013647              1.0
-1                    feature_clean_vs_trap_strength         0.091749        0.011204              1.0
-0                                feature_clean_move         0.085084        0.009868              1.0
-3                             feature_fake_momentum         0.083485        0.014531              1.0
+8                               feature_trap_signal         0.141895        0.020657              1.0
+6                feature_structure_compression_edge         0.121159        0.016074              1.0
+4              feature_momentum_structure_alignment         0.117713        0.018642              1.0
+5               feature_structure_adjusted_strength         0.117439        0.013764              1.0
+7                              feature_total_volume         0.114003        0.017221              1.0
+2  feature_entry_bar_price_action_pct_to_volume_pct         0.109236        0.015647              1.0
+1                    feature_clean_vs_trap_strength         0.105953        0.014252              1.0
+0                                feature_clean_move         0.091756        0.012287              1.0
+3                             feature_fake_momentum         0.080846        0.011886              1.0
 
 Selected stable features:
 - feature_trap_signal
 - feature_structure_compression_edge
 - feature_momentum_structure_alignment
-- feature_total_volume
 - feature_structure_adjusted_strength
+- feature_total_volume
 - feature_entry_bar_price_action_pct_to_volume_pct
 - feature_clean_vs_trap_strength
 - feature_clean_move
@@ -30,13 +30,13 @@ Selected stable features:
 
            fold  best_threshold  positive_pass_rate  false_positive_reject_rate  balanced_score  trading_score        tn         fp         fn         tp
 count  50.00000       50.000000           50.000000                   50.000000       50.000000      50.000000  50.00000  50.000000  50.000000  50.000000
-mean   25.50000        0.554000            0.628286                    0.683462        0.655874       0.498553   8.62000   3.980000   5.440000   9.160000
-std    14.57738        0.075485            0.150337                    0.138038        0.066869       0.507979   1.81704   1.731933   2.251167   2.179309
-min     1.00000        0.500000            0.133333                    0.416667        0.507692      -1.000000   5.00000   0.000000   1.000000   2.000000
-25%    13.25000        0.500000            0.533333                    0.583333        0.597115       0.592788   7.00000   3.000000   4.000000   8.000000
-50%    25.50000        0.550000            0.642857                    0.666667        0.667125       0.667125   8.00000   4.000000   5.000000   9.000000
-75%    37.75000        0.600000            0.733333                    0.769231        0.708791       0.708791  10.00000   5.000000   7.000000  11.000000
-max    50.00000        0.850000            0.933333                    1.000000        0.777473       0.777473  13.00000   7.000000  13.000000  14.000000
+mean   25.50000        0.548000            0.599048                    0.698205        0.648626       0.520603   8.92000   3.880000   5.700000   8.500000
+std    14.57738        0.039071            0.123615                    0.140202        0.066633       0.457467   1.71238   1.814229   1.809837   1.764156
+min     1.00000        0.500000            0.266667                    0.416667        0.516484      -1.000000   5.00000   0.000000   2.000000   4.000000
+25%    13.25000        0.500000            0.533333                    0.615385        0.596154       0.596154   8.00000   3.000000   5.000000   8.000000
+50%    25.50000        0.550000            0.585714                    0.692308        0.634615       0.634615   9.00000   4.000000   6.000000   8.500000
+75%    37.75000        0.550000            0.660714                    0.769231        0.702610       0.702610  10.00000   5.000000   7.000000   9.750000
+max    50.00000        0.650000            0.857143                    1.000000        0.816667       0.816667  13.00000   7.000000  11.000000  12.000000
 
 ================ CHOSEN THRESHOLD ================
 
@@ -44,53 +44,53 @@ Median best CV threshold: 0.55
 
 ================ CV THRESHOLD SUMMARY ================
 
-Mean trading score: 0.4986
-Mean positive pass rate: 0.6283
-Mean false positive reject rate: 0.6835
+Mean trading score: 0.5206
+Mean positive pass rate: 0.5990
+Mean false positive reject rate: 0.6982
 
 ================ HOLDOUT TEST REPORT (threshold=0.50) ================
 
               precision    recall  f1-score   support
 
-           0     0.5625    0.6667    0.6102        27
-           1     0.6667    0.5625    0.6102        32
+           0     0.6000    0.6429    0.6207        28
+           1     0.6429    0.6000    0.6207        30
 
-    accuracy                         0.6102        59
-   macro avg     0.6146    0.6146    0.6102        59
-weighted avg     0.6190    0.6102    0.6102        59
+    accuracy                         0.6207        58
+   macro avg     0.6214    0.6214    0.6207        58
+weighted avg     0.6222    0.6207    0.6207        58
 
 Confusion matrix:
-[[18  9]
- [14 18]]
+[[18 10]
+ [12 18]]
 
 ================ HOLDOUT TEST REPORT (threshold=0.55) ================
 
               precision    recall  f1-score   support
 
-           0     0.5294    0.6667    0.5902        27
-           1     0.6400    0.5000    0.5614        32
+           0     0.5455    0.6429    0.5902        28
+           1     0.6000    0.5000    0.5455        30
 
-    accuracy                         0.5763        59
-   macro avg     0.5847    0.5833    0.5758        59
-weighted avg     0.5894    0.5763    0.5746        59
+    accuracy                         0.5690        58
+   macro avg     0.5727    0.5714    0.5678        58
+weighted avg     0.5737    0.5690    0.5670        58
 
 Confusion matrix:
-[[18  9]
- [16 16]]
+[[18 10]
+ [15 15]]
 
 ================ FINAL FEATURE IMPORTANCE ================
 
-feature_trap_signal                                 0.184796
-feature_structure_compression_edge                  0.124654
-feature_momentum_structure_alignment                0.123047
-feature_structure_adjusted_strength                 0.111422
-feature_total_volume                                0.108361
-feature_entry_bar_price_action_pct_to_volume_pct    0.103529
-feature_clean_vs_trap_strength                      0.087573
-feature_clean_move                                  0.080566
-feature_fake_momentum                               0.076052
+feature_trap_signal                                 0.139052
+feature_momentum_structure_alignment                0.123754
+feature_total_volume                                0.121591
+feature_structure_compression_edge                  0.112613
+feature_structure_adjusted_strength                 0.110972
+feature_entry_bar_price_action_pct_to_volume_pct    0.109981
+feature_clean_vs_trap_strength                      0.107052
+feature_clean_move                                  0.095378
+feature_fake_momentum                               0.079606
 dtype: float64
 
 ================ SAMPLE LIVE OUTPUT ================
 
-{'probability': 0.765286, 'score': 76.53, 'threshold': 0.55, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A'}
+{'probability': 0.519328, 'score': 51.93, 'threshold': 0.55, 'rules_pass': True, 'pass_recommended': False, 'grade': 'REJECT'}

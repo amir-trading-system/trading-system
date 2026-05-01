@@ -404,6 +404,9 @@ class Confirmator:
         if potential_confirmation_bar.close < 1.0:
             return False
 
+        if potential_confirmation_bar.histogram < 0:
+            return False
+
         crossed_any_resistance = any(
             r_l
             for r_l in stock.resistance_levels
