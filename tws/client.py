@@ -3,6 +3,7 @@ import logging
 import math
 import queue
 import time
+import xml.etree.ElementTree as ET
 
 from ibapi import client, common as ibapi_common, wrapper, order as tws_order
 
@@ -36,6 +37,7 @@ class Client(client.EClient, wrapper.EWrapper):
         )
         self.ibapi_requests: dict[int,common.objects.IbAPIRequest] = {}
         self.request_id_to_symbol = request_id_to_symbol
+        self.request_id_to_contract: dict[int,client.Contract] = {}
         self.order_id_to_symbol: dict[int, common.objects.Order] = {}
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
         self.symbols_to_collect_queue = symbols_to_collect_queue
@@ -120,9 +122,30 @@ class Client(client.EClient, wrapper.EWrapper):
         projection,
         legsStr,
     ):
-        self.reqContractDetails(
+        self.request_id_to_contract[reqId] = contractDetails.contract
+        self.reqFundamentalData(
             reqId=reqId,
             contract=contractDetails.contract,
+            reportType="ReportSnapshot",
+            fundamentalDataOptions=[],
+        )
+
+    def fundamentalData(
+        self,
+        reqId: int,
+        data: str,
+    ):
+        parsed_fundamental_data = ET.fromstring(data)
+        shares_outstanding_element = parsed_fundamental_data.find(".//SharesOut")
+        if shares_outstanding_element is not None:
+            available_float = float(shares_outstanding_element.attrib.get("TotalFloat", 0))
+            if available_float >= 20000000:
+                return super().fundamentalData(reqId, data)
+
+        contract = self.request_id_to_contract[reqId]
+        self.reqContractDetails(
+            reqId=reqId,
+            contract=contract,
         )
 
     def contractDetails(
