@@ -274,6 +274,7 @@ class DataExtractor:
         feature_structure_minus_compression = feature_structure_adjusted_strength - feature_compression_score
         feature_structure_compression_stability = feature_structure_compression_edge + feature_structure_minus_compression
         feature_structure_volume_confirmation = feature_structure_adjusted_strength * np.log1p(total_volume)
+        feature_trap_dominance = feature_trap_signal / (1 + feature_clean_move)
 
         features = {
             "bars_since_highest_high_data": bars_since_highest_high_data,
@@ -292,6 +293,7 @@ class DataExtractor:
             "feature_clean_vs_trap_strength": feature_clean_vs_trap_strength,
             "feature_structure_compression_stability": feature_structure_compression_stability,
             "feature_structure_volume_confirmation": feature_structure_volume_confirmation,
+            "feature_trap_extreme": int(feature_trap_dominance > 2.0),
         }
 
         return features

@@ -39,6 +39,7 @@ def write_to_csv(
                     "feature_structure_compression_edge",
                     "feature_momentum_structure_alignment",
                     "feature_clean_vs_trap_strength",
+                    "feature_trap_extreme",
                 ],
             )
             f.flush()
@@ -67,6 +68,7 @@ def write_to_csv(
         feature_structure_compression_edge = symbol_data["feature_structure_compression_edge"]
         feature_momentum_structure_alignment = symbol_data["feature_momentum_structure_alignment"]
         feature_clean_vs_trap_strength = symbol_data["feature_clean_vs_trap_strength"]
+        feature_trap_extreme = symbol_data["feature_trap_extreme"]
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
@@ -90,6 +92,7 @@ def write_to_csv(
                     feature_structure_compression_edge,
                     feature_momentum_structure_alignment,
                     feature_clean_vs_trap_strength,
+                    feature_trap_extreme,
                 ]
             )
 

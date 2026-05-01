@@ -34,7 +34,8 @@ class Scanner():
             tag_value.TagValue("priceAbove", "1"),
             tag_value.TagValue("priceBelow", "100"),
             tag_value.TagValue("marketCapBelow1e6", "500"),
-            tag_value.TagValue("changePercAbove", "10")
+            tag_value.TagValue("numSharesBelow", "40000000"),
+            tag_value.TagValue("changePercAbove", "10"),
         ]
 
     def get_contract_details(

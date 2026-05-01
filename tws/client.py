@@ -122,12 +122,9 @@ class Client(client.EClient, wrapper.EWrapper):
         projection,
         legsStr,
     ):
-        self.request_id_to_contract[reqId] = contractDetails.contract
-        self.reqFundamentalData(
+        self.reqContractDetails(
             reqId=reqId,
             contract=contractDetails.contract,
-            reportType="ReportSnapshot",
-            fundamentalDataOptions=[],
         )
 
     def fundamentalData(
