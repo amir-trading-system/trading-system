@@ -2,115 +2,249 @@ import datetime
 import pickle
 import pandas as pd
 import mplfinance as mpf
+import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 import common
 
-TV_COLORS = {
-    "bg": "#131722",
-    "panel": "#131722",
-    "grid": "#2a2e39",
-    "text": "#d1d4dc",
-    "bull": "#26a69a",
-    "bear": "#ef5350",
-    "ema_9": "#2196f3",
-    "ema_20": "#ab47bc",
-    "vwap": "#ffb74d",
-    "macd": "#42a5f5",
-    "signal": "#ff9800",
-}
+class GraphCreator:
+    def __init__(
+        self,
+    ):
+        pass
 
-market_colors = mpf.make_marketcolors(
-    up=TV_COLORS["bull"],
-    down=TV_COLORS["bear"],
-    edge="inherit",
-    wick="inherit",
-    volume="inherit",
-)
+    def create_interactive_chart(
+        self,
+    ):
+        symbol = "ACXP"
+        signal_time = "2026-03-10 14:43:00"
+        score = 75.0
+        file_path = "model/training/data/ACXP-2026-03-10 14:43:00.json"
 
-tv_dark_style = mpf.make_mpf_style(
-    base_mpf_style="nightclouds",
-    marketcolors=market_colors,
-    facecolor=TV_COLORS["bg"],
-    figcolor=TV_COLORS["bg"],
-    gridcolor=TV_COLORS["grid"],
-    gridstyle="-",
-    rc={
-        "axes.labelcolor": TV_COLORS["text"],
-        "xtick.color": TV_COLORS["text"],
-        "ytick.color": TV_COLORS["text"],
-        "text.color": TV_COLORS["text"],
-        "axes.edgecolor": TV_COLORS["grid"],
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-    }
-)
+        with open(file_path, "rb") as f:
+            obj = pickle.load(f)
 
-file_path = "model/training/data/ACXP-2026-03-10 14:43:00.json"
+        potential_bar: common.objects.BarData = obj["potential_confirmation_bar"]
+        all_bars: common.objects.BarData = obj["one_minute_timeframe_stock"].bars
 
-with open(file_path, "rb") as f:
-    obj = pickle.load(f)
+        same_day_market_open = datetime.datetime(
+            year=potential_bar.bar_time.year,
+            month=potential_bar.bar_time.month,
+            day=potential_bar.bar_time.day,
+            hour=9,
+            minute=30,
+        )
 
-potential_bar: common.objects.BarData = obj["potential_confirmation_bar"]
-all_bars: common.objects.BarData = obj["one_minute_timeframe_stock"].bars
+        same_day_market_close = datetime.datetime(
+            year=potential_bar.bar_time.year,
+            month=potential_bar.bar_time.month,
+            day=potential_bar.bar_time.day,
+            hour=16,
+        )
 
-potential_bar_04_am = datetime.datetime(
-    year=potential_bar.bar_time.year,
-    month=potential_bar.bar_time.month,
-    day=potential_bar.bar_time.day,
-    hour=4,
-)
+        relevant_bars = sorted([
+            bar_object
+            for bar_object in all_bars
+            if same_day_market_open <= bar_object.bar_time <= same_day_market_close
+        ], key=lambda bar_obj: bar_obj.bar_time)
 
-relevant_bars = sorted([
-    bar_object
-    for bar_object in all_bars
-    if bar_object.bar_time >= potential_bar.bar_time
-], key=lambda bar_obj: bar_obj.bar_time)
+        df = pd.DataFrame(bar_object.__dict__ for bar_object in relevant_bars)
+        df.set_index("bar_time", inplace=True)
 
-df = pd.DataFrame(bar_object.__dict__ for bar_object in relevant_bars)
+        hist = df["histogram"]
+        hist_colors = []
 
-# load your data
-df.set_index("bar_time", inplace=True)
+        for i in range(len(hist)):
+            if i == 0:
+                hist_colors.append("#787b86")
+            elif hist.iloc[i] >= 0:
+                hist_colors.append("#26a69a" if hist.iloc[i] > hist.iloc[i - 1] else "#80cbc4")
+            else:
+                hist_colors.append("#ef5350" if hist.iloc[i] < hist.iloc[i - 1] else "#ef9a9a")
 
-# mark the signal
-df["signal"] = None
-df["open"] = df["open_value"]
+        fig = make_subplots(
+            rows=3,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.03,
+            row_heights=[0.62, 0.18, 0.20],
+            subplot_titles=("Price", "Volume", "MACD"),
+        )
 
-hist = df["histogram"]
+        # Candles
+        fig.add_trace(
+            go.Candlestick(
+                x=df.index,
+                open=df["open_value"],
+                high=df["high"],
+                low=df["low"],
+                close=df["close"],
+                name="Candles",
+                increasing_line_color="#26a69a",
+                decreasing_line_color="#ef5350",
+                customdata=np.stack([
+                    df["volume"],
+                    df["volume_average"],
+                    df["ema_9"],
+                    df["ema_20"],
+                    df["vwap"],
+                ], axis=-1),
+                hovertemplate=(
+                    "O: %{open:.2f}<br>"
+                    "H: %{high:.2f}<br>"
+                    "L: %{low:.2f}<br>"
+                    "C: %{close:.2f}<br>"
+                    "Volume: %{customdata[0]:,.0f}<br>"
+                    "Vol Avg: %{customdata[1]:,.0f}<br>"
+                    "EMA 9: %{customdata[2]:.2f}<br>"
+                    "EMA 20: %{customdata[3]:.2f}<br>"
+                    "VWAP: %{customdata[4]:.2f}"
+                    "<extra></extra>"
+                ),
+            ),
+            row=1,
+            col=1,
+        )
 
-hist_colors = []
-for i in range(len(hist)):
-    if i == 0:
-        hist_colors.append("#787b86")
-    elif hist.iloc[i] >= 0:
-        hist_colors.append("#26a69a" if hist.iloc[i] > hist.iloc[i-1] else "#80cbc4")
-    else:
-        hist_colors.append("#ef5350" if hist.iloc[i] < hist.iloc[i-1] else "#ef9a9a")
-# plot
-apds = [
-    mpf.make_addplot(df["ema_9"], panel=0, color="yellow", width=1),
-    mpf.make_addplot(df["ema_20"], panel=0, color="purple", width=1),
-    mpf.make_addplot(df["vwap"], panel=0, color="green", width=1.2),
-    mpf.make_addplot(df["volume_average"], panel=1, color="yellow", width=1),
-    mpf.make_addplot(df["macd"], panel=2, color="blue"),
-    mpf.make_addplot(df["signal_line"], panel=2, color="orange"),
-    mpf.make_addplot(df["histogram"], type="bar", panel=2, color=hist_colors),
-]
 
-fig, axes = mpf.plot(
-    df,
-    type='candle',
-    volume=True,
-    addplot=apds,
-    style=tv_dark_style,
-    panel_ratios=(4, 1.2, 1.8),
-    figscale=1.4,
-    figratio=(16, 9),
-    title="TradingView-style Review Chart",
-    ylabel="Price",
-    ylabel_lower="Volume",
-    returnfig=True,
-)
+        # EMA / VWAP
+        fig.add_trace(go.Scatter(x=df.index, y=df["ema_9"], name="EMA 9", line=dict(color="#edf40b", width=1)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df["ema_20"], name="EMA 20", line=dict(color="#ab47bc", width=1)), row=1, col=1)
+        fig.add_trace(go.Scatter(mode="markers", x=df.index, y=df["vwap"], name="VWAP", marker=dict(color="#18eb11", size=3)), row=1, col=1)
 
-axes[4].axhline(0, color="#787b86", linewidth=0.8, alpha=0.8)
 
-# fig.show()
+        # Volume
+        volume_colors = np.where(df["close"] >= df["open_value"], "#26a69a", "#ef5350")
+        fig.add_trace(
+            go.Bar(
+                x=df.index,
+                y=df["volume"],
+                name="Volume",
+                marker_color=volume_colors,
+            ),
+            row=2,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df.index,
+                y=df["volume_average"],
+                name="Volume Avg",
+                line=dict(color="#fbc02d", width=1),
+            ),
+            row=2,
+            col=1,
+        )
+
+        # MACD
+        fig.add_trace(
+            go.Bar(
+                x=df.index,
+                y=df["histogram"],
+                name="Histogram",
+                marker_color=hist_colors,
+            ),
+            row=3,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df.index,
+                y=df["macd"],
+                name="MACD",
+                line=dict(color="#42a5f5", width=1),
+            ),
+            row=3,
+            col=1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=df.index,
+                y=df["signal_line"],
+                name="Signal Line",
+                line=dict(color="#ff9800", width=1),
+            ),
+            row=3,
+            col=1,
+        )
+
+        signal_time = pd.Timestamp(signal_time)
+        if signal_time in df.index:
+            signal_price = df.loc[signal_time, "close"]
+
+            fig.add_vline(
+                x=signal_time,
+                line_width=1,
+                line_dash="dash",
+                line_color="yellow",
+            )
+
+            fig.add_trace(
+                go.Scatter(
+                    x=[signal_time],
+                    y=[signal_price],
+                    mode="markers",
+                    name=f"Signal {score}" if score is not None else "Signal",
+                    marker=dict(
+                        size=14,
+                        color="yellow",
+                        symbol="triangle-up",
+                        line=dict(color="black", width=1),
+                    ),
+                ),
+                row=1,
+                col=1,
+            )
+
+        title = f"{symbol} Trade Review"
+        if score is not None:
+            title += f" | Score: {score}"
+
+        fig.update_layout(
+            title=title,
+            template="plotly_dark",
+            height=900,
+            width=1500,
+            xaxis_rangeslider_visible=False,
+            hovermode="x unified",
+            hoverlabel=dict(
+                bgcolor="rgba(19,23,34,0.75)",  # semi-transparent
+                font_size=12,
+                font_color="#d1d4dc",
+                bordercolor="#2a2e39",
+            ),
+            paper_bgcolor="#131722",
+            plot_bgcolor="#131722",
+            font=dict(color="#d1d4dc"),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+            ),
+        )
+
+        fig.update_xaxes(
+            showgrid=True,
+            gridcolor="#2a2e39",
+            rangeslider_visible=False,
+        )
+
+        fig.update_yaxes(
+            showgrid=True,
+            gridcolor="#2a2e39",
+        )
+
+        fig.write_html("ACXP.html")
+        fig.show()
+        return fig
+
+
+if __name__ == "__main__":
+    g = GraphCreator()
+    g.create_interactive_chart()
