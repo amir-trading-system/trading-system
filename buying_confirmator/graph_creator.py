@@ -1,7 +1,5 @@
 import datetime
-import pickle
 import pandas as pd
-import mplfinance as mpf
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -9,43 +7,31 @@ from plotly.subplots import make_subplots
 import common
 
 class GraphCreator:
-    def __init__(
-        self,
-    ):
-        pass
-
+    @staticmethod
     def create_interactive_chart(
-        self,
+        symbol: str,
+        potential_confirmation_bar: common.objects.BarData,
+        one_minute_timeframe_stock: common.objects.Stock,
+        score: common.objects.Score,
     ):
-        symbol = "ACXP"
-        signal_time = "2026-03-10 14:43:00"
-        score = 75.0
-        file_path = "model/training/data/ACXP-2026-03-10 14:43:00.json"
-
-        with open(file_path, "rb") as f:
-            obj = pickle.load(f)
-
-        potential_bar: common.objects.BarData = obj["potential_confirmation_bar"]
-        all_bars: common.objects.BarData = obj["one_minute_timeframe_stock"].bars
-
         same_day_market_open = datetime.datetime(
-            year=potential_bar.bar_time.year,
-            month=potential_bar.bar_time.month,
-            day=potential_bar.bar_time.day,
+            year=potential_confirmation_bar.bar_time.year,
+            month=potential_confirmation_bar.bar_time.month,
+            day=potential_confirmation_bar.bar_time.day,
             hour=9,
             minute=30,
         )
 
         same_day_market_close = datetime.datetime(
-            year=potential_bar.bar_time.year,
-            month=potential_bar.bar_time.month,
-            day=potential_bar.bar_time.day,
+            year=potential_confirmation_bar.bar_time.year,
+            month=potential_confirmation_bar.bar_time.month,
+            day=potential_confirmation_bar.bar_time.day,
             hour=16,
         )
 
         relevant_bars = sorted([
             bar_object
-            for bar_object in all_bars
+            for bar_object in one_minute_timeframe_stock.bars
             if same_day_market_open <= bar_object.bar_time <= same_day_market_close
         ], key=lambda bar_obj: bar_obj.bar_time)
 
@@ -113,7 +99,6 @@ class GraphCreator:
         fig.add_trace(go.Scatter(x=df.index, y=df["ema_20"], name="EMA 20", line=dict(color="#ab47bc", width=1)), row=1, col=1)
         fig.add_trace(go.Scatter(mode="markers", x=df.index, y=df["vwap"], name="VWAP", marker=dict(color="#18eb11", size=3)), row=1, col=1)
 
-
         # Volume
         volume_colors = np.where(df["close"] >= df["open_value"], "#26a69a", "#ef5350")
         fig.add_trace(
@@ -172,7 +157,7 @@ class GraphCreator:
             col=1,
         )
 
-        signal_time = pd.Timestamp(signal_time)
+        signal_time = pd.Timestamp(str(potential_confirmation_bar.bar_time))
         if signal_time in df.index:
             signal_price = df.loc[signal_time, "close"]
 
@@ -188,7 +173,7 @@ class GraphCreator:
                     x=[signal_time],
                     y=[signal_price],
                     mode="markers",
-                    name=f"Signal {score}" if score is not None else "Signal",
+                    name=f"Signal {score.score}" if score is not None else "Signal",
                     marker=dict(
                         size=14,
                         color="yellow",
@@ -202,7 +187,7 @@ class GraphCreator:
 
         title = f"{symbol} Trade Review"
         if score is not None:
-            title += f" | Score: {score}"
+            title += f" | Score: {score.score}"
 
         fig.update_layout(
             title=title,
@@ -227,6 +212,7 @@ class GraphCreator:
                 xanchor="left",
                 x=0,
             ),
+            overwrite=True,
         )
 
         fig.update_xaxes(
@@ -240,11 +226,7 @@ class GraphCreator:
             gridcolor="#2a2e39",
         )
 
-        fig.write_html("ACXP.html")
-        fig.show()
-        return fig
+        html_file_path = f"model/training/data/charts/{symbol}-{str(potential_confirmation_bar.bar_time)}.html"
 
-
-if __name__ == "__main__":
-    g = GraphCreator()
-    g.create_interactive_chart()
+        fig.write_html(html_file_path)
+        # fig.show()
