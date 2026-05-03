@@ -278,6 +278,7 @@ class DataExtractor:
 
         features = {
             "bars_since_highest_high_data": bars_since_highest_high_data,
+            "trap_dominance": feature_trap_dominance,
             "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
             "feature_total_volume": total_volume,
             "feature_entry_bar_price_action_pct_to_volume_pct": feature_entry_bar_price_action_pct_to_volume_pct,
@@ -293,7 +294,6 @@ class DataExtractor:
             "feature_clean_vs_trap_strength": feature_clean_vs_trap_strength,
             "feature_structure_compression_stability": feature_structure_compression_stability,
             "feature_structure_volume_confirmation": feature_structure_volume_confirmation,
-            "feature_trap_extreme": int(feature_trap_dominance > 2.0),
         }
 
         return features
