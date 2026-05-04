@@ -318,15 +318,17 @@ def flush_logs():
             time.sleep(1)
 
 def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
-    symbols = [
-        common.objects.SymbolTest(
-            name=symbol,
-            datetime_str=date,
-        )
-        for symbol, date in stock_finder.get_dynamic_symbols_data_from_period(
-            period="1y",
-        ).items()
-    ]
+    symbols: list[common.objects.SymbolTest] = []
+    for symbol, dates in stock_finder.get_dynamic_symbols_data_from_period(
+        period="2y",
+    ).items():
+        for date in dates:
+            symbols.append(
+                common.objects.SymbolTest(
+                    name=symbol,
+                    datetime_str=date,
+                )
+            )
 
     current_symbols = [
         symbol
@@ -350,14 +352,19 @@ def run_retroactive_check():
     should_run_model = True
     get_only_statistics = False
     symbols_data = []
-    # symbols = [
-    #     common.objects.SymbolTest(
-    #         name="AIXI",
-    #         datetime_str="04.07.26T12:29:00",
-    #         is_positive=True,
-    #     ),
-    # ]
-    symbols = explore_past_potential_symbols()
+    symbols = [
+        # common.objects.SymbolTest(
+        #     name="AKAN", # need to check why it didnt confirmed by static analysis.
+        #     datetime_str="04.24.26T15:10:00",
+        #     is_positive=True,
+        # ),
+        # common.objects.SymbolTest( # need to check why it didnt confirmed by static analysis.
+        #     name="AGPU",
+        #     datetime_str="01.06.25T11:24:00",
+        #     is_positive=True,
+        # ),
+    ]
+    # symbols = explore_past_potential_symbols()
     output_file_name = "model/real_case_result.csv"
 
     if not symbols:

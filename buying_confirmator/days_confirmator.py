@@ -8,7 +8,6 @@ import analyzer.evidences
 import common
 import model
 from tws import client
-from . import graph_creator
 
 
 class Confirmator:
@@ -151,6 +150,14 @@ class Confirmator:
             if score.should_take_trade:
                 bar_has_confirmed = True
                 confirmation_bar = copy.deepcopy(next_bar)
+                if self.is_retro:
+                    model.graph_creator.GraphCreator.create_interactive_chart(
+                        symbol=stock.symbol_name,
+                        potential_confirmation_bar=confirmation_bar,
+                        one_minute_timeframe_stock=one_minute_timeframe_stock,
+                        score=score,
+                    )
+
                 continue
 
             most_updated_datetime = next_bar.bar_time
@@ -636,23 +643,16 @@ class Confirmator:
                     )
                 order_has_been_placed = True
 
-                if self.is_retro:
-                    graph_creator.GraphCreator.create_interactive_chart(
-                        symbol=day_timeframe_stock.symbol_name,
-                        potential_confirmation_bar=potential_confirmation_bar,
-                        one_minute_timeframe_stock=one_minute_timeframe_stock,
-                        score=score,
-                    )
-                    self.results_queue.put(
-                        {
-                            "symbol": day_timeframe_stock.symbol_name,
-                            "original_bar_time": original_bar_to_confirm.bar_time,
-                            "confirmation_bar_time": potential_confirmation_bar.bar_time,
-                            "bar_to_place_order_time": current_bar.bar_time,
-                            "price_movement_statistics": potential_confirmation_bar.price_movement_statistics,
-                            "score": score.score if score is not None else 0,
-                        },
-                    )
+                self.results_queue.put(
+                    {
+                        "symbol": day_timeframe_stock.symbol_name,
+                        "original_bar_time": original_bar_to_confirm.bar_time,
+                        "confirmation_bar_time": potential_confirmation_bar.bar_time,
+                        "bar_to_place_order_time": current_bar.bar_time,
+                        "price_movement_statistics": potential_confirmation_bar.price_movement_statistics,
+                        "score": score.score if score is not None else 0,
+                    },
+                )
 
                 self.logger.info(
                     "Bar has confirmed by model and order has been placed",

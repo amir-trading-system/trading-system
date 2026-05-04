@@ -55,7 +55,7 @@ class Confirmator:
                 },
             )
 
-            stock = [
+            potential_stock = [
                 stock_object
                 for _, stock_object in self.request_id_to_symbol.items()
                 if stock_object.is_same(
@@ -64,7 +64,11 @@ class Confirmator:
                     timeframe_type=bar_to_confirm.timeframe_type,
                     specific_bar_time=bar_to_confirm.bar_time,
                 )
-            ][0]
+            ]
+            if not potential_stock:
+                continue
+
+            stock = potential_stock[0]
 
             threading.Thread(
                 target=self.days_confirmator.confirm_entry_position,
