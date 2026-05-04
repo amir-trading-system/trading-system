@@ -349,20 +349,65 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = True
-    get_only_statistics = False
+    should_run_model = False
+    get_only_statistics = True
     symbols_data = []
     symbols = [
-        # common.objects.SymbolTest(
-        #     name="AKAN", # need to check why it didnt confirmed by static analysis.
-        #     datetime_str="04.24.26T15:10:00",
-        #     is_positive=True,
-        # ),
-        # common.objects.SymbolTest( # need to check why it didnt confirmed by static analysis.
-        #     name="AGPU",
-        #     datetime_str="01.06.25T11:24:00",
-        #     is_positive=True,
-        # ),
+        common.objects.SymbolTest(
+            name="ANTX",
+            datetime_str="03.09.26T10:46:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="ANTX",
+            datetime_str="03.09.26T11:50:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="ANTX",
+            datetime_str="03.09.26T11:57:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="ANNA",
+            datetime_str="03.20.26T10:55:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="AGPU",
+            datetime_str="01.06.25T11:24:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="AMCI",
+            datetime_str="12.15.25T11:39:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="AMCI",
+            datetime_str="12.24.25T10:29:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="AMTD",
+            datetime_str="10.31.25T10:08:00",
+            is_positive=True,
+        ),
+        common.objects.SymbolTest(
+            name="AMTD",
+            datetime_str="10.31.25T10:21:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="ANRO",
+            datetime_str="10.03.25T14:41:00",
+            is_positive=False,
+        ),
+        common.objects.SymbolTest(
+            name="ANRO",
+            datetime_str="10.20.25T10:02:00",
+            is_positive=True,
+        ),
     ]
     # symbols = explore_past_potential_symbols()
     output_file_name = "model/real_case_result.csv"

@@ -294,7 +294,7 @@ class Confirmator:
                 and total_volume is not None
             ):
                 if (
-                    total_volume < 300000
+                    total_volume < 200000
                     or (
                         potential_confirmation_bar.volume/total_volume < 0.02
                         and potential_confirmation_bar.volume < 50000
@@ -412,9 +412,6 @@ class Confirmator:
         if potential_confirmation_bar.close < 1.0:
             return False
 
-        if potential_confirmation_bar.histogram < 0:
-            return False
-
         crossed_any_resistance = any(
             r_l
             for r_l in stock.resistance_levels
@@ -445,7 +442,7 @@ class Confirmator:
 
         should_wait_for_next_bar = (
             potential_confirmation_bar.bar_time < today_09_30
-            or potential_confirmation_bar.volume < 20000
+            # or potential_confirmation_bar.volume < 20000
             or stock.volume_sum_since_market_open < 100000
             or (
                 today_10_00 <= potential_confirmation_bar.bar_time <= today_12_00

@@ -204,12 +204,6 @@ class Analyzer:
                 f,
             )
 
-        model.graph_creator.GraphCreator.create_interactive_chart(
-            symbol=day_timeframe_stock.symbol_name,
-            potential_confirmation_bar=current_bar,
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-        )
-
     def get_resistance_levels(
         self,
         stock: common.objects.Stock,
