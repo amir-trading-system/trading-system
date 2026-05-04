@@ -354,58 +354,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="ANTX",
-            datetime_str="03.09.26T10:46:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="ANTX",
-            datetime_str="03.09.26T11:50:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="ANTX",
-            datetime_str="03.09.26T11:57:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="ANNA",
-            datetime_str="03.20.26T10:55:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="AGPU",
-            datetime_str="01.06.25T11:24:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="AMCI",
-            datetime_str="12.15.25T11:39:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AMCI",
-            datetime_str="12.24.25T10:29:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="AMTD",
-            datetime_str="10.31.25T10:08:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="AMTD",
-            datetime_str="10.31.25T10:21:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="ANRO",
-            datetime_str="10.03.25T14:41:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="ANRO",
-            datetime_str="10.20.25T10:02:00",
+            name="ASTC",
+            datetime_str="03.30.26T10:38:00",
             is_positive=True,
         ),
     ]

@@ -150,13 +150,13 @@ class Confirmator:
             if score.should_take_trade:
                 bar_has_confirmed = True
                 confirmation_bar = copy.deepcopy(next_bar)
-                if self.is_retro:
-                    model.graph_creator.GraphCreator.create_interactive_chart(
-                        symbol=stock.symbol_name,
-                        potential_confirmation_bar=confirmation_bar,
-                        one_minute_timeframe_stock=one_minute_timeframe_stock,
-                        score=score,
-                    )
+                # if self.is_retro:
+                #     model.graph_creator.GraphCreator.create_interactive_chart(
+                #         symbol=stock.symbol_name,
+                #         potential_confirmation_bar=confirmation_bar,
+                #         one_minute_timeframe_stock=one_minute_timeframe_stock,
+                #         score=score,
+                #     )
 
                 continue
 
@@ -442,7 +442,7 @@ class Confirmator:
 
         should_wait_for_next_bar = (
             potential_confirmation_bar.bar_time < today_09_30
-            # or potential_confirmation_bar.volume < 20000
+            or potential_confirmation_bar.volume < 20000
             or stock.volume_sum_since_market_open < 100000
             or (
                 today_10_00 <= potential_confirmation_bar.bar_time <= today_12_00
