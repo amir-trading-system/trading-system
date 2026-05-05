@@ -114,7 +114,14 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
 
     final_shares_columns = []
     for feature in shared:
-        if feature.startswith("feature_"):
+        # if feature.startswith("feature_"):
+        if feature in [
+            "feature_current_day_vwap_to_recent_days",
+            "feature_current_day_high_to_previous_high",
+            "feature_current_day_high_to_recent_days_highs",
+            "feature_controlled_volume_entry_quality",
+            "feature_entry_bar_ema_9_to_vwap",
+        ]:
             final_shares_columns.append(feature)
 
     return final_shares_columns

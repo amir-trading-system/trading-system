@@ -289,6 +289,24 @@ class Confirmator:
                 one_minute_bars=one_minute_bars,
             )
 
+            if not self.data_extractor.should_run_model_by_hard_rules(
+                features_data=potential_confirmation_bar.price_movement_statistics,
+            ):
+                self.logger.info(
+                    msg="Data didnt pass hard rules before running model. model wont run, waiting for next bar.",
+                    extra={
+                        "worker": "Confirmator",
+                        "symbol": stock.symbol_name,
+                        "timeframe": original_bar_to_confirm.timeframe,
+                        "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                        "bar_time": original_bar_to_confirm.bar_time,
+                        "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                        "evidence_name": evidence_obj.name,
+                        "request_id": stock.request_id,
+                    },
+                )
+                continue
+
             total_volume = potential_confirmation_bar.price_movement_statistics.get("feature_total_volume")
             if (
                 True
