@@ -402,10 +402,7 @@ class Confirmator:
             minute=00,
         )
 
-        if (
-            potential_confirmation_bar.close < original_bar_to_confirm.ema_9
-            or potential_confirmation_bar.close < original_bar_to_confirm.ema_20
-        ):
+        if potential_confirmation_bar.close < original_bar_to_confirm.ema_20:
             return False
 
         highest_high = round(highest_high, 2)
@@ -446,7 +443,7 @@ class Confirmator:
             or stock.volume_sum_since_market_open < 100000
             or (
                 today_10_00 <= potential_confirmation_bar.bar_time <= today_12_00
-                and stock.volume_sum_since_market_open < 500000
+                and stock.volume_sum_since_market_open < 400000
             )
             or (
                 potential_confirmation_bar.bar_time > today_12_00

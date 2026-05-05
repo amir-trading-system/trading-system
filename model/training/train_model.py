@@ -32,8 +32,8 @@ THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 # Final stable feature filtering
 MIN_MEAN_IMPORTANCE = 0.02
 MIN_TOP_K_FREQUENCY = 0.5
-TOP_K_FOR_STABILITY = 10
-MIN_SELECTED_FEATURES = 8
+TOP_K_FOR_STABILITY = 5
+MIN_SELECTED_FEATURES = 5
 
 # Optional hard rules for final decision layer
 USE_HARD_RULES = True
@@ -517,6 +517,8 @@ print(f"Mean false positive reject rate: {fold_report_df['false_positive_reject_
 test_probs = final_model.predict_proba(X_test_selected_imp)[:, 1]
 test_pred_default = (test_probs >= 0.50).astype(int)
 test_pred_best = (test_probs >= chosen_threshold).astype(int)
+test_pred_052 = (test_probs >= 0.52).astype(int)
+test_pred_055 = (test_probs >= 0.55).astype(int)
 
 print("\n================ HOLDOUT TEST REPORT (threshold=0.50) ================\n")
 print(classification_report(y_test_holdout, test_pred_default, digits=4))
@@ -527,6 +529,16 @@ print(f"\n================ HOLDOUT TEST REPORT (threshold={chosen_threshold:.2f}
 print(classification_report(y_test_holdout, test_pred_best, digits=4))
 print("Confusion matrix:")
 print(confusion_matrix(y_test_holdout, test_pred_best))
+
+print("\n================ HOLDOUT TEST REPORT (threshold=threshold=0.52) ================\n")
+print(classification_report(y_test_holdout, test_pred_052, digits=4))
+print("Confusion matrix:")
+print(confusion_matrix(y_test_holdout, test_pred_052))
+
+print("\n================ HOLDOUT TEST REPORT (threshold=threshold=0.55) ================\n")
+print(classification_report(y_test_holdout, test_pred_055, digits=4))
+print("Confusion matrix:")
+print(confusion_matrix(y_test_holdout,  test_pred_055))
 
 # ------------------------------------------------------------
 # FINAL FEATURE IMPORTANCE

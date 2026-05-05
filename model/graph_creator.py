@@ -1,5 +1,6 @@
 import datetime
 import pandas as pd
+import pickle
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -13,7 +14,7 @@ class GraphCreator:
         potential_confirmation_bar: common.objects.BarData,
         one_minute_timeframe_stock: common.objects.Stock,
         score: common.objects.Score = None,
-    ):
+    ) -> go.Figure:
         same_day_market_open = datetime.datetime(
             year=potential_confirmation_bar.bar_time.year,
             month=potential_confirmation_bar.bar_time.month,
@@ -229,3 +230,21 @@ class GraphCreator:
         html_file_path = f"model/training/data/charts/{symbol}-{str(potential_confirmation_bar.bar_time)}.html"
 
         fig.write_html(html_file_path)
+
+        return fig
+
+
+if __name__ == '__main__':
+    FILE_PATH = "model/training/data/ARTL-2026-03-27 12:33:00.json"
+    with open(FILE_PATH, "rb") as f:
+        obj = pickle.load(f)
+        stock: common.objects.Stock = obj["day_timeframe_stock"]
+        one_minute_timeframe_stock: common.objects.Stock = obj["one_minute_timeframe_stock"]
+        potential_confirmation_bar: common.objects.BarData = obj["potential_confirmation_bar"]
+
+        fig = GraphCreator.create_interactive_chart(
+            symbol=stock.symbol_name,
+            potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+        )
+        fig.show()

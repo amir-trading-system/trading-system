@@ -330,22 +330,6 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
                 )
             )
 
-    current_symbols = [
-        symbol
-        for symbol in training.train_data.get_tagged_data()
-        if symbol.is_positive
-    ]
-    for symbol in symbols:
-        for current_symbol in current_symbols:
-            if (
-                True
-                and symbol.name == current_symbol.name
-                and symbol.date_time.year == current_symbol.date_time.year
-                and symbol.date_time.month == current_symbol.date_time.month
-                and symbol.date_time.day == current_symbol.date_time.day
-            ):
-                symbol.date_time = current_symbol.date_time
-
     return symbols
 
 def run_retroactive_check():
@@ -354,8 +338,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="ASTC",
-            datetime_str="03.30.26T10:38:00",
+            name="BENF",
+            datetime_str="09.30.25T12:19:00",
             is_positive=True,
         ),
     ]
@@ -364,7 +348,9 @@ def run_retroactive_check():
 
     if not symbols:
         output_file_name = ""
-        symbols = training.train_data.get_tagged_data()
+        # need to find a way to create data from current symbols - load data from /data directory.
+        # symbols = training.train_data.get_tagged_data()
+        symbols = []
         get_only_statistics = False
         should_run_model = True
 
