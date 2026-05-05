@@ -1,25 +1,31 @@
 {
-  "candidate_feature_count": 2,
-  "selected_feature_count": 2,
+  "candidate_feature_count": 10,
+  "selected_feature_count": 5,
   "selected_features": [
-    "feature_structure_volume_confirmation",
-    "feature_total_volume"
+    "feature_current_day_high_to_recent_days_highs",
+    "feature_current_day_vwap_to_recent_days",
+    "feature_current_day_high_to_previous_high",
+    "feature_current_day_volume_to_recent_days_volume",
+    "feature_current_day_low_to_ema_9"
   ],
   "chosen_threshold": 0.55,
-  "cv_mean_balanced_score": 0.568514705882353,
-  "cv_std_balanced_score": 0.05292722502845569,
-  "cv_mean_trading_score": 0.04660854341736695,
-  "cv_std_trading_score": 0.7599776246834227,
-  "cv_mean_positive_pass_rate": 0.44599999999999995,
-  "cv_mean_false_positive_reject_rate": 0.6910294117647059,
+  "cv_mean_balanced_score": 0.6593263305322128,
+  "cv_std_balanced_score": 0.07227081696020822,
+  "cv_mean_trading_score": 0.5344989495798319,
+  "cv_std_trading_score": 0.46178411658019847,
+  "cv_mean_positive_pass_rate": 0.6074761904761905,
+  "cv_mean_false_positive_reject_rate": 0.7111764705882352,
   "min_positive_pass_rate": 0.5,
   "min_false_positive_reject_rate": 0.45,
   "trading_score_fp_weight": 0.5,
   "trading_score_pos_weight": 0.5,
   "final_holdout_threshold": 0.55,
   "top_25_feature_importance": {
-    "feature_structure_volume_confirmation": 0.5162554764270021,
-    "feature_total_volume": 0.48374452357299785
+    "feature_current_day_high_to_recent_days_highs": 0.2483664476466452,
+    "feature_current_day_vwap_to_recent_days": 0.23576827901691672,
+    "feature_current_day_high_to_previous_high": 0.20137131141894693,
+    "feature_current_day_volume_to_recent_days_volume": 0.15907395718944622,
+    "feature_current_day_low_to_ema_9": 0.15542000472804493
   },
   "random_state": 42,
   "test_size": 0.3,

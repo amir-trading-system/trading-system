@@ -2,29 +2,82 @@ import datetime
 
 import common
 
-
 class DataExtractor:
-    def recent_days_structure(
+    def recent_days_structure_features(
+        self,
+        day_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict[str, float]:
+        current_day = day_timeframe_stock.bars[0]
+        previous_day = day_timeframe_stock.bars[1]
+        recent_days = day_timeframe_stock.bars[1:10]
+        total_days = len(recent_days)
+
+        volume_sum = 0
+        ema_9_sum = 0
+        ema_20_sum = 0
+        vwap_sum = 0
+        movement_sum = 0
+        ema_9_to_ema_20_distance_sum = 0
+        highs_sum = 0
+
+        for day in recent_days:
+            volume_sum += day.volume
+            ema_9_sum += day.ema_9
+            ema_20_sum += day.ema_20
+            vwap_sum += day.vwap
+            movement_sum += day.high - day.low
+            ema_9_to_ema_20_distance_sum += day.ema_9 - day.ema_20
+            highs_sum += day.high
+
+        recent_days_volume_average = volume_sum/total_days
+        ema_9_average = ema_9_sum/total_days
+        ema_20_average = ema_20_sum/total_days
+        movement_average = movement_sum/total_days
+        ema_9_to_ema_20_distance_average = ema_9_to_ema_20_distance_sum/total_days
+        highs_average = highs_sum/total_days
+        vwap_average = vwap_sum/total_days
+
+        current_day_volume_to_recent_days_volume = current_day.volume/recent_days_volume_average if recent_days_volume_average > 0 else 1
+        current_day_ema_9_to_recent_days_ema_9 = current_day.ema_9/ema_9_average if ema_9_average > 0 else 1
+        current_day_ema_20_to_recent_days_ema_20 = current_day.ema_20/ema_20_average if ema_20_average > 0 else 1
+        current_day_movement_to_recent_days_movement = (potential_confirmation_bar.high - current_day.low)/movement_average if movement_average > 0 else 1
+        current_day_ema_9_to_ema_20_distance_to_recent_days = (current_day.ema_9 - current_day.ema_20)/ema_9_to_ema_20_distance_average if ema_9_to_ema_20_distance_average > 0 else 1
+        current_day_high_to_recent_days_highs = potential_confirmation_bar.high/highs_average if highs_average > 0 else 1
+        current_day_vwap_to_recent_days = current_day.vwap/vwap_average if vwap_average > 0 else 1
+        current_day_low_to_ema_9 = current_day.low/current_day.ema_9 if current_day.ema_9 > 0 else 1
+        current_day_ema_9_to_ema_20 = current_day.ema_9/current_day.ema_20 if current_day.ema_20 > 0 else 1
+        current_day_high_to_previous_high = potential_confirmation_bar.high/previous_day.high if previous_day.high > 0 else 1
+
+        return {
+            "feature_current_day_volume_to_recent_days_volume": current_day_volume_to_recent_days_volume,
+            "feature_current_day_ema_9_to_recent_days_ema_9": current_day_ema_9_to_recent_days_ema_9,
+            "feature_current_day_ema_20_to_recent_days_ema_20": current_day_ema_20_to_recent_days_ema_20,
+            "feature_current_day_vwap_to_recent_days": current_day_vwap_to_recent_days,
+            "feature_current_day_movement_to_recent_days_movement": current_day_movement_to_recent_days_movement,
+            "feature_current_day_ema_9_to_ema_20_distance_to_recent_days": current_day_ema_9_to_ema_20_distance_to_recent_days,
+            "feature_current_day_high_to_recent_days_highs": current_day_high_to_recent_days_highs,
+            "feature_current_day_low_to_ema_9": current_day_low_to_ema_9,
+            "feature_current_day_ema_9_to_ema_20": current_day_ema_9_to_ema_20,
+            "feature_current_day_high_to_previous_high": current_day_high_to_previous_high,
+        }
+
+    def breakout_structure_features(
         self,
     ):
         pass
 
-    def breakout_structure(
+    def volume_structure_features(
         self,
     ):
         pass
 
-    def volume_structure(
+    def macd_structure_features(
         self,
     ):
         pass
 
-    def macd_structure(
-        self,
-    ):
-        pass
-
-    def pre_market_structure(
+    def pre_market_structure_features(
         self,
     ):
         pass
@@ -38,34 +91,16 @@ class DataExtractor:
         highest_high_one_minute_bar: common.objects.BarData,
         volume_sum_since_market_open: float,
         one_minute_bars: list[common.objects.BarData],
-        for_training: bool = False,
     ) -> dict[str, any]:
-        minutes_since_market_open = ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30
-        total_bars = len(one_minute_bars)
-        highest_high_one_minute_bar_time = day_timeframe_stock.get_highest_high_one_minute_bar(
-            current_one_minute_bar=potential_confirmation_bar,
+        recent_days_structure_features = self.recent_days_structure_features(
+            day_timeframe_stock=day_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
         )
 
-        total_volume = 0
-        bars_size_sum = 0
-        highest_volume_average = 0
-
-        for bar_object in one_minute_bars:
-            if bar_object.bar_time < potential_confirmation_bar.bar_time:
-                bars_size_sum += abs(bar_object.close - bar_object.open_value)
-            total_volume += bar_object.volume
-            if bar_object.volume_average > highest_volume_average:
-                highest_volume_average = bar_object.volume_average
-
-            previous_bar = one_minute_timeframe_stock.previous_bar(
-                bar_object=bar_object,
-            )
-            next_bar = one_minute_timeframe_stock.next_bar(
-                bar_object=bar_object,
-            )
-
-        features = {
+        base_features = {
             "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
         }
+
+        features = base_features | recent_days_structure_features
 
         return features
