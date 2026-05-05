@@ -258,10 +258,11 @@ def load_data_for_training_model() -> list[dict[str, any]]:
     return pickled_data
 
 if __name__ == '__main__':
+    data_extractor = data_extractor.DataExtractor()
     symbols_data_parameters: list[dict[str, any]] = []
     training_model_data_list = load_data_for_training_model()
     for data in training_model_data_list:
-        symbol_data_parameters = data_extractor.DataExtractor.extract_features_from_symbol_data(
+        symbol_data_parameters = data_extractor.extract_features_from_symbol_data(
             day_timeframe_stock=data["day_timeframe_stock"],
             one_minute_timeframe_stock=data["one_minute_timeframe_stock"],
             potential_confirmation_bar=data["potential_confirmation_bar"],

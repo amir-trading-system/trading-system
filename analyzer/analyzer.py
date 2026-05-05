@@ -39,6 +39,7 @@ class Analyzer:
             tws_client=tws_client,
             logger=logger,
         )
+        self.data_extractor = model.data_extractor.DataExtractor()
 
     def analyze(
         self,
@@ -178,7 +179,7 @@ class Analyzer:
             current_one_minute_bar=current_bar,
         )
 
-        current_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
+        current_bar.price_movement_statistics = self.data_extractor.extract_features_from_symbol_data(
             day_timeframe_stock=day_timeframe_stock,
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=current_bar,

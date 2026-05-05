@@ -30,6 +30,7 @@ class Confirmator:
         self.model_runner = model.runner.Runner(
             should_run_model=should_run_model,
         )
+        self.data_extractor = model.data_extractor.DataExtractor()
 
     def confirm_entry_position(
         self,
@@ -279,7 +280,7 @@ class Confirmator:
                 },
             )
 
-            potential_confirmation_bar.price_movement_statistics = model.data_extractor.DataExtractor.extract_features_from_symbol_data(
+            potential_confirmation_bar.price_movement_statistics = self.data_extractor.extract_features_from_symbol_data(
                 day_timeframe_stock=stock,
                 one_minute_timeframe_stock=one_minute_timeframe_stock,
                 potential_confirmation_bar=potential_confirmation_bar,

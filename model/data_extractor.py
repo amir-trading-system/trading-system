@@ -4,9 +4,34 @@ import common
 
 
 class DataExtractor:
+    def recent_days_structure(
+        self,
+    ):
+        pass
+
+    def breakout_structure(
+        self,
+    ):
+        pass
+
+    def volume_structure(
+        self,
+    ):
+        pass
+
+    def macd_structure(
+        self,
+    ):
+        pass
+
+    def pre_market_structure(
+        self,
+    ):
+        pass
+
     #pylint:disable=W0613
-    @staticmethod
     def extract_features_from_symbol_data(
+        self,
         day_timeframe_stock: common.objects.Stock,
         one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
