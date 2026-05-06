@@ -80,6 +80,8 @@ class DataExtractor:
         entry_bar_ema_9_to_ema_20 = potential_confirmation_bar.ema_9/potential_confirmation_bar.ema_20
         entry_bar_ema_9_to_vwap = potential_confirmation_bar.ema_9/potential_confirmation_bar.vwap
         distance_from_highest_high = highest_high_one_minute_bar.index - potential_confirmation_bar.index
+        price_action_from_highest_high = potential_confirmation_bar.high - highest_high_one_minute_bar.high
+        price_action_from_ema_9 = potential_confirmation_bar.high - potential_confirmation_bar.ema_9
 
         bars_movement = 0
         lowest_low_since_highest_high = 100
@@ -117,6 +119,7 @@ class DataExtractor:
             "feature_entry_bar_movement_recent_bars_average": entry_bar_movement_recent_bars_average,
             "feature_entry_extension_pressure": entry_extension_pressure,
             "feature_breakout_attempts_during_pullback": breakout_attempts_during_pullback,
+            "feature_entry_breakout_efficiency_from_ema_9": price_action_from_highest_high/price_action_from_ema_9 if price_action_from_ema_9 > 0 else 0,
         }
 
     def volume_structure_features(
@@ -315,6 +318,16 @@ class DataExtractor:
         }
         complex_features = {
             "feature_weak_wick_volume_rejection": 1 if feature_upper_wick > 0.262 and feature_volume_to_previous <= 1.17 else 0,
+            "feature_clean_breakout_efficiency": 1 if (
+                breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] >= 0.35
+                and breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] <= 0.80
+                and breakout_structure_features["feature_entry_bar_body"] >= 0.75
+                and breakout_structure_features["feature_entry_bar_upper_wick"] <= 0.15
+            ) else 0,
+            "feature_inefficient_breakout_extension": 1 if (
+                breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] < 0.20
+                and breakout_structure_features["feature_entry_extension_pressure"] > 0.30
+            ) else 0,
         }
 
         features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
@@ -328,16 +341,16 @@ class DataExtractor:
         current_volume = features_data["feature_current_day_volume_to_recent_days_volume"]
         current_ema20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
         current_ema9_to_ema20 = features_data["feature_current_day_ema_9_to_ema_20"]
-
+        current_vwap = features_data["feature_current_day_vwap_to_recent_days"]
+        gains_until_entry = features_data["feature_gains_until_entry_bar"]
+        current_high_to_recent = features_data["feature_current_day_high_to_recent_days_highs"]
         controlled_volume_quality = features_data["feature_controlled_volume_entry_quality"]
-
         entry_ema9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
         entry_extension_pressure = features_data["feature_entry_extension_pressure"]
-
         entry_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
         pullback_pos_neg_volume = features_data["feature_positive_vs_negative_volume_during_pullback"]
-
         weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
+        breakout_efficiency = features_data["feature_entry_breakout_efficiency_from_ema_9"]
 
         # Reject: weak day context
         if current_volume <= 1.114 and current_ema20 <= 1.363:
@@ -352,6 +365,30 @@ class DataExtractor:
             return False
 
         if weak_wick_volume_rejection:
+            return False
+
+        # Reject: late/chase breakout without enough day-context strength
+        if (
+            breakout_efficiency > 0.70
+            and current_vwap <= 2.0
+            and gains_until_entry > 0.70
+        ):
+            return False
+
+        # Reject: extended entry, but inefficient breakout
+        if (
+            breakout_efficiency <= 0.20
+            and entry_ema9_to_vwap > 1.09
+            and gains_until_entry > 0.60
+        ):
+            return False
+
+        # Reject: very extended day, but weak breakout efficiency
+        if (
+            current_high_to_recent > 3.31
+            and breakout_efficiency <= 0.40
+            and gains_until_entry > 0.60
+        ):
             return False
 
         # Reject: pullback demand failure
