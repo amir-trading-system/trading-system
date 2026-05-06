@@ -168,16 +168,101 @@ class DataExtractor:
     def macd_structure_features(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
+        highest_high_one_minute_bar: common.objects.BarData,
+        bars_since_highest_high: list[common.objects.BarData],
         potential_confirmation_bar: common.objects.BarData,
-    ):
-        pass
+    ) -> dict[str, float]:
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+
+        histogram_sum = 0
+        highest_histogram_since_highest_high = 0
+        lowest_histogram_since_highest_high = 100
+        histogram_changed_to_positive_direction_count = 0
+        histogram_changed_to_negative_direction_count = 0
+        for bar_object in bars_since_highest_high:
+            previous_bar = one_minute_timeframe_stock.previous_bar(
+                bar_object=bar_object,
+            )
+            next_bar = one_minute_timeframe_stock.next_bar(
+                bar_object=bar_object,
+            )
+
+            histogram_sum += bar_object.histogram
+            if bar_object.histogram > highest_histogram_since_highest_high:
+                highest_histogram_since_highest_high = bar_object.histogram
+            if bar_object.histogram < lowest_histogram_since_highest_high:
+                lowest_histogram_since_highest_high = bar_object.histogram
+
+            if (
+                True
+                and previous_bar is not None
+                and next_bar is not None
+            ):
+                if previous_bar.histogram < bar_object.histogram > next_bar.histogram:
+                    histogram_changed_to_negative_direction_count += 1
+                if previous_bar.histogram > bar_object.histogram < next_bar.histogram:
+                    histogram_changed_to_positive_direction_count += 1
+
+        entry_bar_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd if previous_bar is not None else 1
+        entry_bar_histogram_to_previous = potential_confirmation_bar.histogram/previous_bar.histogram if previous_bar is not None else 1
+        entry_bar_histogram_to_highest_high = potential_confirmation_bar.histogram/highest_high_one_minute_bar.histogram
+        entry_bar_histogram_to_highest_histogram = potential_confirmation_bar.histogram/highest_histogram_since_highest_high if highest_histogram_since_highest_high > 0 else 1
+        entry_bar_histogram_to_lowest_histogram = potential_confirmation_bar.histogram/lowest_histogram_since_highest_high if lowest_histogram_since_highest_high > 0 else 1
+        histogram_changed_to_positive_direction_vs_negative_pct = histogram_changed_to_positive_direction_count/histogram_changed_to_negative_direction_count if histogram_changed_to_negative_direction_count > 0 else 1
+
+        return {
+            "feature_entry_bar_macd_to_previous": entry_bar_macd_to_previous,
+            "feature_entry_bar_histogram_to_previous": entry_bar_histogram_to_previous,
+            "feature_entry_bar_histogram_to_highest_high": entry_bar_histogram_to_highest_high,
+            "feature_entry_bar_histogram_to_highest_histogram": entry_bar_histogram_to_highest_histogram,
+            "feature_entry_bar_histogram_to_lowest_histogram": entry_bar_histogram_to_lowest_histogram,
+            "feature_histogram_changed_to_positive_direction_vs_negative_pct": histogram_changed_to_positive_direction_vs_negative_pct,
+        }
 
     def pre_market_structure_features(
         self,
+        day_timeframe_stock: common.objects.Stock,
         one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
-    ):
-        pass
+    ) -> dict[str, float]:
+        same_day_04_am = datetime.datetime(
+            year=potential_confirmation_bar.bar_time.year,
+            month=potential_confirmation_bar.bar_time.month,
+            day=potential_confirmation_bar.bar_time.day,
+            hour=4,
+        )
+        same_day_09_29 = datetime.datetime(
+            year=potential_confirmation_bar.bar_time.year,
+            month=potential_confirmation_bar.bar_time.month,
+            day=potential_confirmation_bar.bar_time.day,
+            hour=9,
+            minute=29,
+        )
+
+        pre_market_bars = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if same_day_04_am <= bar_object.bar_time <= same_day_09_29
+        ]
+
+        pre_market_volume = 0
+        for bar_object in pre_market_bars:
+            pre_market_volume += bar_object.volume
+
+        previous_day = None
+        if len(day_timeframe_stock.bars) > 0:
+            previous_day = day_timeframe_stock.bars[1]
+
+        pre_market_gains = 0
+        if pre_market_bars:
+            pre_market_gains = (pre_market_bars[0].close - previous_day.close)/previous_day.close if previous_day is not None else 1
+
+        return {
+            "feature_pre_market_gains": pre_market_gains,
+            "feature_pre_market_volume": pre_market_volume,
+        }
 
     #pylint:disable=W0613
     def extract_features_from_symbol_data(
@@ -210,6 +295,17 @@ class DataExtractor:
             bars_since_highest_high=bars_since_highest_high,
             potential_confirmation_bar=potential_confirmation_bar,
         )
+        macd_structure_features = self.macd_structure_features(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            bars_since_highest_high=bars_since_highest_high,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        pre_market_structure_features = self.pre_market_structure_features(
+            day_timeframe_stock=day_timeframe_stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
 
         feature_upper_wick = breakout_structure_features["feature_entry_bar_upper_wick"]
         feature_volume_to_previous = volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"]
@@ -221,8 +317,7 @@ class DataExtractor:
             "feature_weak_wick_volume_rejection": 1 if feature_upper_wick > 0.262 and feature_volume_to_previous <= 1.17 else 0,
         }
 
-        features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features
-
+        features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
 
         return features
 
