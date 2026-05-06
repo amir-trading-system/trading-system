@@ -1,6 +1,6 @@
 feature,mean_importance,std_importance,top_k_frequency
-feature_current_day_vwap_to_recent_days,0.22996721878247384,0.019233558765547585,1.0
-feature_current_day_high_to_previous_high,0.21026917732174222,0.019087989769517085,1.0
-feature_controlled_volume_entry_quality,0.19078732271708287,0.01685463859814435,1.0
-feature_current_day_high_to_recent_days_highs,0.18720824018036133,0.011913981874225288,1.0
-feature_entry_bar_ema_9_to_vwap,0.18176804099833976,0.017365810525651303,1.0
+feature_current_day_vwap_to_recent_days,0.24470016332552938,0.015354345220705142,1.0
+feature_controlled_volume_entry_quality,0.21010305898503404,0.021222701941772615,1.0
+feature_current_day_high_to_recent_days_highs,0.20552671032979394,0.016820781234406754,1.0
+feature_current_day_high_to_previous_high,0.1885540554285159,0.01378521889982054,1.0
+feature_entry_bar_ema_9_to_vwap,0.1511160119311268,0.012787760911770073,1.0

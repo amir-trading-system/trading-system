@@ -151,14 +151,6 @@ class Confirmator:
             if score.should_take_trade:
                 bar_has_confirmed = True
                 confirmation_bar = copy.deepcopy(next_bar)
-                # if self.is_retro:
-                #     model.graph_creator.GraphCreator.create_interactive_chart(
-                #         symbol=stock.symbol_name,
-                #         potential_confirmation_bar=confirmation_bar,
-                #         one_minute_timeframe_stock=one_minute_timeframe_stock,
-                #         score=score,
-                #     )
-
                 continue
 
             most_updated_datetime = next_bar.bar_time
@@ -307,7 +299,7 @@ class Confirmator:
                 )
                 continue
 
-            total_volume = potential_confirmation_bar.price_movement_statistics.get("feature_total_volume")
+            total_volume = potential_confirmation_bar.price_movement_statistics.get("total_volume")
             if (
                 True
                 and total_volume is not None

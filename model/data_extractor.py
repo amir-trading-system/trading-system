@@ -68,6 +68,7 @@ class DataExtractor:
 
     def breakout_structure_features(
         self,
+        one_minute_timeframe_stock: common.objects.Stock,
         bars_since_highest_high: list[common.objects.BarData],
         highest_high_one_minute_bar: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
@@ -82,6 +83,12 @@ class DataExtractor:
         distance_from_highest_high = highest_high_one_minute_bar.index - potential_confirmation_bar.index
         price_action_from_highest_high = potential_confirmation_bar.high - highest_high_one_minute_bar.high
         price_action_from_ema_9 = potential_confirmation_bar.high - potential_confirmation_bar.ema_9
+
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+
+        previous_bar_already_crossed_highest_high = 1 if previous_bar.low < highest_high_one_minute_bar.high < previous_bar.close and previous_bar is not None else 0
 
         bars_movement = 0
         lowest_low_since_highest_high = 100
@@ -120,6 +127,7 @@ class DataExtractor:
             "feature_entry_extension_pressure": entry_extension_pressure,
             "feature_breakout_attempts_during_pullback": breakout_attempts_during_pullback,
             "feature_entry_breakout_efficiency_from_ema_9": price_action_from_highest_high/price_action_from_ema_9 if price_action_from_ema_9 > 0 else 0,
+            "feature_previous_bar_already_crossed_highest_high": previous_bar_already_crossed_highest_high,
         }
 
     def volume_structure_features(
@@ -208,9 +216,9 @@ class DataExtractor:
                 if previous_bar.histogram > bar_object.histogram < next_bar.histogram:
                     histogram_changed_to_positive_direction_count += 1
 
-        entry_bar_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd if previous_bar is not None else 1
-        entry_bar_histogram_to_previous = potential_confirmation_bar.histogram/previous_bar.histogram if previous_bar is not None else 1
-        entry_bar_histogram_to_highest_high = potential_confirmation_bar.histogram/highest_high_one_minute_bar.histogram
+        entry_bar_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd if previous_bar is not None and previous_bar.macd > 0 else 1
+        entry_bar_histogram_to_previous = potential_confirmation_bar.histogram/previous_bar.histogram if previous_bar is not None and previous_bar.histogram > 0 else 1
+        entry_bar_histogram_to_highest_high = potential_confirmation_bar.histogram/highest_high_one_minute_bar.histogram if highest_high_one_minute_bar.histogram > 0 else 1
         entry_bar_histogram_to_highest_histogram = potential_confirmation_bar.histogram/highest_histogram_since_highest_high if highest_histogram_since_highest_high > 0 else 1
         entry_bar_histogram_to_lowest_histogram = potential_confirmation_bar.histogram/lowest_histogram_since_highest_high if lowest_histogram_since_highest_high > 0 else 1
         histogram_changed_to_positive_direction_vs_negative_pct = histogram_changed_to_positive_direction_count/histogram_changed_to_negative_direction_count if histogram_changed_to_negative_direction_count > 0 else 1
@@ -283,11 +291,17 @@ class DataExtractor:
             if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
         ]
 
+        total_volume = sum(
+            bar_object.volume
+            for bar_object in one_minute_bars
+        )
+
         recent_days_structure_features = self.recent_days_structure_features(
             day_timeframe_stock=day_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
         breakout_structure_features = self.breakout_structure_features(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
             bars_since_highest_high=bars_since_highest_high,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             potential_confirmation_bar=potential_confirmation_bar,
@@ -315,6 +329,7 @@ class DataExtractor:
 
         base_features = {
             "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
+            "total_volume": total_volume,
         }
         complex_features = {
             "feature_weak_wick_volume_rejection": 1 if feature_upper_wick > 0.262 and feature_volume_to_previous <= 1.17 else 0,
@@ -327,6 +342,11 @@ class DataExtractor:
             "feature_inefficient_breakout_extension": 1 if (
                 breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] < 0.20
                 and breakout_structure_features["feature_entry_extension_pressure"] > 0.30
+            ) else 0,
+            "feature_strong_vwap_volume_reentry": 1 if (
+                recent_days_structure_features["feature_current_day_vwap_to_recent_days"] > 2.28
+                and breakout_structure_features["feature_entry_extension_pressure"] > 0.169
+                and volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"] > 2.03
             ) else 0,
         }
 
@@ -351,6 +371,7 @@ class DataExtractor:
         pullback_pos_neg_volume = features_data["feature_positive_vs_negative_volume_during_pullback"]
         weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
         breakout_efficiency = features_data["feature_entry_breakout_efficiency_from_ema_9"]
+        current_high_to_previous = features_data["feature_previous_bar_already_crossed_highest_high"]
 
         # Reject: weak day context
         if current_volume <= 1.114 and current_ema20 <= 1.363:
@@ -367,11 +388,18 @@ class DataExtractor:
         if weak_wick_volume_rejection:
             return False
 
-        # Reject: late/chase breakout without enough day-context strength
+        # Reject: weak context + inefficient breakout + not enough relative volume
         if (
-            breakout_efficiency > 0.70
-            and current_vwap <= 2.0
-            and gains_until_entry > 0.70
+            current_vwap <= 1.36
+            and breakout_efficiency <= 0.40
+            and current_volume <= 145
+        ):
+            return False
+
+        if (
+            current_vwap <= 2.12
+            and current_high_to_recent > 1.81
+            and current_high_to_previous <= 1.62
         ):
             return False
 
