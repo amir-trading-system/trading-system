@@ -1,4 +1,3 @@
-import csv
 import datetime
 import os
 import sys
@@ -16,55 +15,17 @@ import logger
 from scripts import stock_finder
 import tws
 
-from . import training
-
 LOGS_PATH = "logs/app.log"
 app_logger = logger.logger.Logger(
     enable_stdout=False,
 )
 
 #pylint:disable=unspecified-encoding
-def write_to_csv(
+def wait_for_process_to_finish(
     symbols_data: list[dict[str, str]],
-    original_file_name: str,
     counter: list[int],
-    get_only_statistics: bool,
 ):
-    file_names = [
-        "model/positive_results.csv",
-        "model/false_positive_results.csv",
-    ]
-    if original_file_name != "":
-        file_names = [original_file_name]
     t = tqdm.tqdm(total=len(symbols_data))
-    if not get_only_statistics:
-        for file_name in file_names:
-            with open(file_name, mode="w") as f:
-                writer = csv.writer(f)
-                writer.writerow(
-                    [
-                        "symbol",
-                        "original_bar_time",
-                        "collection_status",
-                        "analysis_status",
-                        "actual_confirmation_bar_time",
-                        "expected_confirmation_bar_time",
-                        "bar_to_place_order_time",
-                        "highest_high_one_minute_bar_time",
-                        "result",
-                        "feature_total_volume",
-                        "feature_entry_bar_price_action_pct_to_volume_pct",
-                        "feature_trap_signal",
-                        "feature_clean_move",
-                        "feature_fake_momentum",
-                        "feature_structure_adjusted_strength",
-                        "feature_structure_compression_edge",
-                        "feature_momentum_structure_alignment",
-                        "feature_clean_vs_trap_strength",
-                        "score",
-                    ],
-                )
-                f.flush()
 
     while True:
         while any(
@@ -77,42 +38,9 @@ def write_to_csv(
                 symbols_data,
                 key=lambda symbol_data: symbol_data["symbol"],
             ):
-                symbol = symbol_data["symbol"]
-                original_bar_time = symbol_data["original_bar_time"]
                 result = symbol_data["result"]
-                highest_high_one_minute_bar_time = None
-                feature_total_volume = 0
-                feature_entry_bar_price_action_pct_to_volume_pct = 0
-                feature_trap_signal = 0
-                feature_clean_move = 0
-                feature_fake_momentum = 0
-                feature_structure_adjusted_strength = 0
-                feature_structure_compression_edge = 0
-                feature_momentum_structure_alignment = 0
-                feature_clean_vs_trap_strength = 0
-
-                price_movement_statistics = symbol_data.get("price_movement_statistics", None)
-                if price_movement_statistics:
-                    feature_total_volume = price_movement_statistics["feature_total_volume"]
-                    feature_entry_bar_price_action_pct_to_volume_pct = price_movement_statistics["feature_entry_bar_price_action_pct_to_volume_pct"]
-                    feature_trap_signal = price_movement_statistics["feature_trap_signal"]
-                    feature_clean_move = price_movement_statistics["feature_clean_move"]
-                    feature_fake_momentum = price_movement_statistics["feature_fake_momentum"]
-                    feature_structure_adjusted_strength = price_movement_statistics["feature_structure_adjusted_strength"]
-                    feature_structure_compression_edge = price_movement_statistics["feature_structure_compression_edge"]
-                    feature_momentum_structure_alignment = price_movement_statistics["feature_momentum_structure_alignment"]
-                    feature_clean_vs_trap_strength = price_movement_statistics["feature_clean_vs_trap_strength"]
-                    highest_high_one_minute_bar_time = price_movement_statistics["highest_high_one_minute_bar_time"]
-
-                collection_status = symbol_data["collection_status"]
-                analysis_status = symbol_data["analysis_status"]
-
-                if symbol_data["is_new"]:
-                    symbol = f"{symbol} - NEW"
 
                 actual_confirmation_bar_time = symbol_data["actual_confirmation_bar_time"]
-                expected_confirmation_bar_time = symbol_data["expected_confirmation_bar_time"]
-                bar_to_place_order_time = symbol_data["bar_to_place_order_time"]
 
                 if (
                     True
@@ -121,54 +49,8 @@ def write_to_csv(
                     and float(symbol_data["score"]) > 0
                     and actual_confirmation_bar_time != "in_progress"
                 ):
-                    if actual_confirmation_bar_time == expected_confirmation_bar_time:
-                        result = "done"
-                        symbol_data["result"] = "done"
-                    else:
-                        result = "failed"
-                        symbol_data["result"] = "failed"
-
-                    if not symbol.endswith("NEW"):
-                        file_name = "model/positive_results.csv"
-                        if not symbol_data["is_positive"]:
-                            file_name = "model/false_positive_results.csv"
-                        if original_file_name != "":
-                            file_name = original_file_name
-
-                    if symbol.endswith("NEW"):
-                        result = "failed"
-
-                    if not get_only_statistics:
-                        with open(file_name, mode="a") as f:
-                            writer = csv.writer(f)
-                            writer.writerow(
-                                [
-                                    symbol,
-                                    original_bar_time,
-                                    collection_status,
-                                    analysis_status,
-                                    actual_confirmation_bar_time,
-                                    expected_confirmation_bar_time,
-                                    bar_to_place_order_time,
-                                    highest_high_one_minute_bar_time,
-                                    result,
-                                    feature_total_volume,
-                                    feature_entry_bar_price_action_pct_to_volume_pct,
-                                    feature_trap_signal,
-                                    feature_clean_move,
-                                    feature_fake_momentum,
-                                    feature_structure_adjusted_strength,
-                                    feature_structure_compression_edge,
-                                    feature_momentum_structure_alignment,
-                                    feature_clean_vs_trap_strength,
-                                    symbol_data["score"],
-                                ]
-                            )
-
-                            f.flush()
-                        t.update(1)
-
-                        counter[0] -= 1
+                    t.update(1)
+                    counter[0] -= 1
 
             time.sleep(2)
 
@@ -344,10 +226,8 @@ def run_retroactive_check():
         ),
     ]
     # symbols = explore_past_potential_symbols()
-    output_file_name = "model/real_case_result.csv"
 
     if not symbols:
-        output_file_name = ""
         # need to find a way to create data from current symbols - load data from /data directory.
         # symbols = training.train_data.get_tagged_data()
         symbols = []
@@ -430,12 +310,10 @@ def run_retroactive_check():
         ).start()
 
         threading.Thread(
-            target=write_to_csv,
+            target=wait_for_process_to_finish,
             kwargs={
                 "symbols_data": symbols_data,
-                "original_file_name": output_file_name,
                 "counter": counter,
-                "get_only_statistics": get_only_statistics,
             },
         ).start()
 
