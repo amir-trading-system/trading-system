@@ -17,6 +17,7 @@ def write_to_csv(
 ):
     columns = [
         "symbol",
+        "label",
         "original_bar_time",
         "expected_confirmation_bar_time",
         "highest_high_one_minute_bar_time",
@@ -57,11 +58,14 @@ def write_to_csv(
 
         expected_confirmation_bar_time = stock_object.expected_bar_time
         file_name = POSITIVE_FILE_NAME
+        label = 1
         if not stock_object.is_positive:
             file_name = FALSE_POSITIVE_FILE_NAME
+            label = 0
 
         row_data = [
             symbol,
+            label,
             original_bar_time,
             expected_confirmation_bar_time,
             highest_high_one_minute_bar_time,

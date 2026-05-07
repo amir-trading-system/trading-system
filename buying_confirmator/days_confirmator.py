@@ -214,6 +214,7 @@ class Confirmator:
 
         if not self.bar_has_potential(
             stock=stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
             original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=temp_one_minute_bars,
@@ -385,6 +386,7 @@ class Confirmator:
     def bar_has_potential(
         self,
         stock: common.objects.Stock,
+        one_minute_timeframe_stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
@@ -411,6 +413,17 @@ class Confirmator:
             hour=12,
             minute=00,
         )
+
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+
+        if (
+            True
+            and previous_bar is not None
+            and previous_bar.high > potential_confirmation_bar.high
+        ):
+            return False
 
         if potential_confirmation_bar.close < original_bar_to_confirm.ema_20:
             return False
