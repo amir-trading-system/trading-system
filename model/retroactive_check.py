@@ -220,8 +220,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="BTCS",
-            datetime_str="07.08.25T12:13:00",
+            name="CDIO",
+            datetime_str="11.06.24T12:22:00",
             is_positive=True,
         ),
     ]
@@ -229,7 +229,6 @@ def run_retroactive_check():
 
     if not symbols:
         # need to find a way to create data from current symbols - load data from /data directory.
-        # symbols = training.train_data.get_tagged_data()
         symbols = []
         get_only_statistics = False
         should_run_model = True
