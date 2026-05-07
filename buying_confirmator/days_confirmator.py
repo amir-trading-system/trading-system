@@ -464,7 +464,7 @@ class Confirmator:
 
         bar_is_strong_than_before = (
             True
-            and potential_confirmation_bar.bar_up_percentage >= 0.03
+            and potential_confirmation_bar.bar_up_percentage >= 0.01
             and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
         )
 
