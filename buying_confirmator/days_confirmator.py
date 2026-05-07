@@ -297,7 +297,6 @@ class Confirmator:
                         "request_id": stock.request_id,
                     },
                 )
-                continue
 
             total_volume = potential_confirmation_bar.price_movement_statistics.get("total_volume")
             if (
@@ -461,15 +460,6 @@ class Confirmator:
                 and stock.volume_sum_since_market_open < 1000000
             )
         )
-
-        bar_is_strong_than_before = (
-            True
-            and potential_confirmation_bar.bar_up_percentage >= 0.01
-            and potential_confirmation_bar.volume > potential_confirmation_bar.volume_average
-        )
-
-        if should_wait_for_next_bar and not bar_is_strong_than_before:
-            return False
 
         if (
             True

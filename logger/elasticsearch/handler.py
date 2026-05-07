@@ -65,6 +65,7 @@ class Handler(
             "last_one_minute_bar_time",
             "entry_position_bar_time",
             "score",
+            "potential_score",
             "probability",
             "threshold",
             "should_run_model",
