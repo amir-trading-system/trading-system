@@ -221,8 +221,8 @@ def run_retroactive_check():
     symbols = [
         common.objects.SymbolTest(
             name="CNTN",
-            datetime_str="08.20.25T09:59:00",
-            is_positive=False,
+            datetime_str="08.25.25T10:12:00",
+            is_positive=True,
         ),
     ]
     # symbols = explore_past_potential_symbols()

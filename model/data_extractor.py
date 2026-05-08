@@ -284,113 +284,7 @@ class DataExtractor:
             "feature_pre_market_volume": pre_market_volume,
         }
 
-    #pylint:disable=W0613
-    def extract_features_from_symbol_data(
-        self,
-        day_timeframe_stock: common.objects.Stock,
-        one_minute_timeframe_stock: common.objects.Stock,
-        potential_confirmation_bar: common.objects.BarData,
-        highest_high_one_minute_bar: common.objects.BarData,
-        volume_sum_since_market_open: float,
-        one_minute_bars: list[common.objects.BarData],
-    ) -> dict[str, any]:
-        bars_since_highest_high = [
-            bar_object
-            for bar_object in one_minute_timeframe_stock.bars
-            if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
-        ]
-
-        total_volume = sum(
-            bar_object.volume
-            for bar_object in one_minute_bars
-        )
-
-        recent_days_structure_features = self.recent_days_structure_features(
-            day_timeframe_stock=day_timeframe_stock,
-            potential_confirmation_bar=potential_confirmation_bar,
-        )
-        breakout_structure_features = self.breakout_structure_features(
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            bars_since_highest_high=bars_since_highest_high,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            potential_confirmation_bar=potential_confirmation_bar,
-        )
-        volume_structure_features = self.volume_structure_features(
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            bars_since_highest_high=bars_since_highest_high,
-            potential_confirmation_bar=potential_confirmation_bar,
-        )
-        macd_structure_features = self.macd_structure_features(
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            bars_since_highest_high=bars_since_highest_high,
-            potential_confirmation_bar=potential_confirmation_bar,
-        )
-        pre_market_structure_features = self.pre_market_structure_features(
-            day_timeframe_stock=day_timeframe_stock,
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            potential_confirmation_bar=potential_confirmation_bar,
-        )
-
-        feature_upper_wick = breakout_structure_features["feature_entry_bar_upper_wick"]
-        feature_volume_to_previous = volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"]
-
-        base_features = {
-            "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
-            "total_volume": total_volume,
-        }
-
-        highest_high_bar_body = abs(highest_high_one_minute_bar.close - highest_high_one_minute_bar.open_value) / highest_high_one_minute_bar.open_value if highest_high_one_minute_bar is not None else 0
-        highest_high_bar_wick = highest_high_one_minute_bar.high - highest_high_one_minute_bar.close if highest_high_one_minute_bar is not None and highest_high_one_minute_bar.is_positive else 0
-        if highest_high_bar_wick == 0:
-            highest_high_bar_wick = highest_high_one_minute_bar.high - highest_high_one_minute_bar.open_value if highest_high_one_minute_bar is not None and not highest_high_one_minute_bar.is_positive else 0
-
-        previous_bar = one_minute_timeframe_stock.previous_bar(
-            bar_object=potential_confirmation_bar,
-        )
-
-        complex_features = {
-            "feature_weak_wick_volume_rejection": 1 if feature_upper_wick > 0.262 and feature_volume_to_previous <= 1.17 else 0,
-            "feature_clean_breakout_efficiency": 1 if (
-                breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] >= 0.35
-                and breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] <= 0.80
-                and breakout_structure_features["feature_entry_bar_body"] >= 0.75
-                and breakout_structure_features["feature_entry_bar_upper_wick"] <= 0.15
-            ) else 0,
-            "feature_inefficient_breakout_extension": 1 if (
-                breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] < 0.20
-                and breakout_structure_features["feature_entry_extension_pressure"] > 0.30
-            ) else 0,
-            "feature_strong_vwap_volume_reentry": 1 if (
-                recent_days_structure_features["feature_current_day_vwap_to_recent_days"] > 2.28
-                and breakout_structure_features["feature_entry_extension_pressure"] > 0.169
-                and volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"] > 2.03
-            ) else 0,
-            "feature_volume_without_macd_confirmation": volume_structure_features["feature_entry_bar_volume_to_highest_volume_in_pullback"]/ max(macd_structure_features["feature_entry_bar_histogram_to_highest_histogram"], 0.01),
-            "feature_entry_volume_price_efficiency": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/max(volume_structure_features["feature_entry_bar_volume_to_volume_average"], 0.01),
-            "feature_highest_high_quality": (
-                highest_high_bar_body
-                * highest_high_one_minute_bar.close
-                * (highest_high_one_minute_bar.volume/highest_high_one_minute_bar.volume_average)
-            ) / max(highest_high_bar_wick + 0.01, 0.01),
-            "feature_pullback_health": (
-                volume_structure_features["feature_positive_vs_negative_volume_during_pullback"]
-                * volume_structure_features["feature_entry_bar_volume_to_highest_high_volume"]
-            ) * max(breakout_structure_features["feature_breakout_attempts_during_pullback"] + 1, 1),
-            "feature_previous_bar_breakout_quality": (
-                breakout_structure_features["feature_previous_bar_already_crossed_highest_high"]
-                and previous_bar.bar_wick_percentage > 0.25
-                and potential_confirmation_bar.body_percentage < previous_bar.body_percentage
-            ) if previous_bar is not None else 0,
-            "feature_minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) - 30,
-        }
-
-        features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
-
-        return features
-
-    def should_run_model_by_hard_rules(
+    def feature_overall_legit_trade(
         self,
         features_data: dict[str, float],
     ) -> bool:
@@ -509,3 +403,117 @@ class DataExtractor:
             return False
 
         return True
+
+    #pylint:disable=W0613
+    def extract_features_from_symbol_data(
+        self,
+        day_timeframe_stock: common.objects.Stock,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+        highest_high_one_minute_bar: common.objects.BarData,
+        volume_sum_since_market_open: float,
+        one_minute_bars: list[common.objects.BarData],
+    ) -> dict[str, any]:
+        bars_since_highest_high = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
+        ]
+
+        total_volume = sum(
+            bar_object.volume
+            for bar_object in one_minute_bars
+        )
+
+        recent_days_structure_features = self.recent_days_structure_features(
+            day_timeframe_stock=day_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        breakout_structure_features = self.breakout_structure_features(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            bars_since_highest_high=bars_since_highest_high,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        volume_structure_features = self.volume_structure_features(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            bars_since_highest_high=bars_since_highest_high,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        macd_structure_features = self.macd_structure_features(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
+            bars_since_highest_high=bars_since_highest_high,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        pre_market_structure_features = self.pre_market_structure_features(
+            day_timeframe_stock=day_timeframe_stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+
+        feature_upper_wick = breakout_structure_features["feature_entry_bar_upper_wick"]
+        feature_volume_to_previous = volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"]
+
+        base_features = {
+            "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
+            "total_volume": total_volume,
+        }
+
+        highest_high_bar_body = abs(highest_high_one_minute_bar.close - highest_high_one_minute_bar.open_value) / highest_high_one_minute_bar.open_value if highest_high_one_minute_bar is not None else 0
+        highest_high_bar_wick = highest_high_one_minute_bar.high - highest_high_one_minute_bar.close if highest_high_one_minute_bar is not None and highest_high_one_minute_bar.is_positive else 0
+        if highest_high_bar_wick == 0:
+            highest_high_bar_wick = highest_high_one_minute_bar.high - highest_high_one_minute_bar.open_value if highest_high_one_minute_bar is not None and not highest_high_one_minute_bar.is_positive else 0
+
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+
+        complex_features = {
+            "feature_weak_wick_volume_rejection": 1 if feature_upper_wick > 0.262 and feature_volume_to_previous <= 1.17 else 0,
+            "feature_clean_breakout_efficiency": 1 if (
+                breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] >= 0.35
+                and breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] <= 0.80
+                and breakout_structure_features["feature_entry_bar_body"] >= 0.75
+                and breakout_structure_features["feature_entry_bar_upper_wick"] <= 0.15
+            ) else 0,
+            "feature_inefficient_breakout_extension": 1 if (
+                breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] < 0.20
+                and breakout_structure_features["feature_entry_extension_pressure"] > 0.30
+            ) else 0,
+            "feature_strong_vwap_volume_reentry": 1 if (
+                recent_days_structure_features["feature_current_day_vwap_to_recent_days"] > 2.28
+                and breakout_structure_features["feature_entry_extension_pressure"] > 0.169
+                and volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"] > 2.03
+            ) else 0,
+            "feature_volume_without_macd_confirmation": volume_structure_features["feature_entry_bar_volume_to_highest_volume_in_pullback"]/ max(macd_structure_features["feature_entry_bar_histogram_to_highest_histogram"], 0.01),
+            "feature_entry_volume_price_efficiency": (potential_confirmation_bar.close - potential_confirmation_bar.open_value)/max(volume_structure_features["feature_entry_bar_volume_to_volume_average"], 0.01),
+            "feature_highest_high_quality": (
+                highest_high_bar_body
+                * highest_high_one_minute_bar.close
+                * (highest_high_one_minute_bar.volume/highest_high_one_minute_bar.volume_average)
+            ) / max(highest_high_bar_wick + 0.01, 0.01),
+            "feature_pullback_health": (
+                volume_structure_features["feature_positive_vs_negative_volume_during_pullback"]
+                * volume_structure_features["feature_entry_bar_volume_to_highest_high_volume"]
+            ) * max(breakout_structure_features["feature_breakout_attempts_during_pullback"] + 1, 1),
+            "feature_previous_bar_breakout_quality": (
+                breakout_structure_features["feature_previous_bar_already_crossed_highest_high"]
+                and previous_bar.bar_wick_percentage > 0.25
+                and potential_confirmation_bar.body_percentage < previous_bar.body_percentage
+            ) if previous_bar is not None else 0,
+            "feature_minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) - 30,
+        }
+
+        features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
+
+        feature_overall_legit_trade = {
+            "feature_overall_legit_trade": self.feature_overall_legit_trade(
+                features_data=features,
+            ),
+        }
+
+        features = features | feature_overall_legit_trade
+
+        return features

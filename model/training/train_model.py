@@ -121,7 +121,7 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_current_day_high_to_recent_days_highs",
             "feature_controlled_volume_entry_quality",
             "feature_entry_bar_ema_9_to_vwap",
-            "should_run_model_by_hard_rules",
+            "feature_overall_legit_trade",
         ]:
             final_shares_columns.append(feature)
 

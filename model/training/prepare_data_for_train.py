@@ -13,7 +13,6 @@ FALSE_POSITIVE_FILE_NAME = "model/training/false_positive_results.csv"
 #pylint:disable=unspecified-encoding
 def write_to_csv(
     symbols_data: list[dict[str, any]],
-    data_extractor_obj: data_extractor.DataExtractor,
 ):
     columns = [
         "symbol",
@@ -22,7 +21,6 @@ def write_to_csv(
         "expected_confirmation_bar_time",
         "highest_high_one_minute_bar_time",
         "total_volume",
-        "should_run_model_by_hard_rules",
     ]
     columns.extend(
         [
@@ -48,11 +46,6 @@ def write_to_csv(
         total_volume = symbol_data["total_volume"]
         features = [v for k, v in symbol_data.items() if k.startswith("feature_")]
 
-        features_data = {k:v for k, v in symbol_data.items() if k.startswith("feature_")}
-        should_run_model_by_hard_rules = data_extractor_obj.should_run_model_by_hard_rules(
-            features_data=features_data,
-        )
-
         symbol = stock_object.symbol_name
         original_bar_time = stock_object.specific_bar_time
 
@@ -70,7 +63,6 @@ def write_to_csv(
             expected_confirmation_bar_time,
             highest_high_one_minute_bar_time,
             total_volume,
-            should_run_model_by_hard_rules,
         ]
         row_data.extend(features)
 
@@ -126,5 +118,4 @@ if __name__ == '__main__':
 
     write_to_csv(
         symbols_data=symbols_data_parameters,
-        data_extractor_obj=data_extractor_object,
     )
