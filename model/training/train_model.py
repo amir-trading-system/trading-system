@@ -32,8 +32,8 @@ THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 # Final stable feature filtering
 MIN_MEAN_IMPORTANCE = 0.02
 MIN_TOP_K_FREQUENCY = 0.5
-TOP_K_FOR_STABILITY = 6
-MIN_SELECTED_FEATURES = 6
+TOP_K_FOR_STABILITY = 7
+MIN_SELECTED_FEATURES = 7
 
 # Optional hard rules for final decision layer
 USE_HARD_RULES = True
@@ -122,6 +122,7 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
             "feature_controlled_volume_entry_quality",
             "feature_entry_bar_ema_9_to_vwap",
             "feature_overall_legit_trade",
+            "feature_entry_rejection_pressure",
         ]:
             final_shares_columns.append(feature)
 

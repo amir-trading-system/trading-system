@@ -1,7 +1,8 @@
 feature,mean_importance,std_importance,top_k_frequency
-feature_overall_legit_trade,0.4179934001947179,0.023054383010598277,1.0
-feature_controlled_volume_entry_quality,0.1408123927247301,0.012837376931225579,1.0
-feature_current_day_vwap_to_recent_days,0.11958090660997707,0.0108654846448895,1.0
-feature_entry_bar_ema_9_to_vwap,0.11381168428331842,0.009286388691623175,1.0
-feature_current_day_high_to_recent_days_highs,0.1054182762518483,0.007856575046483391,1.0
-feature_current_day_high_to_previous_high,0.10238333993540825,0.007772671638892462,1.0
+feature_overall_legit_trade,0.3922908916219596,0.02634794050457357,1.0
+feature_current_day_vwap_to_recent_days,0.11785519704066194,0.01146273213482518,1.0
+feature_entry_bar_ema_9_to_vwap,0.11351693926745707,0.009527390306149084,1.0
+feature_current_day_high_to_recent_days_highs,0.10095608766676521,0.008291220760221433,1.0
+feature_controlled_volume_entry_quality,0.09816077014912354,0.008694472549805207,1.0
+feature_current_day_high_to_previous_high,0.09613902585549937,0.009919008875686914,1.0
+feature_entry_rejection_pressure,0.08108108839853323,0.009143418394197663,1.0

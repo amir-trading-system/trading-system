@@ -504,6 +504,7 @@ class DataExtractor:
                 and potential_confirmation_bar.body_percentage < previous_bar.body_percentage
             ) if previous_bar is not None else 0,
             "feature_minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) - 30,
+            "feature_entry_rejection_pressure": breakout_structure_features["feature_entry_bar_upper_wick"] / max(breakout_structure_features["feature_entry_bar_body"], 0.01),
         }
 
         features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
