@@ -301,13 +301,14 @@ class DataExtractor:
         entry_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
         pullback_pos_neg_volume = features_data["feature_positive_vs_negative_volume_during_pullback"]
         weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
-        breakout_efficiency = features_data["feature_entry_breakout_efficiency_from_ema_9"]
+        entry_breakout_efficiency_from_ema_9 = features_data["feature_entry_breakout_efficiency_from_ema_9"]
         current_day_movement_to_recent_days = features_data["feature_current_day_movement_to_recent_days_movement"]
         entry_bar_upper_wick = features_data["feature_entry_bar_upper_wick"]
         entry_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
         entry_volume_to_highest_volume_in_pullback = features_data["feature_entry_bar_volume_to_highest_volume_in_pullback"]
         entry_histogram_to_lowest_histogram = features_data["feature_entry_bar_histogram_to_lowest_histogram"]
         entry_volume_price_efficiency = features_data["feature_entry_volume_price_efficiency"]
+        current_day_low_to_ema_9 = features_data["feature_current_day_low_to_ema_9"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -336,7 +337,7 @@ class DataExtractor:
         # Added current_volume > 2.0 to avoid rejecting one good positive case.
         if (
             current_vwap <= 1.36
-            and breakout_efficiency <= 0.40
+            and entry_breakout_efficiency_from_ema_9 <= 0.40
             and current_volume <= 145
             and current_volume > 2.0
         ):
@@ -350,14 +351,14 @@ class DataExtractor:
             and current_high_to_recent > 1.81
             and current_high_to_previous <= 1.40
             and gains_until_entry <= 0.70
-            and breakout_efficiency <= 0.55
+            and entry_breakout_efficiency_from_ema_9 <= 0.55
         ):
             return False
 
         # Reject: extended entry, but inefficient breakout
         # Safe on current dataset: removed 0 positives.
         if (
-            breakout_efficiency <= 0.20
+            entry_breakout_efficiency_from_ema_9 <= 0.20
             and entry_ema9_to_vwap > 1.09
             and gains_until_entry > 0.60
         ):
@@ -367,7 +368,7 @@ class DataExtractor:
         # Safe on current dataset: removed 0 positives.
         if (
             current_high_to_recent > 3.31
-            and breakout_efficiency <= 0.40
+            and entry_breakout_efficiency_from_ema_9 <= 0.40
             and gains_until_entry > 0.60
         ):
             return False
@@ -383,7 +384,7 @@ class DataExtractor:
             return False
 
         # Reject: weak previous-high reclaim with high breakout-efficiency ratio
-        if current_high_to_previous <= 1.02 and breakout_efficiency > 0.64:
+        if current_high_to_previous <= 1.02 and entry_breakout_efficiency_from_ema_9 > 0.64:
             return False
 
         # Reject: rejection wick with weak entry pressure
@@ -396,10 +397,18 @@ class DataExtractor:
         if current_ema20 <= 0.988 and entry_histogram_to_lowest_histogram > 1.28:
             return False
 
-        if breakout_efficiency <= 0.263 and entry_ema9_to_vwap > 1.122:
+        if entry_breakout_efficiency_from_ema_9 <= 0.263 and entry_ema9_to_vwap > 1.122:
             return False
 
         if entry_volume_price_efficiency <= 0.050 and controlled_volume_quality <= 0.852:
+            return False
+
+        # Reject: elevated day structure, but inefficient entry breakout
+        if (
+            current_day_low_to_ema_9 > 1.29
+            and entry_breakout_efficiency_from_ema_9 <= 0.36
+            and controlled_volume_quality > 1.0
+        ):
             return False
 
         return True
@@ -470,14 +479,21 @@ class DataExtractor:
             bar_object=potential_confirmation_bar,
         )
 
+        feature_clean_breakout_efficiency = 1 if (
+            breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] >= 0.35
+            and breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] <= 0.80
+            and breakout_structure_features["feature_entry_bar_body"] >= 0.75
+            and breakout_structure_features["feature_entry_bar_upper_wick"] <= 0.15
+        ) else 0
+        feature_entry_rejection_pressure = breakout_structure_features["feature_entry_bar_upper_wick"] / max(breakout_structure_features["feature_entry_bar_body"], 0.01)
+        feature_pullback_health = (
+            volume_structure_features["feature_positive_vs_negative_volume_during_pullback"]
+            * volume_structure_features["feature_entry_bar_volume_to_highest_high_volume"]
+        ) * max(breakout_structure_features["feature_breakout_attempts_during_pullback"] + 1, 1)
+
         complex_features = {
             "feature_weak_wick_volume_rejection": 1 if feature_upper_wick > 0.262 and feature_volume_to_previous <= 1.17 else 0,
-            "feature_clean_breakout_efficiency": 1 if (
-                breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] >= 0.35
-                and breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] <= 0.80
-                and breakout_structure_features["feature_entry_bar_body"] >= 0.75
-                and breakout_structure_features["feature_entry_bar_upper_wick"] <= 0.15
-            ) else 0,
+            "feature_clean_breakout_efficiency": feature_clean_breakout_efficiency,
             "feature_inefficient_breakout_extension": 1 if (
                 breakout_structure_features["feature_entry_breakout_efficiency_from_ema_9"] < 0.20
                 and breakout_structure_features["feature_entry_extension_pressure"] > 0.30
@@ -494,17 +510,24 @@ class DataExtractor:
                 * highest_high_one_minute_bar.close
                 * (highest_high_one_minute_bar.volume/highest_high_one_minute_bar.volume_average)
             ) / max(highest_high_bar_wick + 0.01, 0.01),
-            "feature_pullback_health": (
-                volume_structure_features["feature_positive_vs_negative_volume_during_pullback"]
-                * volume_structure_features["feature_entry_bar_volume_to_highest_high_volume"]
-            ) * max(breakout_structure_features["feature_breakout_attempts_during_pullback"] + 1, 1),
+            "feature_pullback_health": feature_pullback_health,
             "feature_previous_bar_breakout_quality": (
                 breakout_structure_features["feature_previous_bar_already_crossed_highest_high"]
                 and previous_bar.bar_wick_percentage > 0.25
                 and potential_confirmation_bar.body_percentage < previous_bar.body_percentage
             ) if previous_bar is not None else 0,
             "feature_minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) - 30,
-            "feature_entry_rejection_pressure": breakout_structure_features["feature_entry_bar_upper_wick"] / max(breakout_structure_features["feature_entry_bar_body"], 0.01),
+            "feature_entry_rejection_pressure": feature_entry_rejection_pressure,
+            "feature_late_chase_after_high": (
+                breakout_structure_features["feature_distance_from_highest_high"] <= 3
+                and breakout_structure_features["feature_entry_bar_movement_recent_bars_average"] > 20
+                and breakout_structure_features["feature_crossed_at_least_one_bar_from_recent_bars"] == 0
+            ),
+            "feature_clean_reentry_confirmation": (
+                feature_clean_breakout_efficiency == 1
+                and feature_entry_rejection_pressure <= 0.15
+                and feature_pullback_health > 2.0
+            ),
         }
 
         features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
