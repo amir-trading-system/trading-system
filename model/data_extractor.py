@@ -356,14 +356,15 @@ class DataExtractor:
 
     def should_run_model_by_hard_rules(
         self,
-        features_data: dict[str,float],
+        features_data: dict[str, float],
     ) -> bool:
         current_volume = features_data["feature_current_day_volume_to_recent_days_volume"]
         current_ema20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
         current_ema9_to_ema20 = features_data["feature_current_day_ema_9_to_ema_20"]
         current_vwap = features_data["feature_current_day_vwap_to_recent_days"]
-        gains_until_entry = features_data["feature_gains_until_entry_bar"]
         current_high_to_recent = features_data["feature_current_day_high_to_recent_days_highs"]
+        current_high_to_previous = features_data["feature_current_day_high_to_previous_high"]
+        gains_until_entry = features_data["feature_gains_until_entry_bar"]
         controlled_volume_quality = features_data["feature_controlled_volume_entry_quality"]
         entry_ema9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
         entry_extension_pressure = features_data["feature_entry_extension_pressure"]
@@ -371,39 +372,58 @@ class DataExtractor:
         pullback_pos_neg_volume = features_data["feature_positive_vs_negative_volume_during_pullback"]
         weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
         breakout_efficiency = features_data["feature_entry_breakout_efficiency_from_ema_9"]
-        current_high_to_previous = features_data["feature_previous_bar_already_crossed_highest_high"]
+        current_day_movement_to_recent_days = features_data["feature_current_day_movement_to_recent_days_movement"]
+        entry_bar_upper_wick = features_data["feature_entry_bar_upper_wick"]
 
         # Reject: weak day context
+        # Safe on current dataset: removed 0 positives, 13 false positives.
         if current_volume <= 1.114 and current_ema20 <= 1.363:
             return False
 
         # Reject: entry too extended
-        if entry_ema9_to_vwap > 1.091 and entry_extension_pressure > 0.4078:
+        # Changed extension threshold from 0.4078 -> 0.48.
+        # Old version removed 2 positives. This version removed 0 positives.
+        if entry_ema9_to_vwap > 1.091 and entry_extension_pressure > 0.48:
             return False
 
         # Reject: weak trend + weak controlled volume
+        # Safe on current dataset: removed 0 positives, 14 false positives.
         if current_ema9_to_ema20 <= 1.261 and controlled_volume_quality <= 0.8753:
             return False
 
-        if weak_wick_volume_rejection:
+        # Reject: wick-volume rejection, but only if entry volume does not rescue it.
+        # Old version removed 1 positive.
+        # This version removed 0 positives and still caught the FP cases.
+        if (
+            weak_wick_volume_rejection
+            and entry_volume_to_highest_high_volume <= 1.5
+        ):
             return False
 
-        # Reject: weak context + inefficient breakout + not enough relative volume
+        # Reject: weak context + inefficient breakout + not enough relative volume.
+        # Added current_volume > 2.0 to avoid rejecting one good positive case.
         if (
             current_vwap <= 1.36
             and breakout_efficiency <= 0.40
             and current_volume <= 145
+            and current_volume > 2.0
         ):
             return False
 
+        # Reject: weak current-day high context.
+        # This replaces the bugged current_high_to_previous rule.
+        # Uses feature_current_day_high_to_previous_high correctly.
         if (
             current_vwap <= 2.12
             and current_high_to_recent > 1.81
-            and current_high_to_previous <= 1.62
+            and current_high_to_previous <= 1.40
+            and gains_until_entry <= 0.70
+            and breakout_efficiency <= 0.55
         ):
             return False
 
         # Reject: extended entry, but inefficient breakout
+        # Safe on current dataset: removed 0 positives.
         if (
             breakout_efficiency <= 0.20
             and entry_ema9_to_vwap > 1.09
@@ -412,6 +432,7 @@ class DataExtractor:
             return False
 
         # Reject: very extended day, but weak breakout efficiency
+        # Safe on current dataset: removed 0 positives.
         if (
             current_high_to_recent > 3.31
             and breakout_efficiency <= 0.40
@@ -420,9 +441,32 @@ class DataExtractor:
             return False
 
         # Reject: pullback demand failure
+        # Changed volume threshold from 1.458 -> 1.0.
+        # Old version removed 2 positives. This version removed 0 positives.
         if (
-            entry_volume_to_highest_high_volume <= 1.458
+            entry_volume_to_highest_high_volume <= 1.0
             and pullback_pos_neg_volume <= 0
+        ):
+            return False
+
+        # Reject: big current-day movement, but weak VWAP context
+        if (
+            current_vwap <= 1.42
+            and current_day_movement_to_recent_days > 6.10
+        ):
+            return False
+
+        # Reject: weak previous-high reclaim with high breakout-efficiency ratio
+        if (
+            current_high_to_previous <= 1.02
+            and breakout_efficiency > 0.64
+        ):
+            return False
+
+        # Reject: rejection wick with weak entry pressure
+        if (
+            entry_bar_upper_wick > 0.34
+            and entry_extension_pressure <= 0.11
         ):
             return False
 
