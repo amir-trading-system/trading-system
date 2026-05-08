@@ -374,6 +374,9 @@ class DataExtractor:
         breakout_efficiency = features_data["feature_entry_breakout_efficiency_from_ema_9"]
         current_day_movement_to_recent_days = features_data["feature_current_day_movement_to_recent_days_movement"]
         entry_bar_upper_wick = features_data["feature_entry_bar_upper_wick"]
+        entry_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
+        entry_volume_to_highest_volume_in_pullback = features_data["feature_entry_bar_volume_to_highest_volume_in_pullback"]
+        entry_histogram_to_lowest_histogram = features_data["feature_entry_bar_histogram_to_lowest_histogram"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -467,6 +470,18 @@ class DataExtractor:
         if (
             entry_bar_upper_wick > 0.34
             and entry_extension_pressure <= 0.11
+        ):
+            return False
+
+        if (
+            entry_histogram_to_highest_histogram <= 0.417
+            and entry_volume_to_highest_volume_in_pullback > 2.16
+        ):
+            return False
+
+        if (
+            current_ema20 <= 0.988
+            and entry_histogram_to_lowest_histogram > 1.28
         ):
             return False
 
