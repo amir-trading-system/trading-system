@@ -120,7 +120,10 @@ class BarData:
         if self.high - self.low <= 0.0:
             return 0.0
 
-        return (self.high - self.close)/(self.high - self.low)
+        if self.is_positive:
+            return (self.high - self.close)/(self.high - self.low)
+        else:
+            return (self.high - self.open_value)/(self.high - self.low)
 
     @property
     def bar_lower_wick_percentage(

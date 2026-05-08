@@ -40,7 +40,7 @@ class Runner:
         x_live = pd.DataFrame(self.imputer.transform(x_live), columns=self.features)
 
         probability = float(self.model.predict_proba(x_live)[0, 1])
-        should_take_trade = probability > self.threshold
+        should_take_trade = probability >= 0.52
 
         score = round(probability * 100, 2)
 
