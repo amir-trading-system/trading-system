@@ -147,12 +147,28 @@ class DataExtractor:
     ) -> dict[str, float]:
         highest_volume_since_highest_high = 0
         total_bars_since_highest_high = len(bars_since_highest_high)
+        volume_since_highest_high = 0
+        volume_before_highest_high = 0
+        bars_before_highest_high = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if (
+                bar_object.is_after_market_open
+                or bar_object.is_opening_bar
+            )
+            and highest_high_one_minute_bar is not None
+            and bar_object.bar_time < highest_high_one_minute_bar.bar_time
+        ]
+        if bars_before_highest_high:
+            volume_before_highest_high = sum(
+                bar_object.volume
+                for bar_object in bars_before_highest_high
+            )
 
-        volume_sum = 0
         positive_volume = 0
         negative_volume = 0
         for bar_object in bars_since_highest_high:
-            volume_sum += bar_object.volume
+            volume_since_highest_high += bar_object.volume
 
             if bar_object.is_positive:
                 positive_volume += bar_object.volume
@@ -165,7 +181,7 @@ class DataExtractor:
                 bar_object.volume
                 for bar_object in bars_since_highest_high
             )
-            volume_average = volume_sum/total_bars_since_highest_high
+            volume_average = volume_since_highest_high/total_bars_since_highest_high
 
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
@@ -184,6 +200,8 @@ class DataExtractor:
             "feature_entry_bar_volume_to_highest_high_volume": entry_bar_volume_to_highest_high_volume,
             "feature_positive_vs_negative_volume_during_pullback": positive_vs_negative_volume_during_pullback,
             "feature_entry_bar_volume_to_previous_bar_volume": entry_bar_volume_to_previous_bar_volume,
+            "feature_volume_since_highest_high_to_volume_before": volume_since_highest_high/volume_before_highest_high if volume_before_highest_high > 0 else 1,
+            "feature_bars_since_highest_high_to_bars_before": len(bars_since_highest_high)/len(bars_before_highest_high),
         }
 
     def macd_structure_features(
@@ -202,6 +220,8 @@ class DataExtractor:
         lowest_histogram_since_highest_high = 100
         histogram_changed_to_positive_direction_count = 0
         histogram_changed_to_negative_direction_count = 0
+        positive_histogram_count = 0
+        negative_histogram_count = 0
         for bar_object in bars_since_highest_high:
             previous_bar = one_minute_timeframe_stock.previous_bar(
                 bar_object=bar_object,
@@ -209,6 +229,16 @@ class DataExtractor:
             next_bar = one_minute_timeframe_stock.next_bar(
                 bar_object=bar_object,
             )
+
+            if previous_bar is not None:
+                if (
+                    True
+                    and bar_object.histogram > previous_bar.histogram
+                    and bar_object.histogram > 0
+                ):
+                    positive_histogram_count += 1
+                else:
+                    negative_histogram_count += 1
 
             histogram_sum += bar_object.histogram
             if bar_object.histogram > highest_histogram_since_highest_high:
@@ -240,6 +270,7 @@ class DataExtractor:
             "feature_entry_bar_histogram_to_highest_histogram": entry_bar_histogram_to_highest_histogram,
             "feature_entry_bar_histogram_to_lowest_histogram": entry_bar_histogram_to_lowest_histogram,
             "feature_histogram_changed_to_positive_direction_vs_negative_pct": histogram_changed_to_positive_direction_vs_negative_pct,
+            "feature_uptrend_histogram_vs_downtrend_since_highest_high": positive_histogram_count/negative_histogram_count if negative_histogram_count > 0 else 1,
         }
 
     def pre_market_structure_features(
@@ -315,6 +346,8 @@ class DataExtractor:
         price_movement_from_highest_high_to_lowest_low = features_data["feature_price_movement_from_highest_high_to_lowest_low"]
         entry_bar_body = features_data["feature_entry_bar_body"]
         entry_bar_low_to_ema_9 = features_data["feature_entry_bar_low_to_ema_9"]
+        bars_since_highest_high_to_bars_before = features_data["feature_bars_since_highest_high_to_bars_before"]
+        volume_since_highest_high_to_volume_before = features_data["feature_volume_since_highest_high_to_volume_before"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -425,38 +458,48 @@ class DataExtractor:
         if current_day_high_to_previous_high <= 1.28 and entry_bar_low_to_ema_9 <= 0.984:
             return False
 
-        ## positive range features:
-        if entry_volume_price_efficiency < 0.0050880487694637 or entry_volume_price_efficiency > 3.1633728117798294:
+        if bars_since_highest_high_to_bars_before <= 0.011 and entry_breakout_efficiency_from_ema_9 <= 0.27:
             return False
 
-        if current_day_volume_to_recent_days_volume < 0.2313710039166447 or current_day_volume_to_recent_days_volume > 21608.028607655124:
+        if volume_since_highest_high_to_volume_before <= 0.045 and entry_breakout_efficiency_from_ema_9 <= 0.27:
             return False
 
-        if current_day_low_to_ema_9 < 0.2256505023578341 or current_day_low_to_ema_9 > 1.57605115263333:
-            return False
+        positive_range_violations = 0
 
-        if gains_until_entry_bar < 0.0988483685220728 or gains_until_entry_bar > 8.750437521876094:
-            return False
+        if entry_volume_price_efficiency < 0.005 or entry_volume_price_efficiency > 3.16:
+            positive_range_violations += 1
 
-        if controlled_volume_entry_quality < 0.1909542969033574 or controlled_volume_entry_quality > 10181.118846946849:
-            return False
+        if current_day_volume_to_recent_days_volume < 0.23 or current_day_volume_to_recent_days_volume > 21608:
+            positive_range_violations += 1
 
-        if entry_bar_close_to_highest_high < 1.0019451682754066 or entry_bar_close_to_highest_high > 1.1405835543766578:
-            return False
+        if current_day_low_to_ema_9 < 0.225 or current_day_low_to_ema_9 > 1.576:
+            positive_range_violations += 1
 
-        if entry_bar_ema_9_to_ema_20 < 1.0041374938618868 or entry_bar_ema_9_to_ema_20 > 1.162670369021404:
-            return False
+        if gains_until_entry_bar < 0.098 or gains_until_entry_bar > 8.75:
+            positive_range_violations += 1
 
-        if entry_extension_pressure < 0.0028956845241688 or entry_extension_pressure > 1.024814029865993:
-            return False
+        if controlled_volume_entry_quality < 0.19 or controlled_volume_entry_quality > 10181:
+            positive_range_violations += 1
 
-        if entry_breakout_efficiency_from_ema_9 < 0.1166369490295368 or entry_breakout_efficiency_from_ema_9 > 0.9933905432922158:
-            return False
+        if entry_bar_close_to_highest_high < 1.0019 or entry_bar_close_to_highest_high > 1.1406:
+            positive_range_violations += 1
 
-        if entry_histogram_to_lowest_histogram < 0.983900023936078 or entry_histogram_to_lowest_histogram > 60.75459951762035:
-            return False
+        if entry_bar_ema_9_to_ema_20 < 1.004 or entry_bar_ema_9_to_ema_20 > 1.163:
+            positive_range_violations += 1
+
+        if entry_extension_pressure < 0.0029 or entry_extension_pressure > 1.025:
+            positive_range_violations += 1
+
+        if entry_breakout_efficiency_from_ema_9 < 0.1166 or entry_breakout_efficiency_from_ema_9 > 0.9934:
+            positive_range_violations += 1
+
+        if entry_histogram_to_lowest_histogram < 0.984 or entry_histogram_to_lowest_histogram > 60.75:
+            positive_range_violations += 1
 
         if price_movement_from_highest_high_to_lowest_low < 0.0096 or price_movement_from_highest_high_to_lowest_low > 18.18:
+            positive_range_violations += 1
+
+        if positive_range_violations >= 2:
             return False
 
         return True
