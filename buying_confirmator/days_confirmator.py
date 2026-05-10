@@ -289,10 +289,7 @@ class Confirmator:
             ):
                 if (
                     total_volume < 200000
-                    or (
-                        potential_confirmation_bar.volume/total_volume < 0.02
-                        and potential_confirmation_bar.volume < 50000
-                    )
+                    or potential_confirmation_bar.volume < 10000
                 ):
                     return (
                         score,
@@ -300,8 +297,10 @@ class Confirmator:
                     )
 
             if self.model_runner.should_run_model:
+                stock.number_of_potential_entry_points += 1
                 score = self.model_runner.score_potential_confirmation_bar(
                     potential_confirmation_bar=potential_confirmation_bar,
+                    day_timeframe_stock=stock,
                 )
 
                 msg = "Bar confirmed by model"

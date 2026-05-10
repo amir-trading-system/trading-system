@@ -135,6 +135,7 @@ class DataExtractor:
             "feature_previous_bar_already_crossed_highest_high": previous_bar_already_crossed_highest_high,
             "feature_crossed_at_least_one_bar_from_recent_bars": crossed_at_least_one_bar_from_recent_bars,
             "feature_failed_attempts_pressure": breakout_attempts_during_pullback * entry_extension_pressure,
+            "feature_price_movement_from_highest_high_to_lowest_low": highest_high_one_minute_bar.high - lowest_low_since_highest_high if highest_high_one_minute_bar is not None else 0,
         }
 
     def volume_structure_features(
@@ -311,6 +312,8 @@ class DataExtractor:
         current_day_low_to_ema_9 = features_data["feature_current_day_low_to_ema_9"]
         entry_bar_close_to_highest_high = features_data["feature_entry_bar_close_to_highest_high"]
         entry_bar_ema_9_to_ema_20 = features_data["feature_entry_bar_ema_9_to_ema_20"]
+        price_movement_from_highest_high_to_lowest_low = features_data["feature_price_movement_from_highest_high_to_lowest_low"]
+        entry_bar_body = features_data["feature_entry_bar_body"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -413,6 +416,10 @@ class DataExtractor:
         ):
             return False
 
+        # Reject: deep pullback, but weak entry body
+        if price_movement_from_highest_high_to_lowest_low > 5 and entry_bar_body < 0.65:
+            return False
+
         ## positive range features:
         if entry_volume_price_efficiency < 0.0050880487694637 or entry_volume_price_efficiency > 3.1633728117798294:
             return False
@@ -442,6 +449,9 @@ class DataExtractor:
             return False
 
         if entry_histogram_to_lowest_histogram < 0.983900023936078 or entry_histogram_to_lowest_histogram > 60.75459951762035:
+            return False
+
+        if price_movement_from_highest_high_to_lowest_low < 0.0096 or price_movement_from_highest_high_to_lowest_low > 18.18:
             return False
 
         return True

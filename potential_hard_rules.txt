@@ -1,0 +1,11 @@
+condition: feature_entry_volume_price_efficiency < 0.0050880487694637 or feature_entry_volume_price_efficiency > 3.1633728117798294. filtered count: 4
+condition: feature_current_day_volume_to_recent_days_volume < 0.2313710039166447 or feature_current_day_volume_to_recent_days_volume > 21608.028607655124. filtered count: 4
+condition: feature_current_day_low_to_ema_9 < 0.2256505023578341 or feature_current_day_low_to_ema_9 > 1.610804182951975. filtered count: 4
+condition: feature_gains_until_entry_bar < 0.0988483685220728 or feature_gains_until_entry_bar > 8.750437521876094. filtered count: 5
+condition: feature_controlled_volume_entry_quality < 0.1909542969033574 or feature_controlled_volume_entry_quality > 10181.118846946849. filtered count: 4
+condition: feature_entry_bar_close_to_highest_high < 1.0019451682754066 or feature_entry_bar_close_to_highest_high > 1.1405835543766578. filtered count: 4
+condition: feature_entry_bar_ema_9_to_ema_20 < 1.0041374938618868 or feature_entry_bar_ema_9_to_ema_20 > 1.162670369021404. filtered count: 4
+condition: feature_entry_extension_pressure < 0.0028956845241688 or feature_entry_extension_pressure > 1.024814029865993. filtered count: 7
+condition: feature_entry_breakout_efficiency_from_ema_9 < 0.11236995572799 or feature_entry_breakout_efficiency_from_ema_9 > 0.9933905432922158. filtered count: 10
+condition: feature_price_movement_from_highest_high_to_lowest_low < 0.0096 or feature_price_movement_from_highest_high_to_lowest_low > 18.18. filtered count: 4
+condition: feature_entry_bar_volume_to_highest_high_volume < 0.1637344887282379 or feature_entry_bar_volume_to_highest_high_volume > 49.62451273683257. filtered count: 4

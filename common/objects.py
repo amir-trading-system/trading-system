@@ -238,6 +238,7 @@ class Stock:
         total_price_volume: float = 0.0,
         volume_sum_since_4_am_today: float = 0.0,
         volume_sum_since_market_open: float = 0.0,
+        number_of_potential_entry_points: int = 0,
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -260,6 +261,7 @@ class Stock:
         self.day_request_id = day_request_id
         self.total_volume = total_volume
         self.total_price_volume = total_price_volume
+        self.number_of_potential_entry_points = number_of_potential_entry_points
 
     def __getstate__(self):
         # Return a dictionary of attributes to pickle, excluding 'lock'

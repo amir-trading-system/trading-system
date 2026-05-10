@@ -142,6 +142,7 @@ class Analyzer:
                 volume_sum_since_4_am_today=stock_object.volume_sum_since_4_am_today,
                 volume_sum_since_market_open=stock_object.volume_sum_since_market_open,
                 is_positive=stock_object.is_positive,
+                number_of_potential_entry_points=stock_object.number_of_potential_entry_points,
             )
             stock.arrange_data_for_analysis()
 

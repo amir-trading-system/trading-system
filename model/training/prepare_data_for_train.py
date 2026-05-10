@@ -112,6 +112,8 @@ def potential_hard_rules() -> None:
         if column.startswith("feature_")
     ]
 
+    potential_hard_rules_list = []
+
     for feature in features:
         positive_df[feature] = positive_df[feature].replace({"False": 0, "True": 1}).astype(float)
         false_positive_df[feature] = false_positive_df[feature].replace({"False": 0, "True": 1}).astype(float)
@@ -127,7 +129,11 @@ def potential_hard_rules() -> None:
         filtered_length = len(filtered_false_positive)
 
         if filtered_length > 3:
+            potential_hard_rules_list.append(f"{feature} < {min_value} or {feature} > {max_value}\n")
             print(f"condition: {feature} < {min_value} or {feature} > {max_value}. filtered count: {filtered_length}")
+
+    with open("potential_hard_rules.txt", "w") as f:
+        f.writelines(potential_hard_rules_list)
 
 if __name__ == '__main__':
     data_extractor_object = data_extractor.DataExtractor()
