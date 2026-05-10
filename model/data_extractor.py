@@ -294,7 +294,7 @@ class DataExtractor:
         current_ema9_to_ema20 = features_data["feature_current_day_ema_9_to_ema_20"]
         current_vwap = features_data["feature_current_day_vwap_to_recent_days"]
         current_high_to_recent = features_data["feature_current_day_high_to_recent_days_highs"]
-        current_high_to_previous = features_data["feature_current_day_high_to_previous_high"]
+        current_day_high_to_previous_high = features_data["feature_current_day_high_to_previous_high"]
         gains_until_entry_bar = features_data["feature_gains_until_entry_bar"]
         controlled_volume_entry_quality = features_data["feature_controlled_volume_entry_quality"]
         entry_ema9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
@@ -314,6 +314,7 @@ class DataExtractor:
         entry_bar_ema_9_to_ema_20 = features_data["feature_entry_bar_ema_9_to_ema_20"]
         price_movement_from_highest_high_to_lowest_low = features_data["feature_price_movement_from_highest_high_to_lowest_low"]
         entry_bar_body = features_data["feature_entry_bar_body"]
+        entry_bar_low_to_ema_9 = features_data["feature_entry_bar_low_to_ema_9"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -354,7 +355,7 @@ class DataExtractor:
         if (
             current_vwap <= 2.12
             and current_high_to_recent > 1.81
-            and current_high_to_previous <= 1.40
+            and current_day_high_to_previous_high <= 1.40
             and gains_until_entry_bar <= 0.70
             and entry_breakout_efficiency_from_ema_9 <= 0.55
         ):
@@ -389,7 +390,7 @@ class DataExtractor:
             return False
 
         # Reject: weak previous-high reclaim with high breakout-efficiency ratio
-        if current_high_to_previous <= 1.02 and entry_breakout_efficiency_from_ema_9 > 0.64:
+        if current_day_high_to_previous_high <= 1.02 and entry_breakout_efficiency_from_ema_9 > 0.64:
             return False
 
         # Reject: rejection wick with weak entry pressure
@@ -418,6 +419,10 @@ class DataExtractor:
 
         # Reject: deep pullback, but weak entry body
         if price_movement_from_highest_high_to_lowest_low > 5 and entry_bar_body < 0.65:
+            return False
+
+        # Reject: weak current-day breakout context + entry candle loses EMA9
+        if current_day_high_to_previous_high <= 1.28 and entry_bar_low_to_ema_9 <= 0.984:
             return False
 
         ## positive range features:
