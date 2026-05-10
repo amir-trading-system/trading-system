@@ -288,14 +288,14 @@ class DataExtractor:
         self,
         features_data: dict[str, float],
     ) -> bool:
-        current_volume = features_data["feature_current_day_volume_to_recent_days_volume"]
+        current_day_volume_to_recent_days_volume = features_data["feature_current_day_volume_to_recent_days_volume"]
         current_ema20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
         current_ema9_to_ema20 = features_data["feature_current_day_ema_9_to_ema_20"]
         current_vwap = features_data["feature_current_day_vwap_to_recent_days"]
         current_high_to_recent = features_data["feature_current_day_high_to_recent_days_highs"]
         current_high_to_previous = features_data["feature_current_day_high_to_previous_high"]
-        gains_until_entry = features_data["feature_gains_until_entry_bar"]
-        controlled_volume_quality = features_data["feature_controlled_volume_entry_quality"]
+        gains_until_entry_bar = features_data["feature_gains_until_entry_bar"]
+        controlled_volume_entry_quality = features_data["feature_controlled_volume_entry_quality"]
         entry_ema9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
         entry_extension_pressure = features_data["feature_entry_extension_pressure"]
         entry_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
@@ -309,10 +309,12 @@ class DataExtractor:
         entry_histogram_to_lowest_histogram = features_data["feature_entry_bar_histogram_to_lowest_histogram"]
         entry_volume_price_efficiency = features_data["feature_entry_volume_price_efficiency"]
         current_day_low_to_ema_9 = features_data["feature_current_day_low_to_ema_9"]
+        entry_bar_close_to_highest_high = features_data["feature_entry_bar_close_to_highest_high"]
+        entry_bar_ema_9_to_ema_20 = features_data["feature_entry_bar_ema_9_to_ema_20"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
-        if current_volume <= 1.114 and current_ema20 <= 1.363:
+        if current_day_volume_to_recent_days_volume <= 1.114 and current_ema20 <= 1.363:
             return False
 
         # Reject: entry too extended
@@ -324,7 +326,7 @@ class DataExtractor:
 
         # Reject: weak trend + weak controlled volume
         # Safe on current dataset: removed 0 positives, 14 false positives.
-        if current_ema9_to_ema20 <= 1.261 and controlled_volume_quality <= 0.8753:
+        if current_ema9_to_ema20 <= 1.261 and controlled_volume_entry_quality <= 0.8753:
             return False
 
         # Reject: wick-volume rejection, but only if entry volume does not rescue it.
@@ -338,8 +340,8 @@ class DataExtractor:
         if (
             current_vwap <= 1.36
             and entry_breakout_efficiency_from_ema_9 <= 0.40
-            and current_volume <= 145
-            and current_volume > 2.0
+            and current_day_volume_to_recent_days_volume <= 145
+            and current_day_volume_to_recent_days_volume > 2.0
         ):
             return False
 
@@ -350,7 +352,7 @@ class DataExtractor:
             current_vwap <= 2.12
             and current_high_to_recent > 1.81
             and current_high_to_previous <= 1.40
-            and gains_until_entry <= 0.70
+            and gains_until_entry_bar <= 0.70
             and entry_breakout_efficiency_from_ema_9 <= 0.55
         ):
             return False
@@ -360,7 +362,7 @@ class DataExtractor:
         if (
             entry_breakout_efficiency_from_ema_9 <= 0.20
             and entry_ema9_to_vwap > 1.09
-            and gains_until_entry > 0.60
+            and gains_until_entry_bar > 0.60
         ):
             return False
 
@@ -369,7 +371,7 @@ class DataExtractor:
         if (
             current_high_to_recent > 3.31
             and entry_breakout_efficiency_from_ema_9 <= 0.40
-            and gains_until_entry > 0.60
+            and gains_until_entry_bar > 0.60
         ):
             return False
 
@@ -400,15 +402,46 @@ class DataExtractor:
         if entry_breakout_efficiency_from_ema_9 <= 0.263 and entry_ema9_to_vwap > 1.122:
             return False
 
-        if entry_volume_price_efficiency <= 0.050 and controlled_volume_quality <= 0.852:
+        if entry_volume_price_efficiency <= 0.050 and controlled_volume_entry_quality <= 0.852:
             return False
 
         # Reject: elevated day structure, but inefficient entry breakout
         if (
             current_day_low_to_ema_9 > 1.29
             and entry_breakout_efficiency_from_ema_9 <= 0.36
-            and controlled_volume_quality > 1.0
+            and controlled_volume_entry_quality > 1.0
         ):
+            return False
+
+        ## positive range features:
+        if entry_volume_price_efficiency < 0.0050880487694637 or entry_volume_price_efficiency > 3.1633728117798294:
+            return False
+
+        if current_day_volume_to_recent_days_volume < 0.2313710039166447 or current_day_volume_to_recent_days_volume > 21608.028607655124:
+            return False
+
+        if current_day_low_to_ema_9 < 0.2256505023578341 or current_day_low_to_ema_9 > 1.57605115263333:
+            return False
+
+        if gains_until_entry_bar < 0.0988483685220728 or gains_until_entry_bar > 8.750437521876094:
+            return False
+
+        if controlled_volume_entry_quality < 0.1909542969033574 or controlled_volume_entry_quality > 10181.118846946849:
+            return False
+
+        if entry_bar_close_to_highest_high < 1.0019451682754066 or entry_bar_close_to_highest_high > 1.1405835543766578:
+            return False
+
+        if entry_bar_ema_9_to_ema_20 < 1.0041374938618868 or entry_bar_ema_9_to_ema_20 > 1.162670369021404:
+            return False
+
+        if entry_extension_pressure < 0.0028956845241688 or entry_extension_pressure > 1.024814029865993:
+            return False
+
+        if entry_breakout_efficiency_from_ema_9 < 0.1166369490295368 or entry_breakout_efficiency_from_ema_9 > 0.9933905432922158:
+            return False
+
+        if entry_histogram_to_lowest_histogram < 0.983900023936078 or entry_histogram_to_lowest_histogram > 60.75459951762035:
             return False
 
         return True
