@@ -442,20 +442,6 @@ class Confirmator:
         if not crossed_highest_high:
             return False
 
-        should_wait_for_next_bar = (
-            potential_confirmation_bar.bar_time < today_09_30
-            or potential_confirmation_bar.volume < 20000
-            or stock.volume_sum_since_market_open < 100000
-            or (
-                today_10_00 <= potential_confirmation_bar.bar_time <= today_12_00
-                and stock.volume_sum_since_market_open < 400000
-            )
-            or (
-                potential_confirmation_bar.bar_time > today_12_00
-                and stock.volume_sum_since_market_open < 1000000
-            )
-        )
-
         if (
             True
             and potential_confirmation_bar.low - potential_confirmation_bar.ema_9 > potential_confirmation_bar.close - potential_confirmation_bar.low

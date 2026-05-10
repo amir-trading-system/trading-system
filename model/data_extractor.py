@@ -88,17 +88,35 @@ class DataExtractor:
             bar_object=potential_confirmation_bar,
         )
 
+        two_bars_back = one_minute_timeframe_stock.previous_bar(
+            bar_object=previous_bar,
+        ) if previous_bar is not None else None
+
+        previous_bar_volume_to_its_previous_volume = two_bars_back.volume/previous_bar.volume if two_bars_back is not None and previous_bar is not None else 0
+        previous_bar_high_to_highest_high = previous_bar.high/highest_high_one_minute_bar.high if previous_bar is not None and highest_high_one_minute_bar is not None else 0
+        previous_bar_close_to_highest_high = previous_bar.close/highest_high_one_minute_bar.high if previous_bar is not None and highest_high_one_minute_bar is not None else 0
         previous_bar_already_crossed_highest_high = 1 if previous_bar.low < highest_high_one_minute_bar.high < previous_bar.close and previous_bar is not None else 0
 
         bars_movement = 0
         lowest_low_since_highest_high = 100
+        lowest_low_bar = None
         total_bars_since_highest_high = len(bars_since_highest_high)
         breakout_attempts_during_pullback = 0
+        body_size_of_pullback_bars = 0
+        bar_wick_of_pullback_bars = 0
+        total_volume_since_highest_high = 0
         for bar_object in bars_since_highest_high:
+            total_volume_since_highest_high += bar_object.volume
             bars_movement += bar_object.high - bar_object.close
+            body_size_of_pullback_bars += abs(bar_object.close - bar_object.open_value)
+            if bar_object.is_positive:
+                bar_wick_of_pullback_bars += (bar_object.high - bar_object.close)/(bar_object.high - bar_object.low) if (bar_object.high - bar_object.low) > 0 else 0
+            else:
+                bar_wick_of_pullback_bars += (bar_object.high - bar_object.open_value)/(bar_object.high - bar_object.low) if (bar_object.high - bar_object.low) > 0 else 0
 
             if bar_object.low < lowest_low_since_highest_high:
                 lowest_low_since_highest_high = bar_object.low
+                lowest_low_bar = bar_object
 
             if (
                 True
@@ -119,6 +137,59 @@ class DataExtractor:
             if potential_confirmation_bar.low < bar_object.high < potential_confirmation_bar.close
         )
 
+        volume_since_lowest_low = 0
+        if lowest_low_bar is not None:
+            bars_since_lowest_low = [
+                bar_object
+                for bar_object in bars_since_highest_high
+                if bar_object.index <= lowest_low_bar.index
+            ]
+            if bars_since_lowest_low:
+                volume_since_lowest_low = sum(
+                    bar_object.volume
+                    for bar_object in bars_since_lowest_low
+                )
+
+        body_size_of_pullback_bars_average = body_size_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0
+        bar_wick_of_pullback_bars_average = bar_wick_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0
+        entry_body_to_recent_bars_body_average = abs(potential_confirmation_bar.close - potential_confirmation_bar.open_value)/body_size_of_pullback_bars_average if body_size_of_pullback_bars_average > 0 else 1
+        entry_upper_wick_to_recent_upper_wick_average = potential_confirmation_bar.bar_wick_percentage/bar_wick_of_pullback_bars_average if bar_wick_of_pullback_bars_average > 0 else 1
+        pullback_depth_vs_pre_high_move = (highest_high_one_minute_bar.high - lowest_low_since_highest_high) / (highest_high_one_minute_bar.high - highest_high_one_minute_bar.ema_9) if highest_high_one_minute_bar is not None else 0
+
+        highest_high_body = (
+            abs(highest_high_one_minute_bar.close - highest_high_one_minute_bar.open_value)
+            if highest_high_one_minute_bar is not None
+            else 0
+        )
+        entry_body = potential_confirmation_bar.close - potential_confirmation_bar.open_value
+        feature_entry_body_to_highest_high_body = (
+            entry_body / highest_high_body
+            if highest_high_one_minute_bar is not None and highest_high_body != 0
+            else 0
+        )
+
+        entry_range = potential_confirmation_bar.high - potential_confirmation_bar.low
+        entry_close_strength = (
+            (potential_confirmation_bar.close - potential_confirmation_bar.low) / entry_range
+            if entry_range != 0
+            else 0
+        )
+        highest_high_range = (
+            highest_high_one_minute_bar.high - highest_high_one_minute_bar.low
+            if highest_high_one_minute_bar is not None
+            else 0
+        )
+        highest_high_close_strength = (
+            (highest_high_one_minute_bar.close - highest_high_one_minute_bar.low) / highest_high_range
+            if highest_high_one_minute_bar is not None and highest_high_range != 0
+            else 0
+        )
+        feature_entry_close_strength_to_highest_high_close_strength = (
+            entry_close_strength / highest_high_close_strength
+            if highest_high_one_minute_bar is not None and highest_high_close_strength != 0
+            else 0
+        )
+
         return {
             "feature_entry_bar_close_to_highest_high": entry_bar_close_to_highest_high,
             "feature_entry_bar_body": entry_bar_body,
@@ -136,6 +207,19 @@ class DataExtractor:
             "feature_crossed_at_least_one_bar_from_recent_bars": crossed_at_least_one_bar_from_recent_bars,
             "feature_failed_attempts_pressure": breakout_attempts_during_pullback * entry_extension_pressure,
             "feature_price_movement_from_highest_high_to_lowest_low": highest_high_one_minute_bar.high - lowest_low_since_highest_high if highest_high_one_minute_bar is not None else 0,
+            "feature_previous_bar_volume_to_its_previous_volume": previous_bar_volume_to_its_previous_volume,
+            "feature_previous_bar_high_to_highest_high": previous_bar_high_to_highest_high,
+            "feature_previous_bar_close_to_highest_high": previous_bar_close_to_highest_high,
+            "feature_entry_close_to_previous_bar_high": potential_confirmation_bar.close/previous_bar.high if previous_bar is not None else 1,
+            "feature_reclaim_close_strength_since_highest_high": (potential_confirmation_bar.close - highest_high_one_minute_bar.high) / (potential_confirmation_bar.high - potential_confirmation_bar.low) if highest_high_one_minute_bar is not None else 0,
+            "feature_entry_body_to_recent_bars_body_average": entry_body_to_recent_bars_body_average,
+            "feature_entry_upper_wick_to_recent_upper_wick_average": entry_upper_wick_to_recent_upper_wick_average,
+            "feature_pullback_depth_vs_pre_high_move": pullback_depth_vs_pre_high_move,
+            "feature_bars_since_lowest_low_to_entry": lowest_low_bar.index - potential_confirmation_bar.index if lowest_low_bar is not None else 0,
+            "feature_volume_since_lowest_low_to_entry_vs_since_highest_high": volume_since_lowest_low/total_volume_since_highest_high if total_volume_since_highest_high > 0 else 0,
+            "feature_entry_close_to_vwap": potential_confirmation_bar.close/potential_confirmation_bar.vwap,
+            "feature_entry_body_to_highest_high_body": feature_entry_body_to_highest_high_body,
+            "feature_entry_close_strength_to_highest_high_close_strength": feature_entry_close_strength_to_highest_high_close_strength,
         }
 
     def volume_structure_features(
@@ -167,6 +251,8 @@ class DataExtractor:
 
         positive_volume = 0
         negative_volume = 0
+        bars_above_volume_average = 0
+        bars_under_volume_average = 0
         for bar_object in bars_since_highest_high:
             volume_since_highest_high += bar_object.volume
 
@@ -174,6 +260,11 @@ class DataExtractor:
                 positive_volume += bar_object.volume
             else:
                 negative_volume += bar_object.volume
+
+            if 0.98 <= bar_object.volume/bar_object.volume_average:
+                bars_above_volume_average += 1
+            else:
+                bars_under_volume_average += 1
 
         volume_average = 0
         if bars_since_highest_high:
@@ -202,6 +293,7 @@ class DataExtractor:
             "feature_entry_bar_volume_to_previous_bar_volume": entry_bar_volume_to_previous_bar_volume,
             "feature_volume_since_highest_high_to_volume_before": volume_since_highest_high/volume_before_highest_high if volume_before_highest_high > 0 else 1,
             "feature_bars_since_highest_high_to_bars_before": len(bars_since_highest_high)/len(bars_before_highest_high),
+            "feature_bars_above_volume_average_vs_under_since_highest_high": bars_above_volume_average/bars_under_volume_average if bars_under_volume_average > 0 else 1,
         }
 
     def macd_structure_features(
@@ -334,7 +426,7 @@ class DataExtractor:
         pullback_pos_neg_volume = features_data["feature_positive_vs_negative_volume_during_pullback"]
         weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
         entry_breakout_efficiency_from_ema_9 = features_data["feature_entry_breakout_efficiency_from_ema_9"]
-        current_day_movement_to_recent_days = features_data["feature_current_day_movement_to_recent_days_movement"]
+        current_day_movement_to_recent_days_movement = features_data["feature_current_day_movement_to_recent_days_movement"]
         entry_bar_upper_wick = features_data["feature_entry_bar_upper_wick"]
         entry_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
         entry_volume_to_highest_volume_in_pullback = features_data["feature_entry_bar_volume_to_highest_volume_in_pullback"]
@@ -348,6 +440,18 @@ class DataExtractor:
         entry_bar_low_to_ema_9 = features_data["feature_entry_bar_low_to_ema_9"]
         bars_since_highest_high_to_bars_before = features_data["feature_bars_since_highest_high_to_bars_before"]
         volume_since_highest_high_to_volume_before = features_data["feature_volume_since_highest_high_to_volume_before"]
+        previous_bar_volume_to_its_previous_volume = features_data["feature_previous_bar_volume_to_its_previous_volume"]
+        previous_bar_high_to_highest_high = features_data["feature_previous_bar_high_to_highest_high"]
+        entry_bar_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
+        entry_bar_macd_to_previous = features_data["feature_entry_bar_macd_to_previous"]
+        entry_bar_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
+        histogram_changed_to_positive_direction_vs_negative_pct = features_data["feature_histogram_changed_to_positive_direction_vs_negative_pct"]
+        bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
+        entry_bar_volume_to_recent_bars_average = features_data["feature_entry_bar_volume_to_recent_bars_average"]
+        entry_upper_wick_to_recent_upper_wick_average = features_data["feature_entry_upper_wick_to_recent_upper_wick_average"]
+        entry_body_to_highest_high_body = features_data["feature_entry_body_to_highest_high_body"]
+        previous_bar_close_to_highest_high = features_data["feature_previous_bar_close_to_highest_high"]
+        pullback_depth_vs_pre_high_move = features_data["feature_pullback_depth_vs_pre_high_move"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -419,7 +523,7 @@ class DataExtractor:
             return False
 
         # Reject: big current-day movement, but weak VWAP context
-        if current_vwap <= 1.42 and current_day_movement_to_recent_days > 6.10:
+        if current_vwap <= 1.42 and current_day_movement_to_recent_days_movement > 6.10:
             return False
 
         # Reject: weak previous-high reclaim with high breakout-efficiency ratio
@@ -464,6 +568,90 @@ class DataExtractor:
         if volume_since_highest_high_to_volume_before <= 0.045 and entry_breakout_efficiency_from_ema_9 <= 0.27:
             return False
 
+        # Reject: previous bar had weak volume, and entry candle shows rejection
+        if previous_bar_volume_to_its_previous_volume <= 0.49 and entry_bar_upper_wick >= 0.33:
+            return False
+
+        # Reject: previous bar already pushed above old high, but entry body is weak
+        if previous_bar_high_to_highest_high >= 1.019 and entry_bar_body <= 0.586:
+            return False
+
+        # Reject: previous bar was not close to reclaiming high, and entry rejects
+        if previous_bar_high_to_highest_high <= 0.973 and entry_bar_upper_wick >= 0.343:
+            return False
+
+        # Reject: previous bar already pushed above old high,
+        # and histogram already moved strongly in positive direction
+        if previous_bar_high_to_highest_high >= 1.010 and histogram_changed_to_positive_direction_vs_negative_pct >= 1.04:
+            return False
+
+        # Reject: weak day volume + weak post-high volume structure
+        if bars_above_volume_average_vs_under_since_highest_high <= 0.34 and current_day_volume_to_recent_days_volume <= 1.02:
+            return False
+
+        # Reject: active current-day move, but entry is already too extended
+        if current_day_movement_to_recent_days_movement >= 1.30 and entry_extension_pressure >= 0.68:
+            return False
+
+        # Reject: entry volume spike is large versus highest-high volume,
+        # but not truly strong versus recent bars
+        if entry_bar_volume_to_recent_bars_average <= 5.80 and entry_bar_volume_to_highest_high_volume >= 5.60:
+            return False
+
+        # Reject: entry candle shows abnormal rejection
+        # and the entry body is weak compared with the highest-high candle
+        if entry_upper_wick_to_recent_upper_wick_average >= 2.13 and entry_body_to_highest_high_body <= 1.17:
+            return False
+
+        # Reject: previous bar already closed very close to old high,
+        # but entry comes with almost no real rebuild after the highest high
+        if previous_bar_close_to_highest_high >= 0.997 and bars_since_highest_high_to_bars_before <= 0.002:
+            return False
+
+        # Reject: very shallow pullback versus the pre-high move,
+        # while the current day volume is already extremely expanded
+        if pullback_depth_vs_pre_high_move <= 0.42 and current_day_volume_to_recent_days_volume >= 72:
+            return False
+
+        if self.violate_positive_range(
+            entry_volume_price_efficiency=entry_volume_price_efficiency,
+            current_day_volume_to_recent_days_volume=current_day_volume_to_recent_days_volume,
+            current_day_low_to_ema_9=current_day_low_to_ema_9,
+            gains_until_entry_bar=gains_until_entry_bar,
+            controlled_volume_entry_quality=controlled_volume_entry_quality,
+            entry_bar_close_to_highest_high=entry_bar_close_to_highest_high,
+            entry_bar_ema_9_to_ema_20=entry_bar_ema_9_to_ema_20,
+            entry_extension_pressure=entry_extension_pressure,
+            entry_breakout_efficiency_from_ema_9=entry_breakout_efficiency_from_ema_9,
+            entry_histogram_to_lowest_histogram=entry_histogram_to_lowest_histogram,
+            price_movement_from_highest_high_to_lowest_low=price_movement_from_highest_high_to_lowest_low,
+            previous_bar_high_to_highest_high=previous_bar_high_to_highest_high,
+            entry_bar_volume_to_highest_high_volume=entry_bar_volume_to_highest_high_volume,
+            entry_bar_macd_to_previous=entry_bar_macd_to_previous,
+            entry_bar_histogram_to_highest_histogram=entry_bar_histogram_to_highest_histogram,
+        ):
+            return False
+
+        return True
+
+    def violate_positive_range(
+        self,
+        entry_volume_price_efficiency: float,
+        current_day_volume_to_recent_days_volume: float,
+        current_day_low_to_ema_9: float,
+        gains_until_entry_bar: float,
+        controlled_volume_entry_quality: float,
+        entry_bar_close_to_highest_high: float,
+        entry_bar_ema_9_to_ema_20: float,
+        entry_extension_pressure: float,
+        entry_breakout_efficiency_from_ema_9: float,
+        entry_histogram_to_lowest_histogram: float,
+        price_movement_from_highest_high_to_lowest_low: float,
+        previous_bar_high_to_highest_high: float,
+        entry_bar_volume_to_highest_high_volume: float,
+        entry_bar_macd_to_previous: float,
+        entry_bar_histogram_to_highest_histogram: float,
+    ) -> bool:
         positive_range_violations = 0
 
         if entry_volume_price_efficiency < 0.005 or entry_volume_price_efficiency > 3.16:
@@ -472,7 +660,7 @@ class DataExtractor:
         if current_day_volume_to_recent_days_volume < 0.23 or current_day_volume_to_recent_days_volume > 21608:
             positive_range_violations += 1
 
-        if current_day_low_to_ema_9 < 0.225 or current_day_low_to_ema_9 > 1.576:
+        if current_day_low_to_ema_9 < 0.225 or current_day_low_to_ema_9 > 1.610:
             positive_range_violations += 1
 
         if gains_until_entry_bar < 0.098 or gains_until_entry_bar > 8.75:
@@ -493,16 +681,25 @@ class DataExtractor:
         if entry_breakout_efficiency_from_ema_9 < 0.1166 or entry_breakout_efficiency_from_ema_9 > 0.9934:
             positive_range_violations += 1
 
-        if entry_histogram_to_lowest_histogram < 0.984 or entry_histogram_to_lowest_histogram > 60.75:
-            positive_range_violations += 1
-
         if price_movement_from_highest_high_to_lowest_low < 0.0096 or price_movement_from_highest_high_to_lowest_low > 18.18:
             positive_range_violations += 1
 
-        if positive_range_violations >= 2:
-            return False
+        if previous_bar_high_to_highest_high < 0.904 or previous_bar_high_to_highest_high > 1.038:
+            positive_range_violations += 1
 
-        return True
+        if entry_bar_volume_to_highest_high_volume < 0.163 or entry_bar_volume_to_highest_high_volume > 49.624:
+            positive_range_violations += 1
+
+        if entry_bar_macd_to_previous < 0.175 or entry_bar_macd_to_previous > 11.153:
+            positive_range_violations += 1
+
+        if entry_bar_histogram_to_highest_histogram < -1.282 or entry_bar_histogram_to_highest_histogram > 99.413:
+            positive_range_violations += 1
+
+        if entry_histogram_to_lowest_histogram < 0.947 or entry_histogram_to_lowest_histogram > 60.75:
+            positive_range_violations += 1
+
+        return positive_range_violations >= 2
 
     #pylint:disable=W0613
     def extract_features_from_symbol_data(
