@@ -3,14 +3,13 @@ import csv
 import pickle
 import glob
 
-import pandas as pd
-
 import common
 from ..import data_extractor
 
 
 POSITIVE_FILE_NAME = "model/training/positive_results.csv"
 FALSE_POSITIVE_FILE_NAME = "model/training/false_positive_results.csv"
+POTENTIAL_HARD_RULES_FILE_NAME = "model/training/hard_rules.json"
 
 #pylint:disable=unspecified-encoding
 def write_to_csv(
@@ -102,39 +101,6 @@ def load_data_for_training_model() -> list[dict[str, any]]:
 
     return pickled_data
 
-def potential_hard_rules() -> None:
-    positive_df = pd.read_csv(POSITIVE_FILE_NAME)
-    false_positive_df = pd.read_csv(FALSE_POSITIVE_FILE_NAME)
-
-    features = [
-        column
-        for column in positive_df.columns
-        if column.startswith("feature_")
-    ]
-
-    potential_hard_rules_list = []
-
-    for feature in features:
-        positive_df[feature] = positive_df[feature].replace({"False": 0, "True": 1}).astype(float)
-        false_positive_df[feature] = false_positive_df[feature].replace({"False": 0, "True": 1}).astype(float)
-
-        min_value = float(positive_df[feature].min())
-        max_value = float(positive_df[feature].max())
-
-        filtered_false_positive = false_positive_df[
-            (false_positive_df[feature] < min_value)
-            | (false_positive_df[feature] > max_value)
-        ]
-
-        filtered_length = len(filtered_false_positive)
-
-        if filtered_length > 3:
-            potential_hard_rules_list.append(f"{feature} < {min_value} or {feature} > {max_value}\n")
-            print(f"condition: {feature} < {min_value} or {feature} > {max_value}. filtered count: {filtered_length}")
-
-    with open("potential_hard_rules.txt", "w") as f:
-        f.writelines(potential_hard_rules_list)
-
 if __name__ == '__main__':
     data_extractor_object = data_extractor.DataExtractor()
     symbols_data_parameters: list[dict[str, any]] = []
@@ -145,7 +111,6 @@ if __name__ == '__main__':
             one_minute_timeframe_stock=data["one_minute_timeframe_stock"],
             potential_confirmation_bar=data["potential_confirmation_bar"],
             highest_high_one_minute_bar=data["highest_high_one_minute_bar"],
-            volume_sum_since_market_open=data["volume_sum_since_market_open"],
             one_minute_bars=data["one_minute_bars"],
         )
         symbol_data_parameters["stock"] = data["day_timeframe_stock"]
@@ -154,5 +119,3 @@ if __name__ == '__main__':
     write_to_csv(
         symbols_data=symbols_data_parameters,
     )
-
-    potential_hard_rules()

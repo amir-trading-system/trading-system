@@ -278,7 +278,6 @@ class Confirmator:
                 one_minute_timeframe_stock=one_minute_timeframe_stock,
                 potential_confirmation_bar=potential_confirmation_bar,
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
-                volume_sum_since_market_open=stock.volume_sum_since_market_open,
                 one_minute_bars=one_minute_bars,
             )
 
@@ -374,28 +373,6 @@ class Confirmator:
         one_minute_bars: list[common.objects.BarData],
         highest_high: float,
     ) -> bool:
-        today_09_30 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=9,
-            minute=30,
-        )
-        today_10_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=10,
-            minute=00,
-        )
-        today_12_00 = datetime.datetime(
-            year=original_bar_to_confirm.bar_time.year,
-            month=original_bar_to_confirm.bar_time.month,
-            day=original_bar_to_confirm.bar_time.day,
-            hour=12,
-            minute=00,
-        )
-
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
         )

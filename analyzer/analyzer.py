@@ -185,7 +185,6 @@ class Analyzer:
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=current_bar,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
-            volume_sum_since_market_open=volume_sum_since_market_open,
             one_minute_bars=one_minute_bars,
         )
         day_timeframe_stock.resistance_levels = self.get_resistance_levels(

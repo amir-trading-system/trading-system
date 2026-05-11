@@ -72,6 +72,7 @@ class DataExtractor:
         bars_since_highest_high: list[common.objects.BarData],
         highest_high_one_minute_bar: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
         entry_bar_close_to_highest_high = potential_confirmation_bar.close/highest_high_one_minute_bar.high
         entry_bar_body = potential_confirmation_bar.body_percentage
@@ -150,6 +151,21 @@ class DataExtractor:
                     for bar_object in bars_since_lowest_low
                 )
 
+        last_10_bars = one_minute_bars[1:11]
+        keep_up_trend_bars = 0
+        for bar_object in last_10_bars:
+            previous_bar = one_minute_timeframe_stock.previous_bar(
+                bar_object=bar_object
+            )
+            if (
+                True
+                and previous_bar is not None
+                and previous_bar.low < bar_object.low
+            ):
+                keep_up_trend_bars += 1
+
+        feature_recent_bars_up_trend_pct = keep_up_trend_bars/len(last_10_bars)
+
         body_size_of_pullback_bars_average = body_size_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0
         bar_wick_of_pullback_bars_average = bar_wick_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0
         entry_body_to_recent_bars_body_average = abs(potential_confirmation_bar.close - potential_confirmation_bar.open_value)/body_size_of_pullback_bars_average if body_size_of_pullback_bars_average > 0 else 1
@@ -220,6 +236,7 @@ class DataExtractor:
             "feature_entry_close_to_vwap": potential_confirmation_bar.close/potential_confirmation_bar.vwap,
             "feature_entry_body_to_highest_high_body": feature_entry_body_to_highest_high_body,
             "feature_entry_close_strength_to_highest_high_close_strength": feature_entry_close_strength_to_highest_high_close_strength,
+            "feature_recent_bars_up_trend_pct": feature_recent_bars_up_trend_pct,
         }
 
     def volume_structure_features(
@@ -434,7 +451,6 @@ class DataExtractor:
         entry_volume_price_efficiency = features_data["feature_entry_volume_price_efficiency"]
         current_day_low_to_ema_9 = features_data["feature_current_day_low_to_ema_9"]
         entry_bar_close_to_highest_high = features_data["feature_entry_bar_close_to_highest_high"]
-        entry_bar_ema_9_to_ema_20 = features_data["feature_entry_bar_ema_9_to_ema_20"]
         price_movement_from_highest_high_to_lowest_low = features_data["feature_price_movement_from_highest_high_to_lowest_low"]
         entry_bar_body = features_data["feature_entry_bar_body"]
         entry_bar_low_to_ema_9 = features_data["feature_entry_bar_low_to_ema_9"]
@@ -443,8 +459,6 @@ class DataExtractor:
         previous_bar_volume_to_its_previous_volume = features_data["feature_previous_bar_volume_to_its_previous_volume"]
         previous_bar_high_to_highest_high = features_data["feature_previous_bar_high_to_highest_high"]
         entry_bar_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
-        entry_bar_macd_to_previous = features_data["feature_entry_bar_macd_to_previous"]
-        entry_bar_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
         histogram_changed_to_positive_direction_vs_negative_pct = features_data["feature_histogram_changed_to_positive_direction_vs_negative_pct"]
         bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
         entry_bar_volume_to_recent_bars_average = features_data["feature_entry_bar_volume_to_recent_bars_average"]
@@ -452,6 +466,7 @@ class DataExtractor:
         entry_body_to_highest_high_body = features_data["feature_entry_body_to_highest_high_body"]
         previous_bar_close_to_highest_high = features_data["feature_previous_bar_close_to_highest_high"]
         pullback_depth_vs_pre_high_move = features_data["feature_pullback_depth_vs_pre_high_move"]
+        recent_bars_up_trend_pct = features_data["feature_recent_bars_up_trend_pct"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -613,93 +628,17 @@ class DataExtractor:
         if pullback_depth_vs_pre_high_move <= 0.42 and current_day_volume_to_recent_days_volume >= 72:
             return False
 
-        if self.violate_positive_range(
-            entry_volume_price_efficiency=entry_volume_price_efficiency,
-            current_day_volume_to_recent_days_volume=current_day_volume_to_recent_days_volume,
-            current_day_low_to_ema_9=current_day_low_to_ema_9,
-            gains_until_entry_bar=gains_until_entry_bar,
-            controlled_volume_entry_quality=controlled_volume_entry_quality,
-            entry_bar_close_to_highest_high=entry_bar_close_to_highest_high,
-            entry_bar_ema_9_to_ema_20=entry_bar_ema_9_to_ema_20,
-            entry_extension_pressure=entry_extension_pressure,
-            entry_breakout_efficiency_from_ema_9=entry_breakout_efficiency_from_ema_9,
-            entry_histogram_to_lowest_histogram=entry_histogram_to_lowest_histogram,
-            price_movement_from_highest_high_to_lowest_low=price_movement_from_highest_high_to_lowest_low,
-            previous_bar_high_to_highest_high=previous_bar_high_to_highest_high,
-            entry_bar_volume_to_highest_high_volume=entry_bar_volume_to_highest_high_volume,
-            entry_bar_macd_to_previous=entry_bar_macd_to_previous,
-            entry_bar_histogram_to_highest_histogram=entry_bar_histogram_to_highest_histogram,
+        # Reject: weak recent uptrend, but entry is already stretched above old high
+        if (
+            recent_bars_up_trend_pct <= 0.50
+            and (
+                entry_bar_close_to_highest_high >= 1.091
+                or entry_breakout_efficiency_from_ema_9 >= 0.886
+            )
         ):
             return False
 
         return True
-
-    def violate_positive_range(
-        self,
-        entry_volume_price_efficiency: float,
-        current_day_volume_to_recent_days_volume: float,
-        current_day_low_to_ema_9: float,
-        gains_until_entry_bar: float,
-        controlled_volume_entry_quality: float,
-        entry_bar_close_to_highest_high: float,
-        entry_bar_ema_9_to_ema_20: float,
-        entry_extension_pressure: float,
-        entry_breakout_efficiency_from_ema_9: float,
-        entry_histogram_to_lowest_histogram: float,
-        price_movement_from_highest_high_to_lowest_low: float,
-        previous_bar_high_to_highest_high: float,
-        entry_bar_volume_to_highest_high_volume: float,
-        entry_bar_macd_to_previous: float,
-        entry_bar_histogram_to_highest_histogram: float,
-    ) -> bool:
-        positive_range_violations = 0
-
-        if entry_volume_price_efficiency < 0.005 or entry_volume_price_efficiency > 3.16:
-            positive_range_violations += 1
-
-        if current_day_volume_to_recent_days_volume < 0.23 or current_day_volume_to_recent_days_volume > 21608:
-            positive_range_violations += 1
-
-        if current_day_low_to_ema_9 < 0.225 or current_day_low_to_ema_9 > 1.610:
-            positive_range_violations += 1
-
-        if gains_until_entry_bar < 0.098 or gains_until_entry_bar > 8.75:
-            positive_range_violations += 1
-
-        if controlled_volume_entry_quality < 0.19 or controlled_volume_entry_quality > 10181:
-            positive_range_violations += 1
-
-        if entry_bar_close_to_highest_high < 1.0019 or entry_bar_close_to_highest_high > 1.1406:
-            positive_range_violations += 1
-
-        if entry_bar_ema_9_to_ema_20 < 1.004 or entry_bar_ema_9_to_ema_20 > 1.163:
-            positive_range_violations += 1
-
-        if entry_extension_pressure < 0.0029 or entry_extension_pressure > 1.025:
-            positive_range_violations += 1
-
-        if entry_breakout_efficiency_from_ema_9 < 0.1166 or entry_breakout_efficiency_from_ema_9 > 0.9934:
-            positive_range_violations += 1
-
-        if price_movement_from_highest_high_to_lowest_low < 0.0096 or price_movement_from_highest_high_to_lowest_low > 18.18:
-            positive_range_violations += 1
-
-        if previous_bar_high_to_highest_high < 0.904 or previous_bar_high_to_highest_high > 1.038:
-            positive_range_violations += 1
-
-        if entry_bar_volume_to_highest_high_volume < 0.163 or entry_bar_volume_to_highest_high_volume > 49.624:
-            positive_range_violations += 1
-
-        if entry_bar_macd_to_previous < 0.175 or entry_bar_macd_to_previous > 11.153:
-            positive_range_violations += 1
-
-        if entry_bar_histogram_to_highest_histogram < -1.282 or entry_bar_histogram_to_highest_histogram > 99.413:
-            positive_range_violations += 1
-
-        if entry_histogram_to_lowest_histogram < 0.947 or entry_histogram_to_lowest_histogram > 60.75:
-            positive_range_violations += 1
-
-        return positive_range_violations >= 2
 
     #pylint:disable=W0613
     def extract_features_from_symbol_data(
@@ -708,7 +647,6 @@ class DataExtractor:
         one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
         highest_high_one_minute_bar: common.objects.BarData,
-        volume_sum_since_market_open: float,
         one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, any]:
         bars_since_highest_high = [
@@ -731,6 +669,7 @@ class DataExtractor:
             bars_since_highest_high=bars_since_highest_high,
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_bars=one_minute_bars,
         )
         volume_structure_features = self.volume_structure_features(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
