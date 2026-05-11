@@ -469,6 +469,8 @@ class DataExtractor:
         recent_bars_up_trend_pct = features_data["feature_recent_bars_up_trend_pct"]
         entry_body_to_recent_bars_body_average = features_data["feature_entry_body_to_recent_bars_body_average"]
         pre_market_volume = features_data["feature_pre_market_volume"]
+        entry_close_to_vwap = features_data["feature_entry_close_to_vwap"]
+        entry_bar_histogram_to_previous = features_data["feature_entry_bar_histogram_to_previous"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -646,6 +648,14 @@ class DataExtractor:
 
         # Reject: low premarket volume + weak gains into entry
         if gains_until_entry_bar <= 0.347 and pre_market_volume <= 2242:
+            return False
+
+        # Reject: almost no rebuild after highest high + not enough current-day volume context
+        if current_day_volume_to_recent_days_volume <= 4.25 and bars_since_highest_high_to_bars_before <= 0.00163:
+            return False
+
+        # Reject: histogram expands, but price is not strong enough above VWAP
+        if entry_close_to_vwap <= 1.13 and entry_bar_histogram_to_previous >= 4.70:
             return False
 
         return True
