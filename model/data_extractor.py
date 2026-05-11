@@ -467,6 +467,8 @@ class DataExtractor:
         previous_bar_close_to_highest_high = features_data["feature_previous_bar_close_to_highest_high"]
         pullback_depth_vs_pre_high_move = features_data["feature_pullback_depth_vs_pre_high_move"]
         recent_bars_up_trend_pct = features_data["feature_recent_bars_up_trend_pct"]
+        entry_body_to_recent_bars_body_average = features_data["feature_entry_body_to_recent_bars_body_average"]
+        pre_market_volume = features_data["feature_pre_market_volume"]
 
         # Reject: weak day context
         # Safe on current dataset: removed 0 positives, 13 false positives.
@@ -636,6 +638,14 @@ class DataExtractor:
                 or entry_breakout_efficiency_from_ema_9 >= 0.886
             )
         ):
+            return False
+
+        # Reject: deep pullback, but entry body is not strong enough versus recent bars
+        if entry_body_to_recent_bars_body_average <= 3.0 and pullback_depth_vs_pre_high_move >= 2.82:
+            return False
+
+        # Reject: low premarket volume + weak gains into entry
+        if gains_until_entry_bar <= 0.347 and pre_market_volume <= 2242:
             return False
 
         return True
