@@ -505,7 +505,6 @@ class DataExtractor:
         gains_since_lowest_low = features_data["feature_gains_since_lowest_low"]
         recent_bars_positive_bars_pct = features_data["feature_recent_bars_positive_bars_pct"]
         emas_distances_to_recent_bars_ema_distances = features_data["feature_emas_distances_to_recent_bars_ema_distances"]
-        entry_bar_volume_to_total_volume = features_data["feature_entry_bar_volume_to_total_volume"]
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
@@ -783,7 +782,7 @@ class DataExtractor:
                 and previous_bar.bar_wick_percentage > 0.25
                 and potential_confirmation_bar.body_percentage < previous_bar.body_percentage
             ) if previous_bar is not None else 0,
-            "feature_minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) - 30,
+            "feature_minutes_since_market_open": ((potential_confirmation_bar.bar_time.hour - 9) * 60) + potential_confirmation_bar.bar_time.minute - 30,
             "feature_entry_rejection_pressure": feature_entry_rejection_pressure,
             "feature_late_chase_after_high": (
                 breakout_structure_features["feature_distance_from_highest_high"] <= 3
