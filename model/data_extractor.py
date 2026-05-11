@@ -79,6 +79,7 @@ class DataExtractor:
         entry_bar_upper_wick = potential_confirmation_bar.bar_wick_percentage
         entry_bar_lower_wick = potential_confirmation_bar.bar_lower_wick_percentage
         entry_bar_low_to_ema_9 = potential_confirmation_bar.low/potential_confirmation_bar.ema_9
+        entry_bar_open_to_ema_9 = potential_confirmation_bar.open_value/potential_confirmation_bar.ema_9
         entry_bar_ema_9_to_ema_20 = potential_confirmation_bar.ema_9/potential_confirmation_bar.ema_20
         entry_bar_ema_9_to_vwap = potential_confirmation_bar.ema_9/potential_confirmation_bar.vwap
         distance_from_highest_high = highest_high_one_minute_bar.index - potential_confirmation_bar.index
@@ -226,6 +227,7 @@ class DataExtractor:
             "feature_entry_bar_upper_wick": entry_bar_upper_wick,
             "feature_entry_bar_lower_wick": entry_bar_lower_wick,
             "feature_entry_bar_low_to_ema_9": entry_bar_low_to_ema_9,
+            "feature_entry_bar_open_to_ema_9": entry_bar_open_to_ema_9,
             "feature_entry_bar_ema_9_to_ema_20": entry_bar_ema_9_to_ema_20,
             "feature_entry_bar_ema_9_to_vwap": entry_bar_ema_9_to_vwap,
             "feature_distance_from_highest_high": distance_from_highest_high,
@@ -673,6 +675,13 @@ class DataExtractor:
         # Reject: EMA distance is unusually expanded vs recent bars,
         # and entry is already extended from VWAP
         if emas_distances_to_recent_bars_ema_distances >= 1.017 and entry_ema9_to_vwap >= 1.040:
+            return False
+
+        # Reject: entry loses EMA9, but previous bar was already near old high
+        if (
+            entry_bar_low_to_ema_9 <= 0.990
+            and previous_bar_close_to_highest_high >= 0.984
+        ):
             return False
 
         return True
