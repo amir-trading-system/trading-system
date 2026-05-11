@@ -22,6 +22,7 @@ def write_to_csv(
         "expected_confirmation_bar_time",
         "highest_high_one_minute_bar_time",
         "total_volume",
+        "entry_bar_volume",
     ]
     columns.extend(
         [
@@ -45,6 +46,7 @@ def write_to_csv(
         stock_object: common.objects.Stock = symbol_data["stock"]
         highest_high_one_minute_bar_time = symbol_data["highest_high_one_minute_bar_time"]
         total_volume = symbol_data["total_volume"]
+        entry_bar_volume = symbol_data["entry_bar_volume"]
         features = [v for k, v in symbol_data.items() if k.startswith("feature_")]
 
         symbol = stock_object.symbol_name
@@ -64,6 +66,7 @@ def write_to_csv(
             expected_confirmation_bar_time,
             highest_high_one_minute_bar_time,
             total_volume,
+            entry_bar_volume,
         ]
         row_data.extend(features)
 

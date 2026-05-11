@@ -288,7 +288,7 @@ class Confirmator:
             ):
                 if (
                     total_volume < 200000
-                    or potential_confirmation_bar.volume < 10000
+                    or potential_confirmation_bar.volume < 15000
                 ):
                     return (
                         score,

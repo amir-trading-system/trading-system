@@ -153,10 +153,13 @@ class DataExtractor:
 
         last_10_bars = one_minute_bars[1:11]
         keep_up_trend_bars = 0
+        positive_bars = 0
+        ema_9_to_ema_20_distances = 0
         for bar_object in last_10_bars:
             previous_bar = one_minute_timeframe_stock.previous_bar(
                 bar_object=bar_object
             )
+            ema_9_to_ema_20_distances += bar_object.ema_9 - bar_object.ema_20
             if (
                 True
                 and previous_bar is not None
@@ -164,7 +167,11 @@ class DataExtractor:
             ):
                 keep_up_trend_bars += 1
 
+            if bar_object.is_positive:
+                positive_bars += 1
+
         feature_recent_bars_up_trend_pct = keep_up_trend_bars/len(last_10_bars)
+        feature_recent_bars_positive_bars_pct = positive_bars/len(last_10_bars)
 
         body_size_of_pullback_bars_average = body_size_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0
         bar_wick_of_pullback_bars_average = bar_wick_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0
@@ -205,8 +212,15 @@ class DataExtractor:
             if highest_high_one_minute_bar is not None and highest_high_close_strength != 0
             else 0
         )
+        entry_close_strength = (potential_confirmation_bar.close - potential_confirmation_bar.low) / (potential_confirmation_bar.high - potential_confirmation_bar.low) if (potential_confirmation_bar.high - potential_confirmation_bar.low) > 0 else 0
+        previous_close_strength = (previous_bar.close - previous_bar.low) / (previous_bar.high - previous_bar.low) if previous_bar is not None and (previous_bar.high - previous_bar.low) > 0 else 0
+
+        feature_entry_close_position_vs_previous_close_position = entry_close_strength / previous_close_strength if previous_close_strength > 0 else 1
+        feature_lowest_low_to_entry_elapsed_minutes = lowest_low_bar.index - potential_confirmation_bar.index if lowest_low_bar is not None else 0
+        feature_entry_close_to_lowest_low_recovery = (potential_confirmation_bar.close - lowest_low_bar.low) / (highest_high_one_minute_bar.high - lowest_low_bar.low) if highest_high_one_minute_bar is not None and lowest_low_bar is not None and (highest_high_one_minute_bar.high - lowest_low_bar.low) > 0 else 1
 
         return {
+            "entry_bar_volume": potential_confirmation_bar.volume,
             "feature_entry_bar_close_to_highest_high": entry_bar_close_to_highest_high,
             "feature_entry_bar_body": entry_bar_body,
             "feature_entry_bar_upper_wick": entry_bar_upper_wick,
@@ -227,7 +241,7 @@ class DataExtractor:
             "feature_previous_bar_high_to_highest_high": previous_bar_high_to_highest_high,
             "feature_previous_bar_close_to_highest_high": previous_bar_close_to_highest_high,
             "feature_entry_close_to_previous_bar_high": potential_confirmation_bar.close/previous_bar.high if previous_bar is not None else 1,
-            "feature_reclaim_close_strength_since_highest_high": (potential_confirmation_bar.close - highest_high_one_minute_bar.high) / (potential_confirmation_bar.high - potential_confirmation_bar.low) if highest_high_one_minute_bar is not None else 0,
+            "feature_reclaim_close_strength_since_highest_high": (potential_confirmation_bar.close - highest_high_one_minute_bar.high) / (potential_confirmation_bar.high - potential_confirmation_bar.low) if highest_high_one_minute_bar is not None and (potential_confirmation_bar.high - potential_confirmation_bar.low) > 0 else 0,
             "feature_entry_body_to_recent_bars_body_average": entry_body_to_recent_bars_body_average,
             "feature_entry_upper_wick_to_recent_upper_wick_average": entry_upper_wick_to_recent_upper_wick_average,
             "feature_pullback_depth_vs_pre_high_move": pullback_depth_vs_pre_high_move,
@@ -237,6 +251,17 @@ class DataExtractor:
             "feature_entry_body_to_highest_high_body": feature_entry_body_to_highest_high_body,
             "feature_entry_close_strength_to_highest_high_close_strength": feature_entry_close_strength_to_highest_high_close_strength,
             "feature_recent_bars_up_trend_pct": feature_recent_bars_up_trend_pct,
+            "feature_entry_close_to_previous_bar_close": potential_confirmation_bar.close/previous_bar.close if previous_bar is not None else 1,
+            "feature_entry_body_to_previous_bar_body": (potential_confirmation_bar.close - potential_confirmation_bar.open_value) / abs(previous_bar.close - previous_bar.open_value) if previous_bar is not None and abs(previous_bar.close - previous_bar.open_value) > 0 else 1,
+            "feature_entry_close_position_vs_previous_close_position": feature_entry_close_position_vs_previous_close_position,
+            "feature_highest_high_to_entry_elapsed_minutes": highest_high_one_minute_bar.index - potential_confirmation_bar.index if highest_high_one_minute_bar is not None else 0,
+            "feature_lowest_low_to_entry_elapsed_minutes": feature_lowest_low_to_entry_elapsed_minutes,
+            "feature_entry_close_to_lowest_low_recovery": feature_entry_close_to_lowest_low_recovery,
+            "feature_reclaim_speed_from_lowest_low": feature_entry_close_to_lowest_low_recovery/feature_lowest_low_to_entry_elapsed_minutes if feature_lowest_low_to_entry_elapsed_minutes > 0 else 0,
+            "feature_gains_since_lowest_low": (potential_confirmation_bar.high - lowest_low_bar.low)/lowest_low_bar.low if lowest_low_bar is not None else 0,
+            "feature_recent_bars_positive_bars_pct": feature_recent_bars_positive_bars_pct,
+            "feature_entry_bar_vwap_to_ema_20": potential_confirmation_bar.vwap/potential_confirmation_bar.ema_20 if potential_confirmation_bar.ema_20 > 0 else 1,
+            "feature_emas_distances_to_recent_bars_ema_distances": (potential_confirmation_bar.ema_9-potential_confirmation_bar.ema_20)/ema_9_to_ema_20_distances if ema_9_to_ema_20_distances > 0 else 1,
         }
 
     def volume_structure_features(
@@ -319,6 +344,7 @@ class DataExtractor:
         highest_high_one_minute_bar: common.objects.BarData,
         bars_since_highest_high: list[common.objects.BarData],
         potential_confirmation_bar: common.objects.BarData,
+        one_minute_bars: list[common.objects.BarData],
     ) -> dict[str, float]:
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
@@ -365,6 +391,13 @@ class DataExtractor:
                 if previous_bar.histogram > bar_object.histogram < next_bar.histogram:
                     histogram_changed_to_positive_direction_count += 1
 
+        distance_from_last_negative_macd_bar = 0
+        for bar_object in one_minute_bars[1:]:
+            if bar_object.macd > bar_object.signal_line:
+                distance_from_last_negative_macd_bar += 1
+            else:
+                break
+
         entry_bar_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd if previous_bar is not None and previous_bar.macd > 0 else 1
         entry_bar_histogram_to_previous = potential_confirmation_bar.histogram/previous_bar.histogram if previous_bar is not None and previous_bar.histogram > 0 else 1
         entry_bar_histogram_to_highest_high = potential_confirmation_bar.histogram/highest_high_one_minute_bar.histogram if highest_high_one_minute_bar.histogram > 0 else 1
@@ -380,6 +413,7 @@ class DataExtractor:
             "feature_entry_bar_histogram_to_lowest_histogram": entry_bar_histogram_to_lowest_histogram,
             "feature_histogram_changed_to_positive_direction_vs_negative_pct": histogram_changed_to_positive_direction_vs_negative_pct,
             "feature_uptrend_histogram_vs_downtrend_since_highest_high": positive_histogram_count/negative_histogram_count if negative_histogram_count > 0 else 1,
+            "feature_distance_from_last_negative_macd_bar": distance_from_last_negative_macd_bar,
         }
 
     def pre_market_structure_features(
@@ -431,7 +465,6 @@ class DataExtractor:
     ) -> bool:
         current_day_volume_to_recent_days_volume = features_data["feature_current_day_volume_to_recent_days_volume"]
         current_ema20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
-        current_ema9_to_ema20 = features_data["feature_current_day_ema_9_to_ema_20"]
         current_vwap = features_data["feature_current_day_vwap_to_recent_days"]
         current_high_to_recent = features_data["feature_current_day_high_to_recent_days_highs"]
         current_day_high_to_previous_high = features_data["feature_current_day_high_to_previous_high"]
@@ -440,7 +473,6 @@ class DataExtractor:
         entry_ema9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
         entry_extension_pressure = features_data["feature_entry_extension_pressure"]
         entry_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
-        pullback_pos_neg_volume = features_data["feature_positive_vs_negative_volume_during_pullback"]
         weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
         entry_breakout_efficiency_from_ema_9 = features_data["feature_entry_breakout_efficiency_from_ema_9"]
         current_day_movement_to_recent_days_movement = features_data["feature_current_day_movement_to_recent_days_movement"]
@@ -460,7 +492,6 @@ class DataExtractor:
         previous_bar_high_to_highest_high = features_data["feature_previous_bar_high_to_highest_high"]
         entry_bar_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
         histogram_changed_to_positive_direction_vs_negative_pct = features_data["feature_histogram_changed_to_positive_direction_vs_negative_pct"]
-        bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
         entry_bar_volume_to_recent_bars_average = features_data["feature_entry_bar_volume_to_recent_bars_average"]
         entry_upper_wick_to_recent_upper_wick_average = features_data["feature_entry_upper_wick_to_recent_upper_wick_average"]
         entry_body_to_highest_high_body = features_data["feature_entry_body_to_highest_high_body"]
@@ -471,22 +502,15 @@ class DataExtractor:
         pre_market_volume = features_data["feature_pre_market_volume"]
         entry_close_to_vwap = features_data["feature_entry_close_to_vwap"]
         entry_bar_histogram_to_previous = features_data["feature_entry_bar_histogram_to_previous"]
-
-        # Reject: weak day context
-        # Safe on current dataset: removed 0 positives, 13 false positives.
-        if current_day_volume_to_recent_days_volume <= 1.114 and current_ema20 <= 1.363:
-            return False
+        gains_since_lowest_low = features_data["feature_gains_since_lowest_low"]
+        recent_bars_positive_bars_pct = features_data["feature_recent_bars_positive_bars_pct"]
+        emas_distances_to_recent_bars_ema_distances = features_data["feature_emas_distances_to_recent_bars_ema_distances"]
+        entry_bar_volume_to_total_volume = features_data["feature_entry_bar_volume_to_total_volume"]
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
         # Old version removed 2 positives. This version removed 0 positives.
         if entry_ema9_to_vwap > 1.122 and entry_extension_pressure > 0.428:
-            return False
-
-
-        # Reject: weak trend + weak controlled volume
-        # Safe on current dataset: removed 0 positives, 14 false positives.
-        if current_ema9_to_ema20 <= 1.261 and controlled_volume_entry_quality <= 0.8753:
             return False
 
         # Reject: wick-volume rejection, but only if entry volume does not rescue it.
@@ -517,15 +541,6 @@ class DataExtractor:
         ):
             return False
 
-        # Reject: extended entry, but inefficient breakout
-        # Safe on current dataset: removed 0 positives.
-        if (
-            entry_breakout_efficiency_from_ema_9 <= 0.20
-            and entry_ema9_to_vwap > 1.09
-            and gains_until_entry_bar > 0.60
-        ):
-            return False
-
         # Reject: very extended day, but weak breakout efficiency
         # Safe on current dataset: removed 0 positives.
         if (
@@ -533,12 +548,6 @@ class DataExtractor:
             and entry_breakout_efficiency_from_ema_9 <= 0.40
             and gains_until_entry_bar > 0.60
         ):
-            return False
-
-        # Reject: pullback demand failure
-        # Changed volume threshold from 1.458 -> 1.0.
-        # Old version removed 2 positives. This version removed 0 positives.
-        if entry_volume_to_highest_high_volume <= 1.0 and pullback_pos_neg_volume <= 0:
             return False
 
         # Reject: big current-day movement, but weak VWAP context
@@ -549,20 +558,10 @@ class DataExtractor:
         if current_day_high_to_previous_high <= 1.02 and entry_breakout_efficiency_from_ema_9 > 0.64:
             return False
 
-        # Reject: rejection wick with weak entry pressure
-        if entry_bar_upper_wick > 0.34 and entry_extension_pressure <= 0.11:
-            return False
-
         if entry_histogram_to_highest_histogram <= 0.417 and entry_volume_to_highest_volume_in_pullback > 2.16:
             return False
 
         if current_ema20 <= 0.988 and entry_histogram_to_lowest_histogram > 1.28:
-            return False
-
-        if entry_breakout_efficiency_from_ema_9 <= 0.263 and entry_ema9_to_vwap > 1.122:
-            return False
-
-        if entry_volume_price_efficiency <= 0.050 and controlled_volume_entry_quality <= 0.852:
             return False
 
         # Reject: elevated day structure, but inefficient entry breakout
@@ -602,10 +601,6 @@ class DataExtractor:
         # Reject: previous bar already pushed above old high,
         # and histogram already moved strongly in positive direction
         if previous_bar_high_to_highest_high >= 1.010 and histogram_changed_to_positive_direction_vs_negative_pct >= 1.04:
-            return False
-
-        # Reject: weak day volume + weak post-high volume structure
-        if bars_above_volume_average_vs_under_since_highest_high <= 0.34 and current_day_volume_to_recent_days_volume <= 1.02:
             return False
 
         # Reject: active current-day move, but entry is already too extended
@@ -658,6 +653,29 @@ class DataExtractor:
         if entry_close_to_vwap <= 1.13 and entry_bar_histogram_to_previous >= 4.70:
             return False
 
+        if entry_breakout_efficiency_from_ema_9 <= 0.263 and entry_ema9_to_vwap > 1.122:
+            return False
+
+        if entry_volume_price_efficiency <= 0.050 and controlled_volume_entry_quality <= 0.852:
+            return False
+
+        # Reject: almost no bounce from pullback low,
+        # and entry volume is weak versus highest pullback volume
+        if gains_since_lowest_low <= 0.047 and entry_volume_to_highest_volume_in_pullback <= 1.09:
+            return False
+
+        if gains_since_lowest_low <= 0.05 and current_day_movement_to_recent_days_movement >= 7.5:
+            return False
+
+        # Reject: many recent positive bars, but entry candle still loses EMA9
+        if recent_bars_positive_bars_pct >= 0.77 and entry_bar_low_to_ema_9 <= 0.995:
+            return False
+
+        # Reject: EMA distance is unusually expanded vs recent bars,
+        # and entry is already extended from VWAP
+        if emas_distances_to_recent_bars_ema_distances >= 1.017 and entry_ema9_to_vwap >= 1.040:
+            return False
+
         return True
 
     #pylint:disable=W0613
@@ -702,6 +720,7 @@ class DataExtractor:
             highest_high_one_minute_bar=highest_high_one_minute_bar,
             bars_since_highest_high=bars_since_highest_high,
             potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_bars=one_minute_bars,
         )
         pre_market_structure_features = self.pre_market_structure_features(
             day_timeframe_stock=day_timeframe_stock,
@@ -715,6 +734,7 @@ class DataExtractor:
         base_features = {
             "highest_high_one_minute_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else datetime.datetime.fromtimestamp(0),
             "total_volume": total_volume,
+            "feature_entry_bar_volume_to_total_volume": breakout_structure_features["entry_bar_volume"]/total_volume if total_volume > 0 else 1,
         }
 
         highest_high_bar_body = abs(highest_high_one_minute_bar.close - highest_high_one_minute_bar.open_value) / highest_high_one_minute_bar.open_value if highest_high_one_minute_bar is not None else 0
@@ -775,6 +795,7 @@ class DataExtractor:
                 and feature_entry_rejection_pressure <= 0.15
                 and feature_pullback_health > 2.0
             ),
+            "feature_macd_recovery_age_quality": macd_structure_features["feature_distance_from_last_negative_macd_bar"] * macd_structure_features["feature_entry_bar_macd_to_previous"],
         }
 
         features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
