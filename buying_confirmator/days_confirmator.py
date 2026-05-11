@@ -207,19 +207,31 @@ class Confirmator:
             reverse=True
         )
 
-        highest_high: float = max(
-            highest_high_one_minute_bar.high if highest_high_one_minute_bar is not None else 0,
-            stock.last_post_pre_one_minute_highest_high,
-        )
+        highest_high: float = highest_high_one_minute_bar.high if highest_high_one_minute_bar is not None else potential_confirmation_bar.close
 
-        if not self.bar_has_potential(
+        bar_has_potential, reason = self.bar_has_potential(
             stock=stock,
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=temp_one_minute_bars,
             highest_high=highest_high,
-        ):
+        )
+
+        if not bar_has_potential:
+            self.logger.info(
+                msg="Bar does not have a potential",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": stock.symbol_name,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "request_id": stock.request_id,
+                    "reason": reason,
+                }
+            )
             return (
                 score,
                 highest_high,
@@ -372,7 +384,7 @@ class Confirmator:
         potential_confirmation_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         highest_high: float,
-    ) -> bool:
+    ) -> tuple[bool, str]:
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
         )
@@ -382,14 +394,14 @@ class Confirmator:
             and previous_bar is not None
             and previous_bar.high > potential_confirmation_bar.high
         ):
-            return False
+            return False, "previous_bar.high <= potential_confirmation_bar.high"
 
         if potential_confirmation_bar.close < original_bar_to_confirm.ema_20:
-            return False
+            return False, "potential_confirmation_bar.close >= original_bar_to_confirm.ema_20"
 
         highest_high = round(highest_high, 2)
         if potential_confirmation_bar.close < 1.0:
-            return False
+            return False, "potential_confirmation_bar.close >= 1.0"
 
         crossed_any_resistance = any(
             r_l
@@ -398,26 +410,8 @@ class Confirmator:
         )
         crossed_highest_high = round(potential_confirmation_bar.low, 2) < highest_high < round(potential_confirmation_bar.close, 2)
 
-        if potential_confirmation_bar.bar_time < datetime.datetime(
-            year=potential_confirmation_bar.bar_time.year,
-            month=potential_confirmation_bar.bar_time.month,
-            day=potential_confirmation_bar.bar_time.day,
-            hour=9,
-            minute=40,
-        ):
-            return False
-
-        if potential_confirmation_bar.bar_time > datetime.datetime(
-            year=potential_confirmation_bar.bar_time.year,
-            month=potential_confirmation_bar.bar_time.month,
-            day=potential_confirmation_bar.bar_time.day,
-            hour=15,
-            minute=20,
-        ):
-            return False
-
         if not crossed_highest_high:
-            return False
+            return False, "Didnt crossed highest high"
 
         if (
             True
@@ -425,20 +419,20 @@ class Confirmator:
             and not crossed_any_resistance
             and not crossed_highest_high
         ):
-            return False
+            return False, "Didnt crossed highest high"
 
         if highest_high >= potential_confirmation_bar.close:
-            return False
+            return False, "highest_high < potential_confirmation_bar.close"
 
         if self.highest_high_occurred_more_than_once_in_the_last_bars(
             stock=stock,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=one_minute_bars,
         ):
-            return False
+            return False, "highest_high_occurred_more_than_once_in_the_last_bars"
 
         if potential_confirmation_bar.buyers_are_indecision:
-            return False
+            return False, "buyers_are_indecision"
 
         if any(
             r_l
@@ -447,7 +441,7 @@ class Confirmator:
             and potential_confirmation_bar.high/r_l.high > 0.9
             and potential_confirmation_bar.bar_wick_percentage > 0.4
         ):
-            return False
+            return False, "close to resistance level"
 
         if (
             True
@@ -457,9 +451,27 @@ class Confirmator:
                 or 0.9 < potential_confirmation_bar.high/stock.bars[1].high <= 1
             )
         ):
-            return False
+            return False, "previous day close is higher"
 
-        return True
+        if potential_confirmation_bar.bar_time < datetime.datetime(
+            year=potential_confirmation_bar.bar_time.year,
+            month=potential_confirmation_bar.bar_time.month,
+            day=potential_confirmation_bar.bar_time.day,
+            hour=9,
+            minute=40,
+        ):
+            return False, "Before 09:40"
+
+        if potential_confirmation_bar.bar_time > datetime.datetime(
+            year=potential_confirmation_bar.bar_time.year,
+            month=potential_confirmation_bar.bar_time.month,
+            day=potential_confirmation_bar.bar_time.day,
+            hour=15,
+            minute=20,
+        ):
+            return False, "After 15:20"
+
+        return True, "bar has potential"
 
     def highest_high_occurred_more_than_once_in_the_last_bars(
         self,

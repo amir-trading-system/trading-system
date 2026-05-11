@@ -70,6 +70,7 @@ class Handler(
             "threshold",
             "should_run_model",
             "collection_finished_time",
+            "reason",
         ]
 
         for field in fields:

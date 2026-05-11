@@ -32,8 +32,20 @@ THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 # Final stable feature filtering
 MIN_MEAN_IMPORTANCE = 0.02
 MIN_TOP_K_FREQUENCY = 0.5
-TOP_K_FOR_STABILITY = 7
+TOP_K_FOR_STABILITY = 8
 MIN_SELECTED_FEATURES = 7
+
+SELECTED_FEATURES = [
+    "feature_current_day_vwap_to_recent_days",
+    "feature_current_day_high_to_previous_high",
+    "feature_current_day_high_to_recent_days_highs",
+    "feature_controlled_volume_entry_quality",
+    "feature_overall_legit_trade",
+    "feature_entry_close_strength_to_highest_high_close_strength",
+    "feature_entry_bar_body",
+    "feature_entry_body_to_recent_bars_body_average",
+    "feature_entry_bar_volume_to_highest_high_volume",
+]
 
 # Optional hard rules for final decision layer
 USE_HARD_RULES = True
@@ -115,15 +127,7 @@ def find_candidate_numeric_features(pos_df: pd.DataFrame, neg_df: pd.DataFrame):
     final_shares_columns = []
     for feature in shared:
         # if feature.startswith("feature_"):
-        if feature in [
-            "feature_current_day_vwap_to_recent_days",
-            "feature_current_day_high_to_previous_high",
-            "feature_current_day_high_to_recent_days_highs",
-            "feature_controlled_volume_entry_quality",
-            "feature_entry_bar_ema_9_to_vwap",
-            "feature_overall_legit_trade",
-            "feature_entry_rejection_pressure",
-        ]:
+        if feature in SELECTED_FEATURES:
             final_shares_columns.append(feature)
 
     return final_shares_columns

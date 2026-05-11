@@ -220,9 +220,9 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="BTCS",
-            datetime_str="11.12.24T10:36:00",
-            is_positive=True,
+            name="IBG",
+            datetime_str="07.14.25T13:08:00",
+            is_positive=False,
         ),
     ]
     # symbols = explore_past_potential_symbols()

@@ -507,6 +507,15 @@ class DataExtractor:
         gains_since_lowest_low = features_data["feature_gains_since_lowest_low"]
         recent_bars_positive_bars_pct = features_data["feature_recent_bars_positive_bars_pct"]
         emas_distances_to_recent_bars_ema_distances = features_data["feature_emas_distances_to_recent_bars_ema_distances"]
+        minutes_since_market_open = features_data["feature_minutes_since_market_open"]
+        entry_close_to_previous_bar_close = features_data["feature_entry_close_to_previous_bar_close"]
+        entry_body_to_previous_bar_body = features_data["feature_entry_body_to_previous_bar_body"]
+        clean_breakout_efficiency = features_data["feature_clean_breakout_efficiency"]
+        current_day_ema_9_to_ema_20_distance_to_recent_days = features_data["feature_current_day_ema_9_to_ema_20_distance_to_recent_days"]
+        entry_bar_volume_to_previous_bar_volume = features_data["feature_entry_bar_volume_to_previous_bar_volume"]
+        entry_bar_macd_to_previous = features_data["feature_entry_bar_macd_to_previous"]
+        failed_attempts_pressure = features_data["feature_failed_attempts_pressure"]
+        entry_close_position_vs_previous_close_position = features_data["feature_entry_close_position_vs_previous_close_position"]
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
@@ -684,6 +693,48 @@ class DataExtractor:
         ):
             return False
 
+        # Reject: early setup where previous bar was already near the old high,
+        # but entry does not add enough follow-through over previous close
+        if (
+            minutes_since_market_open <= 23
+            and previous_bar_close_to_highest_high >= 0.984
+            and entry_close_to_previous_bar_close <= 1.095
+        ):
+            return False
+
+        # Reject: very early setup, weak entry body versus previous bar,
+        # but the candle still looks like a clean breakout
+        if (
+            minutes_since_market_open <= 23
+            and entry_body_to_previous_bar_body <= 1.86
+            and clean_breakout_efficiency >= 1.0
+        ):
+            return False
+
+        # Reject: stretched EMA structure + volume spike, but weak MACD follow-through
+        if (
+            current_day_ema_9_to_ema_20_distance_to_recent_days >= 5.33
+            and entry_bar_volume_to_previous_bar_volume >= 7.60
+            and entry_bar_macd_to_previous <= 0.67
+        ):
+            return False
+
+        # Reject: entry volume is only strong versus previous bar,
+        # but weak versus the original highest-high volume
+        if (
+            entry_bar_volume_to_previous_bar_volume >= 15.60
+            and entry_bar_volume_to_highest_high_volume <= 0.91
+        ):
+            return False
+
+        # Reject: stretched EMA structure + failed attempts + abnormal close-position shift
+        if (
+            current_day_ema_9_to_ema_20_distance_to_recent_days >= 4.60
+            and failed_attempts_pressure >= 0.34
+            and entry_close_position_vs_previous_close_position >= 2.30
+        ):
+            return False
+
         return True
 
     #pylint:disable=W0613
@@ -765,6 +816,7 @@ class DataExtractor:
             volume_structure_features["feature_positive_vs_negative_volume_during_pullback"]
             * volume_structure_features["feature_entry_bar_volume_to_highest_high_volume"]
         ) * max(breakout_structure_features["feature_breakout_attempts_during_pullback"] + 1, 1)
+        feature_entry_followthrough_after_near_reclaim = breakout_structure_features["feature_entry_close_to_previous_bar_close"]/max(breakout_structure_features["feature_previous_bar_close_to_highest_high"], 0.0001)
 
         complex_features = {
             "feature_weak_wick_volume_rejection": 1 if feature_upper_wick > 0.262 and feature_volume_to_previous <= 1.17 else 0,
@@ -804,6 +856,13 @@ class DataExtractor:
                 and feature_pullback_health > 2.0
             ),
             "feature_macd_recovery_age_quality": macd_structure_features["feature_distance_from_last_negative_macd_bar"] * macd_structure_features["feature_entry_bar_macd_to_previous"],
+            "feature_entry_followthrough_after_near_reclaim": breakout_structure_features["feature_entry_close_to_previous_bar_close"]/max(breakout_structure_features["feature_previous_bar_close_to_highest_high"], 0.0001),
+            "feature_entry_volume_spike_without_high_context": volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"]/max(volume_structure_features["feature_entry_bar_volume_to_highest_high_volume"], 0.0001),
+            "feature_failed_pressure_to_followthrough": breakout_structure_features["feature_failed_attempts_pressure"]/max(feature_entry_followthrough_after_near_reclaim, 0.0001),
+            "feature_near_high_weak_followthrough": breakout_structure_features["feature_previous_bar_close_to_highest_high"]/max(breakout_structure_features["feature_entry_close_to_previous_bar_close"], 0.0001),
+            "feature_macd_recovery_followthrough_quality": macd_structure_features["feature_distance_from_last_negative_macd_bar"] * macd_structure_features["feature_entry_bar_macd_to_previous"] * feature_entry_followthrough_after_near_reclaim,
+            "feature_volume_confirmation_quality": volume_structure_features["feature_entry_bar_volume_to_highest_high_volume"]/max(volume_structure_features["feature_entry_bar_volume_to_previous_bar_volume"], 0.0001),
+            "feature_fake_reclaim_pressure": breakout_structure_features["feature_previous_bar_close_to_highest_high"] * breakout_structure_features["feature_failed_attempts_pressure"]/max(breakout_structure_features["feature_entry_close_to_previous_bar_close"], 0.0001),
         }
 
         features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
