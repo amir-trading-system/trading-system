@@ -385,6 +385,9 @@ class Confirmator:
         one_minute_bars: list[common.objects.BarData],
         highest_high: float,
     ) -> tuple[bool, str]:
+        if stock.number_of_potential_entry_points >= 2:
+            return True, "number_of_potential_entry_points >= 2"
+
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=potential_confirmation_bar,
         )

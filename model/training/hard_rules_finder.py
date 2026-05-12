@@ -1,4 +1,5 @@
 from itertools import combinations, product
+import tqdm
 
 import pandas as pd
 import numpy as np
@@ -233,7 +234,7 @@ def search_two_condition_rules(pos, fp, features):
 
     ops = ["<=", ">="]
 
-    for f1, f2 in combinations(features, 2):
+    for f1, f2 in tqdm.tqdm(combinations(features, 2)):
         t1_values = feature_thresholds[f1]
         t2_values = feature_thresholds[f2]
 
