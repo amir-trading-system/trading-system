@@ -516,6 +516,7 @@ class DataExtractor:
         entry_bar_macd_to_previous = features_data["feature_entry_bar_macd_to_previous"]
         failed_attempts_pressure = features_data["feature_failed_attempts_pressure"]
         entry_close_position_vs_previous_close_position = features_data["feature_entry_close_position_vs_previous_close_position"]
+        entry_bar_open_to_ema_9 = features_data["feature_entry_bar_open_to_ema_9"]
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
@@ -687,10 +688,7 @@ class DataExtractor:
             return False
 
         # Reject: entry loses EMA9, but previous bar was already near old high
-        if (
-            entry_bar_low_to_ema_9 <= 0.990
-            and previous_bar_close_to_highest_high >= 0.984
-        ):
+        if entry_bar_low_to_ema_9 <= 0.990 and previous_bar_close_to_highest_high >= 0.984:
             return False
 
         # Reject: early setup where previous bar was already near the old high,
@@ -721,10 +719,7 @@ class DataExtractor:
 
         # Reject: entry volume is only strong versus previous bar,
         # but weak versus the original highest-high volume
-        if (
-            entry_bar_volume_to_previous_bar_volume >= 15.60
-            and entry_bar_volume_to_highest_high_volume <= 0.91
-        ):
+        if entry_bar_volume_to_previous_bar_volume >= 15.60 and entry_bar_volume_to_highest_high_volume <= 0.91:
             return False
 
         # Reject: stretched EMA structure + failed attempts + abnormal close-position shift
@@ -733,6 +728,13 @@ class DataExtractor:
             and failed_attempts_pressure >= 0.34
             and entry_close_position_vs_previous_close_position >= 2.30
         ):
+            return False
+
+        # Reject: entry opens below EMA9 and entry volume is weak vs recent bars
+        if entry_bar_open_to_ema_9 <= 0.9885 and entry_bar_volume_to_recent_bars_average <= 2.14:
+            return False
+
+        if entry_ema9_to_vwap <= 1.0144 and entry_body_to_highest_high_body <= 1.445:
             return False
 
         return True

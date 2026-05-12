@@ -32,8 +32,8 @@ THRESHOLDS = [0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85]
 # Final stable feature filtering
 MIN_MEAN_IMPORTANCE = 0.02
 MIN_TOP_K_FREQUENCY = 0.5
-TOP_K_FOR_STABILITY = 8
-MIN_SELECTED_FEATURES = 7
+TOP_K_FOR_STABILITY = 6
+MIN_SELECTED_FEATURES = 5
 
 SELECTED_FEATURES = [
     "feature_current_day_vwap_to_recent_days",
@@ -42,9 +42,6 @@ SELECTED_FEATURES = [
     "feature_controlled_volume_entry_quality",
     "feature_overall_legit_trade",
     "feature_entry_close_strength_to_highest_high_close_strength",
-    "feature_entry_bar_body",
-    "feature_entry_body_to_recent_bars_body_average",
-    "feature_entry_bar_volume_to_highest_high_volume",
 ]
 
 # Optional hard rules for final decision layer
