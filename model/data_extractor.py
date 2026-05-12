@@ -219,6 +219,10 @@ class DataExtractor:
         feature_entry_close_position_vs_previous_close_position = entry_close_strength / previous_close_strength if previous_close_strength > 0 else 1
         feature_lowest_low_to_entry_elapsed_minutes = lowest_low_bar.index - potential_confirmation_bar.index if lowest_low_bar is not None else 0
         feature_entry_close_to_lowest_low_recovery = (potential_confirmation_bar.close - lowest_low_bar.low) / (highest_high_one_minute_bar.high - lowest_low_bar.low) if highest_high_one_minute_bar is not None and lowest_low_bar is not None and (highest_high_one_minute_bar.high - lowest_low_bar.low) > 0 else 1
+        bars_count_since_open = len(one_minute_bars)
+        gain_profit_since_open = (potential_confirmation_bar.close - one_minute_bars[-1].open_value)/one_minute_bars[-1].open_value if len(one_minute_bars) > 0 else 0
+        feature_profit_since_open_to_bars_count_since_open = gain_profit_since_open/bars_count_since_open if bars_count_since_open > 0 else 0
+
 
         return {
             "entry_bar_volume": potential_confirmation_bar.volume,
@@ -264,6 +268,7 @@ class DataExtractor:
             "feature_recent_bars_positive_bars_pct": feature_recent_bars_positive_bars_pct,
             "feature_entry_bar_vwap_to_ema_20": potential_confirmation_bar.vwap/potential_confirmation_bar.ema_20 if potential_confirmation_bar.ema_20 > 0 else 1,
             "feature_emas_distances_to_recent_bars_ema_distances": (potential_confirmation_bar.ema_9-potential_confirmation_bar.ema_20)/ema_9_to_ema_20_distances if ema_9_to_ema_20_distances > 0 else 1,
+            "feature_profit_since_open_to_bars_count_since_open": feature_profit_since_open_to_bars_count_since_open,
         }
 
     def volume_structure_features(
@@ -517,6 +522,10 @@ class DataExtractor:
         failed_attempts_pressure = features_data["feature_failed_attempts_pressure"]
         entry_close_position_vs_previous_close_position = features_data["feature_entry_close_position_vs_previous_close_position"]
         entry_bar_open_to_ema_9 = features_data["feature_entry_bar_open_to_ema_9"]
+        profit_since_open_to_bars_count_since_open = features_data["feature_profit_since_open_to_bars_count_since_open"]
+        entry_close_strength_to_highest_high_close_strength = features_data["feature_entry_close_strength_to_highest_high_close_strength"]
+        reclaim_close_strength_since_highest_high = features_data["feature_reclaim_close_strength_since_highest_high"]
+        entry_bar_lower_wick = features_data["feature_entry_bar_lower_wick"]
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
@@ -569,7 +578,14 @@ class DataExtractor:
         if current_day_high_to_previous_high <= 1.02 and entry_breakout_efficiency_from_ema_9 > 0.64:
             return False
 
-        if entry_histogram_to_highest_histogram <= 0.417 and entry_volume_to_highest_volume_in_pullback > 2.16:
+        if (
+            entry_histogram_to_highest_histogram <= 0.417
+            and entry_volume_to_highest_volume_in_pullback > 2.16
+            and not (
+                entry_bar_body >= 0.90
+                and entry_close_strength_to_highest_high_close_strength >= 2.0
+            )
+        ):
             return False
 
         if current_ema20 <= 0.988 and entry_histogram_to_lowest_histogram > 1.28:
@@ -664,7 +680,16 @@ class DataExtractor:
         if entry_close_to_vwap <= 1.13 and entry_bar_histogram_to_previous >= 4.70:
             return False
 
-        if entry_breakout_efficiency_from_ema_9 <= 0.263 and entry_ema9_to_vwap > 1.122:
+        # Reject: inefficient breakout + high EMA9/VWAP,
+        # unless the entry candle itself is strong
+        if (
+            entry_breakout_efficiency_from_ema_9 <= 0.263
+            and entry_ema9_to_vwap > 1.122
+            and not (
+                entry_bar_body >= 0.82
+                and entry_close_strength_to_highest_high_close_strength >= 1.30
+            )
+        ):
             return False
 
         if entry_volume_price_efficiency <= 0.050 and controlled_volume_entry_quality <= 0.852:
@@ -735,6 +760,70 @@ class DataExtractor:
             return False
 
         if entry_ema9_to_vwap <= 1.0144 and entry_body_to_highest_high_body <= 1.445:
+            return False
+
+        if profit_since_open_to_bars_count_since_open >= 0.00775 and volume_since_highest_high_to_volume_before <= 0.0103:
+            return False
+
+        if entry_bar_open_to_ema_9 >= 1.007 and entry_close_position_vs_previous_close_position <= 0.68:
+            return False
+
+        # Reject: weak recent trend + weak previous-high context
+        if (
+            recent_bars_up_trend_pct <= 0.40
+            and current_day_high_to_previous_high <= 1.0216
+        ):
+            return False
+
+        # Reject: compressed EMA structure, but entry candle body is extremely strong
+        if (
+            emas_distances_to_recent_bars_ema_distances <= 0.119
+            and entry_bar_body >= 0.986
+        ):
+            return False
+
+        if (
+            entry_close_to_previous_bar_close <= 1.0624
+            and controlled_volume_entry_quality <= 0.7611
+        ):
+            return False
+
+        if (
+            price_movement_from_highest_high_to_lowest_low <= 0.2253
+            and controlled_volume_entry_quality <= 1.1314
+        ):
+            return False
+
+        # Reject: entry is extended, but candle shows large upper-wick rejection
+        if (
+            entry_bar_upper_wick >= 0.333333
+            and entry_extension_pressure >= 0.325339
+        ):
+            return False
+
+        # Reject: weak reclaim close after highest high,
+        # and entry upper wick is unusually small versus recent upper wicks
+        if (
+            reclaim_close_strength_since_highest_high <= 0.110868
+            and entry_upper_wick_to_recent_upper_wick_average <= 0.264035
+        ):
+            return False
+
+        # Reject: shallow pullback, weak body versus previous bar,
+        # and compressed EMA-distance structure
+        if (
+            pullback_depth_vs_pre_high_move <= 0.88375
+            and entry_body_to_previous_bar_body <= 0.98432
+            and emas_distances_to_recent_bars_ema_distances <= 0.140767
+        ):
+            return False
+
+        # Reject: almost full-body candle after large post-high volume participation
+        if (
+            entry_bar_body >= 0.966085
+            and volume_since_highest_high_to_volume_before >= 0.578934
+            and entry_bar_lower_wick <= 0.015361
+        ):
             return False
 
         return True
