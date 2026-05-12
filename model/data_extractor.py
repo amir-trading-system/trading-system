@@ -407,6 +407,7 @@ class DataExtractor:
 
         entry_bar_macd_to_previous = potential_confirmation_bar.macd/previous_bar.macd if previous_bar is not None and previous_bar.macd > 0 else 1
         entry_bar_histogram_to_previous = potential_confirmation_bar.histogram/previous_bar.histogram if previous_bar is not None and previous_bar.histogram > 0 else 1
+        current_histogram_is_bigger_than_previous = potential_confirmation_bar.histogram > previous_bar.histogram if previous_bar is not None and previous_bar.histogram > 0 else False
         entry_bar_histogram_to_highest_high = potential_confirmation_bar.histogram/highest_high_one_minute_bar.histogram if highest_high_one_minute_bar.histogram > 0 else 1
         entry_bar_histogram_to_highest_histogram = potential_confirmation_bar.histogram/highest_histogram_since_highest_high if highest_histogram_since_highest_high > 0 else 1
         entry_bar_histogram_to_lowest_histogram = potential_confirmation_bar.histogram/lowest_histogram_since_highest_high if lowest_histogram_since_highest_high > 0 else 1
@@ -414,6 +415,7 @@ class DataExtractor:
 
         return {
             "feature_entry_bar_macd_to_previous": entry_bar_macd_to_previous,
+            "feature_current_histogram_is_bigger_than_previous": current_histogram_is_bigger_than_previous,
             "feature_entry_bar_histogram_to_previous": entry_bar_histogram_to_previous,
             "feature_entry_bar_histogram_to_highest_high": entry_bar_histogram_to_highest_high,
             "feature_entry_bar_histogram_to_highest_histogram": entry_bar_histogram_to_highest_histogram,
@@ -526,6 +528,9 @@ class DataExtractor:
         entry_close_strength_to_highest_high_close_strength = features_data["feature_entry_close_strength_to_highest_high_close_strength"]
         reclaim_close_strength_since_highest_high = features_data["feature_reclaim_close_strength_since_highest_high"]
         entry_bar_lower_wick = features_data["feature_entry_bar_lower_wick"]
+        entry_close_to_previous_bar_high = features_data["feature_entry_close_to_previous_bar_high"]
+        volume_without_macd_confirmation = features_data["feature_volume_without_macd_confirmation"]
+        bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
@@ -558,15 +563,23 @@ class DataExtractor:
             and current_day_high_to_previous_high <= 1.40
             and gains_until_entry_bar <= 0.70
             and entry_breakout_efficiency_from_ema_9 <= 0.55
+            and not (
+                current_day_high_to_previous_high >= 1.319
+                and entry_ema9_to_vwap <= 1.073
+            )
         ):
             return False
 
-        # Reject: very extended day, but weak breakout efficiency
-        # Safe on current dataset: removed 0 positives.
+        # Rescue valid positives where entry is not too far above old high
+        # and body is not abnormally expanded versus recent bars
         if (
             current_high_to_recent > 3.31
             and entry_breakout_efficiency_from_ema_9 <= 0.40
             and gains_until_entry_bar > 0.60
+            and not (
+                entry_bar_close_to_highest_high <= 1.023
+                and entry_body_to_recent_bars_body_average <= 5.55
+            )
         ):
             return False
 
@@ -588,7 +601,14 @@ class DataExtractor:
         ):
             return False
 
-        if current_ema20 <= 0.988 and entry_histogram_to_lowest_histogram > 1.28:
+        if (
+            current_ema20 <= 0.988
+            and entry_histogram_to_lowest_histogram > 1.28
+            and not (
+                entry_close_strength_to_highest_high_close_strength >= 1.27
+                and entry_ema9_to_vwap <= 1.10
+            )
+        ):
             return False
 
         # Reject: elevated day structure, but inefficient entry breakout
@@ -607,7 +627,14 @@ class DataExtractor:
         if current_day_high_to_previous_high <= 1.28 and entry_bar_low_to_ema_9 <= 0.984:
             return False
 
-        if bars_since_highest_high_to_bars_before <= 0.011 and entry_breakout_efficiency_from_ema_9 <= 0.27:
+        if (
+            bars_since_highest_high_to_bars_before <= 0.011
+            and entry_breakout_efficiency_from_ema_9 <= 0.27
+            and not (
+                entry_body_to_recent_bars_body_average <= 6.42
+                and entry_bar_upper_wick <= 0.145
+            )
+        ):
             return False
 
         if volume_since_highest_high_to_volume_before <= 0.045 and entry_breakout_efficiency_from_ema_9 <= 0.27:
@@ -824,6 +851,12 @@ class DataExtractor:
             and volume_since_highest_high_to_volume_before >= 0.578934
             and entry_bar_lower_wick <= 0.015361
         ):
+            return False
+
+        if entry_close_to_previous_bar_high <= 1.102621092 and profit_since_open_to_bars_count_since_open >= 0.01616006036:
+            return False
+
+        if volume_without_macd_confirmation <= 1.19487729 and bars_above_volume_average_vs_under_since_highest_high <= 0:
             return False
 
         return True

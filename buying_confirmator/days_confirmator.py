@@ -308,11 +308,11 @@ class Confirmator:
                     )
 
             if self.model_runner.should_run_model:
-                stock.number_of_potential_entry_points += 1
                 score = self.model_runner.score_potential_confirmation_bar(
                     potential_confirmation_bar=potential_confirmation_bar,
                     day_timeframe_stock=stock,
                 )
+                stock.number_of_potential_entry_points += 1
 
                 msg = "Bar confirmed by model"
 

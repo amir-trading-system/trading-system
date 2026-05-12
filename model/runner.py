@@ -44,7 +44,7 @@ class Runner:
         if day_timeframe_stock.number_of_potential_entry_points > 3:
             probability -= 0.1
 
-        should_take_trade = probability >= 0.52
+        should_take_trade = probability >= 0.55
 
         score = round(probability * 100, 2)
 
