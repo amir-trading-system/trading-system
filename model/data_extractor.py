@@ -544,6 +544,7 @@ class DataExtractor:
         macd_recovery_followthrough_quality = features_data["feature_macd_recovery_followthrough_quality"]
         entry_bar_volume_to_volume_average = features_data["feature_entry_bar_volume_to_volume_average"]
         volume_since_lowest_low_to_entry_vs_since_highest_high = features_data["feature_volume_since_lowest_low_to_entry_vs_since_highest_high"]
+        total_volume = features_data["total_volume"]
 
         # Rescue: strong failed-attempt pressure, but day movement is still controlled
         # Use this as a rescue clause inside the rule that rejects this group.
@@ -558,6 +559,14 @@ class DataExtractor:
         if (
             recent_bars_positive_bars_pct <= 0.40
             and bars_since_highest_high_to_bars_before <= 0.0041551565
+        ):
+            return True
+
+        # Rescue: very strong broader EMA20 context,
+        # and current-day low is deeply below EMA9
+        if (
+            current_ema20 >= 1.8320
+            and current_day_low_to_ema_9 <= 0.5501
         ):
             return True
 
@@ -1052,6 +1061,66 @@ class DataExtractor:
             entry_volume_price_efficiency >= 0.2663313036
             and entry_bar_volume_to_recent_bars_average >= 4.1439257575
             and entry_bar_upper_wick >= 0.1618463677
+        ):
+            return False
+
+        # Reject: deep pullback versus pre-high move,
+        # but entry body is weak versus recent candles
+        if (
+            entry_body_to_recent_bars_body_average <= 2.7161
+            and pullback_depth_vs_pre_high_move >= 2.3676
+        ):
+            return False
+
+        # Reject: weak daily EMA20 context,
+        # and entry volume is weaker than previous bar
+        if (
+            current_ema20 <= 1.0059
+            and entry_bar_volume_to_previous_bar_volume <= 0.6496
+        ):
+            return False
+
+        # Reject: very large body versus highest-high body,
+        # but weak volume/MACD confirmation
+        if (
+            volume_without_macd_confirmation <= 0.4503
+            and entry_body_to_highest_high_body >= 21.0911
+        ):
+            return False
+
+        # Reject: failed-pressure/fake-reclaim pattern,
+        # while recent bars are not positive enough
+        if (
+            failed_pressure_to_followthrough >= 0.3708
+            and recent_bars_positive_bars_pct <= 0.30
+        ):
+            return False
+
+        # Reject: very high total-volume day with oversized entry volume vs average
+        if (
+            total_volume >= 21435696.25
+            and entry_bar_volume_to_volume_average >= 6.1061
+        ):
+            return False
+
+        # Reject: low total-volume name, but entry is already extended above VWAP/EMA structure
+        if (
+            total_volume <= 647365.35
+            and entry_ema9_to_vwap >= 1.1237
+        ):
+            return False
+
+        # Reject: almost no premarket participation and current-day move is not strong enough
+        if (
+            pre_market_volume <= 229.31
+            and current_day_movement_to_recent_days_movement <= 4.4058
+        ):
+            return False
+
+        # Reject: weak current-day VWAP context and weak volume from low into entry
+        if (
+            current_day_vwap_to_recent_days <= 1.3480
+            and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.2413
         ):
             return False
 
