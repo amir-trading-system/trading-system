@@ -282,7 +282,7 @@ def search_three_condition_rules(pos, fp, features, max_feature_combos=500):
     if max_feature_combos is not None:
         feature_combos = feature_combos[:max_feature_combos]
 
-    for f1, f2, f3 in feature_combos:
+    for f1, f2, f3 in tqdm.tqdm(feature_combos):
         t1_values = feature_thresholds[f1]
         t2_values = feature_thresholds[f2]
         t3_values = feature_thresholds[f3]
@@ -377,7 +377,7 @@ def main():
 
     print_results(two_condition_results, "BEST 2-CONDITION RULES")
 
-    # Optional: use only the most promising features for triples to avoid huge runtime.
+    # # Optional: use only the most promising features for triples to avoid huge runtime.
     # promising_features = [
     #     "feature_entry_bar_upper_wick",
     #     "feature_entry_extension_pressure",

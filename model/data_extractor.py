@@ -531,6 +531,12 @@ class DataExtractor:
         entry_close_to_previous_bar_high = features_data["feature_entry_close_to_previous_bar_high"]
         volume_without_macd_confirmation = features_data["feature_volume_without_macd_confirmation"]
         bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
+        macd_recovery_age_quality = features_data["feature_macd_recovery_age_quality"]
+        entry_bar_vwap_to_ema_20 = features_data["feature_entry_bar_vwap_to_ema_20"]
+        failed_pressure_to_followthrough = features_data["feature_failed_pressure_to_followthrough"]
+        current_day_vwap_to_recent_days = features_data["feature_current_day_vwap_to_recent_days"]
+        pre_market_gains = features_data["feature_pre_market_gains"]
+        entry_bar_ema_9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
@@ -612,10 +618,14 @@ class DataExtractor:
             return False
 
         # Reject: elevated day structure, but inefficient entry breakout
+        # Rescue if EMA9 is already meaningfully above VWAP
         if (
             current_day_low_to_ema_9 > 1.29
             and entry_breakout_efficiency_from_ema_9 <= 0.36
             and controlled_volume_entry_quality > 1.0
+            and not (
+                entry_ema9_to_vwap >= 1.118
+            )
         ):
             return False
 
@@ -649,7 +659,14 @@ class DataExtractor:
             return False
 
         # Reject: previous bar was not close to reclaiming high, and entry rejects
-        if previous_bar_high_to_highest_high <= 0.973 and entry_bar_upper_wick >= 0.343:
+        # Rescue if recent trend is strong enough
+        if (
+            previous_bar_high_to_highest_high <= 0.973
+            and entry_bar_upper_wick >= 0.343
+            and not (
+                recent_bars_up_trend_pct >= 0.70
+            )
+        ):
             return False
 
         # Reject: previous bar already pushed above old high,
@@ -719,7 +736,17 @@ class DataExtractor:
         ):
             return False
 
-        if entry_volume_price_efficiency <= 0.050 and controlled_volume_entry_quality <= 0.852:
+        # Reject: weak volume-price efficiency + weak controlled volume
+        # Rescue if there was meaningful post-high volume rebuild
+        # and entry close quality is strong versus the highest-high candle
+        if (
+            entry_volume_price_efficiency <= 0.050
+            and controlled_volume_entry_quality <= 0.852
+            and not (
+                volume_since_highest_high_to_volume_before >= 0.2138
+                and entry_close_strength_to_highest_high_close_strength >= 1.69
+            )
+        ):
             return False
 
         # Reject: almost no bounce from pullback low,
@@ -734,9 +761,14 @@ class DataExtractor:
         if recent_bars_positive_bars_pct >= 0.77 and entry_bar_low_to_ema_9 <= 0.995:
             return False
 
-        # Reject: EMA distance is unusually expanded vs recent bars,
-        # and entry is already extended from VWAP
-        if emas_distances_to_recent_bars_ema_distances >= 1.017 and entry_ema9_to_vwap >= 1.040:
+        if (
+            emas_distances_to_recent_bars_ema_distances >= 1.017
+            and entry_ema9_to_vwap >= 1.040
+            and not (
+                entry_body_to_recent_bars_body_average >= 5.50
+                and entry_extension_pressure <= 0.17
+            )
+        ):
             return False
 
         # Reject: entry loses EMA9, but previous bar was already near old high
@@ -857,6 +889,36 @@ class DataExtractor:
             return False
 
         if volume_without_macd_confirmation <= 1.19487729 and bars_above_volume_average_vs_under_since_highest_high <= 0:
+            return False
+
+        if current_day_movement_to_recent_days_movement >= 18.4136654 and bars_since_highest_high_to_bars_before <= 0.0112745098:
+            return False
+
+        if current_day_movement_to_recent_days_movement >= 9.548780488 and volume_since_highest_high_to_volume_before <= 0.01110606138:
+            return False
+
+        if macd_recovery_age_quality >= 17.66563587 and entry_bar_vwap_to_ema_20 <= 0.832889939:
+            return False
+
+        if failed_pressure_to_followthrough >= 0.4016287815 and entry_close_position_vs_previous_close_position >= 8.03125:
+            return False
+
+        if current_day_vwap_to_recent_days <= 1.227176821 and pre_market_gains >= 0.1671960138:
+            return False
+
+        if entry_body_to_recent_bars_body_average <= 1.63759 and entry_close_to_vwap >= 1.27141:
+            return False
+
+        if entry_upper_wick_to_recent_upper_wick_average <= 0 and bars_since_highest_high_to_bars_before <= 0.00269945:
+            return False
+
+        if (
+            entry_body_to_previous_bar_body >= 69.0345
+            and (
+                entry_bar_ema_9_to_vwap >= 1.16935
+                or entry_bar_vwap_to_ema_20 <= 0.885003
+            )
+        ):
             return False
 
         return True
