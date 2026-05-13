@@ -545,6 +545,7 @@ class DataExtractor:
         entry_bar_volume_to_volume_average = features_data["feature_entry_bar_volume_to_volume_average"]
         volume_since_lowest_low_to_entry_vs_since_highest_high = features_data["feature_volume_since_lowest_low_to_entry_vs_since_highest_high"]
         total_volume = features_data["total_volume"]
+        current_day_ema_9_to_ema_20 = features_data["feature_current_day_ema_9_to_ema_20"]
 
         # Rescue: strong failed-attempt pressure, but day movement is still controlled
         # Use this as a rescue clause inside the rule that rejects this group.
@@ -567,6 +568,14 @@ class DataExtractor:
         if (
             current_ema20 >= 1.8320
             and current_day_low_to_ema_9 <= 0.5501
+        ):
+            return True
+
+        # Rescue candidate: very strong current-day EMA structure,
+        # but current-day low had a deep reset below EMA9
+        if (
+            current_day_low_to_ema_9 <= 0.7571
+            and current_day_ema_9_to_ema_20 >= 1.1849
         ):
             return True
 
@@ -1121,6 +1130,27 @@ class DataExtractor:
         if (
             current_day_vwap_to_recent_days <= 1.3480
             and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.2413
+        ):
+            return False
+
+        # Reject: shallow/no real pullback, while VWAP is still below EMA20
+        if (
+            pullback_depth_vs_pre_high_move <= 0.4873
+            and entry_bar_vwap_to_ema_20 <= 0.8890
+        ):
+            return False
+
+        # Reject: entry opens stretched above EMA9, but the pullback from high was tiny
+        if (
+            entry_bar_open_to_ema_9 >= 1.0316
+            and price_movement_from_highest_high_to_lowest_low <= 0.22
+        ):
+            return False
+
+        # Reject: MACD recovery looks old/extended, but entry MACD weakens versus previous bar
+        if (
+            macd_recovery_followthrough_quality >= 18.7867
+            and entry_bar_macd_to_previous <= 0.8328
         ):
             return False
 

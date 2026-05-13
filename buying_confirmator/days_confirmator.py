@@ -399,8 +399,11 @@ class Confirmator:
         ):
             return False, "previous_bar.high <= potential_confirmation_bar.high"
 
-        if potential_confirmation_bar.close < original_bar_to_confirm.ema_20:
-            return False, "potential_confirmation_bar.close >= original_bar_to_confirm.ema_20"
+        if potential_confirmation_bar.close - potential_confirmation_bar.open_value < 0.05:
+            return False, "bar body is less than 0.05"
+
+        # if potential_confirmation_bar.close < original_bar_to_confirm.ema_20:
+        #     return False, "potential_confirmation_bar.close >= original_bar_to_confirm.ema_20"
 
         highest_high = round(highest_high, 2)
         if potential_confirmation_bar.close < 1.0:
