@@ -537,6 +537,29 @@ class DataExtractor:
         current_day_vwap_to_recent_days = features_data["feature_current_day_vwap_to_recent_days"]
         pre_market_gains = features_data["feature_pre_market_gains"]
         entry_bar_ema_9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
+        highest_high_to_entry_elapsed_minutes = features_data["feature_highest_high_to_entry_elapsed_minutes"]
+        highest_high_quality = features_data["feature_highest_high_quality"]
+        entry_followthrough_after_near_reclaim = features_data["feature_entry_followthrough_after_near_reclaim"]
+        near_high_weak_followthrough = features_data["feature_near_high_weak_followthrough"]
+        macd_recovery_followthrough_quality = features_data["feature_macd_recovery_followthrough_quality"]
+        entry_bar_volume_to_volume_average = features_data["feature_entry_bar_volume_to_volume_average"]
+        volume_since_lowest_low_to_entry_vs_since_highest_high = features_data["feature_volume_since_lowest_low_to_entry_vs_since_highest_high"]
+
+        # Rescue: strong failed-attempt pressure, but day movement is still controlled
+        # Use this as a rescue clause inside the rule that rejects this group.
+        if (
+            failed_attempts_pressure >= 0.8136693269
+            and current_day_movement_to_recent_days_movement <= 1.9113661164
+        ):
+            return True
+
+        # Rescue: weak recent trend / no post-high volume pattern,
+        # but only for very low MACD-recovery/volume-above-average structure
+        if (
+            recent_bars_positive_bars_pct <= 0.40
+            and bars_since_highest_high_to_bars_before <= 0.0041551565
+        ):
+            return True
 
         # Reject: entry too extended
         # Changed extension threshold from 0.4078 -> 0.48.
@@ -550,13 +573,17 @@ class DataExtractor:
         if weak_wick_volume_rejection and entry_volume_to_highest_high_volume <= 1.5:
             return False
 
-        # Reject: weak context + inefficient breakout + not enough relative volume.
-        # Added current_volume > 2.0 to avoid rejecting one good positive case.
+        # Reject: weak context + inefficient breakout + not enough relative volume
+        # Rescue if gains into entry are still controlled and profit pace from open is low
         if (
             current_vwap <= 1.36
             and entry_breakout_efficiency_from_ema_9 <= 0.40
             and current_day_volume_to_recent_days_volume <= 145
             and current_day_volume_to_recent_days_volume > 2.0
+            and not (
+                gains_until_entry_bar <= 0.278
+                and profit_since_open_to_bars_count_since_open <= 0.00130
+            )
         ):
             return False
 
@@ -597,12 +624,16 @@ class DataExtractor:
         if current_day_high_to_previous_high <= 1.02 and entry_breakout_efficiency_from_ema_9 > 0.64:
             return False
 
+        # Additional rescue: controlled body versus recent candles
         if (
             entry_histogram_to_highest_histogram <= 0.417
             and entry_volume_to_highest_volume_in_pullback > 2.16
             and not (
                 entry_bar_body >= 0.90
                 and entry_close_strength_to_highest_high_close_strength >= 2.0
+            )
+            and not (
+                entry_body_to_recent_bars_body_average <= 3.26
             )
         ):
             return False
@@ -647,7 +678,18 @@ class DataExtractor:
         ):
             return False
 
-        if volume_since_highest_high_to_volume_before <= 0.045 and entry_breakout_efficiency_from_ema_9 <= 0.27:
+        # Reject: no post-high volume rebuild + inefficient breakout
+        # Rescue very fast continuation if entry body strongly improves over previous bar
+        # and histogram is not weak versus the highest-high histogram
+        if (
+            volume_since_highest_high_to_volume_before <= 0.045
+            and entry_breakout_efficiency_from_ema_9 <= 0.27
+            and not (
+                entry_body_to_previous_bar_body >= 20.0
+                and entry_histogram_to_highest_histogram >= 1.0
+                and highest_high_to_entry_elapsed_minutes <= 2
+            )
+        ):
             return False
 
         # Reject: previous bar had weak volume, and entry candle shows rejection
@@ -918,6 +960,98 @@ class DataExtractor:
                 entry_bar_ema_9_to_vwap >= 1.16935
                 or entry_bar_vwap_to_ema_20 <= 0.885003
             )
+        ):
+            return False
+
+        if highest_high_quality >= 14.5937 and volume_since_highest_high_to_volume_before <= 0.0111551:
+            return False
+
+        if (
+            current_day_ema_9_to_ema_20_distance_to_recent_days >= 15.8314
+            and (
+                entry_followthrough_after_near_reclaim >= 1.46395
+                or near_high_weak_followthrough <= 0.683098
+                or entry_close_to_previous_bar_high >= 1.34121
+                or entry_close_to_previous_bar_close >= 1.3729
+                or pre_market_volume <= 210.48
+            )
+        ):
+            return False
+
+        if macd_recovery_followthrough_quality >= 38.3995 and volume_since_highest_high_to_volume_before <= 0.0265052:
+            return False
+
+        if (
+            previous_bar_high_to_highest_high >= 1.005804598
+            and (
+                entry_bar_volume_to_previous_bar_volume >= 2.483333125
+            )
+        ):
+            return False
+
+        # Reject: previous bar was already near the high,
+        # but entry close quality is weak and entry volume is not impressive vs average
+        if (
+            previous_bar_close_to_highest_high >= 0.97686
+            and entry_close_position_vs_previous_close_position <= 0.79938
+            and entry_bar_volume_to_volume_average <= 2.31401
+        ):
+            return False
+
+        # Reject: previous bar was already near high,
+        # reclaim strength is weak,
+        # and entry volume is not strong versus the previous bar
+        if (
+            previous_bar_close_to_highest_high >= 0.99062
+            and reclaim_close_strength_since_highest_high <= 0.29509
+            and entry_bar_volume_to_previous_bar_volume <= 1.45341
+        ):
+            return False
+
+        # Reject: high volume-price efficiency while histogram already moved positive
+        if (
+            entry_volume_price_efficiency >= 0.81739
+            and histogram_changed_to_positive_direction_vs_negative_pct >= 2.0
+            and volume_since_lowest_low_to_entry_vs_since_highest_high >= 0.86157
+        ):
+            return False
+
+        if (
+            entry_volume_price_efficiency <= 0.03799
+            and current_day_ema_9_to_ema_20_distance_to_recent_days >= 9.24778
+            and failed_attempts_pressure >= 0.14996
+        ):
+            return False
+
+        # Reject: low premarket participation + weak follow-through + weak volume/MACD confirmation
+        if (
+            pre_market_volume <= 12626.2
+            and entry_followthrough_after_near_reclaim <= 1.1097255811
+            and volume_without_macd_confirmation <= 1.3859621588
+        ):
+            return False
+
+        # Reject: entry is floating above EMA9, but bounce/follow-through is weak
+        if (
+            entry_bar_low_to_ema_9 >= 1.0093729767
+            and gains_since_lowest_low <= 0.0738457243
+            and entry_close_position_vs_previous_close_position <= 1.0
+        ):
+            return False
+
+        # Reject: previous bar was not close enough to high, and entry shows rejection
+        if (
+            previous_bar_close_to_highest_high <= 0.9768057971
+            and entry_close_to_previous_bar_high <= 1.0443794455
+            and entry_bar_upper_wick >= 0.1618463677
+        ):
+            return False
+
+        # Reject: high volume efficiency + high recent volume, but with upper-wick rejection
+        if (
+            entry_volume_price_efficiency >= 0.2663313036
+            and entry_bar_volume_to_recent_bars_average >= 4.1439257575
+            and entry_bar_upper_wick >= 0.1618463677
         ):
             return False
 
