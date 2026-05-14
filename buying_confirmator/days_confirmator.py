@@ -212,7 +212,6 @@ class Confirmator:
         bar_has_potential, reason = self.bar_has_potential(
             stock=stock,
             one_minute_timeframe_stock=one_minute_timeframe_stock,
-            original_bar_to_confirm=original_bar_to_confirm,
             potential_confirmation_bar=potential_confirmation_bar,
             one_minute_bars=temp_one_minute_bars,
             highest_high=highest_high,
@@ -380,12 +379,11 @@ class Confirmator:
         self,
         stock: common.objects.Stock,
         one_minute_timeframe_stock: common.objects.Stock,
-        original_bar_to_confirm: common.objects.BarData,
         potential_confirmation_bar: common.objects.BarData,
         one_minute_bars: list[common.objects.BarData],
         highest_high: float,
     ) -> tuple[bool, str]:
-        if stock.number_of_potential_entry_points >= 2:
+        if stock.number_of_potential_entry_points >= 2 and potential_confirmation_bar.close > highest_high:
             return True, "number_of_potential_entry_points >= 2"
 
         previous_bar = one_minute_timeframe_stock.previous_bar(
@@ -401,9 +399,6 @@ class Confirmator:
 
         if potential_confirmation_bar.close - potential_confirmation_bar.open_value < 0.05:
             return False, "bar body is less than 0.05"
-
-        # if potential_confirmation_bar.close < original_bar_to_confirm.ema_20:
-        #     return False, "potential_confirmation_bar.close >= original_bar_to_confirm.ema_20"
 
         highest_high = round(highest_high, 2)
         if potential_confirmation_bar.close < 1.0:

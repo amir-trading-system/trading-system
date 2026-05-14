@@ -334,6 +334,7 @@ class DataExtractor:
         positive_vs_negative_volume_during_pullback = positive_volume/negative_volume if negative_volume > 0 else 1
 
         return {
+            "feature_entry_bar_volume": potential_confirmation_bar.volume,
             "feature_entry_bar_volume_to_highest_volume_in_pullback": entry_bar_volume_to_highest_volume_in_pullback,
             "feature_entry_bar_volume_to_volume_average": entry_bar_volume_to_volume_average,
             "feature_entry_bar_volume_to_recent_bars_average": potential_confirmation_bar.volume/volume_average if volume_average else 1,
@@ -546,6 +547,7 @@ class DataExtractor:
         volume_since_lowest_low_to_entry_vs_since_highest_high = features_data["feature_volume_since_lowest_low_to_entry_vs_since_highest_high"]
         total_volume = features_data["total_volume"]
         current_day_ema_9_to_ema_20 = features_data["feature_current_day_ema_9_to_ema_20"]
+        entry_close_to_lowest_low_recovery = features_data["feature_entry_close_to_lowest_low_recovery"]
 
         # Rescue: strong failed-attempt pressure, but day movement is still controlled
         # Use this as a rescue clause inside the rule that rejects this group.
@@ -1151,6 +1153,51 @@ class DataExtractor:
         if (
             macd_recovery_followthrough_quality >= 18.7867
             and entry_bar_macd_to_previous <= 0.8328
+        ):
+            return False
+
+        # Reject: weak entry body, but stock already has fast profit pace from open
+        if (
+            entry_bar_body <= 0.3877
+            and profit_since_open_to_bars_count_since_open >= 0.00455
+        ):
+            return False
+
+        # Reject: wick-volume rejection still present on a strong EMA20 day
+        if (
+            weak_wick_volume_rejection
+            and current_ema20 >= 1.2131
+        ):
+            return False
+
+        # Reject: large move from highest high to lowest low,
+        # but entry close quality is weak versus previous bar
+        if (
+            price_movement_from_highest_high_to_lowest_low >= 5.9525
+            and entry_close_position_vs_previous_close_position <= 0.83161232
+        ):
+            return False
+
+        # Reject: weak body, weak recovery from low,
+        # and MACD recovery/follow-through quality is not mature
+        if (
+            entry_bar_body <= 0.4061
+            and entry_close_to_lowest_low_recovery <= 1.1066
+            and macd_recovery_followthrough_quality <= 13.9401
+        ):
+            return False
+
+        if (
+            entry_bar_upper_wick >= 0.06666666667
+            and pullback_depth_vs_pre_high_move >= 4.36527928
+            and entry_bar_volume_to_recent_bars_average <= 2.253715889
+        ):
+            return False
+
+        if (
+            reclaim_close_strength_since_highest_high <= 0.173553719
+            and pullback_depth_vs_pre_high_move >= 1.687493832
+            and entry_close_position_vs_previous_close_position >= 4.728543479
         ):
             return False
 

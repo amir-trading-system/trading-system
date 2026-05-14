@@ -372,44 +372,46 @@ def main():
     print(f"False-positive rows: {len(fp)}")
     print(f"Candidate numeric features: {len(features)}")
 
-    two_condition_results = search_two_condition_rules(pos, fp, features)
-    two_condition_results = remove_near_duplicate_rules(two_condition_results, max_results=30)
+    # two_condition_results = search_two_condition_rules(pos, fp, features)
+    # two_condition_results = remove_near_duplicate_rules(two_condition_results, max_results=30)
 
-    print_results(two_condition_results, "BEST 2-CONDITION RULES")
+    # print_results(two_condition_results, "BEST 2-CONDITION RULES")
 
-    # # Optional: use only the most promising features for triples to avoid huge runtime.
-    # promising_features = [
-    #     "feature_entry_bar_upper_wick",
-    #     "feature_entry_extension_pressure",
-    #     "feature_reclaim_close_strength_since_highest_high",
-    #     "feature_entry_upper_wick_to_recent_upper_wick_average",
-    #     "feature_pullback_depth_vs_pre_high_move",
-    #     "feature_entry_body_to_previous_bar_body",
-    #     "feature_emas_distances_to_recent_bars_ema_distances",
-    #     "feature_entry_close_position_vs_previous_close_position",
-    #     "feature_price_movement_from_highest_high_to_lowest_low",
-    #     "feature_recent_bars_up_trend_pct",
-    #     "feature_current_day_high_to_previous_high",
-    #     "feature_entry_bar_open_to_ema_9",
-    #     "feature_entry_bar_volume_to_recent_bars_average",
-    #     "feature_entry_body_to_highest_high_body",
-    #     "feature_entry_bar_ema_9_to_vwap",
-    #     "feature_volume_since_highest_high_to_volume_before",
-    #     "feature_profit_since_open_to_bars_count_since_open",
-    # ]
+    # Optional: use only the most promising features for triples to avoid huge runtime.
+    promising_features = [
+        "feature_current_day_ema_9_to_ema_20",
+        "feature_current_day_ema_9_to_recent_days_ema_9",
+        "feature_current_day_ema_20_to_recent_days_ema_20",
+        "feature_entry_bar_open_to_ema_9",
+        "feature_entry_body_to_highest_high_body",
+        "feature_entry_close_to_lowest_low_recovery",
+        "feature_gains_until_entry_bar",
+        "feature_current_day_high_to_previous_high",
+        "total_volume",
+        "feature_current_day_vwap_to_recent_days",
+        "entry_bar_volume",
+        "feature_entry_bar_volume",
+        "feature_pre_market_gains",
+        "feature_entry_bar_low_to_ema_9",
+        "feature_entry_bar_macd_to_previous",
+        "feature_pullback_depth_vs_pre_high_move",
+        "feature_entry_body_to_recent_bars_body_average",
+        "feature_pre_market_volume",
+        "feature_reclaim_speed_from_lowest_low",
+    ]
 
-    # promising_features = [f for f in promising_features if f in features]
+    promising_features = [f for f in promising_features if f in features]
 
-    # three_condition_results = search_three_condition_rules(
-    #     pos,
-    #     fp,
-    #     promising_features,
-    #     max_feature_combos=None,
-    # )
+    three_condition_results = search_three_condition_rules(
+        pos,
+        fp,
+        promising_features,
+        max_feature_combos=None,
+    )
 
-    # three_condition_results = remove_near_duplicate_rules(three_condition_results, max_results=30)
+    three_condition_results = remove_near_duplicate_rules(three_condition_results, max_results=30)
 
-    # print_results(three_condition_results, "BEST 3-CONDITION RULES")
+    print_results(three_condition_results, "BEST 3-CONDITION RULES")
 
 
 if __name__ == "__main__":
