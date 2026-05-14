@@ -171,8 +171,9 @@ class DataExtractor:
             if bar_object.is_positive:
                 positive_bars += 1
 
-        feature_recent_bars_up_trend_pct = keep_up_trend_bars/len(last_10_bars)
-        feature_recent_bars_positive_bars_pct = positive_bars/len(last_10_bars)
+        last_bars_length = len(last_10_bars)
+        feature_recent_bars_up_trend_pct = keep_up_trend_bars/last_bars_length if last_bars_length > 0 else 0
+        feature_recent_bars_positive_bars_pct = positive_bars/last_bars_length if last_bars_length > 0 else 0
 
         body_size_of_pullback_bars_average = body_size_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0
         bar_wick_of_pullback_bars_average = bar_wick_of_pullback_bars/len(bars_since_highest_high) if len(bars_since_highest_high) > 0 else 0

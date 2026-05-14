@@ -511,7 +511,7 @@ class Confirmator:
         order_has_been_placed = False
         transmit = False
 
-        if potential_confirmation_bar.bar_time + datetime.timedelta(minutes=15) < current_bar.bar_time:
+        if potential_confirmation_bar.bar_time + datetime.timedelta(minutes=20) < current_bar.bar_time:
             return True
 
         relevant_bars = [
@@ -527,6 +527,7 @@ class Confirmator:
             for bar_object in relevant_bars
             if bar_object.close < previous_highest_high
             and bar_object.close < bar_object.ema_20
+            and bar_object.volume > bar_object.volume_average
         ):
             # meaning that this trend is not relevant anymore - not a real trend.
             return True
@@ -556,7 +557,7 @@ class Confirmator:
             True
             and current_bar.is_positive
             and current_bar.volume > current_bar.volume_average
-            and current_bar.low > current_bar.ema_20
+            and current_bar.close > current_bar.ema_20
             and current_bar.ema_9 > current_bar.ema_20
             and current_bar.high - current_bar.low > distance_from_ema_9
             and previous_bar is not None
@@ -583,7 +584,7 @@ class Confirmator:
             )
         )
 
-        if validation_for_placing_order or score.score > 0.9:
+        if validation_for_placing_order:
             if not any(
                     bar_object
                     for bar_object in relevant_bars
