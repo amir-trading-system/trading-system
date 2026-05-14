@@ -379,25 +379,19 @@ def main():
 
     # Optional: use only the most promising features for triples to avoid huge runtime.
     promising_features = [
-        "feature_current_day_ema_9_to_ema_20",
-        "feature_current_day_ema_9_to_recent_days_ema_9",
-        "feature_current_day_ema_20_to_recent_days_ema_20",
-        "feature_entry_bar_open_to_ema_9",
-        "feature_entry_body_to_highest_high_body",
-        "feature_entry_close_to_lowest_low_recovery",
-        "feature_gains_until_entry_bar",
-        "feature_current_day_high_to_previous_high",
-        "total_volume",
-        "feature_current_day_vwap_to_recent_days",
-        "entry_bar_volume",
-        "feature_entry_bar_volume",
-        "feature_pre_market_gains",
-        "feature_entry_bar_low_to_ema_9",
-        "feature_entry_bar_macd_to_previous",
-        "feature_pullback_depth_vs_pre_high_move",
-        "feature_entry_body_to_recent_bars_body_average",
-        "feature_pre_market_volume",
-        "feature_reclaim_speed_from_lowest_low",
+        "feature_late_chase_after_high",
+        "feature_weak_wick_volume_rejection",
+        "feature_current_histogram_is_bigger_than_previous",
+        "feature_crossed_at_least_one_bar_from_recent_bars",
+        "feature_clean_breakout_efficiency",
+        "feature_strong_vwap_volume_reentry",
+        "feature_volume_since_lowest_low_to_entry_vs_since_highest_high",
+        "feature_recent_bars_positive_bars_pct",
+        "feature_entry_bar_ema_9_to_vwap",
+        "feature_entry_bar_vwap_to_ema_20",
+        "feature_entry_volume_price_efficiency",
+        "feature_clean_reentry_confirmation",
+        "feature_price_movement_from_highest_high_to_lowest_low",
     ]
 
     promising_features = [f for f in promising_features if f in features]

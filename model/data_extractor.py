@@ -474,7 +474,6 @@ class DataExtractor:
         features_data: dict[str, float],
     ) -> bool:
         current_day_volume_to_recent_days_volume = features_data["feature_current_day_volume_to_recent_days_volume"]
-        current_ema20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
         current_vwap = features_data["feature_current_day_vwap_to_recent_days"]
         current_high_to_recent = features_data["feature_current_day_high_to_recent_days_highs"]
         current_day_high_to_previous_high = features_data["feature_current_day_high_to_previous_high"]
@@ -548,36 +547,24 @@ class DataExtractor:
         total_volume = features_data["total_volume"]
         current_day_ema_9_to_ema_20 = features_data["feature_current_day_ema_9_to_ema_20"]
         entry_close_to_lowest_low_recovery = features_data["feature_entry_close_to_lowest_low_recovery"]
-
-        # Rescue: strong failed-attempt pressure, but day movement is still controlled
-        # Use this as a rescue clause inside the rule that rejects this group.
-        if (
-            failed_attempts_pressure >= 0.8136693269
-            and current_day_movement_to_recent_days_movement <= 1.9113661164
-        ):
-            return True
-
-        # Rescue: weak recent trend / no post-high volume pattern,
-        # but only for very low MACD-recovery/volume-above-average structure
-        if (
-            recent_bars_positive_bars_pct <= 0.40
-            and bars_since_highest_high_to_bars_before <= 0.0041551565
-        ):
-            return True
+        current_day_ema_20_to_recent_days_ema_20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
+        distance_from_last_negative_macd_bar = features_data["feature_distance_from_last_negative_macd_bar"]
+        reclaim_speed_from_lowest_low = features_data["feature_reclaim_speed_from_lowest_low"]
 
         # Rescue: very strong broader EMA20 context,
         # and current-day low is deeply below EMA9
         if (
-            current_ema20 >= 1.8320
+            current_day_ema_20_to_recent_days_ema_20 >= 1.8320
             and current_day_low_to_ema_9 <= 0.5501
         ):
             return True
 
-        # Rescue candidate: very strong current-day EMA structure,
-        # but current-day low had a deep reset below EMA9
+        # Rescue candidate:
+        # very little volume after highest high,
+        # but previous bar volume was much stronger than its previous bar
         if (
-            current_day_low_to_ema_9 <= 0.7571
-            and current_day_ema_9_to_ema_20 >= 1.1849
+            volume_since_highest_high_to_volume_before <= 0.0042471454
+            and previous_bar_volume_to_its_previous_volume >= 2.4255379381
         ):
             return True
 
@@ -659,7 +646,7 @@ class DataExtractor:
             return False
 
         if (
-            current_ema20 <= 0.988
+            current_day_ema_20_to_recent_days_ema_20 <= 0.988
             and entry_histogram_to_lowest_histogram > 1.28
             and not (
                 entry_close_strength_to_highest_high_close_strength >= 1.27
@@ -1086,7 +1073,7 @@ class DataExtractor:
         # Reject: weak daily EMA20 context,
         # and entry volume is weaker than previous bar
         if (
-            current_ema20 <= 1.0059
+            current_day_ema_20_to_recent_days_ema_20 <= 1.0059
             and entry_bar_volume_to_previous_bar_volume <= 0.6496
         ):
             return False
@@ -1166,7 +1153,7 @@ class DataExtractor:
         # Reject: wick-volume rejection still present on a strong EMA20 day
         if (
             weak_wick_volume_rejection
-            and current_ema20 >= 1.2131
+            and current_day_ema_20_to_recent_days_ema_20 >= 1.2131
         ):
             return False
 
@@ -1198,6 +1185,105 @@ class DataExtractor:
             reclaim_close_strength_since_highest_high <= 0.173553719
             and pullback_depth_vs_pre_high_move >= 1.687493832
             and entry_close_position_vs_previous_close_position >= 4.728543479
+        ):
+            return False
+
+        # Reject: short-term EMA is stretched over EMA20,
+        # broader EMA20 context is not strong enough,
+        # and entry body is oversized versus recent candles
+        if (
+            current_day_ema_9_to_ema_20 >= 1.294666093
+            and current_day_ema_20_to_recent_days_ema_20 <= 1.392372919
+            and (
+                entry_body_to_recent_bars_body_average >= 4.089472023
+                or entry_bar_low_to_ema_9 >= 1.017979924
+            )
+        ):
+            return False
+
+        # Reject: entry opens stretched above EMA9,
+        # entry body is weak versus the highest-high candle,
+        # and pullback was deep
+        if (
+            entry_bar_open_to_ema_9 >= 1.028636162
+            and entry_body_to_highest_high_body <= 1.080105098
+            and pullback_depth_vs_pre_high_move >= 2.991569263
+        ):
+            return False
+
+        if (
+            entry_close_to_lowest_low_recovery >= 1.144645268
+            and gains_until_entry_bar >= 1.989594305
+            and entry_bar_macd_to_previous <= 0.5959072256
+        ):
+            return False
+
+        # Reject: deep pullback, but entry volume does not expand over previous bar
+        if (
+            pullback_depth_vs_pre_high_move >= 3.010019587
+            and entry_bar_volume_to_previous_bar_volume <= 1.097261642
+        ):
+            return False
+
+        if (
+            current_day_ema_9_to_ema_20 >= 1.294000557
+            and current_day_ema_20_to_recent_days_ema_20 <= 1.393020797
+            and gains_until_entry_bar <= 0.8812913898
+        ):
+            return False
+
+        # Reject: weak entry volume versus previous bar,
+        # with upper-wick rejection on a strong EMA20 context day
+        if (
+            entry_bar_volume_to_previous_bar_volume <= 1.2456090699
+            and entry_bar_upper_wick >= 0.1864285714
+            and current_day_ema_20_to_recent_days_ema_20 >= 1.3335272026
+        ):
+            return False
+
+        # Reject: entry opens stretched above EMA9,
+        # but does not clear the previous highest-high strongly enough,
+        # while EMA9 is already stretched over EMA20
+        if (
+            entry_bar_open_to_ema_9 >= 1.02100165
+            and entry_bar_close_to_highest_high <= 1.01447752
+            and current_day_ema_9_to_ema_20 >= 1.153187004
+        ):
+            return False
+
+        # Reject: large upper-wick rejection + extension pressure
+        # in already stretched EMA structure
+        if (
+            entry_bar_upper_wick >= 0.2987368421
+            and entry_extension_pressure >= 0.2814410998
+            and current_day_ema_9_to_ema_20 >= 1.2564937075
+        ):
+            return False
+
+        if (
+            recent_bars_positive_bars_pct >= 0.6
+            and entry_bar_ema_9_to_vwap >= 1.381635056
+            and entry_volume_price_efficiency >= 2.01136099
+        ):
+            return False
+
+        if (
+            macd_recovery_age_quality >= 45.11816621
+            and distance_from_last_negative_macd_bar >= 32.94
+        ):
+            return False
+
+        if (
+            pre_market_volume <= 3288
+            and entry_bar_lower_wick >= 0.1688700749
+            and reclaim_speed_from_lowest_low >= 0.7738171698
+        ):
+            return False
+
+        if (
+            entry_close_strength_to_highest_high_close_strength <= 1.155866609
+            and entry_bar_lower_wick >= 0.1093905084
+            and entry_close_position_vs_previous_close_position >= 3.164044884
         ):
             return False
 
