@@ -553,6 +553,11 @@ class DataExtractor:
         reclaim_speed_from_lowest_low = features_data["feature_reclaim_speed_from_lowest_low"]
         entry_bar_movement_recent_bars_average = features_data["feature_entry_bar_movement_recent_bars_average"]
         entry_bar_volume = features_data["feature_entry_bar_volume"]
+        current_day_ema_9_to_recent_days_ema_9 = features_data["feature_current_day_ema_9_to_recent_days_ema_9"]
+        entry_bar_volume_to_total_volume = features_data["feature_entry_bar_volume_to_total_volume"]
+        inefficient_breakout_extension = features_data["feature_inefficient_breakout_extension"]
+        current_day_high_to_recent_days_highs = features_data["feature_current_day_high_to_recent_days_highs"]
+        strong_vwap_volume_reentry = features_data["feature_strong_vwap_volume_reentry"]
 
         # Rescue: very strong broader EMA20 context,
         # and current-day low is deeply below EMA9
@@ -605,6 +610,76 @@ class DataExtractor:
         if (
             current_day_vwap_to_recent_days >= 3.73543
             and entry_bar_histogram_to_previous <= 0.0866119
+        ):
+            return True
+
+        # Rescue: entry is not too extended above VWAP,
+        # but MACD recovery is mature/established
+        if (
+            entry_close_to_vwap <= 1.091831446
+            and macd_recovery_age_quality >= 25.08706195
+        ):
+            return True
+
+        # Rescue: strong failed-attempt pressure,
+        # but price had a deep reset below EMA9
+        if (
+            failed_attempts_pressure >= 0.8286174979
+            and current_day_low_to_ema_9 <= 0.6858215054
+        ):
+            return True
+
+        # Rescue: strong current-day EMA9 context,
+        # and entry recovered strongly from the lowest low
+        if (
+            current_day_ema_9_to_recent_days_ema_9 >= 1.433818076
+            and entry_close_to_lowest_low_recovery >= 3.1746875
+        ):
+            return True
+
+        # Rescue: strong bounce from lowest low,
+        # with high entry-volume share of total day volume
+        if (
+            gains_since_lowest_low >= 0.4225563909774436
+            and entry_bar_volume_to_total_volume >= 0.1586696945759777
+        ):
+            return True
+
+        # Rescue: strong failed-pressure/fake-reclaim structure,
+        # but entry is still close to previous bar high
+        if (
+            failed_pressure_to_followthrough >= 1.15214089953198
+            and entry_close_to_previous_bar_high <= 1.0165910520531982
+        ):
+            return True
+
+        # Rescue: very deep pullback,
+        # but entry bar low stayed above EMA9
+        if (
+            pullback_depth_vs_pre_high_move >= 7.2254148073
+            and entry_bar_low_to_ema_9 >= 1.0265863377
+        ):
+            return True
+
+        # Rescue: extremely large entry body versus highest-high body,
+        # but not oversized versus previous bar body
+        if (
+            entry_body_to_highest_high_body >= 52.3689565217
+            and entry_body_to_previous_bar_body <= 1.8368582888
+        ):
+            return True
+
+        if (
+            inefficient_breakout_extension >= 1.0
+            and failed_attempts_pressure >= 1.0059454889
+        ):
+            return True
+
+        # Rescue: strong VWAP/volume reentry
+        # and strong breakout efficiency from EMA9
+        if (
+            strong_vwap_volume_reentry >= 1.0
+            and entry_breakout_efficiency_from_ema_9 >= 0.6415188226
         ):
             return True
 
@@ -1361,6 +1436,130 @@ class DataExtractor:
             entry_close_position_vs_previous_close_position <= 0.8047079751
             and minutes_since_market_open <= 42
             and entry_bar_volume <= 191259.5
+        ):
+            return False
+
+        # Reject: weak current-day VWAP context,
+        # tiny pullback/reset,
+        # and entry is already extended
+        if (
+            current_day_vwap_to_recent_days <= 1.22341473
+            and price_movement_from_highest_high_to_lowest_low <= 0.42755
+            and entry_extension_pressure >= 0.2245726894
+        ):
+            return False
+
+        # Reject: recent bars look positive,
+        # but entry volume-price efficiency is very weak
+        # and premarket participation is low
+        if (
+            entry_volume_price_efficiency <= 0.02588854677
+            and pre_market_volume <= 47862
+            and recent_bars_positive_bars_pct >= 0.6
+        ):
+            return False
+
+        # Reject: weak VWAP context,
+        # entry close is not strong above VWAP,
+        # but volume is already spiking versus average
+        if (
+            current_day_vwap_to_recent_days <= 1.139442758
+            and entry_close_to_vwap <= 1.116062675
+            and entry_bar_volume_to_volume_average >= 2.449822397
+        ):
+            return False
+
+        # Reject: current EMA9/EMA20 expansion is not strong,
+        # but entry histogram is very high versus highest-high histogram
+        if (
+            current_day_ema_9_to_ema_20_distance_to_recent_days <= 0.1387122378381986
+            and entry_histogram_to_highest_histogram >= 1.8977198438479372
+        ):
+            return False
+
+        # Reject: very late-day setup,
+        # with histogram already stretched versus highest-high histogram
+        if (
+            minutes_since_market_open >= 339.85
+            and entry_histogram_to_highest_histogram >= 1.8977198438479372
+        ):
+            return False
+
+        # Reject: low-volume name,
+        # post-high volume bars dominate,
+        # but volume lacks MACD confirmation
+        if (
+            total_volume <= 616414.7
+            and bars_above_volume_average_vs_under_since_highest_high >= 1.38
+            and volume_without_macd_confirmation <= 0.7523717610985081
+        ):
+            return False
+
+        # Reject: weak reclaim strength after highest high,
+        # high highest-high quality,
+        # but weak entry close strength versus highest-high close strength
+        if (
+            reclaim_close_strength_since_highest_high <= 0.0717770035
+            and highest_high_quality >= 10.3882806384
+            and entry_close_strength_to_highest_high_close_strength <= 1.1112795315
+        ):
+            return False
+
+        # Reject: entry histogram weakens versus previous,
+        # while current-day low is already far above EMA9
+        if (
+            entry_bar_histogram_to_previous <= -0.0642453770
+            and current_day_low_to_ema_9 >= 1.2470085753
+        ):
+            return False
+
+        # Reject: price has already gained a lot,
+        # but current-day volume is weak versus recent days
+        # and entry volume-price efficiency is not strong enough
+        if (
+            current_day_volume_to_recent_days_volume <= 3.3266385818
+            and gains_until_entry_bar >= 0.8579580645
+            and entry_volume_price_efficiency <= 0.1021919641
+        ):
+            return False
+
+        # Reject: weak highest-high quality,
+        # fake/failed reclaim pressure,
+        # and weak current-day VWAP context
+        if (
+            highest_high_quality <= 0.2531756429
+            and failed_pressure_to_followthrough >= 0.2381467257
+            and current_day_vwap_to_recent_days <= 1.5574589307
+        ):
+            return False
+
+        # Reject: no real reset below EMA9,
+        # but current-day EMA9 context is not strong enough
+        # and MACD recovery is already active
+        if (
+            macd_recovery_age_quality >= 3.9063163683
+            and current_day_ema_9_to_recent_days_ema_9 <= 1.1530989632
+            and current_day_low_to_ema_9 >= 1.1355114046
+        ):
+            return False
+
+        # Reject: weak VWAP context,
+        # high is very elevated versus recent days,
+        # and histogram recovery is already stretched
+        if (
+            current_day_vwap_to_recent_days <= 1.7372093023
+            and current_day_high_to_recent_days_highs >= 1.7738258147
+            and entry_histogram_to_lowest_histogram >= 1.2021664504
+        ):
+            return False
+
+        # Reject: very large current-day movement,
+        # almost no lower wick on entry,
+        # and most volume participation came after the low
+        if (
+            current_day_movement_to_recent_days_movement >= 9.1927298390
+            and entry_bar_lower_wick <= 0.0022260818
+            and volume_since_lowest_low_to_entry_vs_since_highest_high >= 0.6822743076
         ):
             return False
 
