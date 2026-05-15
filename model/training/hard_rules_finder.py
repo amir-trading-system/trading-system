@@ -27,7 +27,7 @@ QUANTILES = [0.05, 0.10, 0.20, 0.33, 0.50, 0.67, 0.80, 0.90, 0.95]
 def load_data():
     pos = pd.read_csv(POSITIVE_FILE)
     fp = pd.read_csv(FALSE_POSITIVE_FILE)
-    fp = fp[fp["feature_overall_legit_trade"] == np.True_]
+    fp = fp[(fp["feature_overall_legit_trade"] == np.True_) & (fp["model_pass"] == np.True_)]
 
     pos = pos.copy()
     fp = fp.copy()
@@ -379,19 +379,16 @@ def main():
 
     # Optional: use only the most promising features for triples to avoid huge runtime.
     promising_features = [
-        "feature_late_chase_after_high",
-        "feature_weak_wick_volume_rejection",
-        "feature_current_histogram_is_bigger_than_previous",
-        "feature_crossed_at_least_one_bar_from_recent_bars",
-        "feature_clean_breakout_efficiency",
-        "feature_strong_vwap_volume_reentry",
-        "feature_volume_since_lowest_low_to_entry_vs_since_highest_high",
-        "feature_recent_bars_positive_bars_pct",
-        "feature_entry_bar_ema_9_to_vwap",
-        "feature_entry_bar_vwap_to_ema_20",
+        "feature_uptrend_histogram_vs_downtrend_since_highest_high",
+        "feature_current_day_vwap_to_recent_days",
+        "feature_previous_bar_volume_to_its_previous_volume",
         "feature_entry_volume_price_efficiency",
-        "feature_clean_reentry_confirmation",
+        "feature_volume_confirmation_quality",
         "feature_price_movement_from_highest_high_to_lowest_low",
+        "feature_entry_volume_spike_without_high_context",
+        "feature_entry_bar_close_to_highest_high",
+        "feature_bars_since_highest_high_to_bars_before",
+        "feature_current_day_ema_9_to_recent_days_ema_9",
     ]
 
     promising_features = [f for f in promising_features if f in features]

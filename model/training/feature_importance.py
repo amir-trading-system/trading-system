@@ -5,8 +5,8 @@ from scipy.stats import ks_2samp
 
 
 pd.set_option('display.max_colwidth', None)
-POSITIVE_FILE = "model/training/positive_results_scored.csv"
-FALSE_POSITIVE_FILE = "model/training/false_positive_results_scored.csv"
+POSITIVE_FILE = "model/training/positive_results.csv"
+FALSE_POSITIVE_FILE = "model/training/false_positive_results.csv"
 
 SCORE_COLUMN = "score"
 RULES_PASS_COLUMN = "feature_overall_legit_trade"

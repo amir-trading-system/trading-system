@@ -551,6 +551,8 @@ class DataExtractor:
         current_day_ema_20_to_recent_days_ema_20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
         distance_from_last_negative_macd_bar = features_data["feature_distance_from_last_negative_macd_bar"]
         reclaim_speed_from_lowest_low = features_data["feature_reclaim_speed_from_lowest_low"]
+        entry_bar_movement_recent_bars_average = features_data["feature_entry_bar_movement_recent_bars_average"]
+        entry_bar_volume = features_data["feature_entry_bar_volume"]
 
         # Rescue: very strong broader EMA20 context,
         # and current-day low is deeply below EMA9
@@ -560,12 +562,49 @@ class DataExtractor:
         ):
             return True
 
-        # Rescue candidate:
-        # very little volume after highest high,
-        # but previous bar volume was much stronger than its previous bar
+        # Rescue: very little volume after highest high,
+        # previous bar had volume spike,
+        # and entry body is strong enough versus recent bars
         if (
             volume_since_highest_high_to_volume_before <= 0.0042471454
             and previous_bar_volume_to_its_previous_volume >= 2.4255379381
+            and entry_body_to_recent_bars_body_average >= 2.090348
+        ):
+            return True
+
+        # Rescue: negative premarket / weak bounce pattern,
+        # but entry movement stayed controlled
+        if (
+            gains_since_lowest_low <= 0.042952
+            and pre_market_gains <= -0.0325203
+            and entry_bar_movement_recent_bars_average <= 2.68926
+        ):
+            return True
+
+        # Rescue: very low bounce from low,
+        # weak body versus previous bar,
+        # and very low absolute entry volume
+        if (
+            gains_since_lowest_low <= 0.042952
+            and entry_body_to_previous_bar_body <= 0.783092
+            and entry_bar_volume <= 27943.2
+        ):
+            return True
+
+        # Rescue: weak breakout efficiency,
+        # but strong volume context without MACD confirmation
+        if (
+            entry_close_to_previous_bar_high <= 1.04277
+            and volume_without_macd_confirmation >= 39.4235
+            and entry_breakout_efficiency_from_ema_9 <= 0.234494
+        ):
+            return True
+
+        # Rescue: very strong VWAP context,
+        # even though entry histogram is weak versus previous
+        if (
+            current_day_vwap_to_recent_days >= 3.73543
+            and entry_bar_histogram_to_previous <= 0.0866119
         ):
             return True
 
@@ -1285,6 +1324,43 @@ class DataExtractor:
             entry_close_strength_to_highest_high_close_strength <= 1.155866609
             and entry_bar_lower_wick >= 0.1093905084
             and entry_close_position_vs_previous_close_position >= 3.164044884
+        ):
+            return False
+
+        # Effective rules:
+
+        # Reject: post-high volume participation without MACD confirmation
+        if (
+            volume_since_highest_high_to_volume_before >= 0.1184412594
+            and volume_without_macd_confirmation >= 109.6745643
+            and previous_bar_volume_to_its_previous_volume >= 1.213324829
+        ):
+            return False
+
+        # Reject: early shallow-pullback chase after fast open profit
+        if (
+            minutes_since_market_open <= 29
+            and pullback_depth_vs_pre_high_move <= 0.6014838509
+            and profit_since_open_to_bars_count_since_open >= 0.01742149356
+        ):
+            return False
+
+        # Reject: expanded EMA-distance structure,
+        # tiny high-to-low reset,
+        # and fast profit pace from open
+        if (
+            emas_distances_to_recent_bars_ema_distances >= 0.207173644
+            and price_movement_from_highest_high_to_lowest_low <= 0.22
+            and profit_since_open_to_bars_count_since_open >= 0.007082560815
+        ):
+            return False
+
+        # Reject: weak close-position improvement early,
+        # with low absolute entry volume
+        if (
+            entry_close_position_vs_previous_close_position <= 0.8047079751
+            and minutes_since_market_open <= 42
+            and entry_bar_volume <= 191259.5
         ):
             return False
 
