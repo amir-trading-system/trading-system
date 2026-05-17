@@ -22,6 +22,7 @@ class Alerter:
         sender: str,
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
+        highest_high_one_minute_bar: common.objects.BarData,
         evidence_name: str,
         is_retro: bool,
         request_id: int,
@@ -34,6 +35,7 @@ class Alerter:
             stock=stock,
             original_bar=original_bar,
             entry_position_bar=entry_position_bar,
+            highest_high_one_minute_bar=highest_high_one_minute_bar,
             evidence_name=evidence_name,
         )
 

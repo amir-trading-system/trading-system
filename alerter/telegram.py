@@ -43,6 +43,7 @@ class Handler:
         stock: common.objects.Stock,
         original_bar: common.objects.BarData,
         entry_position_bar: common.objects.BarData,
+        highest_high_one_minute_bar: common.objects.BarData,
         evidence_name: str,
     ) -> str:
         crossed_resistance_bar_time = None
@@ -55,6 +56,8 @@ class Handler:
             <b>Symbol:</b> <u>{entry_position_bar.symbol}</u>
             <b>Evidence:</b> <code>{evidence_name}</code>
             <b>Timeframe:</b> <code>{entry_position_bar.timeframe}</code>
+            <b>Crossed highest high:</b> <code>{highest_high_one_minute_bar.high if highest_high_one_minute_bar is not None else 0}</code>
+            <b>Highest high Bar Time:</b> <code>{highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else 0}</code>
             <b>Time:</b> <code>{entry_position_bar.bar_time}</code>
             <b>Original bar to confirm Time:</b> <code>{original_bar.bar_time}</code>
             <b>Original bar to confirm Timeframe:</b> <code>{original_bar.timeframe}</code>

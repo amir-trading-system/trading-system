@@ -71,6 +71,8 @@ class Handler(
             "should_run_model",
             "collection_finished_time",
             "reason",
+            "highest_high",
+            "highest_high_bar_time",
         ]
 
         for field in fields:
