@@ -81,6 +81,7 @@ def should_be_rejected_by_hard_rules(
     entry_bar_ema_9_to_ema_20 = features_data["feature_entry_bar_ema_9_to_ema_20"]
     pre_market_gains = features_data["feature_pre_market_gains"]
     entry_rejection_pressure = features_data["feature_entry_rejection_pressure"]
+    entry_bar_volume_to_total_volume = features_data["feature_entry_bar_volume_to_total_volume"]
 
     ############### ---------------- broader rules ---------------- ###############
 
@@ -314,6 +315,81 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    if (
+        current_day_ema_9_to_ema_20 <= 1.259989
+        and controlled_volume_entry_quality <= 0.776765
+    ):
+        return True
+
+    if (
+        entry_bar_open_to_ema_9 >= 1.018775
+        and entry_bar_macd_to_previous <= 0.371873
+    ):
+        return True
+
+    if (
+        entry_body_to_recent_bars_body_average >= 9.759273
+        and entry_close_strength_to_highest_high_close_strength <= 1.041007
+    ):
+        return True
+
+    if (
+        entry_bar_volume_to_total_volume >= 0.104535
+        and entry_bar_vwap_to_ema_20 <= 0.943621
+    ):
+        return True
+
+    if (
+        entry_close_strength_to_highest_high_close_strength <= 0.947374
+        and entry_bar_volume_to_recent_bars_average >= 9.089611
+    ):
+        return True
+
+    if (
+        current_day_volume_to_recent_days_volume <= 1.182418
+        and current_day_ema_9_to_ema_20 <= 1.225573
+    ):
+        return True
+
+    # Reject: recent bars look positive,
+    # but entry volume-price efficiency is very weak
+    # and premarket participation is low
+    if (
+        entry_volume_price_efficiency <= 0.02588854677
+        and pre_market_volume <= 47862
+        and recent_bars_positive_bars_pct >= 0.6
+    ):
+        return True
+
+    # Reject: entry low is elevated above EMA9,
+    # VWAP is weak versus EMA20,
+    # but breakout efficiency is already high
+    if (
+        current_day_low_to_ema_9 >= 1.358228224
+        and entry_bar_vwap_to_ema_20 <= 0.8898687606
+        and entry_breakout_efficiency_from_ema_9 >= 0.5188943549
+    ):
+        return True
+
+    # Reject: large upper-wick rejection + extension pressure
+    # in already stretched EMA structure
+    if (
+        entry_bar_upper_wick >= 0.2987368421
+        and entry_extension_pressure >= 0.2814410998
+        and current_day_ema_9_to_ema_20 >= 1.2564937075
+    ):
+        return True
+
+    # Reject: weak VWAP context,
+    # entry close is not strong above VWAP,
+    # but volume is already spiking versus average
+    if (
+        current_day_vwap_to_recent_days <= 1.139442758
+        and entry_close_to_vwap <= 1.116062675
+        and entry_bar_volume_to_volume_average >= 2.449822397
+    ):
+        return True
+
     ############### ---------------- unique rules ---------------- ###############
 
     # Reject: entry too extended
@@ -471,19 +547,6 @@ def should_be_rejected_by_hard_rules(
     if entry_close_to_vwap <= 1.13 and entry_bar_histogram_to_previous >= 4.70:
         return True
 
-    # Reject: weak volume-price efficiency + weak controlled volume
-    # Rescue if there was meaningful post-high volume rebuild
-    # and entry close quality is strong versus the highest-high candle
-    if (
-        entry_volume_price_efficiency <= 0.050
-        and controlled_volume_entry_quality <= 0.852
-        and not (
-            volume_since_highest_high_to_volume_before >= 0.2138
-            and entry_close_strength_to_highest_high_close_strength >= 1.69
-        )
-    ):
-        return True
-
     # Reject: almost no bounce from pullback low,
     # and entry volume is weak versus highest pullback volume
     if gains_since_lowest_low <= 0.047 and entry_volume_to_highest_volume_in_pullback <= 1.09:
@@ -630,14 +693,6 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if macd_recovery_followthrough_quality >= 38.3995 and volume_since_highest_high_to_volume_before <= 0.0265052:
-        return True
-
-    if (
-        previous_bar_high_to_highest_high >= 1.005804598
-        and (
-            entry_bar_volume_to_previous_bar_volume >= 2.483333125
-        )
-    ):
         return True
 
     # Reject: previous bar was already near high,
@@ -790,15 +845,6 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
-    # Reject: large upper-wick rejection + extension pressure
-    # in already stretched EMA structure
-    if (
-        entry_bar_upper_wick >= 0.2987368421
-        and entry_extension_pressure >= 0.2814410998
-        and current_day_ema_9_to_ema_20 >= 1.2564937075
-    ):
-        return True
-
     if (
         macd_recovery_age_quality >= 45.11816621
         and distance_from_last_negative_macd_bar >= 32.94
@@ -839,15 +885,6 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
-    # Reject: weak close-position improvement early,
-    # with low absolute entry volume
-    if (
-        entry_close_position_vs_previous_close_position <= 0.8047079751
-        and minutes_since_market_open <= 42
-        and entry_bar_volume <= 191259.5
-    ):
-        return True
-
     # Reject: weak current-day VWAP context,
     # tiny pullback/reset,
     # and entry is already extended
@@ -855,26 +892,6 @@ def should_be_rejected_by_hard_rules(
         current_day_vwap_to_recent_days <= 1.22341473
         and price_movement_from_highest_high_to_lowest_low <= 0.42755
         and entry_extension_pressure >= 0.2245726894
-    ):
-        return True
-
-    # Reject: recent bars look positive,
-    # but entry volume-price efficiency is very weak
-    # and premarket participation is low
-    if (
-        entry_volume_price_efficiency <= 0.02588854677
-        and pre_market_volume <= 47862
-        and recent_bars_positive_bars_pct >= 0.6
-    ):
-        return True
-
-    # Reject: weak VWAP context,
-    # entry close is not strong above VWAP,
-    # but volume is already spiking versus average
-    if (
-        current_day_vwap_to_recent_days <= 1.139442758
-        and entry_close_to_vwap <= 1.116062675
-        and entry_bar_volume_to_volume_average >= 2.449822397
     ):
         return True
 
@@ -964,14 +981,6 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
-    # Reject: entry candle movement is very large versus recent bars,
-    # but close strength is weak versus the highest-high candle
-    if (
-        entry_bar_movement_recent_bars_average >= 12.721924
-        and entry_close_strength_to_highest_high_close_strength <= 1.044746
-    ):
-        return True
-
     # # Reject: low absolute entry volume,
     # # high breakout efficiency,
     # # and previous bar already reached/pushed old high
@@ -989,16 +998,6 @@ def should_be_rejected_by_hard_rules(
         positive_vs_negative_volume_during_pullback >= 1.869628616
         and failed_pressure_to_followthrough >= 0.1800401615
         and entry_bar_volume_to_recent_bars_average >= 3.672319135
-    ):
-        return True
-
-    # Reject: entry low is elevated above EMA9,
-    # VWAP is weak versus EMA20,
-    # but breakout efficiency is already high
-    if (
-        current_day_low_to_ema_9 >= 1.358228224
-        and entry_bar_vwap_to_ema_20 <= 0.8898687606
-        and entry_breakout_efficiency_from_ema_9 >= 0.5188943549
     ):
         return True
 
