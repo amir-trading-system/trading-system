@@ -72,7 +72,6 @@ def should_be_rejected_by_hard_rules(
     entry_close_to_lowest_low_recovery = features_data["feature_entry_close_to_lowest_low_recovery"]
     current_day_ema_20_to_recent_days_ema_20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
     distance_from_last_negative_macd_bar = features_data["feature_distance_from_last_negative_macd_bar"]
-    reclaim_speed_from_lowest_low = features_data["feature_reclaim_speed_from_lowest_low"]
     entry_bar_volume = features_data["feature_entry_bar_volume"]
     current_day_ema_9_to_recent_days_ema_9 = features_data["feature_current_day_ema_9_to_recent_days_ema_9"]
     current_day_high_to_recent_days_highs = features_data["feature_current_day_high_to_recent_days_highs"]
@@ -83,6 +82,19 @@ def should_be_rejected_by_hard_rules(
     entry_bar_volume_to_total_volume = features_data["feature_entry_bar_volume_to_total_volume"]
 
     ############### ---------------- broader rules ---------------- ###############
+
+    # Reject: weak VWAP/EMA20 structure after a large current-day move,
+    # with controlled gains, weak pullback-volume position,
+    # and weak body versus highest-high body
+    if (
+        entry_bar_vwap_to_ema_20 <= 0.9624572694
+        and gains_until_entry_bar <= 1.0722402930
+        and entry_volume_to_highest_volume_in_pullback <= 1.8528105021
+        and current_day_movement_to_recent_days_movement > 8.3926472664
+        and entry_body_to_highest_high_body <= 13.3459329605
+        and current_day_vwap_to_recent_days > 1.5232991576
+    ):
+        return True
 
     # Reject: previous bar already reached/pushed the high,
     # EMA structure is stretched,
@@ -593,11 +605,6 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
-    # Reject: previous bar already pushed above old high,
-    # and histogram already moved strongly in positive direction
-    if previous_bar_high_to_highest_high >= 1.010 and histogram_changed_to_positive_direction_vs_negative_pct >= 1.04:
-        return True
-
     # Reject: active current-day move, but entry is already too extended
     if current_day_movement_to_recent_days_movement >= 1.30 and entry_extension_pressure >= 0.68:
         return True
@@ -719,9 +726,6 @@ def should_be_rejected_by_hard_rules(
     if failed_pressure_to_followthrough >= 0.4016287815 and entry_close_position_vs_previous_close_position >= 8.03125:
         return True
 
-    if entry_body_to_recent_bars_body_average <= 1.63759 and entry_close_to_vwap >= 1.27141:
-        return True
-
     if entry_upper_wick_to_recent_upper_wick_average <= 0 and bars_since_highest_high_to_bars_before <= 0.00269945:
         return True
 
@@ -747,24 +751,6 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if macd_recovery_followthrough_quality >= 38.3995 and volume_since_highest_high_to_volume_before <= 0.0265052:
-        return True
-
-    # Reject: previous bar was already near high,
-    # reclaim strength is weak,
-    # and entry volume is not strong versus the previous bar
-    if (
-        previous_bar_close_to_highest_high >= 0.99062
-        and reclaim_close_strength_since_highest_high <= 0.29509
-        and entry_bar_volume_to_previous_bar_volume <= 1.45341
-    ):
-        return True
-
-    # Reject: high volume-price efficiency while histogram already moved positive
-    if (
-        entry_volume_price_efficiency >= 0.81739
-        and histogram_changed_to_positive_direction_vs_negative_pct >= 2.0
-        and volume_since_lowest_low_to_entry_vs_since_highest_high >= 0.86157
-    ):
         return True
 
     if (
@@ -885,13 +871,6 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        current_day_ema_9_to_ema_20 >= 1.294000557
-        and current_day_ema_20_to_recent_days_ema_20 <= 1.393020797
-        and gains_until_entry_bar <= 0.8812913898
-    ):
-        return True
-
-    if (
         macd_recovery_age_quality >= 45.11816621
         and distance_from_last_negative_macd_bar >= 32.94
     ):
@@ -903,8 +882,6 @@ def should_be_rejected_by_hard_rules(
         and entry_close_position_vs_previous_close_position >= 3.164044884
     ):
         return True
-
-    # Effective rules:
 
     # Reject: post-high volume participation without MACD confirmation
     if (
@@ -969,16 +946,6 @@ def should_be_rejected_by_hard_rules(
         highest_high_quality <= 0.2531756429
         and failed_pressure_to_followthrough >= 0.2381467257
         and current_day_vwap_to_recent_days <= 1.5574589307
-    ):
-        return True
-
-    # Reject: no real reset below EMA9,
-    # but current-day EMA9 context is not strong enough
-    # and MACD recovery is already active
-    if (
-        macd_recovery_age_quality >= 3.9063163683
-        and current_day_ema_9_to_recent_days_ema_9 <= 1.1530989632
-        and current_day_low_to_ema_9 >= 1.1355114046
     ):
         return True
 
