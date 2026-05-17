@@ -630,6 +630,21 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    # Reject: moderate current-day move,
+    # entry body is in a narrow weak/unstable range,
+    # breakout efficiency is present,
+    # but volume rebuild from low is too dependent on post-high volume
+    # and entry volume is weak versus the pullback high-volume area
+    if (
+        current_day_movement_to_recent_days_movement <= 7.55102396
+        and entry_bar_body > 0.7834697664
+        and entry_bar_body <= 0.837882787
+        and entry_breakout_efficiency_from_ema_9 > 0.4921557903
+        and entry_volume_to_highest_volume_in_pullback <= 1.998335183
+        and volume_since_lowest_low_to_entry_vs_since_highest_high > 0.9336597621
+    ):
+        return True
+
     ############### ---------------- unique rules ---------------- ###############
 
     # Reject: weak current-day high context.
@@ -706,18 +721,8 @@ def should_be_rejected_by_hard_rules(
     if current_day_movement_to_recent_days_movement >= 1.30 and entry_extension_pressure >= 0.68:
         return True
 
-    # Reject: very shallow pullback versus the pre-high move,
-    # while the current day volume is already extremely expanded
-    if pullback_depth_vs_pre_high_move <= 0.42 and current_day_volume_to_recent_days_volume >= 72:
-        return True
-
     # Reject: histogram expands, but price is not strong enough above VWAP
     if entry_close_to_vwap <= 1.13 and entry_bar_histogram_to_previous >= 4.70:
-        return True
-
-    # Reject: almost no bounce from pullback low,
-    # and entry volume is weak versus highest pullback volume
-    if gains_since_lowest_low <= 0.047 and entry_volume_to_highest_volume_in_pullback <= 1.09:
         return True
 
     if (
