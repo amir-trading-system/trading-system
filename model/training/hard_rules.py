@@ -835,6 +835,7 @@ def should_be_rejected_by_hard_rules(
         weak_wick_volume_rejection
         and entry_bar_volume_to_highest_high_volume <= 1.10680219491
         and inefficient_breakout_extension < 1.0
+        and previous_bar_close_to_highest_high >= 0.9664413613186292
     ):
         return True
 
@@ -847,6 +848,15 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    # Reject: MACD recovery/followthrough score looks large,
+    # but the entry histogram is still weak versus the highest-high histogram.
+    # This means the recovery score is inflated, while true momentum has not rebuilt.
+    if (
+        macd_recovery_followthrough_quality >= 28.65018165941634
+        and entry_histogram_to_highest_histogram <= 0.4210012484394506
+    ):
+        return True
+
     if (
         current_day_ema_9_to_ema_20 <= 1.259989
         and controlled_volume_entry_quality <= 0.776765
@@ -856,6 +866,16 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_bar_open_to_ema_9 >= 1.018775
         and entry_bar_macd_to_previous <= 0.371873
+    ):
+        return True
+
+    # Reject: weak broader VWAP context,
+    # while current-day EMA9/EMA20 distance is extremely stretched versus recent days.
+    # This is a poor-quality intraday stretch where the move is internally extended
+    # but not broadly strong versus recent VWAP context.
+    if (
+        current_day_vwap_to_recent_days <= 1.4039128316808989
+        and current_day_ema_9_to_ema_20_distance_to_recent_days >= 7.446534377544922
     ):
         return True
 
