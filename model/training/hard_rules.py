@@ -498,6 +498,61 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    # Reject: weak bounce above EMA9,
+    # almost no positive-vs-negative pullback volume support,
+    # and broader EMA structure is not strong enough.
+    if (
+        pre_market_gains > 0.0056163829285651445
+        and entry_bar_low_to_ema_9 > 1.007060468196869
+        and positive_vs_negative_volume_during_pullback <= 0.09442323446273804
+        and gains_since_lowest_low <= 0.14852026104927063
+        and current_day_ema_9_to_ema_20 <= 1.370779812335968
+        and current_day_low_to_ema_9 > 0.7675630450248718
+    ):
+        return True
+
+    # Reject: post-high volume is limited,
+    # entry volume is not expanding enough,
+    # and bounce from low is already meaningful but inefficient.
+    if (
+        pre_market_gains <= 0.0056163829285651445
+        and price_movement_from_highest_high_to_lowest_low > 0.397149994969368
+        and volume_since_highest_high_to_volume_before <= 0.8350349962711334
+        and entry_bar_volume_to_previous_bar_volume > 1.1702489852905273
+        and gains_since_lowest_low > 0.14865899831056595
+        and entry_bar_volume_to_volume_average <= 2.095898747444153
+    ):
+        return True
+
+    # Reject: compressed high-to-low movement,
+    # weak current-day context,
+    # low gains into entry,
+    # and poor volume-price efficiency.
+    if (
+        pre_market_gains <= 0.0056163829285651445
+        and price_movement_from_highest_high_to_lowest_low <= 0.397149994969368
+        and current_day_vwap_to_recent_days <= 2.1310880184173584
+        and gains_until_entry_bar <= 0.34598593413829803
+        and highest_high_quality > 2.8904706239700317
+        and entry_volume_price_efficiency <= 0.04760081134736538
+    ):
+        return True
+
+    # Reject: elevated current-day context,
+    # entry is not cleanly above EMA9,
+    # recent positive bars exist,
+    # but uptrend quality is not strong enough.
+    if (
+        pre_market_gains > 0.0056163829285651445
+        and entry_bar_low_to_ema_9 <= 1.007060468196869
+        and current_day_ema_9_to_recent_days_ema_9 > 0.9913356900215149
+        and current_day_high_to_recent_days_highs > 1.3778034448623657
+        and current_day_vwap_to_recent_days > 1.4217395186424255
+        and recent_bars_positive_bars_pct > 0.75
+        and recent_bars_up_trend_pct <= 0.75
+    ):
+        return True
+
     # Reject: previous bar already reached/pushed the high,
     # EMA structure is stretched,
     # and entry candle shows rejection versus recent upper wicks
@@ -956,6 +1011,84 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_breakout_efficiency_from_ema_9 <= 0.1347363219
         and entry_bar_low_to_ema_9 <= 1.0026425123
+    ):
+        return True
+
+    # Reject: immediate retest after highest-high,
+    # but entry body is weak both versus highest-high body
+    # and versus previous bar body.
+    if (
+        bars_since_highest_high_to_bars_before <= 0.001774
+        and entry_body_to_highest_high_body <= 1.271
+        and entry_body_to_previous_bar_body <= 2.81
+    ):
+        return True
+
+    # Reject: compressed high-to-low reset,
+    # weak entry volume versus recent bars,
+    # weak body versus previous bar,
+    # and weak recent positive-bar structure.
+    if (
+        entry_bar_volume_to_recent_bars_average <= 1.613
+        and entry_body_to_previous_bar_body <= 1.591
+        and price_movement_from_highest_high_to_lowest_low <= 0.271
+        and recent_bars_positive_bars_pct <= 0.701
+    ):
+        return True
+
+    # Reject: compressed high-to-low reset,
+    # weak entry volume versus recent bars,
+    # weak body versus previous bar,
+    # and weak recent positive-bar structure.
+    if (
+        entry_bar_volume_to_recent_bars_average <= 1.613
+        and entry_body_to_previous_bar_body <= 1.591
+        and price_movement_from_highest_high_to_lowest_low <= 0.271
+        and recent_bars_positive_bars_pct <= 0.701
+    ):
+        return True
+
+    # Reject: broader EMA20 context is weak,
+    # entry body is weak versus the highest-high candle,
+    # and there was not enough post-high volume rebuild.
+    if (
+        current_day_ema_20_to_recent_days_ema_20 <= 1.0401
+        and entry_body_to_highest_high_body <= 0.807
+        and volume_since_highest_high_to_volume_before <= 0.331
+    ):
+        return True
+
+    # Reject: no premarket volume,
+    # weak bounce from lowest low,
+    # and entry still happens close enough to the highest-high event.
+    if (
+        bars_since_highest_high_to_bars_before <= 0.1951219512195122
+        and gains_since_lowest_low <= 0.2146118721461188
+        and pre_market_volume <= 0.0
+    ):
+        return True
+
+    # Reject: weak EMA9/EMA20 structure,
+    # weak entry volume versus recent bars,
+    # weak close strength versus highest-high candle,
+    # and weak bounce from low.
+    if (
+        current_day_ema_9_to_ema_20 <= 1.120
+        and entry_bar_volume_to_recent_bars_average <= 1.094
+        and entry_close_strength_to_highest_high_close_strength <= 1.316
+        and gains_since_lowest_low <= 0.139
+    ):
+        return True
+
+    # Reject: broader EMA20 context is weak,
+    # pullback health is weak,
+    # total volume is limited,
+    # and close strength is not enough to justify the reclaim.
+    if (
+        current_day_ema_20_to_recent_days_ema_20 <= 0.908
+        and pullback_health <= 2.137
+        and total_volume <= 3855000
+        and entry_close_strength_to_highest_high_close_strength <= 2.227
     ):
         return True
 
