@@ -602,6 +602,34 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    # Reject: current-day move is active,
+    # entry tries to reclaim from a pullback-volume area,
+    # but histogram strength is weak and the entry does not cleanly separate
+    if (
+        bars_above_volume_average_vs_under_since_highest_high > 0.2539
+        and current_day_movement_to_recent_days_movement > 2.2284
+        and entry_bar_low_to_ema_9 <= 1.00354
+        and entry_breakout_efficiency_from_ema_9 > 0.4921
+        and entry_close_to_previous_bar_close <= 1.1124
+        and entry_histogram_to_highest_histogram <= 0.4558
+        and entry_volume_to_highest_volume_in_pullback > 1.2703
+    ):
+        return True
+
+    # Reject: active current-day move with weak histogram quality,
+    # entry remains near EMA9/low structure,
+    # and the candle has almost no lower-wick support
+    if (
+        current_day_movement_to_recent_days_movement > 2.2284
+        and entry_bar_low_to_ema_9 <= 1.00354
+        and entry_bar_lower_wick <= 0.0443
+        and entry_breakout_efficiency_from_ema_9 > 0.4921
+        and entry_histogram_to_highest_histogram <= 0.4558
+        and entry_volume_to_highest_volume_in_pullback > 1.2703
+        and near_high_weak_followthrough > 0.8687
+    ):
+        return True
+
     ############### ---------------- unique rules ---------------- ###############
 
     # Reject: weak current-day high context.
@@ -632,20 +660,6 @@ def should_be_rejected_by_hard_rules(
         and not (
             entry_bar_close_to_highest_high <= 1.023
             and entry_body_to_recent_bars_body_average <= 5.55
-        )
-    ):
-        return True
-
-    # Additional rescue: controlled body versus recent candles
-    if (
-        entry_histogram_to_highest_histogram <= 0.417
-        and entry_volume_to_highest_volume_in_pullback > 2.16
-        and not (
-            entry_bar_body >= 0.90
-            and entry_close_strength_to_highest_high_close_strength >= 2.0
-        )
-        and not (
-            entry_body_to_recent_bars_body_average <= 3.26
         )
     ):
         return True
@@ -695,10 +709,6 @@ def should_be_rejected_by_hard_rules(
     # Reject: very shallow pullback versus the pre-high move,
     # while the current day volume is already extremely expanded
     if pullback_depth_vs_pre_high_move <= 0.42 and current_day_volume_to_recent_days_volume >= 72:
-        return True
-
-    # Reject: deep pullback, but entry body is not strong enough versus recent bars
-    if entry_body_to_recent_bars_body_average <= 3.0 and pullback_depth_vs_pre_high_move >= 2.82:
         return True
 
     # Reject: histogram expands, but price is not strong enough above VWAP
@@ -804,14 +814,6 @@ def should_be_rejected_by_hard_rules(
         entry_bar_low_to_ema_9 >= 1.0093729767
         and gains_since_lowest_low <= 0.0738457243
         and entry_close_position_vs_previous_close_position <= 1.0
-    ):
-        return True
-
-    # Reject: previous bar was not close enough to high, and entry shows rejection
-    if (
-        previous_bar_close_to_highest_high <= 0.9768057971
-        and entry_close_to_previous_bar_high <= 1.0443794455
-        and entry_bar_upper_wick >= 0.1618463677
     ):
         return True
 
