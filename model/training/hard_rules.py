@@ -81,6 +81,8 @@ def should_be_rejected_by_hard_rules(
     uptrend_histogram_vs_downtrend_since_highest_high = features_data["feature_uptrend_histogram_vs_downtrend_since_highest_high"]
     entry_volume_spike_without_high_context = features_data["feature_entry_volume_spike_without_high_context"]
     inefficient_breakout_extension = features_data["feature_inefficient_breakout_extension"]
+    fake_reclaim_pressure = features_data["feature_fake_reclaim_pressure"]
+    volume_confirmation_quality = features_data["feature_volume_confirmation_quality"]
 
     ############### ---------------- broader rules ---------------- ###############
 
@@ -174,6 +176,7 @@ def should_be_rejected_by_hard_rules(
         and current_day_ema_9_to_recent_days_ema_9 <= 0.9913356900
         and entry_body_to_highest_high_body <= 4.6936500072
         and entry_rejection_pressure > 0.0012531328
+        and entry_bar_vwap_to_ema_20 >= 0.7832668372258171
     ):
         return True
 
@@ -201,6 +204,7 @@ def should_be_rejected_by_hard_rules(
         and profit_since_open_to_bars_count_since_open <= 0.0179995298
         and entry_body_to_highest_high_body <= 5.3399999142
         and entry_bar_close_to_highest_high > 1.0051801205
+        and entry_bar_body <= 0.9892086330935264
     ):
         return True
 
@@ -489,6 +493,7 @@ def should_be_rejected_by_hard_rules(
         and entry_upper_wick_to_recent_upper_wick_average >= 0.5068
         and current_day_high_to_recent_days_highs <= 1.8587
         and entry_bar_volume_to_highest_high_volume <= 2.2372
+        and highest_high_quality >= 0.0858358066383931
     ):
         return True
 
@@ -648,6 +653,7 @@ def should_be_rejected_by_hard_rules(
     if (
         pullback_depth_vs_pre_high_move <= 0.541837652642
         and entry_close_to_vwap >= 1.31664343091
+        and pre_market_gains <= 0.5459247224478744
     ):
         return True
 
@@ -674,6 +680,7 @@ def should_be_rejected_by_hard_rules(
         entry_bar_open_to_ema_9 >= 1.02100165
         and entry_bar_close_to_highest_high <= 1.01447752
         and current_day_ema_9_to_ema_20 >= 1.153187004
+        and entry_bar_body <= 0.6229021941816995
     ):
         return True
 
@@ -689,6 +696,7 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_close_position_vs_previous_close_position <= 0.731694032711
         and volume_since_highest_high_to_volume_before <= 0.144645677467
+        and volume_without_macd_confirmation >= 0.7320706574892093
     ):
         return True
 
@@ -835,6 +843,7 @@ def should_be_rejected_by_hard_rules(
         minutes_since_market_open <= 29
         and pullback_depth_vs_pre_high_move <= 0.6014838509
         and profit_since_open_to_bars_count_since_open >= 0.01742149356
+        and inefficient_breakout_extension <= 0.0
     ):
         return True
 
@@ -862,6 +871,7 @@ def should_be_rejected_by_hard_rules(
         entry_close_strength_to_highest_high_close_strength <= 0.947374
         and entry_bar_volume_to_recent_bars_average >= 9.089611
         and failed_pressure_to_followthrough < 1.8032795612091643
+        and entry_volume_spike_without_high_context >= 0.0108463987712592
     ):
         return True
 
@@ -878,6 +888,7 @@ def should_be_rejected_by_hard_rules(
         entry_volume_price_efficiency <= 0.02588854677
         and pre_market_volume <= 47862
         and recent_bars_positive_bars_pct >= 0.6
+        and entry_close_to_previous_bar_high >= 1.0431372549019609
     ):
         return True
 
@@ -913,12 +924,14 @@ def should_be_rejected_by_hard_rules(
     if (
         current_day_movement_to_recent_days_movement >= 4.478947923630989
         and bars_since_highest_high_to_bars_before <= 0.001501164841972015
+        and entry_followthrough_after_near_reclaim >= 1.0477563200701343
     ):
         return True
 
     if (
         highest_high_to_entry_elapsed_minutes <= 2.0
         and entry_bar_volume_to_total_volume <= 0.013987671038471768
+        and entry_volume_spike_without_high_context <= 2.1745357952992115
     ):
         return True
 
@@ -957,6 +970,7 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_volume_to_highest_volume_in_pullback >= 2.3644566162
         and volume_without_macd_confirmation <= 1.3859621588
+        and entry_close_to_vwap <= 1.192665838838092
     ):
         return True
 
@@ -1145,6 +1159,7 @@ def should_be_rejected_by_hard_rules(
     if (
         recent_bars_up_trend_pct <= 0.40
         and current_day_high_to_previous_high <= 1.0216
+        and controlled_volume_entry_quality <= 5.631135876710102
     ):
         return True
 
@@ -1154,6 +1169,7 @@ def should_be_rejected_by_hard_rules(
         pullback_depth_vs_pre_high_move <= 0.88375
         and entry_body_to_previous_bar_body <= 0.98432
         and emas_distances_to_recent_bars_ema_distances <= 0.140767
+        and pullback_health <= 5.634074932605927
     ):
         return True
 
@@ -1163,6 +1179,7 @@ def should_be_rejected_by_hard_rules(
             entry_bar_ema_9_to_vwap >= 1.16935
             or entry_bar_vwap_to_ema_20 <= 0.885003
         )
+        and entry_bar_volume_to_total_volume >= 0.0103088631576093
     ):
         return True
 
@@ -1182,6 +1199,7 @@ def should_be_rejected_by_hard_rules(
         reclaim_close_strength_since_highest_high <= 0.173553719
         and pullback_depth_vs_pre_high_move >= 1.687493832
         and entry_close_position_vs_previous_close_position >= 4.728543479
+        and pullback_health <= 2.7758057632396795
     ):
         return True
 
@@ -1192,6 +1210,34 @@ def should_be_rejected_by_hard_rules(
         current_day_movement_to_recent_days_movement >= 9.1927298390
         and entry_bar_lower_wick <= 0.0022260818
         and volume_since_lowest_low_to_entry_vs_since_highest_high >= 0.6822743076
+        and current_day_low_to_ema_9 <= 1.0293851964429035
+    ):
+        return True
+
+    # Reject: entry bar owns a large part of total volume,
+    # while VWAP is still weak versus EMA20.
+    # This is usually a late/forced reclaim, not a clean continuation.
+    if (
+        entry_bar_volume_to_total_volume >= 0.1046935351294476
+        and entry_bar_vwap_to_ema_20 <= 0.9426331149875774
+    ):
+        return True
+
+    # Reject: failed pressure and fake-reclaim pressure are nearly aligned.
+    # This means the reclaim is not creating a new clean pressure profile;
+    # it is mostly recycling the same failed-pressure structure.
+    if (
+        failed_pressure_to_followthrough >= 0.4087759498495121
+        and fake_reclaim_pressure <= 0.4155040928633324
+    ):
+        return True
+
+    # Reject: entry has a volume spike,
+    # but volume confirmation quality is still weak/capped.
+    # This is a fake participation pattern, not a clean volume confirmation.
+    if (
+        entry_volume_spike_without_high_context <= 1.9263097571372707
+        and volume_confirmation_quality <= 0.5200111706836894
     ):
         return True
 
