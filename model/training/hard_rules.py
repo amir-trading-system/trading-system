@@ -12,7 +12,6 @@ def should_be_rejected_by_hard_rules(
     entry_bar_upper_wick = features_data["feature_entry_bar_upper_wick"]
     entry_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
     entry_volume_to_highest_volume_in_pullback = features_data["feature_entry_bar_volume_to_highest_volume_in_pullback"]
-    entry_bar_histogram_to_lowest_histogram = features_data["feature_entry_bar_histogram_to_lowest_histogram"]
     entry_volume_price_efficiency = features_data["feature_entry_volume_price_efficiency"]
     current_day_low_to_ema_9 = features_data["feature_current_day_low_to_ema_9"]
     entry_bar_close_to_highest_high = features_data["feature_entry_bar_close_to_highest_high"]
@@ -24,11 +23,9 @@ def should_be_rejected_by_hard_rules(
     previous_bar_volume_to_its_previous_volume = features_data["feature_previous_bar_volume_to_its_previous_volume"]
     previous_bar_high_to_highest_high = features_data["feature_previous_bar_high_to_highest_high"]
     entry_bar_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
-    histogram_changed_to_positive_direction_vs_negative_pct = features_data["feature_histogram_changed_to_positive_direction_vs_negative_pct"]
     entry_bar_volume_to_recent_bars_average = features_data["feature_entry_bar_volume_to_recent_bars_average"]
     entry_upper_wick_to_recent_upper_wick_average = features_data["feature_entry_upper_wick_to_recent_upper_wick_average"]
     entry_body_to_highest_high_body = features_data["feature_entry_body_to_highest_high_body"]
-    previous_bar_close_to_highest_high = features_data["feature_previous_bar_close_to_highest_high"]
     pullback_depth_vs_pre_high_move = features_data["feature_pullback_depth_vs_pre_high_move"]
     recent_bars_up_trend_pct = features_data["feature_recent_bars_up_trend_pct"]
     entry_body_to_recent_bars_body_average = features_data["feature_entry_body_to_recent_bars_body_average"]
@@ -41,11 +38,9 @@ def should_be_rejected_by_hard_rules(
     minutes_since_market_open = features_data["feature_minutes_since_market_open"]
     entry_close_to_previous_bar_close = features_data["feature_entry_close_to_previous_bar_close"]
     entry_body_to_previous_bar_body = features_data["feature_entry_body_to_previous_bar_body"]
-    clean_breakout_efficiency = features_data["feature_clean_breakout_efficiency"]
     current_day_ema_9_to_ema_20_distance_to_recent_days = features_data["feature_current_day_ema_9_to_ema_20_distance_to_recent_days"]
     entry_bar_volume_to_previous_bar_volume = features_data["feature_entry_bar_volume_to_previous_bar_volume"]
     entry_bar_macd_to_previous = features_data["feature_entry_bar_macd_to_previous"]
-    failed_attempts_pressure = features_data["feature_failed_attempts_pressure"]
     entry_close_position_vs_previous_close_position = features_data["feature_entry_close_position_vs_previous_close_position"]
     entry_bar_open_to_ema_9 = features_data["feature_entry_bar_open_to_ema_9"]
     profit_since_open_to_bars_count_since_open = features_data["feature_profit_since_open_to_bars_count_since_open"]
@@ -55,7 +50,6 @@ def should_be_rejected_by_hard_rules(
     entry_close_to_previous_bar_high = features_data["feature_entry_close_to_previous_bar_high"]
     volume_without_macd_confirmation = features_data["feature_volume_without_macd_confirmation"]
     bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
-    macd_recovery_age_quality = features_data["feature_macd_recovery_age_quality"]
     entry_bar_vwap_to_ema_20 = features_data["feature_entry_bar_vwap_to_ema_20"]
     failed_pressure_to_followthrough = features_data["feature_failed_pressure_to_followthrough"]
     current_day_vwap_to_recent_days = features_data["feature_current_day_vwap_to_recent_days"]
@@ -71,7 +65,6 @@ def should_be_rejected_by_hard_rules(
     current_day_ema_9_to_ema_20 = features_data["feature_current_day_ema_9_to_ema_20"]
     entry_close_to_lowest_low_recovery = features_data["feature_entry_close_to_lowest_low_recovery"]
     current_day_ema_20_to_recent_days_ema_20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
-    distance_from_last_negative_macd_bar = features_data["feature_distance_from_last_negative_macd_bar"]
     entry_bar_volume = features_data["feature_entry_bar_volume"]
     current_day_ema_9_to_recent_days_ema_9 = features_data["feature_current_day_ema_9_to_recent_days_ema_9"]
     current_day_high_to_recent_days_highs = features_data["feature_current_day_high_to_recent_days_highs"]
@@ -645,6 +638,22 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    # Reject: entry extension is very high,
+    # but MACD is already weak versus the previous bar
+    if (
+        entry_extension_pressure > 0.7173990309
+        and entry_bar_macd_to_previous <= 1.1105212569
+    ):
+        return True
+
+    # Reject: extremely weak breakout efficiency,
+    # while entry low is not meaningfully above EMA9
+    if (
+        entry_breakout_efficiency_from_ema_9 <= 0.1347363219
+        and entry_bar_low_to_ema_9 <= 1.0026425123
+    ):
+        return True
+
     ############### ---------------- unique rules ---------------- ###############
 
     # Reject: weak current-day high context.
@@ -703,24 +712,6 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
-    # Reject: no post-high volume rebuild + inefficient breakout
-    # Rescue very fast continuation if entry body strongly improves over previous bar
-    # and histogram is not weak versus the highest-high histogram
-    if (
-        volume_since_highest_high_to_volume_before <= 0.045
-        and entry_breakout_efficiency_from_ema_9 <= 0.27
-        and not (
-            entry_body_to_previous_bar_body >= 20.0
-            and entry_histogram_to_highest_histogram >= 1.0
-            and highest_high_to_entry_elapsed_minutes <= 2
-        )
-    ):
-        return True
-
-    # Reject: active current-day move, but entry is already too extended
-    if current_day_movement_to_recent_days_movement >= 1.30 and entry_extension_pressure >= 0.68:
-        return True
-
     # Reject: histogram expands, but price is not strong enough above VWAP
     if entry_close_to_vwap <= 1.13 and entry_bar_histogram_to_previous >= 4.70:
         return True
@@ -754,14 +745,6 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_bar_upper_wick >= 0.333333
         and entry_extension_pressure >= 0.325339
-    ):
-        return True
-
-    # Reject: weak reclaim close after highest high,
-    # and entry upper wick is unusually small versus recent upper wicks
-    if (
-        reclaim_close_strength_since_highest_high <= 0.110868
-        and entry_upper_wick_to_recent_upper_wick_average <= 0.264035
     ):
         return True
 
