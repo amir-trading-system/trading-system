@@ -601,16 +601,11 @@ class DataExtractor:
 
         features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
 
-        should_be_rescued_by_hard_rules = model.training.hard_rules.should_be_rescued_by_hard_rules(
-            features_data=features,
-        )
-
         should_be_rejected_by_hard_rules = model.training.hard_rules.should_be_rejected_by_hard_rules(
             features_data=features,
         )
-        feature_overall_legit_trade = True if should_be_rescued_by_hard_rules or not should_be_rejected_by_hard_rules else False
         feature_overall_legit_trade = {
-            "feature_overall_legit_trade": feature_overall_legit_trade,
+            "feature_overall_legit_trade": not should_be_rejected_by_hard_rules,
         }
 
         features = features | feature_overall_legit_trade

@@ -5,32 +5,32 @@ Total candidate features: 6
 ================ FEATURE STABILITY REPORT ================
 
                                                        feature  mean_importance  std_importance  top_k_frequency
-5                                  feature_overall_legit_trade         0.869818        0.008919              1.0
-3                      feature_current_day_vwap_to_recent_days         0.031122        0.003726              1.0
-4  feature_entry_close_strength_to_highest_high_close_strength         0.029730        0.004610              1.0
-1                    feature_current_day_high_to_previous_high         0.026111        0.002537              1.0
-0                      feature_controlled_volume_entry_quality         0.023364        0.002392              1.0
-2                feature_current_day_high_to_recent_days_highs         0.019855        0.001948              1.0
+5                                  feature_overall_legit_trade         0.866230        0.008661              1.0
+4  feature_entry_close_strength_to_highest_high_close_strength         0.031764        0.003171              1.0
+3                      feature_current_day_vwap_to_recent_days         0.031467        0.003384              1.0
+1                    feature_current_day_high_to_previous_high         0.025332        0.002479              1.0
+2                feature_current_day_high_to_recent_days_highs         0.023975        0.002158              1.0
+0                      feature_controlled_volume_entry_quality         0.021233        0.002547              1.0
 
 Selected stable features:
 - feature_overall_legit_trade
-- feature_current_day_vwap_to_recent_days
 - feature_entry_close_strength_to_highest_high_close_strength
+- feature_current_day_vwap_to_recent_days
 - feature_current_day_high_to_previous_high
-- feature_controlled_volume_entry_quality
 - feature_current_day_high_to_recent_days_highs
+- feature_controlled_volume_entry_quality
 
 ================ CV FOLD REPORT ================
 
-           fold  best_threshold  positive_pass_rate  false_positive_reject_rate  balanced_score  trading_score        tn        fp         fn         tp
-count  50.00000       50.000000           50.000000                   50.000000       50.000000      50.000000  50.00000  50.00000  50.000000  50.000000
-mean   25.50000        0.627000            0.982400                    0.993333        0.987867       0.987867  71.52000   0.48000   1.200000  67.000000
-std    14.57738        0.074375            0.014504                    0.008529        0.009035       0.009035   0.61412   0.61412   0.989743   1.087968
-min     1.00000        0.600000            0.941176                    0.972222        0.963644       0.963644  70.00000   0.00000   0.000000  64.000000
-25%    13.25000        0.600000            0.970588                    0.986111        0.980392       0.980392  71.00000   0.00000   0.250000  66.000000
-50%    25.50000        0.600000            0.985294                    1.000000        0.992647       0.992647  72.00000   0.00000   1.000000  67.000000
-75%    37.75000        0.600000            0.996377                    1.000000        0.992980       0.992980  72.00000   1.00000   2.000000  68.000000
-max    50.00000        0.850000            1.000000                    1.000000        1.000000       1.000000  72.00000   2.00000   4.000000  69.000000
+           fold  best_threshold  positive_pass_rate  false_positive_reject_rate  balanced_score  trading_score         tn         fp         fn         tp
+count  50.00000    5.000000e+01           50.000000                   50.000000       50.000000      50.000000  50.000000  50.000000  50.000000  50.000000
+mean   25.50000    6.000000e-01            0.973589                    0.988889        0.981239       0.981239  71.200000   0.800000   1.800000  66.400000
+std    14.57738    1.121495e-16            0.021204                    0.010117        0.012690       0.012690   0.728431   0.728431   1.442786   1.551826
+min     1.00000    6.000000e-01            0.911765                    0.972222        0.941993       0.941993  70.000000   0.000000   0.000000  62.000000
+25%    13.25000    6.000000e-01            0.955882                    0.986111        0.970997       0.970997  71.000000   0.000000   1.000000  65.000000
+50%    25.50000    6.000000e-01            0.970801                    0.986111        0.982026       0.982026  71.000000   1.000000   2.000000  66.500000
+75%    37.75000    6.000000e-01            0.985507                    1.000000        0.992647       0.992647  72.000000   1.000000   3.000000  68.000000
+max    50.00000    6.000000e-01            1.000000                    1.000000        1.000000       1.000000  72.000000   2.000000   6.000000  69.000000
 
 ================ CHOSEN THRESHOLD ================
 
@@ -38,80 +38,80 @@ Median best CV threshold: 0.60
 
 ================ CV THRESHOLD SUMMARY ================
 
-Mean trading score: 0.9879
-Mean positive pass rate: 0.9824
-Mean false positive reject rate: 0.9933
+Mean trading score: 0.9812
+Mean positive pass rate: 0.9736
+Mean false positive reject rate: 0.9889
 
 ================ HOLDOUT TEST REPORT (threshold=0.50) ================
 
               precision    recall  f1-score   support
 
-           0     0.9623    0.9935    0.9776       154
-           1     0.9930    0.9592    0.9758       147
+           0     0.9935    1.0000    0.9968       154
+           1     1.0000    0.9932    0.9966       147
 
-    accuracy                         0.9767       301
-   macro avg     0.9776    0.9763    0.9767       301
-weighted avg     0.9773    0.9767    0.9767       301
+    accuracy                         0.9967       301
+   macro avg     0.9968    0.9966    0.9967       301
+weighted avg     0.9967    0.9967    0.9967       301
 
 Confusion matrix:
-[[153   1]
- [  6 141]]
+[[154   0]
+ [  1 146]]
 
 ================ HOLDOUT TEST REPORT (threshold=0.60) ================
 
               precision    recall  f1-score   support
 
-           0     0.9623    0.9935    0.9776       154
-           1     0.9930    0.9592    0.9758       147
+           0     0.9935    1.0000    0.9968       154
+           1     1.0000    0.9932    0.9966       147
 
-    accuracy                         0.9767       301
-   macro avg     0.9776    0.9763    0.9767       301
-weighted avg     0.9773    0.9767    0.9767       301
+    accuracy                         0.9967       301
+   macro avg     0.9968    0.9966    0.9967       301
+weighted avg     0.9967    0.9967    0.9967       301
 
 Confusion matrix:
-[[153   1]
- [  6 141]]
+[[154   0]
+ [  1 146]]
 
 ================ HOLDOUT TEST REPORT (threshold=threshold=0.52) ================
 
               precision    recall  f1-score   support
 
-           0     0.9623    0.9935    0.9776       154
-           1     0.9930    0.9592    0.9758       147
+           0     0.9935    1.0000    0.9968       154
+           1     1.0000    0.9932    0.9966       147
 
-    accuracy                         0.9767       301
-   macro avg     0.9776    0.9763    0.9767       301
-weighted avg     0.9773    0.9767    0.9767       301
+    accuracy                         0.9967       301
+   macro avg     0.9968    0.9966    0.9967       301
+weighted avg     0.9967    0.9967    0.9967       301
 
 Confusion matrix:
-[[153   1]
- [  6 141]]
+[[154   0]
+ [  1 146]]
 
 ================ HOLDOUT TEST REPORT (threshold=threshold=0.55) ================
 
               precision    recall  f1-score   support
 
-           0     0.9623    0.9935    0.9776       154
-           1     0.9930    0.9592    0.9758       147
+           0     0.9935    1.0000    0.9968       154
+           1     1.0000    0.9932    0.9966       147
 
-    accuracy                         0.9767       301
-   macro avg     0.9776    0.9763    0.9767       301
-weighted avg     0.9773    0.9767    0.9767       301
+    accuracy                         0.9967       301
+   macro avg     0.9968    0.9966    0.9967       301
+weighted avg     0.9967    0.9967    0.9967       301
 
 Confusion matrix:
-[[153   1]
- [  6 141]]
+[[154   0]
+ [  1 146]]
 
 ================ FINAL FEATURE IMPORTANCE ================
 
-feature_overall_legit_trade                                    0.881312
-feature_current_day_vwap_to_recent_days                        0.028989
-feature_entry_close_strength_to_highest_high_close_strength    0.026837
-feature_current_day_high_to_previous_high                      0.023310
-feature_controlled_volume_entry_quality                        0.021912
-feature_current_day_high_to_recent_days_highs                  0.017639
+feature_overall_legit_trade                                    0.874568
+feature_entry_close_strength_to_highest_high_close_strength    0.029912
+feature_current_day_vwap_to_recent_days                        0.029885
+feature_current_day_high_to_previous_high                      0.025026
+feature_current_day_high_to_recent_days_highs                  0.020895
+feature_controlled_volume_entry_quality                        0.019715
 dtype: float64
 
 ================ SAMPLE LIVE OUTPUT ================
 
-{'probability': 0.94915, 'score': 94.92, 'threshold': 0.6, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A+'}
+{'probability': 0.971492, 'score': 97.15, 'threshold': 0.6, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A+'}
