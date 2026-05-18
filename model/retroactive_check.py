@@ -215,13 +215,13 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    should_run_model = True
-    get_only_statistics = False
+    should_run_model = False
+    get_only_statistics = True
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="QMCO",
-            datetime_str="12.18.24T09:47:00",
+            name="AIIO",
+            datetime_str="05.18.26T13:17:00",
             is_positive=False,
         ),
     ]

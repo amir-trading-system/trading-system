@@ -173,6 +173,7 @@ def should_be_rejected_by_hard_rules(
         and current_day_movement_to_recent_days_movement > 8.3926472664
         and entry_body_to_highest_high_body <= 13.3459329605
         and current_day_vwap_to_recent_days > 1.5232991576
+        and gains_since_lowest_low <= 0.56
     ):
         return True
 
@@ -442,6 +443,7 @@ def should_be_rejected_by_hard_rules(
     if (
         recent_bars_positive_bars_pct > 0.8499999940
         and entry_bar_body > 0.8969591260
+        and inefficient_breakout_extension <= 0.0
     ):
         return True
 
@@ -575,6 +577,7 @@ def should_be_rejected_by_hard_rules(
     if (
         pre_market_volume <= 41894.4
         and entry_bar_histogram_to_previous >= 7.814066193177794
+        and entry_close_to_previous_bar_high >= 1.086
     ):
         return True
 
@@ -582,6 +585,7 @@ def should_be_rejected_by_hard_rules(
         entry_volume_to_highest_volume_in_pullback >= 2.3644566162
         and volume_without_macd_confirmation <= 1.3859621588
         and entry_close_to_vwap <= 1.192665838838092
+        and bars_above_volume_average_vs_under_since_highest_high <= 1.0
     ):
         return True
 
@@ -791,6 +795,39 @@ def should_be_rejected_by_hard_rules(
     if (
         current_day_vwap_to_recent_days <= 1.42
         and current_day_high_to_recent_days_highs >= 1.44
+    ):
+        return True
+
+    if (
+        controlled_volume_entry_quality <= 0.905
+        and entry_body_to_previous_bar_body >= 21.15
+    ):
+        return True
+
+    if (
+        current_day_vwap_to_recent_days <= 1.423
+        and current_day_high_to_recent_days_highs >= 1.488
+    ):
+        return True
+
+    if (
+        current_day_movement_to_recent_days_movement >= 3.966
+        and current_day_low_to_ema_9 >= 1.58
+    ):
+        return True
+
+    if (
+        entry_bar_close_to_highest_high <= 1.008
+        and pre_market_volume <= 1347
+    ):
+        return True
+
+    # Reject: very weak volume-price efficiency,
+    # with small absolute entry volume.
+    # The move is not converting volume into useful price action.
+    if (
+        entry_volume_price_efficiency <= 0.0243
+        and entry_bar_volume <= 22682
     ):
         return True
 
