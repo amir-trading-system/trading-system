@@ -151,6 +151,24 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
+        entry_bar_ema_9_to_vwap >= 1.1264
+        and pullback_depth_vs_pre_high_move <= 0.4182
+    ):
+        return True
+
+    if (
+        entry_bar_volume_to_previous_bar_volume <= 1.3171
+        and volume_since_highest_high_to_volume_before <= 0.0141
+    ):
+        return True
+
+    if (
+        entry_close_position_vs_previous_close_position <= 0.7012
+        and volume_since_highest_high_to_volume_before <= 0.4316
+    ):
+        return True
+
+    if (
         entry_bar_low_to_ema_9 > 1.0070604682
         and gains_since_lowest_low <= 0.1303373128
         and entry_bar_upper_wick > 0.0226323679
@@ -556,12 +574,6 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        previous_bar_high_to_highest_high >= 1.0022882983263004
-        and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.4224316619731764
-    ):
-        return True
-
-    if (
         entry_extension_pressure <= 0.11295875101172427
         and entry_bar_body <= 0.5507023034551829
     ):
@@ -738,8 +750,8 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        entry_body_to_highest_high_body <= 0.334147
-        and entry_volume_to_highest_volume_in_pullback <= 0.623601
+        entry_body_to_highest_high_body <= 0.3655
+        and entry_volume_to_highest_volume_in_pullback <= 0.8162
     ):
         return True
 
