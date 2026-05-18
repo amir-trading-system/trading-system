@@ -5,20 +5,20 @@ Total candidate features: 6
 ================ FEATURE STABILITY REPORT ================
 
                                                        feature  mean_importance  std_importance  top_k_frequency
-5                                  feature_overall_legit_trade         0.896210        0.006380              1.0
-3                      feature_current_day_vwap_to_recent_days         0.027538        0.002999              1.0
-4  feature_entry_close_strength_to_highest_high_close_strength         0.022934        0.002665              1.0
-1                    feature_current_day_high_to_previous_high         0.020162        0.002712              1.0
-2                feature_current_day_high_to_recent_days_highs         0.016869        0.001624              1.0
-0                      feature_controlled_volume_entry_quality         0.016287        0.001703              1.0
+5                                  feature_overall_legit_trade         0.891902        0.007324              1.0
+4  feature_entry_close_strength_to_highest_high_close_strength         0.030045        0.002828              1.0
+1                    feature_current_day_high_to_previous_high         0.022705        0.003001              1.0
+3                      feature_current_day_vwap_to_recent_days         0.021051        0.002590              1.0
+0                      feature_controlled_volume_entry_quality         0.018389        0.002300              1.0
+2                feature_current_day_high_to_recent_days_highs         0.015908        0.001925              1.0
 
 Selected stable features:
 - feature_overall_legit_trade
-- feature_current_day_vwap_to_recent_days
 - feature_entry_close_strength_to_highest_high_close_strength
 - feature_current_day_high_to_previous_high
-- feature_current_day_high_to_recent_days_highs
+- feature_current_day_vwap_to_recent_days
 - feature_controlled_volume_entry_quality
+- feature_current_day_high_to_recent_days_highs
 
 ================ CV FOLD REPORT ================
 
@@ -104,14 +104,14 @@ Confusion matrix:
 
 ================ FINAL FEATURE IMPORTANCE ================
 
-feature_overall_legit_trade                                    0.913976
-feature_current_day_vwap_to_recent_days                        0.022800
-feature_entry_close_strength_to_highest_high_close_strength    0.019417
-feature_current_day_high_to_previous_high                      0.017404
-feature_controlled_volume_entry_quality                        0.013329
-feature_current_day_high_to_recent_days_highs                  0.013074
+feature_overall_legit_trade                                    0.898470
+feature_entry_close_strength_to_highest_high_close_strength    0.028489
+feature_current_day_high_to_previous_high                      0.020946
+feature_current_day_vwap_to_recent_days                        0.019132
+feature_controlled_volume_entry_quality                        0.018447
+feature_current_day_high_to_recent_days_highs                  0.014516
 dtype: float64
 
 ================ SAMPLE LIVE OUTPUT ================
 
-{'probability': 0.974457, 'score': 97.45, 'threshold': 0.6, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A+'}
+{'probability': 0.974213, 'score': 97.42, 'threshold': 0.6, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A+'}
