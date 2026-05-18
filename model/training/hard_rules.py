@@ -100,6 +100,7 @@ def should_be_rejected_by_hard_rules(
         and total_volume <= 258551312.0
         and emas_distances_to_recent_bars_ema_distances > 0.1030314825
         and current_day_movement_to_recent_days_movement > 1.1011566698988786
+        and current_day_vwap_to_recent_days <= 3.565152257209529
     ):
         return True
 
@@ -300,6 +301,7 @@ def should_be_rejected_by_hard_rules(
         entry_bar_upper_wick >= 0.2837
         and current_day_low_to_ema_9 >= 1.1456
         and entry_followthrough_after_near_reclaim >= 1.1020
+        and recent_bars_positive_bars_pct <= 0.7
     ):
         return True
 
@@ -681,6 +683,7 @@ def should_be_rejected_by_hard_rules(
         and entry_bar_close_to_highest_high <= 1.01447752
         and current_day_ema_9_to_ema_20 >= 1.153187004
         and entry_bar_body <= 0.6229021941816995
+        and pullback_health <= 2.199284663467352
     ):
         return True
 
@@ -707,6 +710,7 @@ def should_be_rejected_by_hard_rules(
         current_day_high_to_previous_high <= 1.02
         and entry_breakout_efficiency_from_ema_9 > 0.64
         and controlled_volume_entry_quality <= 1.94325300464
+        and entry_close_to_vwap <= 1.141160582354013
     ):
         return True
 
@@ -919,6 +923,7 @@ def should_be_rejected_by_hard_rules(
         current_day_low_to_ema_9 >= 1.358228224
         and entry_bar_vwap_to_ema_20 <= 0.8898687606
         and entry_breakout_efficiency_from_ema_9 >= 0.5188943549
+        and pre_market_gains >= 0.2355555555555554
     ):
         return True
 
@@ -1000,6 +1005,7 @@ def should_be_rejected_by_hard_rules(
         entry_body_to_highest_high_body >= 21.0911
         and pullback_depth_vs_pre_high_move <= 0.8421832074
         and entry_close_to_vwap < 1.214043135738546
+        and pre_market_gains <= 0.203125
     ):
         return True
 
@@ -1019,19 +1025,6 @@ def should_be_rejected_by_hard_rules(
         and current_day_vwap_to_recent_days <= 2.7823119164
         and profit_since_open_to_bars_count_since_open > 0.0132751414
         and bars_above_volume_average_vs_under_since_highest_high > 0.2250000015
-        and entry_followthrough_after_near_reclaim > 1.0432881853785902
-    ):
-        return True
-
-    # Reject: weak VWAP/EMA20 structure,
-    # weak broader VWAP context,
-    # strong profit pace from open,
-    # and oversized entry body versus recent bodies
-    if (
-        entry_bar_vwap_to_ema_20 <= 0.9514810741
-        and current_day_vwap_to_recent_days <= 2.7823119164
-        and profit_since_open_to_bars_count_since_open > 0.0132751414
-        and entry_body_to_recent_bars_body_average > 3.0990895033
         and entry_followthrough_after_near_reclaim > 1.0432881853785902
     ):
         return True
@@ -1258,6 +1251,59 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_volume_spike_without_high_context <= 1.9263097571372707
         and volume_confirmation_quality <= 0.5200111706836894
+    ):
+        return True
+
+    if (
+        reclaim_close_strength_since_highest_high <= 0.055556
+        and entry_upper_wick_to_recent_upper_wick_average <= 0.293437
+    ):
+        return True
+
+    if (
+        entry_body_to_highest_high_body <= 0.334147
+        and entry_volume_to_highest_volume_in_pullback <= 0.623601
+    ):
+        return True
+
+    if (
+        failed_pressure_to_followthrough >= 0.613675803152515
+        and entry_bar_ema_9_to_ema_20 >= 1.0561902776954681
+    ):
+        return True
+
+    if (
+        volume_without_macd_confirmation <= 0.4212260308300548
+        and entry_close_strength_to_highest_high_close_strength <= 1.3536733454766223
+    ):
+        return True
+
+    if (
+        recent_bars_positive_bars_pct <= 0.4
+        and pre_market_gains <= -0.0682967959527823
+    ):
+        return True
+
+    if (
+        entry_bar_lower_wick >= 0.3599999999999994
+        and entry_volume_to_highest_volume_in_pullback <= 0.7375094517384586
+    ):
+        return True
+
+    # Reject: weak wick-volume rejection,
+    # and post-high volume balance is not strong enough.
+    if (
+        weak_wick_volume_rejection
+        and bars_above_volume_average_vs_under_since_highest_high <= 0.615
+    ):
+        return True
+
+    # Reject: current-day high expanded versus recent days,
+    # but VWAP context did not confirm enough.
+    # This is a fake-strength / wick-extension profile.
+    if (
+        current_day_vwap_to_recent_days <= 1.42
+        and current_day_high_to_recent_days_highs >= 1.44
     ):
         return True
 
