@@ -321,19 +321,20 @@ class Confirmator:
                 else:
                     entry_position_bar = potential_confirmation_bar
                     confirmed_evidence = evidence_obj.name
-                    if not self.is_retro:
-                        with open(f"model/training/data/next_training/{stock.symbol_name}-{potential_confirmation_bar.bar_time}.json", "wb") as f:
-                            pickle.dump(
-                                {
-                                    "day_timeframe_stock": stock,
-                                    "one_minute_timeframe_stock": one_minute_timeframe_stock,
-                                    "potential_confirmation_bar": potential_confirmation_bar,
-                                    "highest_high_one_minute_bar": highest_high_one_minute_bar,
-                                    "volume_sum_since_market_open": stock.volume_sum_since_market_open,
-                                    "one_minute_bars": one_minute_bars,
-                                },
-                                f,
-                            )
+
+                if not self.is_retro:
+                    with open(f"model/training/data/next_training/{stock.symbol_name}-{potential_confirmation_bar.bar_time}.json", "wb") as f:
+                        pickle.dump(
+                            {
+                                "day_timeframe_stock": stock,
+                                "one_minute_timeframe_stock": one_minute_timeframe_stock,
+                                "potential_confirmation_bar": potential_confirmation_bar,
+                                "highest_high_one_minute_bar": highest_high_one_minute_bar,
+                                "volume_sum_since_market_open": stock.volume_sum_since_market_open,
+                                "one_minute_bars": one_minute_bars,
+                            },
+                            f,
+                        )
 
                 self.logger.info(
                     msg=msg,
