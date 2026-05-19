@@ -73,6 +73,9 @@ class Handler(
             "reason",
             "highest_high",
             "highest_high_bar_time",
+            "current_day_ema_9",
+            "current_day_ema_20",
+            "current_day_vwap",
         ]
 
         for field in fields:

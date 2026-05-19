@@ -351,6 +351,9 @@ class Confirmator:
                         "score": score.score,
                         "probability": score.probability,
                         "threshold": score.threshold,
+                        "current_day_ema_9": original_bar_to_confirm.ema_9,
+                        "current_day_ema_20": original_bar_to_confirm.ema_20,
+                        "current_day_vwap": original_bar_to_confirm.vwap,
                     },
                 )
 
