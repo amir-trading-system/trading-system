@@ -94,8 +94,8 @@ def should_be_rejected_by_hard_rules(
         and gains_since_lowest_low <= 0.0916305929
         and entry_rejection_pressure > 0.0234738560
         and entry_close_to_previous_bar_high > 1.0530339479
-        and current_day_vwap_to_recent_days <= 2.8522806168
-        and entry_followthrough_after_near_reclaim > 1.0850483775
+        and current_day_vwap_to_recent_days <= 7.642689643659104
+        and entry_followthrough_after_near_reclaim > 1.073159808628476
         and bars_above_volume_average_vs_under_since_highest_high > 0
         and entry_bar_close_to_highest_high < 1.0188677346643054
     ):
@@ -123,12 +123,12 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        entry_bar_vwap_to_ema_20 <= 0.9624572694
+        entry_bar_vwap_to_ema_20 <= 0.9903881602526934
         and gains_until_entry_bar <= 1.0722402930
         and entry_volume_to_highest_volume_in_pullback <= 1.8528105021
         and current_day_movement_to_recent_days_movement > 8.3926472664
         and entry_body_to_highest_high_body <= 13.3459329605
-        and current_day_vwap_to_recent_days > 1.5232991576
+        and current_day_vwap_to_recent_days > 1.461265299777554
         and gains_since_lowest_low <= 0.56
         and entry_breakout_efficiency_from_ema_9 > 0.3267045912611484
     ):
@@ -235,7 +235,7 @@ def should_be_rejected_by_hard_rules(
     if (
         current_day_ema_20_to_recent_days_ema_20 <= 1.0401
         and entry_body_to_highest_high_body <= 1.03731343284
-        and volume_since_highest_high_to_volume_before <= 0.331
+        and volume_since_highest_high_to_volume_before <= 0.8409639544696886
         and entry_bar_ema_9_to_vwap > 1.0852916008150164
     ):
         return True
@@ -264,8 +264,8 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        gains_since_lowest_low <= 0.1226
-        and previous_bar_volume_to_its_previous_volume <= 0.8477
+        gains_since_lowest_low <= 0.2115384615384616
+        and previous_bar_volume_to_its_previous_volume <= 0.896686726772411
         and previous_bar_volume_to_its_previous_volume >= 0.5973
         and entry_upper_wick_to_recent_upper_wick_average >= 0.5068
         and current_day_high_to_recent_days_highs <= 1.8587
@@ -297,7 +297,7 @@ def should_be_rejected_by_hard_rules(
         current_day_movement_to_recent_days_movement >= 6.5162
         and gains_since_lowest_low <= 0.228448275862
         and entry_body_to_previous_bar_body >= 2.8959
-        and current_day_ema_9_to_recent_days_ema_9 <= 1.4339
+        and current_day_ema_9_to_recent_days_ema_9 <= 1.4831883273158324
         and entry_bar_close_to_highest_high >= 1.0178
         and bars_since_highest_high_to_bars_before <= 0.0141
         and recent_bars_up_trend_pct >= 0.4
@@ -390,7 +390,7 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        entry_breakout_efficiency_from_ema_9 > 0.4910371602
+        entry_breakout_efficiency_from_ema_9 > 0.4245388588392034
         and bars_since_highest_high_to_bars_before <= 0.0018091702
         and entry_body_to_highest_high_body <= 1.6986946464
         and current_day_movement_to_recent_days_movement > 0.6746948957
@@ -418,9 +418,9 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        entry_close_strength_to_highest_high_close_strength <= 0.6933561644938037
+        entry_close_strength_to_highest_high_close_strength <= 0.7199999999999989
         and entry_bar_volume_to_previous_bar_volume <= 1.9862868213373515
-        and entry_bar_body <= 0.7009402985074643
+        and entry_bar_body <= 0.8341666666666647
     ):
         return True
 
@@ -435,7 +435,7 @@ def should_be_rejected_by_hard_rules(
         entry_bar_open_to_ema_9 >= 1.02100165
         and entry_bar_close_to_highest_high <= 1.05555555556
         and current_day_ema_9_to_ema_20 >= 1.153187004
-        and entry_bar_body <= 0.6229021941816995
+        and entry_bar_body <= 0.6721874999999996
         and pullback_health <= 2.199284663467352
     ):
         return True
@@ -494,7 +494,7 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        pullback_depth_vs_pre_high_move <= 0.417
+        pullback_depth_vs_pre_high_move <= 0.4368705484108274
         and profit_since_open_to_bars_count_since_open >= 0.00576
     ):
         return True
@@ -524,7 +524,7 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_bar_upper_wick >= 0.278571428571
         and entry_extension_pressure >= 0.2814410998
-        and current_day_ema_9_to_ema_20 >= 1.2564937075
+        and current_day_ema_9_to_ema_20 >= 1.2140274946512368
     ):
         return True
 
@@ -614,7 +614,7 @@ def should_be_rejected_by_hard_rules(
     if (
         bars_since_highest_high_to_bars_before <= 0.001774
         and entry_body_to_highest_high_body <= 1.271
-        and entry_body_to_previous_bar_body <= 2.81
+        and entry_body_to_previous_bar_body <= 4.333333333333294
         and not clean_reentry_confirmation
     ):
         return True
@@ -623,14 +623,6 @@ def should_be_rejected_by_hard_rules(
         bars_since_highest_high_to_bars_before <= 0.1951219512195122
         and gains_since_lowest_low <= 0.2146118721461188
         and pre_market_volume <= 0.0
-    ):
-        return True
-
-    if (
-        current_day_ema_9_to_ema_20 <= 1.120
-        and entry_bar_volume_to_recent_bars_average <= 1.094
-        and entry_close_strength_to_highest_high_close_strength <= 1.316
-        and gains_since_lowest_low <= 0.139
     ):
         return True
 
@@ -689,7 +681,7 @@ def should_be_rejected_by_hard_rules(
 
     if (
         highest_high_to_entry_elapsed_minutes <= 4
-        and entry_bar_volume_to_total_volume <= 0.0167
+        and entry_bar_volume_to_total_volume <= 0.0186582446829219
         and entry_bar_close_to_highest_high <= 1.0121
         and entry_bar_open_to_ema_9 >= 1.003
     ):
@@ -734,7 +726,7 @@ def should_be_rejected_by_hard_rules(
 
     if (
         current_day_vwap_to_recent_days <= 1.5019456072
-        and current_day_high_to_recent_days_highs >= 1.488
+        and current_day_high_to_recent_days_highs >= 1.4439142795391444
         and entry_volume_price_efficiency <= 0.0256996691932799
     ):
         return True
@@ -759,7 +751,7 @@ def should_be_rejected_by_hard_rules(
 
     if (
         total_volume >= 27017198.0
-        and entry_body_to_recent_bars_body_average <= 1.159070329006945
+        and entry_body_to_recent_bars_body_average <= 1.5048761408083349
     ):
         return True
 
@@ -850,7 +842,7 @@ def should_be_rejected_by_hard_rules(
 
     if (
         macd_recovery_age_quality >= 18.45
-        and current_day_low_to_ema_9 <= 0.8525
+        and current_day_low_to_ema_9 <= 1.0123227559458436
         and highest_high_quality <= 0.2095
     ):
         return True
@@ -917,7 +909,7 @@ def should_be_rejected_by_hard_rules(
 
     if (
         recent_bars_up_trend_pct >= 0.9
-        and entry_volume_price_efficiency <= 0.04
+        and entry_volume_price_efficiency <= 0.1111710752349686
         and current_day_vwap_to_recent_days >= 1.8
         and entry_histogram_to_highest_histogram <= 1.2
     ):
@@ -970,15 +962,6 @@ def should_be_rejected_by_hard_rules(
         entry_volume_price_efficiency <= 0.0439789558119
         and highest_high_quality >= 10
         and entry_body_to_previous_bar_body >= 10
-    ):
-        return True
-
-    if (
-        entry_close_strength_to_highest_high_close_strength <= 0.9
-        and highest_high_quality >= 10
-        and pre_market_gains <= 0
-        and entry_volume_price_efficiency <= 0.04
-        and current_day_vwap_to_recent_days <= 1.3
     ):
         return True
 
