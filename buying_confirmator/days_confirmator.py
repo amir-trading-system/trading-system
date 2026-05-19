@@ -323,7 +323,7 @@ class Confirmator:
                     confirmed_evidence = evidence_obj.name
 
                 if not self.is_retro:
-                    with open(f"model/training/data/next_training/{stock.symbol_name}-{potential_confirmation_bar.bar_time}.json", "wb") as f:
+                    with open(f"model/training/data/next_training/{stock.symbol_name}-{potential_confirmation_bar.bar_time}-PROD.json", "wb") as f:
                         pickle.dump(
                             {
                                 "day_timeframe_stock": stock,

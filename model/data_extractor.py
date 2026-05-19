@@ -4,15 +4,71 @@ import common
 import model
 
 class DataExtractor:
+    def safe_divide(
+        self,
+        numerator: float,
+        denominator: float,
+        default: float = 1.0,
+    ) -> float:
+        return numerator / denominator if denominator and denominator > 0 else default
+
+    def projected_daily_ema(
+        self,
+        current_price: float,
+        previous_ema: float,
+        period: int,
+    ) -> float:
+        alpha = 2.0 / (period + 1.0)
+        return (current_price * alpha) + (previous_ema * (1.0 - alpha))
+
     def recent_days_structure_features(
         self,
         day_timeframe_stock: common.objects.Stock,
+        one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
     ) -> dict[str, float]:
-        current_day = day_timeframe_stock.bars[0]
         previous_day = day_timeframe_stock.bars[1]
         recent_days = day_timeframe_stock.bars[1:10]
         total_days = len(recent_days)
+
+        bars_since_04_am = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if datetime.datetime(
+                year=potential_confirmation_bar.bar_time.year,
+                month=potential_confirmation_bar.bar_time.month,
+                day=potential_confirmation_bar.bar_time.day,
+                hour=4,
+            ) <= bar_object.bar_time <= potential_confirmation_bar.bar_time
+        ]
+        current_day_volume_so_far = sum(bar_object.volume for bar_object in bars_since_04_am) if bars_since_04_am else 0
+        current_day_low_so_far = min(bar_object.low for bar_object in bars_since_04_am) if bars_since_04_am else 0
+
+        dollar_volume_sum = 0.0
+        volume_for_vwap = 0.0
+
+        for bar_object in bars_since_04_am:
+            typical_price = (bar_object.high + bar_object.low + bar_object.close) / 3.0
+            dollar_volume_sum += typical_price * bar_object.volume
+            volume_for_vwap += bar_object.volume
+
+        current_day_vwap_so_far = (
+            dollar_volume_sum / volume_for_vwap
+            if volume_for_vwap > 0
+            else potential_confirmation_bar.close
+        )
+
+        current_day_ema_9_projected = self.projected_daily_ema(
+            current_price=potential_confirmation_bar.close,
+            previous_ema=previous_day.ema_9,
+            period=9,
+        )
+
+        current_day_ema_20_projected = self.projected_daily_ema(
+            current_price=potential_confirmation_bar.close,
+            previous_ema=previous_day.ema_20,
+            period=20,
+        )
 
         volume_sum = 0
         ema_9_sum = 0
@@ -39,18 +95,52 @@ class DataExtractor:
         highs_average = highs_sum/total_days
         vwap_average = vwap_sum/total_days
 
-        current_day_volume_to_recent_days_volume = current_day.volume/recent_days_volume_average if recent_days_volume_average > 0 else 1
-        current_day_ema_9_to_recent_days_ema_9 = current_day.ema_9/ema_9_average if ema_9_average > 0 else 1
-        current_day_ema_20_to_recent_days_ema_20 = current_day.ema_20/ema_20_average if ema_20_average > 0 else 1
-        current_day_movement_to_recent_days_movement = (potential_confirmation_bar.high - current_day.low)/movement_average if movement_average > 0 else 1
-        current_day_ema_9_to_ema_20_distance_to_recent_days = (current_day.ema_9 - current_day.ema_20)/ema_9_to_ema_20_distance_average if ema_9_to_ema_20_distance_average > 0 else 1
-        current_day_high_to_recent_days_highs = potential_confirmation_bar.high/highs_average if highs_average > 0 else 1
-        current_day_vwap_to_recent_days = current_day.vwap/vwap_average if vwap_average > 0 else 1
-        current_day_low_to_ema_9 = current_day.low/current_day.ema_9 if current_day.ema_9 > 0 else 1
-        current_day_ema_9_to_ema_20 = current_day.ema_9/current_day.ema_20 if current_day.ema_20 > 0 else 1
-        current_day_high_to_previous_high = potential_confirmation_bar.high/previous_day.high if previous_day.high > 0 else 1
-        gains_until_entry_bar = (potential_confirmation_bar.close - previous_day.close)/previous_day.close if previous_day is not None and previous_day.high > 0 else 1
-        controlled_volume_entry_quality = current_day_volume_to_recent_days_volume/ (1.0 + gains_until_entry_bar)
+        current_day_volume_to_recent_days_volume = self.safe_divide(
+            numerator=current_day_volume_so_far,
+            denominator=recent_days_volume_average,
+        )
+        current_day_ema_9_to_recent_days_ema_9 = self.safe_divide(
+            numerator=current_day_ema_9_projected,
+            denominator=ema_9_average,
+        )
+        current_day_ema_20_to_recent_days_ema_20 = self.safe_divide(
+            numerator=current_day_ema_20_projected,
+            denominator=ema_20_average,
+        )
+        current_day_movement_to_recent_days_movement = self.safe_divide(
+            numerator=potential_confirmation_bar.high - current_day_low_so_far,
+            denominator=movement_average,
+        )
+        current_day_ema_9_to_ema_20_distance_to_recent_days = self.safe_divide(
+            numerator=current_day_ema_9_projected - current_day_ema_20_projected,
+            denominator=ema_9_to_ema_20_distance_average,
+        )
+        current_day_high_to_recent_days_highs = self.safe_divide(
+            numerator=potential_confirmation_bar.high,
+            denominator=highs_average,
+        )
+        current_day_vwap_to_recent_days = self.safe_divide(
+            numerator=current_day_vwap_so_far,
+            denominator=vwap_average,
+        )
+        current_day_low_to_ema_9 = self.safe_divide(
+            numerator=current_day_low_so_far,
+            denominator=current_day_ema_9_projected,
+        )
+        current_day_ema_9_to_ema_20 = self.safe_divide(
+            numerator=current_day_ema_9_projected,
+            denominator=current_day_ema_20_projected,
+        )
+        current_day_high_to_previous_high = self.safe_divide(
+            numerator=potential_confirmation_bar.high,
+            denominator=previous_day.high,
+        )
+        gains_until_entry_bar = self.safe_divide(
+            numerator=potential_confirmation_bar.close - previous_day.close,
+            denominator=previous_day.close,
+            default=0.0,
+        )
+        controlled_volume_entry_quality = current_day_volume_to_recent_days_volume/ (1.0 + gains_until_entry_bar) if (1.0 + gains_until_entry_bar) != 0 else current_day_volume_to_recent_days_volume
 
         return {
             "feature_current_day_volume_to_recent_days_volume": current_day_volume_to_recent_days_volume,
@@ -493,6 +583,7 @@ class DataExtractor:
 
         recent_days_structure_features = self.recent_days_structure_features(
             day_timeframe_stock=day_timeframe_stock,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
         breakout_structure_features = self.breakout_structure_features(
