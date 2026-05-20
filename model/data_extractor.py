@@ -695,8 +695,14 @@ class DataExtractor:
         should_be_rejected_by_hard_rules = model.training.hard_rules.should_be_rejected_by_hard_rules(
             features_data=features,
         )
+        positive_score, positive_reasons = model.training.hard_rules.success_patterns(
+            features_data=features,
+        )
+
         feature_overall_legit_trade = {
             "feature_overall_legit_trade": not should_be_rejected_by_hard_rules,
+            "positive_score": positive_score,
+            "positive_reasons": positive_reasons,
         }
 
         features = features | feature_overall_legit_trade

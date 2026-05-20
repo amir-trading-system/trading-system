@@ -76,6 +76,8 @@ class Handler(
             "current_day_ema_9",
             "current_day_ema_20",
             "current_day_vwap",
+            "positive_score",
+            "positive_reasons",
         ]
 
         for field in fields:

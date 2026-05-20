@@ -144,6 +144,7 @@ def should_be_rejected_by_hard_rules(
             and current_day_vwap_to_recent_days <= 2.1286
             and entry_bar_volume_to_total_volume <= 0.227660134288
             and pre_market_gains <= 0.7774401823005571
+            and entry_extension_pressure <= 0.84
         )
         or (
             entry_bar_low_to_ema_9 > 1.0070604682
@@ -262,6 +263,7 @@ def should_be_rejected_by_hard_rules(
             and current_day_high_to_previous_high <= 1.9557220936
             and entry_bar_volume <= 45106.3496
             and positive_vs_negative_volume_during_pullback <= 1.1987136006
+            and entry_bar_low_to_ema_9 <= 1.04
         )
         or (
             pre_market_volume <= 4998.5
@@ -440,6 +442,7 @@ def should_be_rejected_by_hard_rules(
             and entry_close_strength_to_highest_high_close_strength <= 1.052
             and macd_recovery_age_quality > 11.472846724011536
             and entry_close_to_previous_bar_high >= 1.0543184885290149
+            and entry_extension_pressure >= 0.0943
         )
     ):
         return True
@@ -469,6 +472,7 @@ def should_be_rejected_by_hard_rules(
         and price_movement_from_highest_high_to_lowest_low <= 4.099999904632568
         and entry_body_to_previous_bar_body <= 4.946176528930664
         and positive_vs_negative_volume_during_pullback <= 3.7747384309768677
+        and entry_body_to_highest_high_body <= 52.3
     ):
         return True
 
@@ -498,6 +502,7 @@ def should_be_rejected_by_hard_rules(
         and entry_close_to_previous_bar_close <= 1.32196044921875
         and current_day_vwap_to_recent_days <= 3.9065240621566772
         and entry_volume_to_highest_volume_in_pullback <= 2.7033112049102783
+        and entry_close_to_vwap >= 1.147
     ):
         return True
 
@@ -521,6 +526,7 @@ def should_be_rejected_by_hard_rules(
         and pullback_health <= 9.686372756958008
         and total_volume <= 193450808.0
         and pre_market_gains <= 0.398
+        and entry_extension_pressure >= 0.059
     ):
         return True
 
@@ -537,6 +543,7 @@ def should_be_rejected_by_hard_rules(
         and entry_bar_ema_9_to_vwap <= 1.1866434812545776
         and entry_volume_price_efficiency <= 0.3189230039715767
         and current_day_ema_9_to_ema_20 <= 1.311029368268173
+        and entry_volume_price_efficiency >= 0.014
     ):
         return True
 
@@ -669,6 +676,7 @@ def should_be_rejected_by_hard_rules(
         and pullback_depth_vs_pre_high_move <= 0.8421832074
         and entry_close_to_vwap < 1.214043135738546
         and pre_market_gains <= 0.203125
+        and volume_since_highest_high_to_volume_before >= 0.0083
     ):
         return True
 
@@ -908,6 +916,7 @@ def should_be_rejected_by_hard_rules(
         and entry_bar_close_to_highest_high <= 1.0109454545454546
         and entry_extension_pressure >= 0.3105943493744694
         and entry_bar_volume >= 518983.0
+        and entry_bar_ema_9_to_vwap >= 1.08
     ):
         return True
 
@@ -941,4 +950,194 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    if (
+        entry_close_strength_to_highest_high_close_strength <= 0.0
+        and current_day_movement_to_recent_days_movement <= 1.2851
+    ):
+        return True
+
+    if (
+        distance_from_last_negative_macd_bar >= 27
+        and current_day_vwap_to_recent_days >= 2.7578
+    ):
+        return True
+
     return False
+
+def success_patterns(
+    features_data: dict[str, float]
+) -> tuple[int, list[str]]:
+    """
+    Returns a buyer-arrival score and the matched positive behavior families.
+
+    Important:
+    - Do not use this as rescue logic.
+    - Use it to protect positives when designing reject rules.
+    - Use it to debug why a positive should maybe not be rejected.
+    """
+
+    score = 0
+    reasons: list[str] = []
+
+    entry_bar_close_to_highest_high = features_data["feature_entry_bar_close_to_highest_high"]
+    entry_bar_histogram_to_previous = features_data["feature_entry_bar_histogram_to_previous"]
+    current_day_ema_9_to_ema_20 = features_data["feature_current_day_ema_9_to_ema_20"]
+    current_day_ema_9_to_recent_days_ema_9 = features_data["feature_current_day_ema_9_to_recent_days_ema_9"]
+    total_volume = features_data["total_volume"]
+    distance_from_last_negative_macd_bar = features_data["feature_distance_from_last_negative_macd_bar"]
+    minutes_since_market_open = features_data["feature_minutes_since_market_open"]
+    entry_close_position_vs_previous_close_position = features_data["feature_entry_close_position_vs_previous_close_position"]
+    entry_close_strength_to_highest_high_close_strength = features_data["feature_entry_close_strength_to_highest_high_close_strength"]
+    entry_extension_pressure = features_data["feature_entry_extension_pressure"]
+    entry_body_to_highest_high_body = features_data["feature_entry_body_to_highest_high_body"]
+    current_day_low_to_ema_9 = features_data["feature_current_day_low_to_ema_9"]
+    entry_body_to_previous_bar_body = features_data["feature_entry_body_to_previous_bar_body"]
+    entry_bar_histogram_to_lowest_histogram = features_data["feature_entry_bar_histogram_to_lowest_histogram"]
+    entry_rejection_pressure = features_data["feature_entry_rejection_pressure"]
+    entry_bar_body = features_data["feature_entry_bar_body"]
+    entry_bar_volume_to_recent_bars_average = features_data["feature_entry_bar_volume_to_recent_bars_average"]
+    pullback_depth_vs_pre_high_move = features_data["feature_pullback_depth_vs_pre_high_move"]
+    controlled_volume_entry_quality = features_data["feature_controlled_volume_entry_quality"]
+    entry_upper_wick_to_recent_upper_wick_average = features_data["feature_entry_upper_wick_to_recent_upper_wick_average"]
+    entry_bar_volume_to_previous_bar_volume = features_data["feature_entry_bar_volume_to_previous_bar_volume"]
+    volume_confirmation_quality = features_data["feature_volume_confirmation_quality"]
+    entry_volume_price_efficiency = features_data["feature_entry_volume_price_efficiency"]
+    volume_since_highest_high_to_volume_before = features_data["feature_volume_since_highest_high_to_volume_before"]
+    previous_bar_close_to_highest_high = features_data["feature_previous_bar_close_to_highest_high"]
+    entry_bar_volume_to_highest_volume_in_pullback = features_data["feature_entry_bar_volume_to_highest_volume_in_pullback"]
+    entry_bar_ema_9_to_vwap = features_data["feature_entry_bar_ema_9_to_vwap"]
+    current_day_high_to_previous_high = features_data["feature_current_day_high_to_previous_high"]
+    entry_volume_spike_without_high_context = features_data["feature_entry_volume_spike_without_high_context"]
+    pre_market_volume = features_data["feature_pre_market_volume"]
+    reclaim_close_strength_since_highest_high = features_data["feature_reclaim_close_strength_since_highest_high"]
+    entry_bar_volume_to_total_volume = features_data["feature_entry_bar_volume_to_total_volume"]
+    previous_bar_high_to_highest_high = features_data["feature_previous_bar_high_to_highest_high"]
+
+    # Success Pattern 1:
+    # Clean high breakout continuation.
+    if (
+        entry_bar_close_to_highest_high >= 1.047401043
+        and entry_bar_histogram_to_previous <= 0.9876351128
+        and current_day_ema_9_to_ema_20 >= 1.047288046
+        and total_volume >= 604175
+    ):
+        score += 1
+        reasons.append("clean_high_breakout_continuation")
+
+    # Success Pattern 2:
+    # Real daily EMA expansion breakout.
+    if (
+        entry_bar_close_to_highest_high >= 1.047401043
+        and entry_bar_histogram_to_previous <= 0.9876351128
+        and current_day_ema_9_to_recent_days_ema_9 >= 1.169691864
+        and total_volume >= 604175
+    ):
+        score += 1
+        reasons.append("daily_ema_expansion_breakout")
+
+    # Success Pattern 3:
+    # Fresh early reclaim.
+    if (
+        distance_from_last_negative_macd_bar <= 0
+        and minutes_since_market_open <= 44
+        and total_volume <= 12725290.2
+        and entry_close_position_vs_previous_close_position <= 2.482081959
+    ):
+        score += 1
+        reasons.append("fresh_early_reclaim")
+
+    # Success Pattern 4:
+    # Snap close strength with low extension pressure.
+    if (
+        entry_close_strength_to_highest_high_close_strength >= 8.05010989
+        and entry_extension_pressure <= 0.2199993956
+        and entry_bar_histogram_to_previous <= 1.225417414
+        and entry_body_to_highest_high_body <= 14.73302478
+    ):
+        score += 1
+        reasons.append("snap_close_strength_low_extension")
+
+    # Success Pattern 5:
+    # Supported explosive body.
+    if (
+        current_day_low_to_ema_9 >= 1.119229591
+        and entry_body_to_previous_bar_body >= 7.89129069
+        and entry_bar_histogram_to_lowest_histogram <= 1
+        and entry_rejection_pressure <= 0.2498751041
+    ):
+        score += 1
+        reasons.append("supported_explosive_body")
+
+    # Success Pattern 6:
+    # Real reset with volume confirmation.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.8915035128593445
+        and entry_bar_body > 0.6001200675964355
+        and pullback_depth_vs_pre_high_move > 0.4464638829231262
+        and controlled_volume_entry_quality > 88.66648483276367
+        and entry_upper_wick_to_recent_upper_wick_average > 0.2643764615058899
+        and entry_bar_volume_to_previous_bar_volume > 1.6711958050727844
+        and volume_confirmation_quality > 0.3263349384069443
+    ):
+        score += 1
+        reasons.append("real_reset_with_volume_confirmation")
+
+    # Success Pattern 7:
+    # Strong pullback-volume reclaim.
+    if (
+        entry_bar_volume_to_recent_bars_average > 2.4643672704696655
+        and entry_volume_price_efficiency > 0.03994190879166126
+        and volume_since_highest_high_to_volume_before <= 0.5249083638191223
+        and previous_bar_close_to_highest_high <= 0.9887155294418335
+        and entry_bar_volume_to_highest_volume_in_pullback > 1.013592779636383
+        and minutes_since_market_open <= 125.0
+        and entry_body_to_highest_high_body > 4.575719833374023
+    ):
+        score += 1
+        reasons.append("strong_pullback_volume_reclaim")
+
+    # Success Pattern 8:
+    # Controlled non-chase close strength.
+    if (
+        entry_bar_volume_to_recent_bars_average <= 1.8915035128593445
+        and entry_bar_ema_9_to_vwap <= 1.0798304677009583
+        and current_day_high_to_previous_high <= 1.5273277759552002
+        and entry_volume_spike_without_high_context > 0.9171657264232635
+        and pre_market_volume <= 725162.5
+        and entry_body_to_previous_bar_body > 0.8507025837898254
+        and entry_close_strength_to_highest_high_close_strength > 1.1331384778022766
+    ):
+        score += 1
+        reasons.append("controlled_non_chase_close_strength")
+
+    # Success Pattern 9:
+    # Supported low-float style volume ownership.
+    if (
+        entry_bar_volume_to_recent_bars_average <= 1.729531705379486
+        and entry_bar_volume_to_total_volume > 0.0218327259644866
+        and previous_bar_high_to_highest_high <= 1.0108754634857178
+        and pre_market_volume > 175.0
+        and total_volume <= 2451437.0
+        and current_day_high_to_previous_high <= 2.3071115016937256
+        and entry_close_position_vs_previous_close_position > 0.99399334192276
+        and entry_bar_volume_to_recent_bars_average <= 1.6182057857513428
+    ):
+        score += 1
+        reasons.append("supported_low_float_volume_ownership")
+
+    # Success Pattern 10:
+    # Supported body expansion from strong day structure.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.8915035128593445
+        and entry_bar_body > 0.6001200675964355
+        and pullback_depth_vs_pre_high_move > 0.4464638829231262
+        and controlled_volume_entry_quality <= 88.66648483276367
+        and current_day_low_to_ema_9 > 1.111901879310608
+        and entry_upper_wick_to_recent_upper_wick_average <= 0.763389527797699
+        and reclaim_close_strength_since_highest_high <= 0.6107226312160492
+        and pre_market_volume <= 339666.0
+    ):
+        score += 1
+        reasons.append("supported_body_expansion_from_day_structure")
+
+    return score, reasons

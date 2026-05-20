@@ -3,9 +3,6 @@ import csv
 import pickle
 import glob
 
-import numpy
-import pandas as pd
-
 import common
 from ..import data_extractor
 
@@ -26,6 +23,8 @@ def write_to_csv(
         "highest_high_one_minute_bar_time",
         "total_volume",
         "entry_bar_volume",
+        "positive_score",
+        "positive_reasons",
     ]
     columns.extend(
         [
@@ -50,6 +49,8 @@ def write_to_csv(
         highest_high_one_minute_bar_time = symbol_data["highest_high_one_minute_bar_time"]
         total_volume = symbol_data["total_volume"]
         entry_bar_volume = symbol_data["entry_bar_volume"]
+        positive_score = symbol_data["positive_score"]
+        positive_reasons = symbol_data["positive_reasons"]
         features = [v for k, v in symbol_data.items() if k.startswith("feature_")]
 
         symbol = stock_object.symbol_name
@@ -70,6 +71,8 @@ def write_to_csv(
             highest_high_one_minute_bar_time,
             total_volume,
             entry_bar_volume,
+            positive_score,
+            positive_reasons,
         ]
         row_data.extend(features)
 
