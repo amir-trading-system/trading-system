@@ -4,33 +4,37 @@ Total candidate features: 6
 
 ================ FEATURE STABILITY REPORT ================
 
-                                                       feature  mean_importance  std_importance  top_k_frequency
-5                                  feature_overall_legit_trade         0.913740        0.005438              1.0
-4  feature_entry_close_strength_to_highest_high_close_strength         0.028407        0.002837              1.0
-1                    feature_current_day_high_to_previous_high         0.015052        0.001890              1.0
-3                      feature_current_day_vwap_to_recent_days         0.014747        0.001674              1.0
-2                feature_current_day_high_to_recent_days_highs         0.014409        0.001520              1.0
-0                      feature_controlled_volume_entry_quality         0.013645        0.001563              1.0
+                                                       feature  ...  top_k_frequency
+5                                  feature_overall_legit_trade  ...              1.0
+4  feature_entry_close_strength_to_highest_high_close_strength  ...              1.0
+1                    feature_current_day_high_to_previous_high  ...              1.0
+2                feature_current_day_high_to_recent_days_highs  ...              1.0
+0                      feature_controlled_volume_entry_quality  ...              1.0
+3                      feature_current_day_vwap_to_recent_days  ...              1.0
+
+[6 rows x 4 columns]
 
 Selected stable features:
 - feature_overall_legit_trade
 - feature_entry_close_strength_to_highest_high_close_strength
 - feature_current_day_high_to_previous_high
-- feature_current_day_vwap_to_recent_days
 - feature_current_day_high_to_recent_days_highs
 - feature_controlled_volume_entry_quality
+- feature_current_day_vwap_to_recent_days
 
 ================ CV FOLD REPORT ================
 
-           fold  best_threshold  positive_pass_rate  false_positive_reject_rate  balanced_score  trading_score     tn    fp    fn         tp
-count  50.00000    5.000000e+01                50.0                        50.0            50.0           50.0   50.0  50.0  50.0  50.000000
-mean   25.50000    6.000000e-01                 1.0                         1.0             1.0            1.0  102.0   0.0   0.0  76.600000
-std    14.57738    1.121495e-16                 0.0                         0.0             0.0            0.0    0.0   0.0   0.0   0.494872
-min     1.00000    6.000000e-01                 1.0                         1.0             1.0            1.0  102.0   0.0   0.0  76.000000
-25%    13.25000    6.000000e-01                 1.0                         1.0             1.0            1.0  102.0   0.0   0.0  76.000000
-50%    25.50000    6.000000e-01                 1.0                         1.0             1.0            1.0  102.0   0.0   0.0  77.000000
-75%    37.75000    6.000000e-01                 1.0                         1.0             1.0            1.0  102.0   0.0   0.0  77.000000
-max    50.00000    6.000000e-01                 1.0                         1.0             1.0            1.0  102.0   0.0   0.0  77.000000
+           fold  best_threshold  positive_pass_rate  ...    fp    fn    tp
+count  50.00000    5.000000e+01                50.0  ...  50.0  50.0  50.0
+mean   25.50000    6.000000e-01                 1.0  ...   0.0   0.0  78.0
+std    14.57738    1.121495e-16                 0.0  ...   0.0   0.0   0.0
+min     1.00000    6.000000e-01                 1.0  ...   0.0   0.0  78.0
+25%    13.25000    6.000000e-01                 1.0  ...   0.0   0.0  78.0
+50%    25.50000    6.000000e-01                 1.0  ...   0.0   0.0  78.0
+75%    37.75000    6.000000e-01                 1.0  ...   0.0   0.0  78.0
+max    50.00000    6.000000e-01                 1.0  ...   0.0   0.0  78.0
+
+[8 rows x 10 columns]
 
 ================ CHOSEN THRESHOLD ================
 
@@ -46,72 +50,72 @@ Mean false positive reject rate: 1.0000
 
               precision    recall  f1-score   support
 
-           0     1.0000    1.0000    1.0000       219
-           1     1.0000    1.0000    1.0000       164
+           0     1.0000    1.0000    1.0000       231
+           1     1.0000    1.0000    1.0000       168
 
-    accuracy                         1.0000       383
-   macro avg     1.0000    1.0000    1.0000       383
-weighted avg     1.0000    1.0000    1.0000       383
+    accuracy                         1.0000       399
+   macro avg     1.0000    1.0000    1.0000       399
+weighted avg     1.0000    1.0000    1.0000       399
 
 Confusion matrix:
-[[219   0]
- [  0 164]]
+[[231   0]
+ [  0 168]]
 
 ================ HOLDOUT TEST REPORT (threshold=0.60) ================
 
               precision    recall  f1-score   support
 
-           0     1.0000    1.0000    1.0000       219
-           1     1.0000    1.0000    1.0000       164
+           0     1.0000    1.0000    1.0000       231
+           1     1.0000    1.0000    1.0000       168
 
-    accuracy                         1.0000       383
-   macro avg     1.0000    1.0000    1.0000       383
-weighted avg     1.0000    1.0000    1.0000       383
+    accuracy                         1.0000       399
+   macro avg     1.0000    1.0000    1.0000       399
+weighted avg     1.0000    1.0000    1.0000       399
 
 Confusion matrix:
-[[219   0]
- [  0 164]]
+[[231   0]
+ [  0 168]]
 
 ================ HOLDOUT TEST REPORT (threshold=threshold=0.52) ================
 
               precision    recall  f1-score   support
 
-           0     1.0000    1.0000    1.0000       219
-           1     1.0000    1.0000    1.0000       164
+           0     1.0000    1.0000    1.0000       231
+           1     1.0000    1.0000    1.0000       168
 
-    accuracy                         1.0000       383
-   macro avg     1.0000    1.0000    1.0000       383
-weighted avg     1.0000    1.0000    1.0000       383
+    accuracy                         1.0000       399
+   macro avg     1.0000    1.0000    1.0000       399
+weighted avg     1.0000    1.0000    1.0000       399
 
 Confusion matrix:
-[[219   0]
- [  0 164]]
+[[231   0]
+ [  0 168]]
 
 ================ HOLDOUT TEST REPORT (threshold=threshold=0.55) ================
 
               precision    recall  f1-score   support
 
-           0     1.0000    1.0000    1.0000       219
-           1     1.0000    1.0000    1.0000       164
+           0     1.0000    1.0000    1.0000       231
+           1     1.0000    1.0000    1.0000       168
 
-    accuracy                         1.0000       383
-   macro avg     1.0000    1.0000    1.0000       383
-weighted avg     1.0000    1.0000    1.0000       383
+    accuracy                         1.0000       399
+   macro avg     1.0000    1.0000    1.0000       399
+weighted avg     1.0000    1.0000    1.0000       399
 
 Confusion matrix:
-[[219   0]
- [  0 164]]
+[[231   0]
+ [  0 168]]
 
 ================ FINAL FEATURE IMPORTANCE ================
 
-feature_overall_legit_trade                                    0.930222
-feature_entry_close_strength_to_highest_high_close_strength    0.024182
-feature_current_day_high_to_previous_high                      0.012344
-feature_current_day_vwap_to_recent_days                        0.011903
-feature_current_day_high_to_recent_days_highs                  0.011703
-feature_controlled_volume_entry_quality                        0.009645
+feature_overall_legit_trade                                    0.925162
+feature_entry_close_strength_to_highest_high_close_strength    0.024682
+feature_current_day_high_to_previous_high                      0.015152
+feature_controlled_volume_entry_quality                        0.012841
+feature_current_day_high_to_recent_days_highs                  0.012059
+feature_current_day_vwap_to_recent_days                        0.010103
 dtype: float64
 
 ================ SAMPLE LIVE OUTPUT ================
 
-{'probability': 0.965511, 'score': 96.55, 'threshold': 0.6, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A+'}
+{'probability': 0.982473, 'score': 98.25, 'threshold': 0.6, 'rules_pass': True, 'pass_recommended': True, 'grade': 'A+'}

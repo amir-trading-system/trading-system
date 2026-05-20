@@ -5,9 +5,9 @@
     "feature_overall_legit_trade",
     "feature_entry_close_strength_to_highest_high_close_strength",
     "feature_current_day_high_to_previous_high",
-    "feature_current_day_vwap_to_recent_days",
     "feature_current_day_high_to_recent_days_highs",
-    "feature_controlled_volume_entry_quality"
+    "feature_controlled_volume_entry_quality",
+    "feature_current_day_vwap_to_recent_days"
   ],
   "chosen_threshold": 0.6,
   "cv_mean_balanced_score": 1.0,
@@ -22,12 +22,12 @@
   "trading_score_pos_weight": 0.5,
   "final_holdout_threshold": 0.6,
   "top_25_feature_importance": {
-    "feature_overall_legit_trade": 0.9302219495422727,
-    "feature_entry_close_strength_to_highest_high_close_strength": 0.024182457785508364,
-    "feature_current_day_high_to_previous_high": 0.012344107736758146,
-    "feature_current_day_vwap_to_recent_days": 0.01190329522386167,
-    "feature_current_day_high_to_recent_days_highs": 0.011703052288582441,
-    "feature_controlled_volume_entry_quality": 0.009645137423016668
+    "feature_overall_legit_trade": 0.9251619763122604,
+    "feature_entry_close_strength_to_highest_high_close_strength": 0.02468248224111186,
+    "feature_current_day_high_to_previous_high": 0.015152163737090227,
+    "feature_controlled_volume_entry_quality": 0.012841315607311351,
+    "feature_current_day_high_to_recent_days_highs": 0.012058969397711016,
+    "feature_current_day_vwap_to_recent_days": 0.010103092704515022
   },
   "random_state": 42,
   "test_size": 0.3,
