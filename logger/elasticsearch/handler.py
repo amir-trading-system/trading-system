@@ -76,8 +76,14 @@ class Handler(
             "current_day_ema_9",
             "current_day_ema_20",
             "current_day_vwap",
+            "positive_tier",
+            "positive_group_score",
+            "positive_group_reasons",
             "positive_score",
-            "positive_reasons",
+            "strong_positive_group_score",
+            "strong_positive_group_reasons",
+            "soft_positive_group_score",
+            "soft_positive_group_reasons",
         ]
 
         for field in fields:

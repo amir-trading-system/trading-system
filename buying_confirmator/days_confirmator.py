@@ -294,8 +294,15 @@ class Confirmator:
             )
 
             total_volume = potential_confirmation_bar.price_movement_statistics.get("total_volume")
+            positive_tier = potential_confirmation_bar.price_movement_statistics.get("positive_tier")
+            positive_group_score = potential_confirmation_bar.price_movement_statistics.get("positive_group_score")
+            positive_group_reasons = potential_confirmation_bar.price_movement_statistics.get("positive_group_reasons")
             positive_score = potential_confirmation_bar.price_movement_statistics.get("positive_score")
-            positive_reasons = potential_confirmation_bar.price_movement_statistics.get("positive_reasons")
+            strong_positive_group_score = potential_confirmation_bar.price_movement_statistics.get("strong_positive_group_score")
+            strong_positive_group_reasons = potential_confirmation_bar.price_movement_statistics.get("strong_positive_group_reasons")
+            soft_positive_group_score = potential_confirmation_bar.price_movement_statistics.get("soft_positive_group_score")
+            soft_positive_group_reasons = potential_confirmation_bar.price_movement_statistics.get("soft_positive_group_reasons")
+
             if (
                 True
                 and total_volume is not None
@@ -357,8 +364,14 @@ class Confirmator:
                         "current_day_ema_9": original_bar_to_confirm.ema_9,
                         "current_day_ema_20": original_bar_to_confirm.ema_20,
                         "current_day_vwap": original_bar_to_confirm.vwap,
+                        "positive_tier": positive_tier,
+                        "positive_group_score": positive_group_score,
+                        "positive_group_reasons": positive_group_reasons,
                         "positive_score": positive_score,
-                        "positive_reasons": positive_reasons,
+                        "strong_positive_group_score": strong_positive_group_score,
+                        "strong_positive_group_reasons": strong_positive_group_reasons,
+                        "soft_positive_group_score": soft_positive_group_score,
+                        "soft_positive_group_reasons": soft_positive_group_reasons,
                     },
                 )
 

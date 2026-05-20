@@ -698,11 +698,26 @@ class DataExtractor:
         positive_score, positive_reasons = model.training.hard_rules.success_patterns(
             features_data=features,
         )
+        positive_score_statistics = model.training.hard_rules.positive_reason_groups(
+            positive_reasons=positive_reasons,
+        )
+
+        positive_tier = model.training.hard_rules.positive_tier(
+            strong_positive_group_score=positive_score_statistics["strong_positive_group_score"],
+            soft_positive_group_score=positive_score_statistics["soft_positive_group_score"],
+            positive_score=positive_score,
+        )
 
         feature_overall_legit_trade = {
             "feature_overall_legit_trade": not should_be_rejected_by_hard_rules,
+            "positive_tier": positive_tier,
+            "positive_group_score": positive_score_statistics["positive_group_score"],
+            "positive_group_reasons": positive_score_statistics["positive_group_reasons"],
             "positive_score": positive_score,
-            "positive_reasons": positive_reasons,
+            "strong_positive_group_score": positive_score_statistics["strong_positive_group_score"],
+            "strong_positive_group_reasons": positive_score_statistics["strong_positive_group_reasons"],
+            "soft_positive_group_score": positive_score_statistics["soft_positive_group_score"],
+            "soft_positive_group_reasons": positive_score_statistics["soft_positive_group_reasons"],
         }
 
         features = features | feature_overall_legit_trade

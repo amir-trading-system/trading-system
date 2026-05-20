@@ -1,3 +1,4 @@
+#pylint:disable=too-many-lines
 def should_be_rejected_by_hard_rules(
     features_data: dict[str, float],
 ) -> bool:
@@ -1012,6 +1013,23 @@ def success_patterns(
     reclaim_close_strength_since_highest_high = features_data["feature_reclaim_close_strength_since_highest_high"]
     entry_bar_volume_to_total_volume = features_data["feature_entry_bar_volume_to_total_volume"]
     previous_bar_high_to_highest_high = features_data["feature_previous_bar_high_to_highest_high"]
+    entry_bar_low_to_ema_9 = features_data["feature_entry_bar_low_to_ema_9"]
+    profit_since_open_to_bars_count_since_open = features_data["feature_profit_since_open_to_bars_count_since_open"]
+    pre_market_gains = features_data["feature_pre_market_gains"]
+    entry_bar_macd_to_previous = features_data["feature_entry_bar_macd_to_previous"]
+    entry_close_to_previous_bar_high = features_data["feature_entry_close_to_previous_bar_high"]
+    entry_bar_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
+    fake_reclaim_pressure = features_data["feature_fake_reclaim_pressure"]
+    entry_bar_volume_to_highest_high_volume = features_data["feature_entry_bar_volume_to_highest_high_volume"]
+    volume_since_lowest_low_to_entry_vs_since_highest_high = features_data["feature_volume_since_lowest_low_to_entry_vs_since_highest_high"]
+    entry_bar_movement_recent_bars_average = features_data["feature_entry_bar_movement_recent_bars_average"]
+    price_movement_from_highest_high_to_lowest_low = features_data["feature_price_movement_from_highest_high_to_lowest_low"]
+    gains_since_lowest_low = features_data["feature_gains_since_lowest_low"]
+    gains_until_entry_bar = features_data["feature_gains_until_entry_bar"]
+    bars_since_highest_high_to_bars_before = features_data["feature_bars_since_highest_high_to_bars_before"]
+    entry_bar_histogram_to_highest_high = features_data["feature_entry_bar_histogram_to_highest_high"]
+    entry_bar_vwap_to_ema_20 = features_data["feature_entry_bar_vwap_to_ema_20"]
+    volume_without_macd_confirmation = features_data["feature_volume_without_macd_confirmation"]
 
     # Success Pattern 1:
     # Clean high breakout continuation.
@@ -1140,4 +1158,242 @@ def success_patterns(
         score += 1
         reasons.append("supported_body_expansion_from_day_structure")
 
+    # Success Pattern 11:
+    # Fresh MACD acceleration with controlled profit pace.
+    # Buyers step in with volume and MACD acceleration,
+    # but the move is not yet overextended from the open.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.729531705379486
+        and entry_bar_low_to_ema_9 <= 1.0111923813819885
+        and profit_since_open_to_bars_count_since_open <= 0.00812609912827611
+        and pre_market_gains > 0.0056163829285651445
+        and entry_bar_macd_to_previous > 1.1619797348976135
+        and entry_close_position_vs_previous_close_position <= 1.4259920120239258
+        and entry_upper_wick_to_recent_upper_wick_average > 0.18786534667015076
+        and entry_bar_volume_to_total_volume > 0.025398355908691883
+    ):
+        score += 1
+        reasons.append("fresh_macd_acceleration_controlled_pace")
+
+    # Success Pattern 12:
+    # Supported EMA histogram reclaim.
+    # Entry is supported above EMA9, clears previous-bar high strongly,
+    # histogram expansion is strong, and fake reclaim pressure is controlled.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.729531705379486
+        and entry_bar_low_to_ema_9 > 1.0111923813819885
+        and pullback_depth_vs_pre_high_move > 0.5860188007354736
+        and current_day_ema_9_to_ema_20 <= 1.159429669380188
+        and entry_upper_wick_to_recent_upper_wick_average <= 1.0669987797737122
+        and entry_close_to_previous_bar_high > 1.0965244770050049
+        and entry_bar_histogram_to_highest_histogram > 1.398955523967743
+        and fake_reclaim_pressure <= 0.15265937894582748
+    ):
+        score += 1
+        reasons.append("supported_ema_histogram_reclaim")
+
+    # Success Pattern 13:
+    # Mature reset efficiency reclaim.
+    # The setup had time to reset, volume after the low rebuilt,
+    # and price efficiency on the entry is strong.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.729531705379486
+        and entry_bar_low_to_ema_9 <= 1.0111923813819885
+        and profit_since_open_to_bars_count_since_open > 0.00812609912827611
+        and entry_bar_volume_to_highest_high_volume <= 1.3092172741889954
+        and volume_since_lowest_low_to_entry_vs_since_highest_high > 0.5118023157119751
+        and minutes_since_market_open > 12.5
+        and entry_volume_price_efficiency > 0.34550152719020844
+    ):
+        score += 1
+        reasons.append("mature_reset_efficiency_reclaim")
+
+    # Success Pattern 14:
+    # Controlled weak-body reclaim.
+    # The body is not large, but volume is above recent average,
+    # movement from high to low was meaningful,
+    # and the close-position structure stayed controlled.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.729531705379486
+        and entry_bar_body <= 0.6001200675964355
+        and previous_bar_high_to_highest_high <= 0.9952147305011749
+        and controlled_volume_entry_quality <= 91.79913330078125
+        and entry_close_position_vs_previous_close_position <= 2.037855386734009
+        and entry_bar_movement_recent_bars_average <= 9.0991530418396
+        and price_movement_from_highest_high_to_lowest_low > 0.24994999915361404
+    ):
+        score += 1
+        reasons.append("controlled_weak_body_reclaim")
+
+    # Success Pattern 15:
+    # Premarket-supported controlled extension.
+    # Premarket/gap context exists, but the entry extension remains controlled,
+    # and histogram versus the highest-high remains constructive.
+    if (
+        entry_bar_volume_to_recent_bars_average <= 1.729531705379486
+        and gains_since_lowest_low > 0.05263790301978588
+        and gains_until_entry_bar <= 3.3947486877441406
+        and bars_since_highest_high_to_bars_before > 0.007808145135641098
+        and entry_bar_histogram_to_highest_high > 0.9913771152496338
+        and entry_extension_pressure <= 0.4007411450147629
+        and current_day_ema_9_to_ema_20 > 1.0398948788642883
+        and pre_market_gains > 0.06045127287507057
+    ):
+        score += 1
+        reasons.append("premarket_supported_controlled_extension")
+
+    # Success Pattern 16:
+    # Broad reset with buyer volume confirmation.
+    # The setup had a real pullback/reset, the entry body is meaningful,
+    # volume expands versus recent bars, and the entry volume beats the previous bar.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.8915035128593445
+        and entry_bar_body > 0.6001200675964355
+        and pullback_depth_vs_pre_high_move > 0.4464638829231262
+        and controlled_volume_entry_quality > 88.66648483276367
+        and entry_upper_wick_to_recent_upper_wick_average > 0.2643764615058899
+        and entry_bar_volume_to_previous_bar_volume > 1.6711958050727844
+    ):
+        score += 1
+        reasons.append("broad_reset_buyer_volume_confirmation")
+
+    # Success Pattern 17:
+    # Broad reset efficiency reclaim.
+    # After a real reset, the entry shows body/volume participation
+    # and beats the highest pullback volume enough to show buyer control.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.8915035128593445
+        and entry_bar_body > 0.6001200675964355
+        and pullback_depth_vs_pre_high_move > 0.48088546097278595
+        and controlled_volume_entry_quality > 88.66648483276367
+        and entry_bar_volume_to_highest_volume_in_pullback > 1.271771490573883
+    ):
+        score += 1
+        reasons.append("broad_reset_efficiency_reclaim")
+
+    # Success Pattern 18:
+    # Fresh supported reclaim before MACD gets stale.
+    # The entry happens early/fresh, MACD has not been positive for long,
+    # and price is still structurally supported above EMA20/VWAP.
+    if (
+        distance_from_last_negative_macd_bar <= 0
+        and minutes_since_market_open <= 39
+        and entry_bar_vwap_to_ema_20 > 0.953998
+    ):
+        score += 1
+        reasons.append("fresh_supported_reclaim_before_macd_stale")
+
+    # Success Pattern 19:
+    # Fresh supported volume reclaim without chase.
+    # The setup is still fresh, not too extended over previous-bar high,
+    # and volume/MACD confirmation is strong enough to show real demand.
+    if (
+        entry_bar_vwap_to_ema_20 > 0.969909
+        and entry_close_to_previous_bar_high <= 1.064691
+        and distance_from_last_negative_macd_bar <= 4
+        and volume_without_macd_confirmation > 1.333612
+    ):
+        score += 1
+        reasons.append("fresh_supported_volume_reclaim_no_chase")
+
     return score, reasons
+
+def positive_reason_groups(
+    positive_reasons: list[str],
+) -> dict[str, object]:
+    reason_set = set(positive_reasons)
+
+    strong_groups = {
+        "breakout_expansion": {
+            "clean_high_breakout_continuation",
+            "daily_ema_expansion_breakout",
+        },
+        "reset_volume_confirmation": {
+            "real_reset_with_volume_confirmation",
+            "strong_pullback_volume_reclaim",
+            "supported_body_expansion_from_day_structure",
+        },
+        "fresh_timing": {
+            "fresh_early_reclaim",
+            "fresh_supported_reclaim_before_macd_stale",
+        },
+        "fresh_supported_volume_reclaim": {
+            "fresh_supported_volume_reclaim_no_chase",
+        },
+        "close_strength_non_chase": {
+            "snap_close_strength_low_extension",
+            "controlled_non_chase_close_strength",
+        },
+        "explosive_body_support": {
+            "supported_explosive_body",
+        },
+        "supported_ema_reclaim": {
+            "supported_ema_histogram_reclaim",
+        },
+    }
+
+    soft_groups = {
+        "broad_reset_buyer_volume": {
+            "broad_reset_buyer_volume_confirmation",
+            "broad_reset_efficiency_reclaim",
+        },
+        "low_float_volume_ownership": {
+            "supported_low_float_volume_ownership",
+        },
+        "mature_reset_efficiency": {
+            "mature_reset_efficiency_reclaim",
+        },
+        "controlled_weak_body_reclaim": {
+            "controlled_weak_body_reclaim",
+        },
+        "premarket_supported_extension": {
+            "premarket_supported_controlled_extension",
+        },
+    }
+
+    matched_strong_groups: list[str] = []
+    matched_soft_groups: list[str] = []
+
+    for group_name, group_reasons in strong_groups.items():
+        if reason_set.intersection(group_reasons):
+            matched_strong_groups.append(group_name)
+
+    for group_name, group_reasons in soft_groups.items():
+        if reason_set.intersection(group_reasons):
+            matched_soft_groups.append(group_name)
+
+    matched_groups = matched_strong_groups + matched_soft_groups
+
+    return {
+        "positive_group_score": len(matched_groups),
+        "positive_group_reasons": matched_groups,
+        "strong_positive_group_score": len(matched_strong_groups),
+        "strong_positive_group_reasons": matched_strong_groups,
+        "soft_positive_group_score": len(matched_soft_groups),
+        "soft_positive_group_reasons": matched_soft_groups,
+    }
+
+def positive_tier(
+    strong_positive_group_score: int,
+    soft_positive_group_score: int,
+    positive_score: int,
+) -> str:
+    if strong_positive_group_score >= 3:
+        return "elite_tag_trade"
+
+    if strong_positive_group_score >= 2:
+        return "strong_tag_trade"
+
+    if strong_positive_group_score >= 1 and soft_positive_group_score >= 1:
+        return "mixed_tag_trade"
+
+    if strong_positive_group_score == 1:
+        return "moderate_tag_trade"
+
+    if soft_positive_group_score >= 1:
+        return "soft_tag_trade"
+
+    if positive_score >= 1:
+        return "soft_tag_trade"
+
+    return "no_known_tag_trade"

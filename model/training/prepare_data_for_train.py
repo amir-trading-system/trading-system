@@ -23,8 +23,14 @@ def write_to_csv(
         "highest_high_one_minute_bar_time",
         "total_volume",
         "entry_bar_volume",
+        "positive_tier",
+        "positive_group_score",
+        "positive_group_reasons",
         "positive_score",
-        "positive_reasons",
+        "strong_positive_group_score",
+        "strong_positive_group_reasons",
+        "soft_positive_group_score",
+        "soft_positive_group_reasons",
     ]
     columns.extend(
         [
@@ -49,8 +55,14 @@ def write_to_csv(
         highest_high_one_minute_bar_time = symbol_data["highest_high_one_minute_bar_time"]
         total_volume = symbol_data["total_volume"]
         entry_bar_volume = symbol_data["entry_bar_volume"]
+        positive_tier = symbol_data["positive_tier"]
+        positive_group_score = symbol_data["positive_group_score"]
+        positive_group_reasons = symbol_data["positive_group_reasons"]
         positive_score = symbol_data["positive_score"]
-        positive_reasons = symbol_data["positive_reasons"]
+        strong_positive_group_score = symbol_data["strong_positive_group_score"]
+        strong_positive_group_reasons = symbol_data["strong_positive_group_reasons"]
+        soft_positive_group_score = symbol_data["soft_positive_group_score"]
+        soft_positive_group_reasons = symbol_data["soft_positive_group_reasons"]
         features = [v for k, v in symbol_data.items() if k.startswith("feature_")]
 
         symbol = stock_object.symbol_name
@@ -71,8 +83,14 @@ def write_to_csv(
             highest_high_one_minute_bar_time,
             total_volume,
             entry_bar_volume,
+            positive_tier,
+            positive_group_score,
+            positive_group_reasons,
             positive_score,
-            positive_reasons,
+            strong_positive_group_score,
+            strong_positive_group_reasons,
+            soft_positive_group_score,
+            soft_positive_group_reasons,
         ]
         row_data.extend(features)
 
