@@ -545,6 +545,7 @@ def should_be_rejected_by_hard_rules(
         and entry_volume_price_efficiency <= 0.3189230039715767
         and current_day_ema_9_to_ema_20 <= 1.311029368268173
         and entry_volume_price_efficiency >= 0.014
+        and previous_bar_close_to_highest_high >= 0.965
     ):
         return True
 
@@ -555,6 +556,25 @@ def should_be_rejected_by_hard_rules(
         and entry_body_to_recent_bars_body_average <= 16.909310340881348
         and pre_market_gains <= 0.8412856012582779
         and entry_close_to_lowest_low_recovery <= 7.416666507720947
+    ):
+        return True
+
+    if (
+        entry_bar_volume_to_recent_bars_average >= 8.8
+        and entry_bar_volume_to_total_volume <= 0.055
+        and entry_bar_low_to_ema_9 <= 1.0
+        and pre_market_gains <= 0
+        and entry_close_strength_to_highest_high_close_strength <= 3.0
+        and entry_bar_body <= 0.85
+    ):
+        return True
+
+    if (
+        current_day_ema_9_to_recent_days_ema_9 >= 1.35
+        and entry_bar_volume_to_total_volume <= 0.012
+        and entry_close_strength_to_highest_high_close_strength <= 1.2
+        and entry_bar_low_to_ema_9 <= 1.005
+        and pre_market_gains <= 0.04
     ):
         return True
 
@@ -1030,6 +1050,7 @@ def success_patterns(
     entry_bar_histogram_to_highest_high = features_data["feature_entry_bar_histogram_to_highest_high"]
     entry_bar_vwap_to_ema_20 = features_data["feature_entry_bar_vwap_to_ema_20"]
     volume_without_macd_confirmation = features_data["feature_volume_without_macd_confirmation"]
+    histogram_changed_to_positive_direction_vs_negative_pct = features_data["feature_histogram_changed_to_positive_direction_vs_negative_pct"]
 
     # Success Pattern 1:
     # Clean high breakout continuation.
@@ -1296,6 +1317,35 @@ def success_patterns(
         score += 1
         reasons.append("fresh_supported_volume_reclaim_no_chase")
 
+    # Success Pattern 20:
+    # Controlled snap reclaim.
+    # Buyers step in with strong close strength,
+    # but the entry is not an overextended chase.
+    if (
+        entry_close_strength_to_highest_high_close_strength >= 4.30
+        and entry_bar_histogram_to_previous <= 0.56
+        and entry_extension_pressure <= 0.262
+        and entry_bar_macd_to_previous >= 0.30
+        and entry_bar_volume_to_recent_bars_average >= 2.0
+    ):
+        score += 1
+        reasons.append("controlled_snap_reclaim")
+
+    # Success Pattern 21:
+    # Supported day volume rotation.
+    # The current day is well-supported above EMA9,
+    # histogram direction is positive,
+    # and buyers rotate volume into the entry bar.
+    if (
+        current_day_low_to_ema_9 >= 1.12186123895
+        and histogram_changed_to_positive_direction_vs_negative_pct >= 1.2125
+        and entry_bar_volume_to_previous_bar_volume >= 2.32971107929
+        and entry_bar_volume_to_recent_bars_average >= 2.41328487682
+        and entry_bar_volume_to_total_volume >= 0.015
+    ):
+        score += 1
+        reasons.append("supported_day_volume_rotation")
+
     return score, reasons
 
 def positive_reason_groups(
@@ -1329,6 +1379,13 @@ def positive_reason_groups(
         },
         "supported_ema_reclaim": {
             "supported_ema_histogram_reclaim",
+        },
+        "controlled_snap_reclaim": {
+            "controlled_snap_reclaim",
+        },
+
+        "supported_day_volume_rotation": {
+            "supported_day_volume_rotation",
         },
     }
 
