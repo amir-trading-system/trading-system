@@ -220,48 +220,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="PIII",
-            datetime_str="05.21.26T12:01:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AKAN",
-            datetime_str="05.21.26T12:27:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AKAN",
-            datetime_str="05.21.26T13:33:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AMPG",
-            datetime_str="05.21.26T13:16:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="AMPG",
-            datetime_str="05.21.26T13:45:00",
-            is_positive=True,
-        ),
-        common.objects.SymbolTest(
-            name="AMPG",
-            datetime_str="05.21.26T14:16:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AMPG",
-            datetime_str="05.21.26T14:17:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="AMPG",
-            datetime_str="05.21.26T14:20:00",
-            is_positive=False,
-        ),
-        common.objects.SymbolTest(
-            name="HCWB",
-            datetime_str="05.21.26T13:43:00",
+            name="SDEV",
+            datetime_str="09.04.25T10:04:00",
             is_positive=False,
         ),
     ]
