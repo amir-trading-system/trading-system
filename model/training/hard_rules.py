@@ -88,6 +88,7 @@ def should_be_rejected_by_hard_rules(
     distance_from_last_negative_macd_bar = features_data["feature_distance_from_last_negative_macd_bar"]
     breakout_attempts_during_pullback = features_data["feature_breakout_attempts_during_pullback"]
     entry_bar_histogram_to_lowest_histogram = features_data["feature_entry_bar_histogram_to_lowest_histogram"]
+    clean_breakout_efficiency = features_data["feature_clean_breakout_efficiency"]
 
     # Major reject family: weak reclaim / weak breakout / weak extension.
     # These are setups where the candle may look like a reclaim,
@@ -196,6 +197,7 @@ def should_be_rejected_by_hard_rules(
             and entry_bar_volume_to_volume_average <= 2.208707094192505
             and entry_close_strength_to_highest_high_close_strength <= 1.479868233203888
             and macd_recovery_age_quality <= 24.621222496032715
+            and current_day_ema_9_to_recent_days_ema_9 <= 4.0
         )
         or (
             pullback_depth_vs_pre_high_move <= 0.44685098528862
@@ -391,6 +393,7 @@ def should_be_rejected_by_hard_rules(
             and entry_bar_volume_to_total_volume <= 0.0186582446829219
             and entry_bar_close_to_highest_high <= 1.0121
             and entry_bar_open_to_ema_9 >= 1.003
+            and current_day_ema_9_to_recent_days_ema_9 <= 4.0
         )
     ):
         return True
@@ -411,6 +414,7 @@ def should_be_rejected_by_hard_rules(
             and current_day_low_to_ema_9 > 1.0629708767
             and entry_bar_movement_recent_bars_average >= 1.8572
             and entry_bar_volume_to_total_volume >= 0.00999352744067
+            and current_day_ema_9_to_recent_days_ema_9 <= 4.0
         )
         or (
             current_day_vwap_to_recent_days <= 2.2341
@@ -474,6 +478,7 @@ def should_be_rejected_by_hard_rules(
         and entry_body_to_previous_bar_body <= 4.946176528930664
         and positive_vs_negative_volume_during_pullback <= 3.7747384309768677
         and entry_body_to_highest_high_body <= 52.3
+        and current_day_ema_9_to_recent_days_ema_9 <= 4.0
     ):
         return True
 
@@ -482,6 +487,7 @@ def should_be_rejected_by_hard_rules(
         and entry_upper_wick_to_recent_upper_wick_average > 0.672604113817215
         and entry_bar_ema_9_to_vwap > 1.0428656935691833
         and current_day_ema_9_to_recent_days_ema_9 > 0.7825587093830109
+        and current_day_ema_9_to_recent_days_ema_9 <= 4.0
         and entry_breakout_efficiency_from_ema_9 <= 0.7530556917190552
         and pre_market_volume <= 15563601.0
         and entry_body_to_highest_high_body <= 2.502500057220459
@@ -575,6 +581,7 @@ def should_be_rejected_by_hard_rules(
         and entry_close_strength_to_highest_high_close_strength <= 1.2
         and entry_bar_low_to_ema_9 <= 1.005
         and pre_market_gains <= 0.04
+        and entry_bar_body <= 0.86
     ):
         return True
 
@@ -741,6 +748,7 @@ def should_be_rejected_by_hard_rules(
         and entry_body_to_previous_bar_body <= 0.98432
         and emas_distances_to_recent_bars_ema_distances <= 0.149473967112886
         and pullback_health <= 5.634074932605927
+        and current_day_ema_9_to_recent_days_ema_9 <= 4.0
     ):
         return True
 
@@ -983,6 +991,41 @@ def should_be_rejected_by_hard_rules(
     ):
         return True
 
+    if (
+        current_day_ema_9_to_recent_days_ema_9 >= 3.3216
+        and entry_bar_body <= 0.6921
+        and recent_bars_up_trend_pct >= 0.70
+    ):
+        return True
+
+    if (
+        entry_volume_price_efficiency >= 0.2372
+        and previous_bar_close_to_highest_high >= 0.9979
+        and entry_bar_histogram_to_previous >= 2.6424
+    ):
+        return True
+
+    if (
+        entry_bar_volume_to_previous_bar_volume >= 15
+        and entry_body_to_highest_high_body <= 1.30
+        and current_day_vwap_to_recent_days >= 2.0
+    ):
+        return True
+
+    if (
+        clean_breakout_efficiency <= 0.32
+        and highest_high_quality >= 65.56
+        and entry_bar_body >= 0.867
+    ):
+        return True
+
+    if (
+        previous_bar_close_to_highest_high >= 0.9979
+        and highest_high_to_entry_elapsed_minutes <= 2
+        and entry_bar_vwap_to_ema_20 <= 0.8885
+    ):
+        return True
+
     return False
 
 def success_patterns(
@@ -1051,6 +1094,30 @@ def success_patterns(
     entry_bar_vwap_to_ema_20 = features_data["feature_entry_bar_vwap_to_ema_20"]
     volume_without_macd_confirmation = features_data["feature_volume_without_macd_confirmation"]
     histogram_changed_to_positive_direction_vs_negative_pct = features_data["feature_histogram_changed_to_positive_direction_vs_negative_pct"]
+    macd_recovery_age_quality = features_data["feature_macd_recovery_age_quality"]
+    entry_body_to_recent_bars_body_average = features_data["feature_entry_body_to_recent_bars_body_average"]
+    reclaim_speed_from_lowest_low = features_data["feature_reclaim_speed_from_lowest_low"]
+    pullback_health = features_data["feature_pullback_health"]
+    highest_high_to_entry_elapsed_minutes = features_data["feature_highest_high_to_entry_elapsed_minutes"]
+    previous_bar_volume_to_its_previous_volume = features_data["feature_previous_bar_volume_to_its_previous_volume"]
+    current_day_high_to_recent_days_highs = features_data["feature_current_day_high_to_recent_days_highs"]
+    positive_vs_negative_volume_during_pullback = features_data["feature_positive_vs_negative_volume_during_pullback"]
+    highest_high_quality = features_data["feature_highest_high_quality"]
+    current_day_ema_9_to_ema_20_distance_to_recent_days = features_data["feature_current_day_ema_9_to_ema_20_distance_to_recent_days"]
+    emas_distances_to_recent_bars_ema_distances = features_data["feature_emas_distances_to_recent_bars_ema_distances"]
+    entry_bar_volume = features_data["feature_entry_bar_volume"]
+    recent_bars_positive_bars_pct = features_data["feature_recent_bars_positive_bars_pct"]
+    entry_bar_open_to_ema_9 = features_data["feature_entry_bar_open_to_ema_9"]
+    current_day_vwap_to_recent_days = features_data["feature_current_day_vwap_to_recent_days"]
+    entry_breakout_efficiency_from_ema_9 = features_data["feature_entry_breakout_efficiency_from_ema_9"]
+    recent_bars_up_trend_pct = features_data["feature_recent_bars_up_trend_pct"]
+    current_day_movement_to_recent_days_movement = features_data["feature_current_day_movement_to_recent_days_movement"]
+    distance_from_highest_high = features_data["feature_distance_from_highest_high"]
+    entry_bar_volume_to_volume_average = features_data["feature_entry_bar_volume_to_volume_average"]
+    near_high_weak_followthrough = features_data["feature_near_high_weak_followthrough"]
+    uptrend_histogram_vs_downtrend_since_highest_high = features_data["feature_uptrend_histogram_vs_downtrend_since_highest_high"]
+    entry_followthrough_after_near_reclaim = features_data["feature_entry_followthrough_after_near_reclaim"]
+    entry_close_to_previous_bar_close = features_data["feature_entry_close_to_previous_bar_close"]
 
     # Success Pattern 1:
     # Clean high breakout continuation.
@@ -1346,6 +1413,558 @@ def success_patterns(
         score += 1
         reasons.append("supported_day_volume_rotation")
 
+    # Success Pattern 22:
+    # Extreme daily expansion fresh body surge.
+    # Current-day EMA9 is extremely expanded versus recent days,
+    # MACD recovery is still fresh, and the entry body is much stronger than recent bars.
+    if (
+        current_day_ema_9_to_recent_days_ema_9 > 2.275308112629929
+        and macd_recovery_age_quality <= 5.956758668893252
+        and entry_body_to_recent_bars_body_average > 3.6966142941910953
+    ):
+        score += 1
+        reasons.append("extreme_daily_expansion_fresh_body_surge")
+
+    # Success Pattern 23:
+    # Quiet open controlled body reclaim.
+    # The move from the open is still quiet,
+    # but the entry body is much stronger than the highest-high body,
+    # and reclaim speed is controlled rather than a chase.
+    if (
+        profit_since_open_to_bars_count_since_open <= 0.0011123761300984101
+        and entry_body_to_highest_high_body > 5.93333333333328
+        and reclaim_speed_from_lowest_low <= 0.6875694444444458
+    ):
+        score += 1
+        reasons.append("quiet_open_controlled_body_reclaim")
+
+    # Success Pattern 24:
+    # Delayed volume rebuild with controlled histogram.
+    # The move from the open is still quiet,
+    # enough volume has rebuilt after the highest-high,
+    # and histogram is controlled rather than overextended.
+    if (
+        profit_since_open_to_bars_count_since_open <= 0.0011123761300984101
+        and volume_since_highest_high_to_volume_before > 0.13026786204894306
+        and entry_bar_histogram_to_highest_histogram <= 0.9568272235385898
+    ):
+        score += 1
+        reasons.append("delayed_volume_rebuild_controlled_histogram")
+
+    # Success Pattern 25:
+    # Delayed pullback volume spike.
+    # Enough time passed after the highest-high,
+    # pullback health is strong,
+    # and the entry shows a strong volume spike without being just a near-high chase.
+    if (
+        entry_volume_spike_without_high_context > 6.083272046377
+        and pullback_health > 4.523913100916
+        and highest_high_to_entry_elapsed_minutes > 21.0
+    ):
+        score += 1
+        reasons.append("delayed_pullback_volume_spike")
+
+    # Success Pattern 26:
+    # Previous-volume spike body expansion, not VWAP chase.
+    # The previous bar already showed volume ignition,
+    # the entry body expands strongly versus recent bars,
+    # and the entry is not overly stretched above VWAP.
+    if (
+        previous_bar_volume_to_its_previous_volume > 2.940825425613
+        and entry_bar_ema_9_to_vwap <= 1.054934240024
+        and entry_body_to_recent_bars_body_average > 4.905669490266
+    ):
+        score += 1
+        reasons.append("previous_volume_spike_body_expansion_not_vwap_chase")
+
+    # Success Pattern 27:
+    # Pullback volume dominance with body expansion.
+    # The entry volume dominates the pullback volume,
+    # previous bar is still below the high,
+    # and the entry body expands strongly versus recent bars.
+    if (
+        entry_bar_volume_to_highest_volume_in_pullback > 3.830134920395
+        and previous_bar_high_to_highest_high <= 0.980774337661
+        and entry_body_to_recent_bars_body_average > 4.050921052632
+    ):
+        score += 1
+        reasons.append("pullback_volume_dominance_body_expansion")
+
+    # Success Pattern 28:
+    # Late body continuation in non-extreme daily context.
+    # The setup is later after the highest-high,
+    # but the day is not excessively stretched versus recent highs,
+    # and the entry body is meaningful.
+    if (
+        highest_high_to_entry_elapsed_minutes > 131.0
+        and current_day_high_to_recent_days_highs <= 1.430637402494
+        and entry_bar_body > 0.80619589516
+    ):
+        score += 1
+        reasons.append("late_body_continuation_non_extreme_daily_context")
+
+    # Success Pattern 29:
+    # Refined broad supported base reclaim.
+    # Buyers are recovering from the pullback with positive-volume dominance,
+    # controlled rejection pressure, non-extreme daily EMA expansion,
+    # and a real entry body.
+    if (
+        positive_vs_negative_volume_during_pullback >= 0.767725
+        and highest_high_quality <= 1.307631
+        and entry_rejection_pressure <= 0.270846
+        and current_day_ema_9_to_recent_days_ema_9 <= 1.266073
+        and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.643274
+        and entry_bar_body > 0.806196
+    ):
+        score += 1
+        reasons.append("refined_broad_supported_base_reclaim")
+
+    # Success Pattern 30:
+    # Supported volume ownership above EMA9.
+    # Buyers own a meaningful part of the day volume,
+    # entry is supported above EMA9,
+    # body is real, and wick/EMA-distance pressure is controlled.
+    if (
+        entry_bar_volume_to_recent_bars_average > 1.924173593521
+        and entry_bar_body > 0.600120067596
+        and entry_bar_low_to_ema_9 > 1.010593
+        and entry_bar_volume_to_total_volume > 0.11214
+        and current_day_ema_9_to_ema_20_distance_to_recent_days <= 1.410308
+        and emas_distances_to_recent_bars_ema_distances <= 0.2497
+        and entry_upper_wick_to_recent_upper_wick_average <= 1.0
+    ):
+        score += 1
+        reasons.append("supported_volume_ownership_above_ema9")
+
+    # Untagged Positive Pattern:
+    # Near-high body/volume reclaim.
+    # Covers: 31 positives / 0 FP
+    # Includes: 26 currently untagged positives, 5 already-tagged positives
+    if (
+        near_high_weak_followthrough <= 0.960273236
+        and current_day_ema_9_to_ema_20_distance_to_recent_days <= 1.348466456
+        and controlled_volume_entry_quality > 0.8305397928
+        and entry_close_to_previous_bar_high <= 1.044427335
+        and entry_body_to_previous_bar_body > 0.7977560461
+        and gains_since_lowest_low <= 0.1519492269
+        and profit_since_open_to_bars_count_since_open > 0.002028054791
+        and entry_bar_volume_to_highest_volume_in_pullback > 0.7476072311
+    ):
+        score += 1
+        reasons.append("untagged_near_high_body_volume_reclaim")
+
+    # Untagged Positive Pattern:
+    # Delayed pullback base reclaim with quiet prior-volume behavior.
+    # Covers: 14 positives / 0 FP
+    # Includes: 14 currently untagged positives
+    if (
+        pullback_health <= 0.9453305304
+        and minutes_since_market_open > 96.5
+        and current_day_low_to_ema_9 <= 1.106336474
+        and entry_bar_body > 0.8096311688
+        and entry_bar_open_to_ema_9 <= 1.008332789
+        and previous_bar_volume_to_its_previous_volume <= 0.5910618901
+        and pullback_depth_vs_pre_high_move > 0.5377934277
+        and gains_since_lowest_low <= 0.220812723
+    ):
+        score += 1
+        reasons.append("untagged_delayed_pullback_base_reclaim")
+
+    # Untagged Positive Pattern:
+    # Controlled extension reclaim.
+    # Covers: 14 positives / 0 FP
+    # Includes: 14 currently untagged positives
+    if (
+        macd_recovery_age_quality > 1.028459311
+        and entry_volume_spike_without_high_context <= 1.636733711
+        and entry_bar_close_to_highest_high > 1.019910216
+        and entry_bar_open_to_ema_9 > 1.008179486
+        and entry_extension_pressure <= 0.2962066829
+        and entry_extension_pressure > 0.2425897047
+        and previous_bar_volume_to_its_previous_volume > 0.430446744
+        and uptrend_histogram_vs_downtrend_since_highest_high <= 0.3390804678
+    ):
+        score += 1
+        reasons.append("untagged_controlled_extension_reclaim")
+
+    # Untagged Positive Pattern:
+    # Compact volume-followthrough reclaim.
+    # Covers: 14 positives / 0 FP
+    # Includes: 14 currently untagged positives
+    if (
+        volume_without_macd_confirmation > 1.497488439
+        and entry_followthrough_after_near_reclaim > 1.023718357
+        and gains_until_entry_bar > 0.4142454565
+        and entry_bar_open_to_ema_9 <= 1.008332789
+        and price_movement_from_highest_high_to_lowest_low <= 0.1289499998
+        and entry_upper_wick_to_recent_upper_wick_average > 0.1980083734
+        and volume_since_highest_high_to_volume_before > 0.001002329387
+        and entry_bar_histogram_to_lowest_histogram <= 1.53204447
+    ):
+        score += 1
+        reasons.append("untagged_compact_volume_followthrough_reclaim")
+
+    # Untagged Positive Pattern:
+    # Low-positive-bars volume reclaim.
+    # Covers: 12 positives / 0 FP
+    # Includes: 12 currently untagged positives
+    if (
+        current_day_low_to_ema_9 <= 1.106336474
+        and entry_bar_open_to_ema_9 <= 1.008179486
+        and entry_close_to_previous_bar_close <= 1.115805089
+        and recent_bars_positive_bars_pct <= 0.450000003
+        and entry_bar_volume_to_recent_bars_average > 1.807909131
+        and entry_bar_volume_to_previous_bar_volume <= 2.797281384
+        and entry_bar_volume_to_previous_bar_volume > 1.816251576
+    ):
+        score += 1
+        reasons.append("untagged_low_positive_bars_volume_reclaim")
+
+    # Untagged Positive Pattern:
+    # VWAP body-compression reclaim.
+    # Covers: 12 positives / 0 FP
+    # Includes: 12 currently untagged positives
+    if (
+        current_day_vwap_to_recent_days <= 1.545367122
+        and entry_bar_low_to_ema_9 > 0.9870319068
+        and entry_bar_open_to_ema_9 <= 1.006395698
+        and entry_body_to_recent_bars_body_average > 3.406441331
+        and entry_body_to_previous_bar_body <= 3.957191467
+        and entry_close_position_vs_previous_close_position > 0.9390972555
+        and entry_bar_volume_to_previous_bar_volume <= 3.406533241
+        and entry_bar_volume_to_previous_bar_volume > 1.836494625
+    ):
+        score += 1
+        reasons.append("untagged_vwap_body_compression_reclaim")
+
+    # Untagged Positive Pattern:
+    # Clean rejection-pressure volume reclaim.
+    # Covers: 17 positives / 0 FP
+    # Includes: 14 currently untagged positives, 3 already-tagged positives
+    if (
+        entry_rejection_pressure <= 0.01129987789
+        and near_high_weak_followthrough > 0.8779112101
+        and current_day_low_to_ema_9 <= 1.106336474
+        and entry_bar_low_to_ema_9 > 0.9958772957
+        and entry_bar_open_to_ema_9 <= 1.008179486
+        and entry_close_position_vs_previous_close_position <= 3.152427435
+        and entry_bar_volume_to_recent_bars_average > 1.799983323
+        and entry_bar_volume_to_previous_bar_volume <= 3.564065337
+    ):
+        score += 1
+        reasons.append("untagged_clean_rejection_volume_reclaim")
+
+    # Safe Positive Variant 1:
+    # Broad reset-volume confirmation where low-to-entry volume stays controlled
+    # versus the post-high volume, and entry volume is meaningful.
+    # Covers: 65 positives / 0 FP
+    if (
+        "reset_volume_confirmation" in reasons
+        and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.770058
+        and entry_bar_volume > 84684.6
+    ):
+        score += 1
+        reasons.append("safe_reset_volume_confirmation_volume_balance")
+
+    # Safe Positive Variant 2:
+    # Close-strength non-chase where recent bars are not too one-sided
+    # and entry opens above EMA9 support.
+    # Covers: 49 positives / 0 FP
+    if (
+        "close_strength_non_chase" in reasons
+        and recent_bars_positive_bars_pct <= 0.7
+        and entry_bar_open_to_ema_9 > 1.000809
+    ):
+        score += 1
+        reasons.append("safe_close_strength_non_chase_base")
+
+    # Safe Positive Variant 3:
+    # Broad reset buyer-volume case with controlled daily VWAP expansion,
+    # no excessive entry-volume spike, and enough wick/participation.
+    # Covers: 38 positives / 0 FP
+    if (
+        "broad_reset_buyer_volume" in reasons
+        and current_day_vwap_to_recent_days <= 1.979262
+        and entry_volume_spike_without_high_context <= 2.574231
+        and entry_upper_wick_to_recent_upper_wick_average > 0.240062
+    ):
+        score += 1
+        reasons.append("safe_broad_reset_clean_volume")
+
+    # Safe Positive Variant 4:
+    # Breakout expansion that is not histogram-overextended
+    # and still occurs inside a reasonable market-open window.
+    # Covers: 32 positives / 0 FP
+    if (
+        "breakout_expansion" in reasons
+        and entry_bar_histogram_to_lowest_histogram <= 2.438529
+        and minutes_since_market_open <= 314.0
+    ):
+        score += 1
+        reasons.append("safe_breakout_expansion_histogram_time")
+
+    # Safe Positive Variant 5:
+    # Fresh supported volume reclaim with real body expansion,
+    # previous bar still near the highest high, and no oversized entry-volume chase.
+    # Covers: 30 positives / 0 FP
+    if (
+        "fresh_supported_volume_reclaim" in reasons
+        and entry_bar_body > 0.507875
+        and previous_bar_high_to_highest_high > 0.961338
+        and entry_bar_volume <= 879005.6
+    ):
+        score += 1
+        reasons.append("safe_fresh_supported_volume_reclaim_body")
+
+    # Safe Positive Variant 6:
+    # Refined supported base reclaim with controlled breakout efficiency,
+    # some profit-per-bar expansion, and healthy pullback structure.
+    # Covers: 29 positives / 0 FP
+    if (
+        "refined_broad_supported_base_reclaim" in reasons
+        and entry_breakout_efficiency_from_ema_9 <= 0.891129
+        and profit_since_open_to_bars_count_since_open > 0.000791
+        and pullback_health > 0.659266
+    ):
+        score += 1
+        reasons.append("safe_refined_supported_base_reclaim")
+
+    # Safe Positive Variant 7:
+    # Fresh timing case with controlled entry movement,
+    # enough recent upward participation, and strong close-position followthrough.
+    # Covers: 28 positives / 0 FP
+    if (
+        "fresh_timing" in reasons
+        and entry_bar_movement_recent_bars_average <= 5.811589
+        and recent_bars_up_trend_pct > 0.35
+        and entry_close_position_vs_previous_close_position > 0.936711
+    ):
+        score += 1
+        reasons.append("safe_fresh_timing_close_followthrough")
+
+    # Safe Positive Variant 8:
+    # Explosive body support where reclaim close-strength is not too stretched,
+    # MACD recovery is still fresh, and EMA9 breakout efficiency stays controlled.
+    # Covers: 28 positives / 0 FP
+    if (
+        "explosive_body_support" in reasons
+        and reclaim_close_strength_since_highest_high <= 0.729485
+        and macd_recovery_age_quality <= 12.539876
+        and entry_breakout_efficiency_from_ema_9 <= 0.834276
+    ):
+        score += 1
+        reasons.append("safe_explosive_body_controlled_macd")
+
+    # Safe Positive Variant:
+    # Real reset with volume confirmation, but without extreme total-liquidity expansion.
+    # Covers: 41 positives / 0 FP
+    if (
+        "real_reset_with_volume_confirmation" in reasons
+        and total_volume <= 62889928.8
+    ):
+        score += 1
+        reasons.append("safe_real_reset_volume_confirmation_liquidity_control")
+
+    # Safe Positive Variant:
+    # Broad reset buyer-volume confirmation with clean expansion.
+    # Keeps the buyer-volume reset but removes the overextended daily-movement cases.
+    # Covers: 38 positives / 0 FP
+    if (
+        "broad_reset_buyer_volume_confirmation" in reasons
+        and entry_volume_spike_without_high_context <= 3.08358017
+        and current_day_movement_to_recent_days_movement <= 18.6383137
+    ):
+        score += 1
+        reasons.append("safe_broad_reset_buyer_volume_confirmation_clean_expansion")
+
+    # Safe Positive Variant:
+    # Fresh MACD acceleration where entry volume is a meaningful part of total volume.
+    # Covers: 33 positives / 0 FP
+    if (
+        "fresh_macd_acceleration_controlled_pace" in reasons
+        and entry_bar_volume_to_total_volume > 0.0127641446
+    ):
+        score += 1
+        reasons.append("safe_fresh_macd_acceleration_volume_participation")
+
+    # Safe Positive Variant:
+    # Strong pullback volume reclaim, but only after real distance from the high
+    # and without a previous-volume blowoff.
+    # Covers: 33 positives / 0 FP
+    if (
+        "strong_pullback_volume_reclaim" in reasons
+        and previous_bar_volume_to_its_previous_volume <= 1.77033687
+        and distance_from_highest_high > 2
+    ):
+        score += 1
+        reasons.append("safe_strong_pullback_volume_reclaim_after_distance")
+
+    # Safe Positive Variant:
+    # Clean high breakout continuation with controlled histogram extension.
+    # Covers: 31 positives / 0 FP
+    if (
+        "clean_high_breakout_continuation" in reasons
+        and entry_volume_price_efficiency <= 1.60443805
+        and entry_bar_histogram_to_lowest_histogram <= 2.43852923
+    ):
+        score += 1
+        reasons.append("safe_clean_high_breakout_histogram_control")
+
+    # Safe Positive Variant:
+    # Supported base reclaim where highest-high quality is low enough
+    # to avoid the more dangerous extension/chase cases.
+    # Covers: 29 positives / 0 FP
+    if (
+        "safe_refined_supported_base_reclaim" in reasons
+        and highest_high_quality <= 1.33356595
+    ):
+        score += 1
+        reasons.append("safe_supported_base_reclaim_low_high_quality")
+
+    # Safe Positive Variant:
+    # Controlled non-chase close-strength with clean pullback movement
+    # and no extreme premarket stretch.
+    # Covers: 26 positives / 0 FP
+    if (
+        "controlled_non_chase_close_strength" in reasons
+        and price_movement_from_highest_high_to_lowest_low <= 0.92
+        and pre_market_gains <= 0.0875621891
+    ):
+        score += 1
+        reasons.append("safe_controlled_non_chase_close_strength_clean_pullback")
+
+    # Safe Positive Variant:
+    # Real reset with controlled rejection pressure and acceptable EMA9 daily context.
+    # Covers: 45 positives / 0 FP
+    if (
+        "real_reset_with_volume_confirmation" in reasons
+        and entry_rejection_pressure <= 0.4971486222
+        and current_day_ema_9_to_recent_days_ema_9 <= 1.527511594
+    ):
+        score += 1
+        reasons.append("safe_real_reset_rejection_ema_context")
+
+    # Safe Positive Variant:
+    # Broad reset buyer-volume confirmation with controlled entry spike and liquidity.
+    # Covers: 41 positives / 0 FP
+    if (
+        "broad_reset_buyer_volume_confirmation" in reasons
+        and entry_volume_spike_without_high_context <= 2.814302399
+        and total_volume <= 74729905.95
+    ):
+        score += 1
+        reasons.append("safe_broad_reset_buyer_clean_liquidity")
+
+    # Safe Positive Variant:
+    # Strong pullback reclaim without previous-bar blowoff and without extreme body expansion.
+    # Covers: 37 positives / 0 FP
+    if (
+        "strong_pullback_volume_reclaim" in reasons
+        and previous_bar_volume_to_its_previous_volume <= 2.126178413
+        and entry_body_to_recent_bars_body_average <= 13.59989672
+    ):
+        score += 1
+        reasons.append("safe_strong_pullback_no_prior_blowoff")
+
+    # Safe Positive Variant:
+    # Clean high breakout where close-strength is real and recent bars still show participation.
+    # Covers: 35 positives / 0 FP
+    if (
+        "clean_high_breakout_continuation" in reasons
+        and entry_close_strength_to_highest_high_close_strength > 0.5433462246
+        and recent_bars_positive_bars_pct > 0.4
+    ):
+        score += 1
+        reasons.append("safe_clean_high_close_strength_continuation")
+
+    # Safe Positive Variant:
+    # Daily EMA expansion breakout with efficient volume/price behavior and participation.
+    # Covers: 32 positives / 0 FP
+    if (
+        "daily_ema_expansion_breakout" in reasons
+        and entry_volume_price_efficiency <= 1.495320283
+        and recent_bars_positive_bars_pct > 0.4
+    ):
+        score += 1
+        reasons.append("safe_daily_ema_expansion_efficient_participation")
+
+    # Safe Positive Variant:
+    # Broad reset efficiency reclaim with low-to-entry volume balance and some premarket strength.
+    # Covers: 32 positives / 0 FP
+    if (
+        "broad_reset_efficiency_reclaim" in reasons
+        and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.801966641
+        and pre_market_gains > 0.01146131805
+    ):
+        score += 1
+        reasons.append("safe_broad_reset_efficiency_premarket_volume_balance")
+
+    # Safe Positive Variant:
+    # Controlled non-chase close-strength with VWAP/day context under control.
+    # Covers: 29 positives / 0 FP
+    if (
+        "controlled_non_chase_close_strength" in reasons
+        and current_day_vwap_to_recent_days <= 2.016561739
+        and entry_bar_open_to_ema_9 > 0.9984208946
+    ):
+        score += 1
+        reasons.append("safe_controlled_non_chase_vwap_base")
+
+    # Safe Positive Variant:
+    # Fresh supported volume reclaim where previous bar remains near high context.
+    # Covers: 29 positives / 0 FP
+    if (
+        "fresh_supported_volume_reclaim_no_chase" in reasons
+        and previous_bar_high_to_highest_high > 0.9569656773
+        and current_day_low_to_ema_9 > 0.836463179
+    ):
+        score += 1
+        reasons.append("safe_fresh_supported_near_high_base")
+
+    # Safe Positive Variant:
+    # Snap close-strength with meaningful entry volume versus highest-high volume.
+    # Covers: 28 positives / 0 FP
+    if (
+        "snap_close_strength_low_extension" in reasons
+        and recent_bars_positive_bars_pct <= 0.7
+        and entry_bar_volume_to_highest_high_volume > 0.7509705684
+    ):
+        score += 1
+        reasons.append("safe_snap_close_strength_volume_confirmation")
+
+    # Safe Positive Variant:
+    # Supported body expansion from day structure with clean participation.
+    # Covers: 28 positives / 0 FP
+    if (
+        "supported_body_expansion_from_day_structure" in reasons
+        and entry_volume_spike_without_high_context <= 4.070191289
+        and recent_bars_positive_bars_pct <= 0.7
+    ):
+        score += 1
+        reasons.append("safe_supported_body_day_structure_clean_participation")
+
+    # Safe Positive Variant:
+    # Fresh reclaim before MACD stale with controlled body expansion and close followthrough.
+    # Covers: 27 positives / 0 FP
+    if (
+        "fresh_supported_reclaim_before_macd_stale" in reasons
+        and entry_body_to_recent_bars_body_average <= 5.953984864
+        and entry_close_position_vs_previous_close_position > 0.858351
+    ):
+        score += 1
+        reasons.append("safe_fresh_reclaim_macd_close_followthrough")
+
+    # Safe Positive Variant:
+    # Refined base reclaim with controlled EMA9 breakout efficiency and volume-average behavior.
+    # Covers: 26 positives / 0 FP
+    if (
+        "refined_broad_supported_base_reclaim" in reasons
+        and entry_breakout_efficiency_from_ema_9 <= 0.8129578009
+        and entry_bar_volume_to_volume_average <= 7.39324826
+    ):
+        score += 1
+        reasons.append("safe_refined_base_reclaim_efficiency_volume_control")
+
     return score, reasons
 
 def positive_reason_groups(
@@ -1383,9 +2002,110 @@ def positive_reason_groups(
         "controlled_snap_reclaim": {
             "controlled_snap_reclaim",
         },
-
         "supported_day_volume_rotation": {
             "supported_day_volume_rotation",
+        },
+        "extreme_daily_expansion_fresh_body": {
+            "extreme_daily_expansion_fresh_body_surge",
+        },
+        "quiet_open_controlled_reclaim": {
+            "quiet_open_controlled_body_reclaim",
+        },
+        "delayed_volume_rebuild_controlled_histogram": {
+            "delayed_volume_rebuild_controlled_histogram",
+        },
+        "delayed_pullback_volume_spike": {
+            "delayed_pullback_volume_spike",
+        },
+        "previous_volume_spike_body_expansion": {
+            "previous_volume_spike_body_expansion_not_vwap_chase",
+        },
+        "pullback_volume_dominance": {
+            "pullback_volume_dominance_body_expansion",
+        },
+        "supported_volume_ownership": {
+            "supported_volume_ownership_above_ema9",
+        },
+        "safe_reset_volume_confirmation": {
+            "safe_reset_volume_confirmation_volume_balance",
+        },
+        "safe_close_strength_non_chase": {
+            "safe_close_strength_non_chase_base",
+        },
+        "safe_broad_reset_clean_volume": {
+            "safe_broad_reset_clean_volume",
+        },
+        "safe_breakout_expansion": {
+            "safe_breakout_expansion_histogram_time",
+        },
+        "safe_fresh_supported_volume_reclaim": {
+            "safe_fresh_supported_volume_reclaim_body",
+        },
+        "safe_refined_supported_base_reclaim": {
+            "safe_refined_supported_base_reclaim",
+        },
+        "safe_fresh_timing": {
+            "safe_fresh_timing_close_followthrough",
+        },
+        "safe_explosive_body_support": {
+            "safe_explosive_body_controlled_macd",
+        },
+        "safe_real_reset_volume_confirmation": {
+            "safe_real_reset_volume_confirmation_liquidity_control",
+        },
+        "safe_broad_reset_buyer_volume_confirmation": {
+            "safe_broad_reset_buyer_volume_confirmation_clean_expansion",
+        },
+        "safe_fresh_macd_acceleration": {
+            "safe_fresh_macd_acceleration_volume_participation",
+        },
+        "safe_strong_pullback_volume_reclaim": {
+            "safe_strong_pullback_volume_reclaim_after_distance",
+        },
+        "safe_clean_high_breakout": {
+            "safe_clean_high_breakout_histogram_control",
+        },
+        "safe_supported_base_reclaim": {
+            "safe_supported_base_reclaim_low_high_quality",
+        },
+        "safe_controlled_non_chase_close_strength": {
+            "safe_controlled_non_chase_close_strength_clean_pullback",
+        },
+        "safe_real_reset_rejection_ema_context": {
+            "safe_real_reset_rejection_ema_context",
+        },
+        "safe_broad_reset_buyer_clean_liquidity": {
+            "safe_broad_reset_buyer_clean_liquidity",
+        },
+        "safe_strong_pullback_no_prior_blowoff": {
+            "safe_strong_pullback_no_prior_blowoff",
+        },
+        "safe_clean_high_close_strength_continuation": {
+            "safe_clean_high_close_strength_continuation",
+        },
+        "safe_daily_ema_expansion_efficient_participation": {
+            "safe_daily_ema_expansion_efficient_participation",
+        },
+        "safe_broad_reset_efficiency_premarket_volume_balance": {
+            "safe_broad_reset_efficiency_premarket_volume_balance",
+        },
+        "safe_controlled_non_chase_vwap_base": {
+            "safe_controlled_non_chase_vwap_base",
+        },
+        "safe_fresh_supported_near_high_base": {
+            "safe_fresh_supported_near_high_base",
+        },
+        "safe_snap_close_strength_volume_confirmation": {
+            "safe_snap_close_strength_volume_confirmation",
+        },
+        "safe_supported_body_day_structure_clean_participation": {
+            "safe_supported_body_day_structure_clean_participation",
+        },
+        "safe_fresh_reclaim_macd_close_followthrough": {
+            "safe_fresh_reclaim_macd_close_followthrough",
+        },
+        "safe_refined_base_reclaim_efficiency_volume_control": {
+            "safe_refined_base_reclaim_efficiency_volume_control",
         },
     }
 
@@ -1405,6 +2125,33 @@ def positive_reason_groups(
         },
         "premarket_supported_extension": {
             "premarket_supported_controlled_extension",
+        },
+        "late_body_continuation": {
+            "late_body_continuation_non_extreme_daily_context",
+        },
+        "refined_broad_supported_base_reclaim": {
+            "refined_broad_supported_base_reclaim",
+        },
+        "untagged_near_high_body_volume_reclaim": {
+            "untagged_near_high_body_volume_reclaim",
+        },
+        "untagged_delayed_pullback_base_reclaim": {
+            "untagged_delayed_pullback_base_reclaim",
+        },
+        "untagged_controlled_extension_reclaim": {
+            "untagged_controlled_extension_reclaim",
+        },
+        "untagged_compact_volume_followthrough_reclaim": {
+            "untagged_compact_volume_followthrough_reclaim",
+        },
+        "untagged_low_positive_bars_volume_reclaim": {
+            "untagged_low_positive_bars_volume_reclaim",
+        },
+        "untagged_vwap_body_compression_reclaim": {
+            "untagged_vwap_body_compression_reclaim",
+        },
+        "untagged_clean_rejection_volume_reclaim": {
+            "untagged_clean_rejection_volume_reclaim",
         },
     }
 

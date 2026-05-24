@@ -22,12 +22,12 @@
   "trading_score_pos_weight": 0.5,
   "final_holdout_threshold": 0.6,
   "top_25_feature_importance": {
-    "feature_overall_legit_trade": 0.9302049903625561,
-    "feature_entry_close_strength_to_highest_high_close_strength": 0.02623812182443572,
-    "feature_current_day_high_to_previous_high": 0.012385666455411158,
-    "feature_current_day_vwap_to_recent_days": 0.01131367708071897,
-    "feature_current_day_high_to_recent_days_highs": 0.010750742346840893,
-    "feature_controlled_volume_entry_quality": 0.00910680193003707
+    "feature_overall_legit_trade": 0.9337043659616785,
+    "feature_entry_close_strength_to_highest_high_close_strength": 0.02018431102827806,
+    "feature_current_day_vwap_to_recent_days": 0.01243238603035584,
+    "feature_current_day_high_to_previous_high": 0.012161429424286727,
+    "feature_current_day_high_to_recent_days_highs": 0.011813965737066591,
+    "feature_controlled_volume_entry_quality": 0.009703541818334296
   },
   "random_state": 42,
   "test_size": 0.3,
