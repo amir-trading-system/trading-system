@@ -25,7 +25,6 @@
             "module": "model.training.prepare_data_for_train",
             "console": "integratedTerminal"
         },
-
         {
             "name": "train model",
             "type": "debugpy",
@@ -35,12 +34,40 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "columns editor",
+            "name": "graph creator",
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,
-            "module": "model.training.columns_editor",
+            "module": "model.graph_creator",
             "console": "integratedTerminal"
-        }
+        },
+        {
+            "name": "deep rule miner",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "model.training.deep_rule_miner",
+            "console": "integratedTerminal",
+            "args": [
+                "--outdir", "mining_out_88",
+                "--random-state", "101",
+                "--time-budget-minutes", "240",
+                "--max-depth",  "22",
+                "--n-estimators", "1000",
+                "--beam-width", "3000",
+                "--beam-max-atoms", "1000",
+                "--beam-max-conditions", "22",
+                "--reason-max-conditions", "5",
+                "--reason-top-k", "1999",
+                "--min-pos-broad", "20",
+                "--min-pos-untagged", "6",
+                "--min-untagged", "6",
+                "--max-selected-rules", "50",
+                "--min-new-untagged", "2",
+                "--local-expansion",
+                "--local-expansion-trials", "2000",
+                "--n-jobs", "4",
+            ],
+        },
     ]
 }
