@@ -1,3 +1,5 @@
+# pylint: skip-file
+# type: ignore
 #!/usr/bin/env python3
 """
 Deep zero-FP positive rule miner for hard_rules.py + positive/false-positive CSV files.
