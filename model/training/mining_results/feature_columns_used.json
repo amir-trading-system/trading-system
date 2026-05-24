@@ -1,10 +1,4 @@
 [
-  "total_volume",
-  "entry_bar_volume",
-  "positive_group_score",
-  "positive_score",
-  "strong_positive_group_score",
-  "soft_positive_group_score",
   "feature_entry_bar_volume_to_total_volume",
   "feature_weak_wick_volume_rejection",
   "feature_clean_breakout_efficiency",

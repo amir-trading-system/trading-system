@@ -1,7 +1,3 @@
-# pylint: skip-file
-# type: ignore
-
-entry_bar_volume = features_data["entry_bar_volume"]
 bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
 bars_since_highest_high_to_bars_before = features_data["feature_bars_since_highest_high_to_bars_before"]
 bars_since_lowest_low_to_entry = features_data["feature_bars_since_lowest_low_to_entry"]
@@ -99,8 +95,3 @@ volume_since_highest_high_to_volume_before = features_data["feature_volume_since
 volume_since_lowest_low_to_entry_vs_since_highest_high = features_data["feature_volume_since_lowest_low_to_entry_vs_since_highest_high"]
 volume_without_macd_confirmation = features_data["feature_volume_without_macd_confirmation"]
 weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
-positive_group_score = features_data["positive_group_score"]
-positive_score = features_data["positive_score"]
-soft_positive_group_score = features_data["soft_positive_group_score"]
-strong_positive_group_score = features_data["strong_positive_group_score"]
-total_volume = features_data["total_volume"]

@@ -6,23 +6,22 @@ Deep zero-FP positive rule miner for hard_rules.py + positive/false-positive CSV
 
 COMMAND:
 python -m model.training.deep_rule_miner \
-  --outdir mining_out_88_seed_101 \
-  --random-state 101 \
-  --time-budget-minutes 240 \
-  --max-depth 22 \
-  --n-estimators 1000 \
-  --beam-width 3000 \
-  --beam-max-atoms 1000 \
-  --beam-max-conditions 22 \
-  --reason-max-conditions 5 \
-  --reason-top-k 1999 \
-  --min-pos-broad 20 \
-  --min-pos-untagged 6 \
-  --min-untagged 6 \
-  --max-selected-rules 50 \
-  --min-new-untagged 2 \
+  --outdir model/training/mining_results \
+  --time-budget-minutes 360 \
+  --max-depth 24 \
+  --n-estimators 1800 \
+  --beam-width 6000 \
+  --beam-max-atoms 1400 \
+  --beam-max-conditions 24 \
+  --reason-max-conditions 6 \
+  --reason-top-k 2500 \
+  --min-pos-broad 25 \
+  --min-pos-untagged 10 \
+  --min-untagged 0 \
+  --max-selected-rules 60 \
+  --min-new-untagged 5 \
   --local-expansion \
-  --local-expansion-trials 2000 \
+  --local-expansion-trials 6000 \
   --n-jobs 4
 
 Purpose
@@ -30,7 +29,8 @@ Purpose
 Find candidate success_patterns / positive_reason_groups rules that:
   - cover positive rows,
   - cover 0 false-positive rows,
-  - optionally prioritize currently untagged positives,
+  - prioritize the broadest possible 0-FP coverage across all positives,
+  - still report untagged coverage,
   - optionally refine existing success reasons.
 
 This script is designed for long local runs: 30 minutes to 3+ hours.
@@ -93,6 +93,11 @@ from tqdm import tqdm
 
 DEFAULT_EXCLUDE_PATTERNS = [
     r"^feature_overall_legit_trade$",
+    # Keep mining on raw feature_* columns only, but exclude known target/meta score features.
+    r"^feature_.*positive_score$",
+    r"^feature_.*positive_group_score$",
+    r"^feature_.*soft_positive_group_score$",
+    r"^feature_.*strong_positive_group_score$",
 ]
 
 DEFAULT_META_COLS = {
@@ -249,6 +254,9 @@ def discover_feature_cols(
     compiled = [re.compile(p) for p in exclude_regexes]
 
     for c in common:
+        # Strict mode for this version: mine ONLY raw columns that start with feature_.
+        if not c.startswith("feature_"):
+            continue
         if c in DEFAULT_META_COLS:
             continue
         if any(rx.search(c) for rx in compiled):
@@ -380,8 +388,9 @@ def rule_from_masks(
     fp_count = int(fp_mask.sum())
     untagged = int((pos_mask & untagged_pos_mask).sum())
     tagged = pos_count - untagged
-    # Objective favors untagged-heavy broad 0-FP rules.
-    score = untagged * 10.0 + pos_count * 1.0 - tagged * 1.5 - len(atoms) * 0.20
+    # Objective favors the broadest 0-FP rules across ALL positives.
+    # Untagged coverage is still a useful secondary signal, but it is not the main target.
+    score = pos_count * 10.0 + untagged * 2.0 - len(atoms) * 0.20
     if fp_count > 0:
         score -= fp_count * 100000
     return Rule(
@@ -471,9 +480,10 @@ def greedy_select_rules(
     max_rules: int,
     min_new_untagged: int,
 ) -> List[Rule]:
-    # Precompute masks.
+    # Greedy objective for this broad version:
+    # maximize NEW unique positive coverage first, then total breadth, then untagged coverage, then simplicity.
     selected: List[Rule] = []
-    covered_untagged = np.zeros(len(pos_df), dtype=bool)
+    covered_pos = np.zeros(len(pos_df), dtype=bool)
 
     rule_masks = []
     for r in rules:
@@ -492,10 +502,11 @@ def greedy_select_rules(
         for r, pm, fm in candidates:
             if r in selected:
                 continue
-            new_untagged = int((pm & untagged_pos_mask & ~covered_untagged).sum())
-            if new_untagged < min_new_untagged:
+            new_pos = int((pm & ~covered_pos).sum())
+            new_untagged = int((pm & untagged_pos_mask & ~covered_pos).sum())
+            if new_pos < min_new_untagged:
                 continue
-            key = (new_untagged, r.untagged_pos_count, r.pos_count, -len(r.atoms), r.score)
+            key = (new_pos, r.pos_count, new_untagged, r.untagged_pos_count, -len(r.atoms), r.score)
             if best_key is None or key > best_key:
                 best = (r, pm, fm)
                 best_key = key
@@ -504,7 +515,7 @@ def greedy_select_rules(
             break
         r, pm, fm = best
         selected.append(r)
-        covered_untagged |= (pm & untagged_pos_mask)
+        covered_pos |= pm
 
     return selected
 
@@ -629,7 +640,7 @@ def mine_untagged_beam(
         fp = int(fm.sum())
         if unt < max(2, min_untagged // 3):
             continue
-        score = unt * 10 + pos - tag * 1.5 - fp * 0.05
+        score = pos * 10 + unt * 2 - fp * 0.05
         atom_rows.append((score, i))
     atom_rows.sort(reverse=True)
     keep_idxs = [i for _, i in atom_rows[:max_atoms]]
@@ -654,17 +665,10 @@ def mine_untagged_beam(
                 if pos_count < min_pos:
                     continue
                 unt = int((npm & untagged_pos_mask).sum())
-                if unt < min_untagged:
-                    continue
 
                 nfm = fm & fp_masks[j]
                 fp_count = int(nfm.sum())
                 nidxs = idxs + (j,)
-
-                # Require untagged-heavy, or at least very close.
-                tagged = pos_count - unt
-                if unt <= tagged:
-                    continue
 
                 if fp_count == 0:
                     ratoms = [atoms[k] for k in nidxs]
@@ -685,9 +689,9 @@ def mine_untagged_beam(
 
         new_frontier.sort(
             key=lambda x: (
-                -int((x[1] & untagged_pos_mask).sum()),
-                int(x[2].sum()),
                 -int(x[1].sum()),
+                int(x[2].sum()),
+                -int((x[1] & untagged_pos_mask).sum()),
                 len(x[0]),
             )
         )
@@ -747,11 +751,12 @@ def extract_tree_rules(
             if fp_count != 0:
                 return
             unt = int((pm & untagged_pos_mask).sum())
-            if unt < min_untagged:
-                return
             tagged = pos_count - unt
-            if require_untagged_heavy and unt <= tagged:
-                return
+            if require_untagged_heavy:
+                if unt < min_untagged:
+                    return
+                if unt <= tagged:
+                    return
 
             r = rule_from_masks(
                 name=f"deep_tree_{len(rules)+1}",
@@ -950,10 +955,6 @@ def local_expand_rules(
             if pm.sum() < min_pos:
                 continue
             unt = int((pm & untagged_pos_mask).sum())
-            if unt < min_untagged:
-                continue
-            if unt <= int(pm.sum()) - unt:
-                continue
 
             ratoms = [atoms[i] for i in sorted(chosen)]
             r = rule_from_masks(
@@ -1047,7 +1048,7 @@ def checkpoint_rules(
 # ======================================================================================
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Deep zero-FP positive rule miner")
+    p = argparse.ArgumentParser(description="Deep broad zero-FP positive rule miner; mines feature_* columns only")
     p.add_argument("--outdir", required=True, type=Path)
 
     p.add_argument("--time-budget-minutes", type=float, default=180.0)
@@ -1072,7 +1073,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--local-expansion-trials", type=int, default=2000)
 
     p.add_argument("--max-selected-rules", type=int, default=30)
-    p.add_argument("--min-new-untagged", type=int, default=3)
+    p.add_argument("--min-new-untagged", type=int, default=3, help="In this broad version, this means minimum NEW positives per selected rule.")
 
     p.add_argument("--checkpoint-chunk-size", type=int, default=5000)
     # p.add_argument(
@@ -1217,11 +1218,11 @@ def main() -> None:
         untagged_pos_mask=untagged_pos_mask,
         max_depth=args.max_depth,
         min_pos=args.min_pos_untagged,
-        min_untagged=args.min_untagged,
+        min_untagged=0,
         n_estimators=args.n_estimators,
         n_jobs=args.n_jobs,
         random_state=args.random_state,
-        require_untagged_heavy=True,
+        require_untagged_heavy=False,
     )
     checkpoint_rules(tree_rules, args.outdir / "pass3_deep_tree_candidates.csv", include_python_if=args.candidate_python_if, chunk_size=args.checkpoint_chunk_size, max_rows=max_checkpoint_rules)
     importance_df.to_csv(args.outdir / "pass3_feature_importance.csv", index=False)
@@ -1236,7 +1237,7 @@ def main() -> None:
         print("\n=== Pass 4: local expansion from top tree/beam seeds ===")
         seed_rules = sorted(
             [r for r in all_rules if r.fp_count == 0],
-            key=lambda r: (-r.untagged_pos_count, -r.pos_count, len(r.atoms), -r.score),
+            key=lambda r: (-r.pos_count, -r.untagged_pos_count, len(r.atoms), -r.score),
         )[:100]
         expanded_rules = local_expand_rules(
             seed_rules=seed_rules,
@@ -1270,7 +1271,7 @@ def main() -> None:
 
     final_rules = sorted(
         unique.values(),
-        key=lambda r: (-r.untagged_pos_count, -r.pos_count, len(r.atoms), -r.score),
+        key=lambda r: (-r.pos_count, -r.untagged_pos_count, len(r.atoms), -r.score),
     )
     checkpoint_rules(final_rules, args.outdir / "all_zero_fp_candidates.csv", include_python_if=args.candidate_python_if, chunk_size=args.checkpoint_chunk_size, max_rows=max_checkpoint_rules)
 
@@ -1283,19 +1284,22 @@ def main() -> None:
         min_new_untagged=args.min_new_untagged,
     )
     checkpoint_rules(selected, args.outdir / "selected_zero_fp_rules.csv", include_python_if=True, chunk_size=args.checkpoint_chunk_size, max_rows=None)
-    write_python_blocks(selected, args.outdir / "selected_rules_python_blocks.py", prefix="mined_untagged_rule")
+    write_python_blocks(selected, args.outdir / "selected_rules_python_blocks.py", prefix="mined_broad_rule")
 
+    selected_pos_mask = np.zeros(len(pos_df), dtype=bool)
     selected_untagged_mask = np.zeros(len(pos_df), dtype=bool)
     for r in selected:
         pm = np.ones(len(pos_df), dtype=bool)
         for a in r.atoms:
             pm &= mask_for_atom(pos_df[a.feature].to_numpy(float), a)
+        selected_pos_mask |= pm
         selected_untagged_mask |= (pm & untagged_pos_mask)
 
     final_summary = {
         **baseline,
         "all_zero_fp_candidates": int(len(final_rules)),
         "selected_rules": int(len(selected)),
+        "selected_unique_positives_covered": int(selected_pos_mask.sum()),
         "selected_unique_untagged_covered": int(selected_untagged_mask.sum()),
         "selected_unique_untagged_coverage_pct": float(selected_untagged_mask.sum() / max(1, untagged_pos_mask.sum())),
         "elapsed_minutes": round((time.time() - started) / 60.0, 2),
