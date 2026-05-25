@@ -89,6 +89,348 @@ def should_be_rejected_by_hard_rules(
     breakout_attempts_during_pullback = features_data["feature_breakout_attempts_during_pullback"]
     entry_bar_histogram_to_lowest_histogram = features_data["feature_entry_bar_histogram_to_lowest_histogram"]
     clean_breakout_efficiency = features_data["feature_clean_breakout_efficiency"]
+    entry_bar_volume_to_highest_volume_in_pullback = features_data["feature_entry_bar_volume_to_highest_volume_in_pullback"]
+    entry_bar_histogram_to_highest_histogram = features_data["feature_entry_bar_histogram_to_highest_histogram"]
+    distance_from_highest_high = features_data["feature_distance_from_highest_high"]
+    lowest_low_to_entry_elapsed_minutes = features_data["feature_lowest_low_to_entry_elapsed_minutes"]
+    bars_since_lowest_low_to_entry = features_data["feature_bars_since_lowest_low_to_entry"]
+    crossed_at_least_one_bar_from_recent_bars = features_data["feature_crossed_at_least_one_bar_from_recent_bars"]
+    entry_bar_histogram_to_highest_high = features_data["feature_entry_bar_histogram_to_highest_high"]
+    strong_vwap_volume_reentry = features_data["feature_strong_vwap_volume_reentry"]
+
+    if (
+        current_day_low_to_ema_9 > 0.4654018283
+        and current_day_movement_to_recent_days_movement > 0.8634671271
+        and distance_from_highest_high <= 3.5
+        and entry_bar_open_to_ema_9 > 1.011614263
+        and entry_bar_vwap_to_ema_20 <= 0.9697213471
+        and entry_body_to_highest_high_body <= 2.53125
+        and highest_high_quality > 2.613798141
+        and previous_bar_close_to_highest_high > 0.9315455556
+        and pullback_depth_vs_pre_high_move <= 7.982297182
+    ):
+        return True
+
+    if (
+        current_day_volume_to_recent_days_volume <= 703.3054199
+        and entry_bar_ema_9_to_vwap <= 1.435429037
+        and entry_bar_volume_to_total_volume <= 0.1350661144
+        and entry_rejection_pressure > 0.2498437762
+        and entry_volume_spike_without_high_context <= 1.367694974
+        and highest_high_quality <= 66.52034187
+        and highest_high_to_entry_elapsed_minutes > 3.5
+        and pre_market_volume <= 13579827
+        and previous_bar_volume_to_its_previous_volume <= 0.6207201183
+    ):
+        return True
+
+    if (
+        entry_bar_low_to_ema_9 > 1.012828231
+        and entry_close_to_previous_bar_high <= 1.297641873
+        and entry_rejection_pressure > 0.1781633571
+        and gains_until_entry_bar <= 2.989003778
+        and previous_bar_close_to_highest_high > 0.9875080884
+        and volume_confirmation_quality <= 1.72980243
+        and volume_since_lowest_low_to_entry_vs_since_highest_high > 0.6912430525
+    ):
+        return True
+
+    if (
+        current_day_vwap_to_recent_days > 0.8840062022
+        and entry_bar_low_to_ema_9 > 1.006311774
+        and entry_bar_volume <= 4122598
+        and entry_bar_volume_to_highest_volume_in_pullback <= 8.049009562
+        and entry_body_to_highest_high_body <= 3.53125
+        and entry_volume_price_efficiency <= 3.518256426
+        and pre_market_gains > -0.05602339841
+        and previous_bar_close_to_highest_high > 0.9641307294
+        and volume_since_highest_high_to_volume_before <= 0.01759812422
+    ):
+        return True
+
+    if (
+        current_day_ema_9_to_ema_20_distance_to_recent_days <= 2.93526125
+        and current_day_vwap_to_recent_days <= 3.399968147
+        and entry_bar_body > 0.2872670814
+        and entry_bar_body <= 0.9736668766
+        and entry_bar_histogram_to_previous > 1.065275609
+        and entry_bar_low_to_ema_9 > 1.007060468
+        and entry_bar_low_to_ema_9 <= 1.07849741
+        and entry_bar_volume <= 2578833.5
+        and entry_bar_volume_to_volume_average <= 5.240484953
+        and entry_bar_vwap_to_ema_20 <= 1.166416168
+        and highest_high_to_entry_elapsed_minutes <= 4.5
+        and previous_bar_close_to_highest_high > 0.982717365
+        and previous_bar_high_to_highest_high > 0.9890772998
+    ):
+        return True
+
+    if (
+        emas_distances_to_recent_bars_ema_distances <= 0.1689215526
+        and entry_bar_close_to_highest_high <= 1.043924272
+        and entry_bar_volume_to_recent_bars_average <= 1.946778297
+        and entry_bar_vwap_to_ema_20 <= 0.9454233944
+        and previous_bar_high_to_highest_high > 0.9869109094
+        and volume_since_lowest_low_to_entry_vs_since_highest_high > 0.8193178177
+    ):
+        return True
+
+    if (
+        bars_since_lowest_low_to_entry > 13.5
+        and current_day_ema_9_to_ema_20 <= 1.456079483
+        and distance_from_last_negative_macd_bar <= 19.5
+        and entry_bar_ema_9_to_ema_20 <= 1.078942776
+        and entry_body_to_highest_high_body <= 52.60869598
+        and entry_body_to_previous_bar_body <= 2.773749948
+        and entry_close_to_lowest_low_recovery > 1.015999258
+        and entry_close_to_lowest_low_recovery <= 2.411666632
+        and entry_close_to_vwap > 1.070587277
+        and entry_volume_price_efficiency <= 1.747485936
+        and previous_bar_close_to_highest_high > 0.979554683
+        and profit_since_open_to_bars_count_since_open > 0.0009796297527
+        and pullback_depth_vs_pre_high_move > 1.010968328
+        and volume_without_macd_confirmation <= 138.1645584
+    ):
+        return True
+
+    if (
+        current_day_ema_9_to_recent_days_ema_9 > 0.9682975113
+        and entry_bar_low_to_ema_9 > 1.007064581
+        and entry_bar_upper_wick > 0.07549857721
+        and entry_bar_volume_to_total_volume > 0.035168631
+        and entry_upper_wick_to_recent_upper_wick_average > 0.5023422539
+        and entry_upper_wick_to_recent_upper_wick_average <= 3.96203959
+        and gains_since_lowest_low <= 0.2105717137
+        and highest_high_to_entry_elapsed_minutes <= 4.5
+        and pre_market_gains <= 0.04537976906
+    ):
+        return True
+
+    if (
+        entry_bar_histogram_to_highest_histogram <= 2.916334152
+        and entry_bar_macd_to_previous <= 1.18422693
+        and entry_bar_volume_to_highest_volume_in_pullback <= 2.039056778
+        and entry_bar_volume_to_volume_average <= 2.078589797
+        and entry_close_to_previous_bar_close > 1.077357113
+        and entry_rejection_pressure <= 0.3083916157
+        and macd_recovery_followthrough_quality > 1.545556247
+        and volume_without_macd_confirmation <= 1.708280623
+    ):
+        return True
+
+    if (
+        bars_above_volume_average_vs_under_since_highest_high > 0.2722222358
+        and bars_above_volume_average_vs_under_since_highest_high <= 3.75
+        and current_day_ema_9_to_ema_20 <= 1.488875508
+        and current_day_high_to_recent_days_highs > 0.8672295213
+        and distance_from_highest_high <= 74.5
+        and entry_bar_body > 0.5604878068
+        and entry_bar_close_to_highest_high > 1.011305332
+        and entry_bar_low_to_ema_9 > 1.007342935
+        and entry_bar_volume_to_volume_average > 2.204502106
+        and gains_until_entry_bar <= 1.971365035
+        and macd_recovery_age_quality > 0.3023335636
+        and near_high_weak_followthrough > 0.8526823223
+        and pullback_health <= 19.83761978
+    ):
+        return True
+
+    if (
+        entry_bar_ema_9_to_vwap > 1.082769752
+        and entry_bar_histogram_to_highest_histogram > 0.8403291106
+        and entry_bar_volume_to_total_volume <= 0.3913063109
+        and entry_body_to_recent_bars_body_average <= 2.421025872
+        and gains_until_entry_bar > 0.2645576745
+        and pullback_depth_vs_pre_high_move <= 0.6512024105
+    ):
+        return True
+
+    if (
+        current_day_ema_20_to_recent_days_ema_20 <= 1.121191442
+        and entry_bar_body <= 0.5581818223
+        and entry_close_to_previous_bar_close <= 1.360087812
+        and entry_volume_spike_without_high_context <= 2.508698463
+        and fake_reclaim_pressure <= 0.4436782897
+        and previous_bar_high_to_highest_high > 0.9942194521
+    ):
+        return True
+
+    if (
+        entry_bar_ema_9_to_vwap > 1.133062124
+        and entry_bar_volume_to_volume_average <= 1.689962864
+        and entry_extension_pressure > 0.372032851
+        and previous_bar_close_to_highest_high <= 0.9900442362
+    ):
+        return True
+
+    if (
+        current_day_high_to_recent_days_highs > 0.7507748902
+        and current_day_low_to_ema_9 <= 1.139907777
+        and current_day_movement_to_recent_days_movement <= 32.88862991
+        and current_day_volume_to_recent_days_volume <= 875.9853821
+        and current_day_vwap_to_recent_days > 1.454364538
+        and entry_bar_body > 0.5109468102
+        and entry_bar_close_to_highest_high <= 1.045481384
+        and entry_bar_histogram_to_highest_histogram <= 0.8661656678
+        and entry_bar_volume > 33694.59961
+        and entry_bar_volume_to_volume_average <= 2.624112844
+        and entry_bar_vwap_to_ema_20 <= 0.962839365
+        and entry_volume_price_efficiency > 0.01550700841
+        and lowest_low_to_entry_elapsed_minutes > 2.5
+        and previous_bar_volume_to_its_previous_volume > 0.7161327899
+        and pullback_health > 0.2186572626
+        and volume_since_highest_high_to_volume_before <= 25.43840027
+    ):
+        return True
+
+    if (
+        bars_above_volume_average_vs_under_since_highest_high <= 0.9181818366
+        and entry_bar_body <= 0.9964788854
+        and entry_bar_ema_9_to_ema_20 <= 1.064846516
+        and entry_bar_low_to_ema_9 > 1.006782889
+        and entry_close_to_previous_bar_close <= 1.109350085
+        and entry_volume_price_efficiency <= 0.4933377206
+        and gains_since_lowest_low <= 0.3378870934
+        and minutes_since_market_open > 53
+        and near_high_weak_followthrough <= 0.9518693388
+        and positive_vs_negative_volume_during_pullback <= 2.33378005
+        and pre_market_volume <= 8486279
+        and previous_bar_close_to_highest_high > 0.9837848246
+        and profit_since_open_to_bars_count_since_open > 0.001342775533
+        and volume_confirmation_quality > 0.1957733929
+    ):
+        return True
+
+    if (
+        bars_above_volume_average_vs_under_since_highest_high > 0.2833333388
+        and bars_since_highest_high_to_bars_before > 0.004706116859
+        and crossed_at_least_one_bar_from_recent_bars <= 0.5
+        and entry_extension_pressure > 0.3980751336
+        and entry_followthrough_after_near_reclaim > 1.052758813
+        and entry_rejection_pressure <= 0.448347494
+        and gains_until_entry_bar > 0.2575407252
+    ):
+        return True
+
+    if (
+        distance_from_last_negative_macd_bar > 0.5
+        and entry_bar_histogram_to_previous > 0.8973072767
+        and entry_bar_movement_recent_bars_average > 4.271438837
+        and entry_rejection_pressure > 0.4579292238
+        and entry_rejection_pressure <= 1.00746125
+        and entry_volume_spike_without_high_context <= 2.44371748
+        and positive_vs_negative_volume_during_pullback > 0.8280515075
+    ):
+        return True
+
+    if (
+        current_day_ema_9_to_ema_20 > 1.127568305
+        and entry_bar_ema_9_to_vwap > 1.059993267
+        and entry_bar_histogram_to_highest_high <= 1.373863101
+        and entry_bar_histogram_to_lowest_histogram <= 3.183271527
+        and entry_bar_volume_to_volume_average <= 3.27557838
+        and entry_body_to_highest_high_body <= 5.090906143
+        and entry_body_to_previous_bar_body <= 7.108420849
+        and entry_volume_price_efficiency > 0.04680577293
+        and previous_bar_high_to_highest_high > 0.9739197195
+        and profit_since_open_to_bars_count_since_open > 0.001346467761
+        and volume_since_highest_high_to_volume_before <= 0.04159185477
+        and volume_without_macd_confirmation > 1.793002427
+    ):
+        return True
+
+    if (
+        bars_since_lowest_low_to_entry <= 148
+        and current_day_high_to_recent_days_highs > 1.33207345
+        and entry_bar_ema_9_to_vwap > 1.036095798
+        and entry_bar_histogram_to_previous <= 7.061025143
+        and entry_bar_upper_wick <= 0.3777113408
+        and entry_bar_volume_to_previous_bar_volume > 1.864426255
+        and entry_close_strength_to_highest_high_close_strength > 1.099067092
+        and entry_volume_price_efficiency > 0.01015808573
+        and entry_volume_price_efficiency <= 0.02891539689
+        and minutes_since_market_open > 19.5
+        and pre_market_volume <= 266917
+    ):
+        return True
+
+    if (
+        current_day_ema_9_to_ema_20 <= 1.303220093
+        and current_day_low_to_ema_9 <= 0.8846435249
+        and entry_followthrough_after_near_reclaim > 1.103989959
+        and entry_volume_spike_without_high_context > 1.263534904
+        and minutes_since_market_open > 104.5
+        and positive_vs_negative_volume_during_pullback > 0.9473784864
+        and previous_bar_high_to_highest_high <= 0.9818832576
+        and profit_since_open_to_bars_count_since_open <= 0.0098955594
+        and reclaim_close_strength_since_highest_high > 0.1096149348
+    ):
+        return True
+
+    if (
+        distance_from_highest_high <= 124
+        and entry_bar_close_to_highest_high <= 1.045296669
+        and entry_bar_histogram_to_highest_histogram <= 1.19168514
+        and entry_bar_lower_wick <= 0.3195833266
+        and entry_bar_open_to_ema_9 > 0.9714248776
+        and entry_bar_upper_wick <= 0.1224450655
+        and entry_bar_volume_to_total_volume > 0.01537841512
+        and entry_body_to_highest_high_body <= 3.287479758
+        and entry_body_to_recent_bars_body_average > 2.901790857
+        and entry_close_to_lowest_low_recovery <= 3.464285731
+        and entry_rejection_pressure <= 0.1654646024
+        and entry_volume_spike_without_high_context <= 3.849831343
+        and failed_attempts_pressure <= 0.7391435802
+        and gains_until_entry_bar > 0.1546464488
+        and highest_high_quality <= 13.61110258
+        and histogram_changed_to_positive_direction_vs_negative_pct <= 1.75
+        and minutes_since_market_open <= 191
+        and strong_vwap_volume_reentry <= 0.5
+    ):
+        return True
+
+    if (
+        clean_breakout_efficiency > 0.5
+        and current_day_ema_20_to_recent_days_ema_20 <= 1.571746111
+        and entry_extension_pressure <= 0.3833960891
+        and entry_upper_wick_to_recent_upper_wick_average <= 0.6057751775
+        and minutes_since_market_open <= 29.5
+        and previous_bar_volume_to_its_previous_volume <= 1.556341767
+        and profit_since_open_to_bars_count_since_open > 0.007602220634
+        and uptrend_histogram_vs_downtrend_since_highest_high <= 0.6339712739
+    ):
+        return True
+
+    if (
+        entry_bar_close_to_highest_high <= 1.043531597
+        and entry_bar_low_to_ema_9 > 1.011304021
+        and entry_bar_vwap_to_ema_20 > 0.9603820443
+        and entry_body_to_highest_high_body <= 17.125
+        and fake_reclaim_pressure <= 0.4190528095
+        and gains_since_lowest_low <= 0.1707759276
+        and lowest_low_to_entry_elapsed_minutes <= 76
+        and previous_bar_close_to_highest_high <= 1.007362843
+        and previous_bar_high_to_highest_high > 0.9852338731
+    ):
+        return True
+
+    if (
+        bars_since_lowest_low_to_entry <= 3.5
+        and current_day_ema_9_to_recent_days_ema_9 <= 3.498072624
+        and entry_bar_ema_9_to_ema_20 <= 1.029673398
+        and entry_bar_lower_wick <= 0.6599602103
+        and entry_body_to_highest_high_body <= 1.53372848
+        and entry_breakout_efficiency_from_ema_9 <= 0.7222301364
+        and entry_close_to_previous_bar_close <= 1.113800228
+        and entry_close_to_vwap > 1.096868455
+        and entry_followthrough_after_near_reclaim <= 1.390912592
+        and failed_attempts_pressure <= 1.269806921
+        and gains_until_entry_bar > 0.2242122218
+        and highest_high_to_entry_elapsed_minutes <= 7.5
+        and volume_confirmation_quality > 0.1984702945
+        and volume_confirmation_quality <= 1.750842631
+    ):
+        return True
 
     # Major reject family: weak reclaim / weak breakout / weak extension.
     # These are setups where the candle may look like a reclaim,
@@ -466,23 +808,6 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        previous_bar_high_to_highest_high > 0.9955507814884186
-        and entry_upper_wick_to_recent_upper_wick_average > 0.672604113817215
-        and entry_bar_volume > 19377.8037109375
-        and gains_until_entry_bar > 0.15879975259304047
-        and entry_bar_histogram_to_previous > 0.4862351715564728
-        and entry_bar_body > 0.40687979757785797
-        and entry_breakout_efficiency_from_ema_9 <= 0.7530556917190552
-        and pre_market_volume <= 15563601.0
-        and price_movement_from_highest_high_to_lowest_low <= 4.099999904632568
-        and entry_body_to_previous_bar_body <= 4.946176528930664
-        and positive_vs_negative_volume_during_pullback <= 3.7747384309768677
-        and entry_body_to_highest_high_body <= 52.3
-        and current_day_ema_9_to_recent_days_ema_9 <= 4.0
-    ):
-        return True
-
-    if (
         previous_bar_high_to_highest_high > 0.9965063631534576
         and entry_upper_wick_to_recent_upper_wick_average > 0.672604113817215
         and entry_bar_ema_9_to_vwap > 1.0428656935691833
@@ -510,14 +835,6 @@ def should_be_rejected_by_hard_rules(
         and current_day_vwap_to_recent_days <= 3.9065240621566772
         and entry_volume_to_highest_volume_in_pullback <= 2.7033112049102783
         and entry_close_to_vwap >= 1.147
-    ):
-        return True
-
-    if (
-        pullback_depth_vs_pre_high_move <= 0.5807133615016937
-        and entry_body_to_recent_bars_body_average <= 2.9088518619537354
-        and current_day_ema_9_to_ema_20_distance_to_recent_days <= 2.0150817036628723
-        and entry_bar_volume_to_volume_average <= 6.434927463531494
     ):
         return True
 
@@ -594,18 +911,6 @@ def should_be_rejected_by_hard_rules(
         and current_day_vwap_to_recent_days > 1.461265299777554
         and gains_since_lowest_low <= 0.56
         and entry_breakout_efficiency_from_ema_9 > 0.3267045912611484
-    ):
-        return True
-
-    if (
-        entry_bar_low_to_ema_9 <= 1.0070604682
-        and entry_breakout_efficiency_from_ema_9 <= 0.9983366132
-        and current_day_ema_9_to_recent_days_ema_9 <= 0.9913356900
-        and entry_body_to_highest_high_body <= 4.6936500072
-        and entry_rejection_pressure > 0.0012531328
-        and entry_bar_vwap_to_ema_20 >= 0.7832668372258171
-        and entry_body_to_previous_bar_body < 5.700066666666
-        and volume_without_macd_confirmation <= 114.50953379574102
     ):
         return True
 
@@ -688,12 +993,6 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        entry_extension_pressure <= 0.11295875101172427
-        and entry_bar_body <= 0.5507023034551829
-    ):
-        return True
-
-    if (
         entry_bar_low_to_ema_9 <= 0.9834826278430685
         and entry_bar_ema_9_to_vwap <= 1.062694232648664
     ):
@@ -712,17 +1011,6 @@ def should_be_rejected_by_hard_rules(
         entry_bar_low_to_ema_9 >= 1.0372845392925112
         and entry_bar_histogram_to_lowest_histogram >= 1.266386431558122
         and distance_from_last_negative_macd_bar >= 12
-    ):
-        return True
-
-    if (
-        entry_bar_vwap_to_ema_20 <= 0.9514810741
-        and current_day_vwap_to_recent_days <= 2.7823119164
-        and profit_since_open_to_bars_count_since_open > 0.0132751414
-        and bars_above_volume_average_vs_under_since_highest_high > 0.2250000015
-        and entry_followthrough_after_near_reclaim > 1.0432881853785902
-        and entry_upper_wick_to_recent_upper_wick_average > 0.3835864374007101
-        and near_high_weak_followthrough <= 0.862386317520218
     ):
         return True
 
@@ -756,15 +1044,6 @@ def should_be_rejected_by_hard_rules(
         gains_since_lowest_low <= 0.0491
         and entry_volume_to_highest_volume_in_pullback <= 0.893
         and entry_bar_volume_to_total_volume <= 0.0284
-    ):
-        return True
-
-    if (
-        current_day_movement_to_recent_days_movement >= 9.1927298390
-        and entry_bar_lower_wick <= 0.0022260818
-        and volume_since_lowest_low_to_entry_vs_since_highest_high >= 0.6822743076
-        and current_day_low_to_ema_9 <= 1.0293851964429035
-        and highest_high_quality >= 0.147032623908
     ):
         return True
 
@@ -806,18 +1085,6 @@ def should_be_rejected_by_hard_rules(
     if (
         entry_body_to_highest_high_body <= 0.3977
         and entry_volume_to_highest_volume_in_pullback <= 0.7483
-    ):
-        return True
-
-    if (
-        recent_bars_positive_bars_pct <= 0.4
-        and pre_market_gains <= -0.0682967959527823
-    ):
-        return True
-
-    if (
-        entry_bar_lower_wick >= 0.3599999999999994
-        and entry_volume_to_highest_volume_in_pullback <= 0.7375094517384586
     ):
         return True
 
@@ -899,22 +1166,6 @@ def should_be_rejected_by_hard_rules(
         return True
 
     if (
-        current_day_high_to_previous_high <= 0.85
-        and entry_bar_volume_to_recent_bars_average >= 5
-        and entry_body_to_previous_bar_body >= 5
-        and entry_bar_volume_to_total_volume >= 0.05
-    ):
-        return True
-
-    if (
-        recent_bars_up_trend_pct >= 0.9
-        and entry_volume_price_efficiency <= 0.1111710752349686
-        and current_day_vwap_to_recent_days >= 1.8
-        and entry_histogram_to_highest_histogram <= 1.2
-    ):
-        return True
-
-    if (
         volume_confirmation_quality <= 0.2
         and current_day_vwap_to_recent_days >= 2.5
         and recent_bars_positive_bars_pct <= 0.4
@@ -946,14 +1197,6 @@ def should_be_rejected_by_hard_rules(
         and entry_extension_pressure >= 0.3105943493744694
         and entry_bar_volume >= 518983.0
         and entry_bar_ema_9_to_vwap >= 1.08
-    ):
-        return True
-
-    if (
-        gains_until_entry_bar > 0.4172315448522568
-        and current_day_movement_to_recent_days_movement > 5.66583251953125
-        and pre_market_gains > 3.3070324659347534
-        and near_high_weak_followthrough <= 0.7769657671451569
     ):
         return True
 
@@ -1016,13 +1259,6 @@ def should_be_rejected_by_hard_rules(
         clean_breakout_efficiency <= 0.32
         and highest_high_quality >= 65.56
         and entry_bar_body >= 0.867
-    ):
-        return True
-
-    if (
-        previous_bar_close_to_highest_high >= 0.9979
-        and highest_high_to_entry_elapsed_minutes <= 2
-        and entry_bar_vwap_to_ema_20 <= 0.8885
     ):
         return True
 
@@ -1130,6 +1366,15 @@ def success_patterns(
     failed_pressure_to_followthrough = features_data["feature_failed_pressure_to_followthrough"]
     lowest_low_to_entry_elapsed_minutes = features_data["feature_lowest_low_to_entry_elapsed_minutes"]
     macd_recovery_followthrough_quality = features_data["feature_macd_recovery_followthrough_quality"]
+    weak_wick_volume_rejection = features_data["feature_weak_wick_volume_rejection"]
+    failed_attempts_pressure = features_data["feature_failed_attempts_pressure"]
+    bars_since_lowest_low_to_entry = features_data["feature_bars_since_lowest_low_to_entry"]
+    clean_reentry_confirmation = features_data["feature_clean_reentry_confirmation"]
+    crossed_at_least_one_bar_from_recent_bars = features_data["feature_crossed_at_least_one_bar_from_recent_bars"]
+    previous_bar_already_crossed_highest_high = features_data["feature_previous_bar_already_crossed_highest_high"]
+    strong_vwap_volume_reentry = features_data["feature_strong_vwap_volume_reentry"]
+    current_histogram_is_bigger_than_previous = features_data["feature_current_histogram_is_bigger_than_previous"]
+    late_chase_after_high = features_data["feature_late_chase_after_high"]
 
     # Success Pattern 1:
     # Clean high breakout continuation.
@@ -1138,6 +1383,10 @@ def success_patterns(
         and entry_bar_histogram_to_previous <= 0.9876351128
         and current_day_ema_9_to_ema_20 >= 1.047288046
         and total_volume >= 604175
+        and (
+            entry_volume_price_efficiency <= 0.7632405201
+            or distance_from_last_negative_macd_bar <= 11
+        )
     ):
         score += 1
         reasons.append("clean_high_breakout_continuation")
@@ -1149,6 +1398,10 @@ def success_patterns(
         and entry_bar_histogram_to_previous <= 0.9876351128
         and current_day_ema_9_to_recent_days_ema_9 >= 1.169691864
         and total_volume >= 604175
+        and (
+            entry_volume_price_efficiency <= 0.757661104
+            or distance_from_last_negative_macd_bar <= 11
+        )
     ):
         score += 1
         reasons.append("daily_ema_expansion_breakout")
@@ -1160,6 +1413,12 @@ def success_patterns(
         and minutes_since_market_open <= 44
         and total_volume <= 12725290.2
         and entry_close_position_vs_previous_close_position <= 2.482081959
+        and (
+            entry_bar_volume > 155009.25
+            or current_day_ema_20_to_recent_days_ema_20 <= 1.056790182
+            or entry_bar_open_to_ema_9 <= 1.0051742
+            or gains_since_lowest_low <= 0.0664616589
+        )
     ):
         score += 1
         reasons.append("fresh_early_reclaim")
@@ -1171,6 +1430,10 @@ def success_patterns(
         and entry_extension_pressure <= 0.2199993956
         and entry_bar_histogram_to_previous <= 1.225417414
         and entry_body_to_highest_high_body <= 14.73302478
+        and (
+            volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.9289029302
+            or entry_bar_movement_recent_bars_average <= 7.072084165
+        )
     ):
         score += 1
         reasons.append("snap_close_strength_low_extension")
@@ -1182,6 +1445,12 @@ def success_patterns(
         and entry_body_to_previous_bar_body >= 7.89129069
         and entry_bar_histogram_to_lowest_histogram <= 1
         and entry_rejection_pressure <= 0.2498751041
+        and (
+            entry_breakout_efficiency_from_ema_9 <= 0.4935715804
+            or reclaim_close_strength_since_highest_high <= 0.4322637363
+            or current_day_ema_9_to_recent_days_ema_9 <= 1.708970385
+            or entry_volume_price_efficiency > 0.2126894303
+        )
     ):
         score += 1
         reasons.append("supported_explosive_body")
@@ -1196,6 +1465,7 @@ def success_patterns(
         and entry_upper_wick_to_recent_upper_wick_average > 0.2643764615058899
         and entry_bar_volume_to_previous_bar_volume > 1.6711958050727844
         and volume_confirmation_quality > 0.3263349384069443
+        and pre_market_volume <= 24508381.2
     ):
         score += 1
         reasons.append("real_reset_with_volume_confirmation")
@@ -1210,6 +1480,11 @@ def success_patterns(
         and entry_bar_volume_to_highest_volume_in_pullback > 1.013592779636383
         and minutes_since_market_open <= 125.0
         and entry_body_to_highest_high_body > 4.575719833374023
+        and (
+            volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.7353464202
+            or clean_breakout_efficiency <= 0
+            or entry_bar_histogram_to_previous <= 0.8751089841
+        )
     ):
         score += 1
         reasons.append("strong_pullback_volume_reclaim")
@@ -1224,6 +1499,10 @@ def success_patterns(
         and pre_market_volume <= 725162.5
         and entry_body_to_previous_bar_body > 0.8507025837898254
         and entry_close_strength_to_highest_high_close_strength > 1.1331384778022766
+        and (
+            entry_volume_price_efficiency <= 0.16389987
+            or entry_breakout_efficiency_from_ema_9 > 0.3063767961
+        )
     ):
         score += 1
         reasons.append("controlled_non_chase_close_strength")
@@ -1239,6 +1518,12 @@ def success_patterns(
         and current_day_high_to_previous_high <= 2.3071115016937256
         and entry_close_position_vs_previous_close_position > 0.99399334192276
         and entry_bar_volume_to_recent_bars_average <= 1.6182057857513428
+        and (
+            reclaim_speed_from_lowest_low <= 0.6929185565
+            or entry_volume_spike_without_high_context > 1.295573914
+            or entry_body_to_recent_bars_body_average <= 1.189382887
+            or current_day_ema_9_to_ema_20 <= 0.9967936267
+        )
     ):
         score += 1
         reasons.append("supported_low_float_volume_ownership")
@@ -1254,6 +1539,11 @@ def success_patterns(
         and entry_upper_wick_to_recent_upper_wick_average <= 0.763389527797699
         and reclaim_close_strength_since_highest_high <= 0.6107226312160492
         and pre_market_volume <= 339666.0
+        and (
+            previous_bar_high_to_highest_high > 0.9887115942
+            or entry_bar_close_to_highest_high > 1.016633188
+            or entry_bar_volume > 79504.66
+        )
     ):
         score += 1
         reasons.append("supported_body_expansion_from_day_structure")
@@ -1288,6 +1578,7 @@ def success_patterns(
         and entry_close_to_previous_bar_high > 1.0965244770050049
         and entry_bar_histogram_to_highest_histogram > 1.398955523967743
         and fake_reclaim_pressure <= 0.15265937894582748
+        and entry_bar_close_to_highest_high <= 1.106389022
     ):
         score += 1
         reasons.append("supported_ema_histogram_reclaim")
@@ -1304,6 +1595,7 @@ def success_patterns(
         and volume_since_lowest_low_to_entry_vs_since_highest_high > 0.5118023157119751
         and minutes_since_market_open > 12.5
         and entry_volume_price_efficiency > 0.34550152719020844
+        and current_day_low_to_ema_9 <= 1.01415676
     ):
         score += 1
         reasons.append("mature_reset_efficiency_reclaim")
@@ -1321,6 +1613,14 @@ def success_patterns(
         and entry_close_position_vs_previous_close_position <= 2.037855386734009
         and entry_bar_movement_recent_bars_average <= 9.0991530418396
         and price_movement_from_highest_high_to_lowest_low > 0.24994999915361404
+        and (
+            entry_upper_wick_to_recent_upper_wick_average <= 1.489878601
+            or entry_volume_price_efficiency <= 0.0914612848
+            or (
+                bars_since_highest_high_to_bars_before > 0.03194444444
+                and current_day_ema_20_to_recent_days_ema_20 <= 1.168615583
+            )
+        )
     ):
         score += 1
         reasons.append("controlled_weak_body_reclaim")
@@ -1338,6 +1638,7 @@ def success_patterns(
         and entry_extension_pressure <= 0.4007411450147629
         and current_day_ema_9_to_ema_20 > 1.0398948788642883
         and pre_market_gains > 0.06045127287507057
+        and late_chase_after_high <= 0
     ):
         score += 1
         reasons.append("premarket_supported_controlled_extension")
@@ -1353,6 +1654,16 @@ def success_patterns(
         and controlled_volume_entry_quality > 88.66648483276367
         and entry_upper_wick_to_recent_upper_wick_average > 0.2643764615058899
         and entry_bar_volume_to_previous_bar_volume > 1.6711958050727844
+        and (
+            entry_bar_vwap_to_ema_20 > 0.9331148889
+            or current_day_volume_to_recent_days_volume <= 422.9847087
+            or current_day_movement_to_recent_days_movement <= 11.05521599
+            or controlled_volume_entry_quality <= 172.7556804
+            or (
+                current_day_volume_to_recent_days_volume <= 950.425369
+                and current_day_ema_9_to_ema_20 <= 1.084503536
+            )
+        )
     ):
         score += 1
         reasons.append("broad_reset_buyer_volume_confirmation")
@@ -1367,6 +1678,12 @@ def success_patterns(
         and pullback_depth_vs_pre_high_move > 0.48088546097278595
         and controlled_volume_entry_quality > 88.66648483276367
         and entry_bar_volume_to_highest_volume_in_pullback > 1.271771490573883
+        and (
+            entry_bar_volume_to_volume_average > 2.80820461
+            or entry_bar_open_to_ema_9 > 1.01936471
+            or pullback_depth_vs_pre_high_move > 1.733580424
+            or entry_bar_volume_to_total_volume <= 0.0192017821
+        )
     ):
         score += 1
         reasons.append("broad_reset_efficiency_reclaim")
@@ -1379,6 +1696,12 @@ def success_patterns(
         distance_from_last_negative_macd_bar <= 0
         and minutes_since_market_open <= 39
         and entry_bar_vwap_to_ema_20 > 0.953998
+        and (
+            entry_bar_volume_to_highest_high_volume <= 1.368278618
+            or current_day_ema_20_to_recent_days_ema_20 <= 1.030645218
+            or entry_bar_movement_recent_bars_average <= 3.982817294
+            or entry_bar_lower_wick > 0.1253896104
+        )
     ):
         score += 1
         reasons.append("fresh_supported_reclaim_before_macd_stale")
@@ -1392,6 +1715,10 @@ def success_patterns(
         and entry_close_to_previous_bar_high <= 1.064691
         and distance_from_last_negative_macd_bar <= 4
         and volume_without_macd_confirmation > 1.333612
+        and (
+            emas_distances_to_recent_bars_ema_distances > 0.0933982807
+            or current_day_ema_9_to_ema_20 <= 1.082003055
+        )
     ):
         score += 1
         reasons.append("fresh_supported_volume_reclaim_no_chase")
@@ -1421,6 +1748,7 @@ def success_patterns(
         and entry_bar_volume_to_previous_bar_volume >= 2.32971107929
         and entry_bar_volume_to_recent_bars_average >= 2.41328487682
         and entry_bar_volume_to_total_volume >= 0.015
+        and failed_pressure_to_followthrough <= 0.5579329452
     ):
         score += 1
         reasons.append("supported_day_volume_rotation")
@@ -1527,6 +1855,10 @@ def success_patterns(
         and current_day_ema_9_to_recent_days_ema_9 <= 1.266073
         and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.643274
         and entry_bar_body > 0.806196
+        and (
+            entry_body_to_recent_bars_body_average <= 8.434378194
+            or previous_bar_volume_to_its_previous_volume > 0.906032568
+        )
     ):
         score += 1
         reasons.append("refined_broad_supported_base_reclaim")
@@ -1665,317 +1997,6 @@ def success_patterns(
     ):
         score += 1
         reasons.append("untagged_clean_rejection_volume_reclaim")
-
-    # Safe Positive Variant 1:
-    # Broad reset-volume confirmation where low-to-entry volume stays controlled
-    # versus the post-high volume, and entry volume is meaningful.
-    # Covers: 65 positives / 0 FP
-    if (
-        "reset_volume_confirmation" in reasons
-        and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.770058
-        and entry_bar_volume > 84684.6
-    ):
-        score += 1
-        reasons.append("safe_reset_volume_confirmation_volume_balance")
-
-    # Safe Positive Variant 2:
-    # Close-strength non-chase where recent bars are not too one-sided
-    # and entry opens above EMA9 support.
-    # Covers: 49 positives / 0 FP
-    if (
-        "close_strength_non_chase" in reasons
-        and recent_bars_positive_bars_pct <= 0.7
-        and entry_bar_open_to_ema_9 > 1.000809
-    ):
-        score += 1
-        reasons.append("safe_close_strength_non_chase_base")
-
-    # Safe Positive Variant 3:
-    # Broad reset buyer-volume case with controlled daily VWAP expansion,
-    # no excessive entry-volume spike, and enough wick/participation.
-    # Covers: 38 positives / 0 FP
-    if (
-        "broad_reset_buyer_volume" in reasons
-        and current_day_vwap_to_recent_days <= 1.979262
-        and entry_volume_spike_without_high_context <= 2.574231
-        and entry_upper_wick_to_recent_upper_wick_average > 0.240062
-    ):
-        score += 1
-        reasons.append("safe_broad_reset_clean_volume")
-
-    # Safe Positive Variant 4:
-    # Breakout expansion that is not histogram-overextended
-    # and still occurs inside a reasonable market-open window.
-    # Covers: 32 positives / 0 FP
-    if (
-        "breakout_expansion" in reasons
-        and entry_bar_histogram_to_lowest_histogram <= 2.438529
-        and minutes_since_market_open <= 314.0
-    ):
-        score += 1
-        reasons.append("safe_breakout_expansion_histogram_time")
-
-    # Safe Positive Variant 5:
-    # Fresh supported volume reclaim with real body expansion,
-    # previous bar still near the highest high, and no oversized entry-volume chase.
-    # Covers: 30 positives / 0 FP
-    if (
-        "fresh_supported_volume_reclaim" in reasons
-        and entry_bar_body > 0.507875
-        and previous_bar_high_to_highest_high > 0.961338
-        and entry_bar_volume <= 879005.6
-    ):
-        score += 1
-        reasons.append("safe_fresh_supported_volume_reclaim_body")
-
-    # Safe Positive Variant 6:
-    # Refined supported base reclaim with controlled breakout efficiency,
-    # some profit-per-bar expansion, and healthy pullback structure.
-    # Covers: 29 positives / 0 FP
-    if (
-        "refined_broad_supported_base_reclaim" in reasons
-        and entry_breakout_efficiency_from_ema_9 <= 0.891129
-        and profit_since_open_to_bars_count_since_open > 0.000791
-        and pullback_health > 0.659266
-    ):
-        score += 1
-        reasons.append("safe_refined_supported_base_reclaim")
-
-    # Safe Positive Variant 7:
-    # Fresh timing case with controlled entry movement,
-    # enough recent upward participation, and strong close-position followthrough.
-    # Covers: 28 positives / 0 FP
-    if (
-        "fresh_timing" in reasons
-        and entry_bar_movement_recent_bars_average <= 5.811589
-        and recent_bars_up_trend_pct > 0.35
-        and entry_close_position_vs_previous_close_position > 0.936711
-    ):
-        score += 1
-        reasons.append("safe_fresh_timing_close_followthrough")
-
-    # Safe Positive Variant 8:
-    # Explosive body support where reclaim close-strength is not too stretched,
-    # MACD recovery is still fresh, and EMA9 breakout efficiency stays controlled.
-    # Covers: 28 positives / 0 FP
-    if (
-        "explosive_body_support" in reasons
-        and reclaim_close_strength_since_highest_high <= 0.729485
-        and macd_recovery_age_quality <= 12.539876
-        and entry_breakout_efficiency_from_ema_9 <= 0.834276
-    ):
-        score += 1
-        reasons.append("safe_explosive_body_controlled_macd")
-
-    # Safe Positive Variant:
-    # Real reset with volume confirmation, but without extreme total-liquidity expansion.
-    # Covers: 41 positives / 0 FP
-    if (
-        "real_reset_with_volume_confirmation" in reasons
-        and total_volume <= 62889928.8
-    ):
-        score += 1
-        reasons.append("safe_real_reset_volume_confirmation_liquidity_control")
-
-    # Safe Positive Variant:
-    # Broad reset buyer-volume confirmation with clean expansion.
-    # Keeps the buyer-volume reset but removes the overextended daily-movement cases.
-    # Covers: 38 positives / 0 FP
-    if (
-        "broad_reset_buyer_volume_confirmation" in reasons
-        and entry_volume_spike_without_high_context <= 3.08358017
-        and current_day_movement_to_recent_days_movement <= 18.6383137
-    ):
-        score += 1
-        reasons.append("safe_broad_reset_buyer_volume_confirmation_clean_expansion")
-
-    # Safe Positive Variant:
-    # Fresh MACD acceleration where entry volume is a meaningful part of total volume.
-    # Covers: 33 positives / 0 FP
-    if (
-        "fresh_macd_acceleration_controlled_pace" in reasons
-        and entry_bar_volume_to_total_volume > 0.0127641446
-    ):
-        score += 1
-        reasons.append("safe_fresh_macd_acceleration_volume_participation")
-
-    # Safe Positive Variant:
-    # Strong pullback volume reclaim, but only after real distance from the high
-    # and without a previous-volume blowoff.
-    # Covers: 33 positives / 0 FP
-    if (
-        "strong_pullback_volume_reclaim" in reasons
-        and previous_bar_volume_to_its_previous_volume <= 1.77033687
-        and distance_from_highest_high > 2
-    ):
-        score += 1
-        reasons.append("safe_strong_pullback_volume_reclaim_after_distance")
-
-    # Safe Positive Variant:
-    # Clean high breakout continuation with controlled histogram extension.
-    # Covers: 31 positives / 0 FP
-    if (
-        "clean_high_breakout_continuation" in reasons
-        and entry_volume_price_efficiency <= 1.60443805
-        and entry_bar_histogram_to_lowest_histogram <= 2.43852923
-    ):
-        score += 1
-        reasons.append("safe_clean_high_breakout_histogram_control")
-
-    # Safe Positive Variant:
-    # Supported base reclaim where highest-high quality is low enough
-    # to avoid the more dangerous extension/chase cases.
-    # Covers: 29 positives / 0 FP
-    if (
-        "safe_refined_supported_base_reclaim" in reasons
-        and highest_high_quality <= 1.33356595
-    ):
-        score += 1
-        reasons.append("safe_supported_base_reclaim_low_high_quality")
-
-    # Safe Positive Variant:
-    # Controlled non-chase close-strength with clean pullback movement
-    # and no extreme premarket stretch.
-    # Covers: 26 positives / 0 FP
-    if (
-        "controlled_non_chase_close_strength" in reasons
-        and price_movement_from_highest_high_to_lowest_low <= 0.92
-        and pre_market_gains <= 0.0875621891
-    ):
-        score += 1
-        reasons.append("safe_controlled_non_chase_close_strength_clean_pullback")
-
-    # Safe Positive Variant:
-    # Real reset with controlled rejection pressure and acceptable EMA9 daily context.
-    # Covers: 45 positives / 0 FP
-    if (
-        "real_reset_with_volume_confirmation" in reasons
-        and entry_rejection_pressure <= 0.4971486222
-        and current_day_ema_9_to_recent_days_ema_9 <= 1.527511594
-    ):
-        score += 1
-        reasons.append("safe_real_reset_rejection_ema_context")
-
-    # Safe Positive Variant:
-    # Broad reset buyer-volume confirmation with controlled entry spike and liquidity.
-    # Covers: 41 positives / 0 FP
-    if (
-        "broad_reset_buyer_volume_confirmation" in reasons
-        and entry_volume_spike_without_high_context <= 2.814302399
-        and total_volume <= 74729905.95
-    ):
-        score += 1
-        reasons.append("safe_broad_reset_buyer_clean_liquidity")
-
-    # Safe Positive Variant:
-    # Strong pullback reclaim without previous-bar blowoff and without extreme body expansion.
-    # Covers: 37 positives / 0 FP
-    if (
-        "strong_pullback_volume_reclaim" in reasons
-        and previous_bar_volume_to_its_previous_volume <= 2.126178413
-        and entry_body_to_recent_bars_body_average <= 13.59989672
-    ):
-        score += 1
-        reasons.append("safe_strong_pullback_no_prior_blowoff")
-
-    # Safe Positive Variant:
-    # Clean high breakout where close-strength is real and recent bars still show participation.
-    # Covers: 35 positives / 0 FP
-    if (
-        "clean_high_breakout_continuation" in reasons
-        and entry_close_strength_to_highest_high_close_strength > 0.5433462246
-        and recent_bars_positive_bars_pct > 0.4
-    ):
-        score += 1
-        reasons.append("safe_clean_high_close_strength_continuation")
-
-    # Safe Positive Variant:
-    # Daily EMA expansion breakout with efficient volume/price behavior and participation.
-    # Covers: 32 positives / 0 FP
-    if (
-        "daily_ema_expansion_breakout" in reasons
-        and entry_volume_price_efficiency <= 1.495320283
-        and recent_bars_positive_bars_pct > 0.4
-    ):
-        score += 1
-        reasons.append("safe_daily_ema_expansion_efficient_participation")
-
-    # Safe Positive Variant:
-    # Broad reset efficiency reclaim with low-to-entry volume balance and some premarket strength.
-    # Covers: 32 positives / 0 FP
-    if (
-        "broad_reset_efficiency_reclaim" in reasons
-        and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.801966641
-        and pre_market_gains > 0.01146131805
-    ):
-        score += 1
-        reasons.append("safe_broad_reset_efficiency_premarket_volume_balance")
-
-    # Safe Positive Variant:
-    # Controlled non-chase close-strength with VWAP/day context under control.
-    # Covers: 29 positives / 0 FP
-    if (
-        "controlled_non_chase_close_strength" in reasons
-        and current_day_vwap_to_recent_days <= 2.016561739
-        and entry_bar_open_to_ema_9 > 0.9984208946
-    ):
-        score += 1
-        reasons.append("safe_controlled_non_chase_vwap_base")
-
-    # Safe Positive Variant:
-    # Fresh supported volume reclaim where previous bar remains near high context.
-    # Covers: 29 positives / 0 FP
-    if (
-        "fresh_supported_volume_reclaim_no_chase" in reasons
-        and previous_bar_high_to_highest_high > 0.9569656773
-        and current_day_low_to_ema_9 > 0.836463179
-    ):
-        score += 1
-        reasons.append("safe_fresh_supported_near_high_base")
-
-    # Safe Positive Variant:
-    # Snap close-strength with meaningful entry volume versus highest-high volume.
-    # Covers: 28 positives / 0 FP
-    if (
-        "snap_close_strength_low_extension" in reasons
-        and recent_bars_positive_bars_pct <= 0.7
-        and entry_bar_volume_to_highest_high_volume > 0.7509705684
-    ):
-        score += 1
-        reasons.append("safe_snap_close_strength_volume_confirmation")
-
-    # Safe Positive Variant:
-    # Supported body expansion from day structure with clean participation.
-    # Covers: 28 positives / 0 FP
-    if (
-        "supported_body_expansion_from_day_structure" in reasons
-        and entry_volume_spike_without_high_context <= 4.070191289
-        and recent_bars_positive_bars_pct <= 0.7
-    ):
-        score += 1
-        reasons.append("safe_supported_body_day_structure_clean_participation")
-
-    # Safe Positive Variant:
-    # Fresh reclaim before MACD stale with controlled body expansion and close followthrough.
-    # Covers: 27 positives / 0 FP
-    if (
-        "fresh_supported_reclaim_before_macd_stale" in reasons
-        and entry_body_to_recent_bars_body_average <= 5.953984864
-        and entry_close_position_vs_previous_close_position > 0.858351
-    ):
-        score += 1
-        reasons.append("safe_fresh_reclaim_macd_close_followthrough")
-
-    # Safe Positive Variant:
-    # Refined base reclaim with controlled EMA9 breakout efficiency and volume-average behavior.
-    # Covers: 26 positives / 0 FP
-    if (
-        "refined_broad_supported_base_reclaim" in reasons
-        and entry_breakout_efficiency_from_ema_9 <= 0.8129578009
-        and entry_bar_volume_to_volume_average <= 7.39324826
-    ):
-        score += 1
-        reasons.append("safe_refined_base_reclaim_efficiency_volume_control")
 
     # Mined Feature-Only Positive Pattern:
     # mined_broad_distance_body_macd_reclaim
@@ -2340,6 +2361,303 @@ def success_patterns(
         score += 1
         reasons.append("mined_untagged_daily_extension_histogram_reclaim")
 
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_low_rejection_volume_base
+    # Covers: 16 positives / 0 FP
+    # Includes: 3 currently untagged positives, 13 already-tagged positives
+    # Conditions: 12
+    if (
+        weak_wick_volume_rejection <= 0.8267089309
+        and entry_volume_price_efficiency <= 13.54870455
+        and current_day_volume_to_recent_days_volume <= 757.3834509
+        and current_day_ema_9_to_recent_days_ema_9 <= 2.225949322
+        and current_day_ema_20_to_recent_days_ema_20 <= 1.075124718
+        and entry_bar_lower_wick > 0.006737036502
+        and entry_bar_ema_9_to_ema_20 <= 1.06134999
+        and failed_attempts_pressure <= 0.9366171075
+        and bars_since_lowest_low_to_entry > 11.68045476
+        and volume_since_lowest_low_to_entry_vs_since_highest_high > 0.5967076417
+        and profit_since_open_to_bars_count_since_open > 0.00546872876
+        and entry_bar_volume_to_volume_average <= 8.764365613
+    ):
+        score += 1
+        reasons.append("mined_remaining_low_rejection_volume_base")
+
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_controlled_rejection_body_reclaim
+    # Covers: 13 positives / 0 FP
+    # Includes: 3 currently untagged positives, 10 already-tagged positives
+    # Conditions: 11
+    if (
+        weak_wick_volume_rejection <= 0.4675156737
+        and clean_breakout_efficiency <= 0.6213551525
+        and entry_rejection_pressure > 0.09344328609
+        and entry_rejection_pressure <= 0.7751065391
+        and entry_followthrough_after_near_reclaim <= 1.58449653
+        and current_day_movement_to_recent_days_movement <= 40.66453227
+        and entry_bar_body > 0.451868423
+        and entry_bar_upper_wick <= 0.3756447434
+        and gains_since_lowest_low > 0.3931919675
+        and distance_from_last_negative_macd_bar <= 11.62031027
+        and pre_market_volume <= 11956998.67
+    ):
+        score += 1
+        reasons.append("mined_remaining_controlled_rejection_body_reclaim")
+
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_histogram_vwap_reclaim
+    # Covers: 13 positives / 0 FP
+    # Includes: 3 currently untagged positives, 10 already-tagged positives
+    # Conditions: 12
+    if (
+        volume_confirmation_quality <= 1.00665296
+        and current_day_vwap_to_recent_days <= 3.087522314
+        and current_day_high_to_previous_high <= 4.236543187
+        and entry_bar_upper_wick <= 0.1416590098
+        and entry_bar_lower_wick <= 0.5526584537
+        and entry_bar_ema_9_to_ema_20 > 1.010502795
+        and entry_breakout_efficiency_from_ema_9 > -10.91856465
+        and recent_bars_up_trend_pct <= 0.5219878486
+        and reclaim_speed_from_lowest_low <= 10.73887275
+        and entry_bar_vwap_to_ema_20 <= 0.9723256055
+        and entry_bar_histogram_to_highest_histogram <= 10.67842787
+        and histogram_changed_to_positive_direction_vs_negative_pct > 1.074236088
+    ):
+        score += 1
+        reasons.append("mined_remaining_histogram_vwap_reclaim")
+
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_clean_reentry_volume_balance
+    # Covers: 11 positives / 0 FP
+    # Includes: 3 currently untagged positives, 8 already-tagged positives
+    # Conditions: 10
+    if (
+        clean_reentry_confirmation > 0.1018242022
+        and macd_recovery_age_quality <= 35.56919472
+        and volume_confirmation_quality <= 3.90772414
+        and entry_bar_low_to_ema_9 > 0.9657317152
+        and crossed_at_least_one_bar_from_recent_bars > 0.2646963584
+        and previous_bar_close_to_highest_high <= 1.008240985
+        and reclaim_close_strength_since_highest_high > 0.6533897158
+        and entry_bar_volume_to_volume_average <= 3.029036107
+        and positive_vs_negative_volume_during_pullback > 0.9680152797
+        and positive_vs_negative_volume_during_pullback <= 2.122585019
+    ):
+        score += 1
+        reasons.append("mined_remaining_clean_reentry_volume_balance")
+
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_high_ema_body_reclaim
+    # Covers: 8 positives / 0 FP
+    # Includes: 3 currently untagged positives, 5 already-tagged positives
+    # Conditions: 12
+    if (
+        clean_breakout_efficiency <= 0.5521400336
+        and volume_without_macd_confirmation <= 1.189778951
+        and macd_recovery_followthrough_quality <= 42.03586994
+        and current_day_low_to_ema_9 <= 1.290495366
+        and entry_bar_close_to_highest_high > 1.026396429
+        and entry_bar_lower_wick > 0.02515218016
+        and entry_bar_open_to_ema_9 <= 1.034347602
+        and entry_bar_ema_9_to_ema_20 > 1.041769086
+        and previous_bar_already_crossed_highest_high <= 0.1742370134
+        and previous_bar_close_to_highest_high <= 1.009323884
+        and profit_since_open_to_bars_count_since_open <= 0.00866881372
+        and entry_bar_volume_to_recent_bars_average <= 2.227198621
+    ):
+        score += 1
+        reasons.append("mined_remaining_high_ema_body_reclaim")
+
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_clean_breakout_failed_pressure_reclaim
+    # Covers: 8 positives / 0 FP
+    # Includes: 3 currently untagged positives, 5 already-tagged positives
+    # Conditions: 12
+    if (
+        clean_breakout_efficiency > 0.8679911321
+        and failed_pressure_to_followthrough <= 0.2806502301
+        and current_day_volume_to_recent_days_volume <= 2151.330641
+        and current_day_ema_9_to_ema_20 <= 2.068578148
+        and gains_until_entry_bar > 0.6508998443
+        and gains_until_entry_bar <= 3.315219202
+        and failed_attempts_pressure > 0.2393804472
+        and entry_body_to_recent_bars_body_average <= 28.41616542
+        and highest_high_to_entry_elapsed_minutes <= 289.5805694
+        and entry_close_to_lowest_low_recovery <= 2.556267822
+        and bars_since_highest_high_to_bars_before <= 0.2501828326
+        and distance_from_last_negative_macd_bar <= 7.587303113
+    ):
+        score += 1
+        reasons.append("mined_remaining_clean_breakout_failed_pressure_reclaim")
+
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_compressed_body_volume_reclaim
+    # Covers: 11 positives / 0 FP
+    # Includes: 2 currently untagged positives, 9 already-tagged positives
+    # Conditions: 8
+    if (
+        entry_bar_body <= 0.7768401479
+        and entry_bar_ema_9_to_ema_20 <= 1.021455112
+        and entry_bar_movement_recent_bars_average > 4.413576269
+        and recent_bars_up_trend_pct <= 0.4243145738
+        and entry_close_to_previous_bar_close > 1.018255787
+        and positive_vs_negative_volume_during_pullback <= 1.14657416
+        and entry_bar_volume_to_previous_bar_volume > 1.725867421
+        and entry_bar_volume_to_previous_bar_volume <= 47.81485838
+    ):
+        score += 1
+        reasons.append("mined_remaining_compressed_body_volume_reclaim")
+
+    # Mined Remaining Positive Pattern:
+    # mined_remaining_clean_reentry_fake_pressure_reclaim
+    # Covers: 8 positives / 0 FP
+    # Includes: 3 currently untagged positives, 5 already-tagged positives
+    # Conditions: 7
+    if (
+        clean_reentry_confirmation > 0.7113957134
+        and near_high_weak_followthrough <= 0.9531700096
+        and fake_reclaim_pressure > 0.4975582556
+        and current_day_low_to_ema_9 > 0.8086961169
+        and entry_bar_movement_recent_bars_average > 2.936756911
+        and entry_breakout_efficiency_from_ema_9 > 0.487023271
+        and previous_bar_high_to_highest_high <= 1.026179614
+    ):
+        score += 1
+        reasons.append("mined_remaining_clean_reentry_fake_pressure_reclaim")
+
+    # Mined Final Positive Pattern:
+    # mined_final_body_high_reclaim_balance
+    # Covers: 13 positives / 0 FP
+    # Includes: 3 currently untagged positives, 10 already-tagged positives
+    # Conditions: 6
+    if (
+        current_day_vwap_to_recent_days <= 3.0883252621
+        and entry_body_to_highest_high_body > 0.7158285677
+        and entry_body_to_previous_bar_body <= 1.3461538553
+        and entry_close_position_vs_previous_close_position > 0.8199965954
+        and entry_close_to_previous_bar_high <= 1.022669971
+        and volume_since_lowest_low_to_entry_vs_since_highest_high <= 0.9546654224
+    ):
+        score += 1
+        reasons.append("mined_final_body_high_reclaim_balance")
+
+    # Mined Final Positive Pattern:
+    # mined_final_histogram_volume_reclaim
+    # Covers: 7 positives / 0 FP
+    # Includes: 3 currently untagged positives, 4 already-tagged positives
+    # Conditions: 13
+    if (
+        current_day_ema_20_to_recent_days_ema_20 > 0.8869609237
+        and current_day_movement_to_recent_days_movement > 0.6063295007
+        and entry_bar_histogram_to_highest_histogram > 0.5869852006
+        and entry_bar_upper_wick <= 0.3582621068
+        and entry_bar_volume_to_recent_bars_average > 1.035813272
+        and entry_bar_volume_to_recent_bars_average <= 1.4356510639
+        and entry_bar_vwap_to_ema_20 > 0.948479861
+        and entry_bar_vwap_to_ema_20 <= 1.0228150487
+        and entry_body_to_recent_bars_body_average > 0.7887629867
+        and entry_rejection_pressure <= 0.668664068
+        and entry_volume_price_efficiency > 0.021060274
+        and failed_attempts_pressure > 0.5981762707
+        and macd_recovery_followthrough_quality <= 47.7695560455
+    ):
+        score += 1
+        reasons.append("mined_final_histogram_volume_reclaim")
+
+    # Mined Final Positive Pattern:
+    # mined_final_early_uptrend_low_rejection_reclaim
+    # Covers: 8 positives / 0 FP
+    # Includes: 2 currently untagged positives, 6 already-tagged positives
+    # Conditions: 13
+    if (
+        bars_above_volume_average_vs_under_since_highest_high <= 1.2346978034
+        and entry_bar_histogram_to_highest_histogram <= 47.1856528401
+        and entry_bar_upper_wick <= 0.5343652246
+        and entry_bar_volume_to_highest_volume_in_pullback <= 0.9580695784
+        and entry_close_to_previous_bar_high <= 2.6711447535
+        and entry_rejection_pressure <= 0.0750613524
+        and entry_volume_price_efficiency <= 13.6050896871
+        and gains_since_lowest_low <= 0.8451647291
+        and histogram_changed_to_positive_direction_vs_negative_pct > 0.7944070617
+        and minutes_since_market_open <= 72.0747458479
+        and recent_bars_up_trend_pct > 0.684337374
+        and strong_vwap_volume_reentry <= 0.7865783888
+        and volume_confirmation_quality <= 12.316440904
+    ):
+        score += 1
+        reasons.append("mined_final_early_uptrend_low_rejection_reclaim")
+
+    # Mined Final Positive Pattern:
+    # mined_final_high_quality_wick_reclaim
+    # Covers: 14 positives / 0 FP
+    # Includes: 2 currently untagged positives, 12 already-tagged positives
+    # New untagged gain after earlier rules: 1
+    # Conditions: 12
+    if (
+        current_histogram_is_bigger_than_previous <= 0.9152817702
+        and entry_bar_upper_wick > 0.1627729364
+        and entry_bar_volume_to_highest_high_volume <= 2.2357392947
+        and entry_body_to_previous_bar_body > -2.2648822603
+        and entry_close_position_vs_previous_close_position <= 10.1107738003
+        and entry_rejection_pressure <= 0.5744646023
+        and highest_high_quality > 11.9448701502
+        and macd_recovery_age_quality <= 23.4001856429
+        and pre_market_gains <= 3.8039290651
+        and recent_bars_positive_bars_pct <= 0.6590139116
+        and reclaim_speed_from_lowest_low <= 1.3731545122
+        and weak_wick_volume_rejection <= 0.6614048959
+    ):
+        score += 1
+        reasons.append("mined_final_high_quality_wick_reclaim")
+
+    # Mined Final Positive Pattern:
+    # mined_final_high_recent_day_quiet_volume_reclaim
+    # Covers: 4 positives / 0 FP
+    # Includes: 2 currently untagged positives, 2 already-tagged positives
+    # New untagged gain after earlier rules: 1
+    # Conditions: 13
+    if (
+        clean_reentry_confirmation <= 0.7837463048
+        and current_day_high_to_previous_high <= 3.9678742432
+        and current_day_high_to_recent_days_highs > 3.0481580699
+        and entry_bar_volume_to_highest_volume_in_pullback <= 0.7926409544
+        and entry_close_to_vwap <= 1.8788432603
+        and entry_rejection_pressure <= 2.1429751665
+        and entry_volume_price_efficiency > -0.0499494257
+        and entry_volume_spike_without_high_context <= 5.457498789
+        and lowest_low_to_entry_elapsed_minutes <= 43.5558783
+        and macd_recovery_age_quality <= 23.036249387
+        and pre_market_gains <= 3.772352479
+        and volume_confirmation_quality <= 1.2791586105
+        and weak_wick_volume_rejection <= 0.2287135754
+    ):
+        score += 1
+        reasons.append("mined_final_high_recent_day_quiet_volume_reclaim")
+
+    # Mined Final Positive Pattern:
+    # mined_final_fast_macd_reclaim
+    # Covers: 17 positives / 0 FP
+    # Includes: 1 currently untagged positive, 16 already-tagged positives
+    # New untagged gain after earlier rules: 1
+    # Conditions: 13
+    if (
+        crossed_at_least_one_bar_from_recent_bars > 0.4007793737
+        and distance_from_last_negative_macd_bar <= 5.3003959517
+        and emas_distances_to_recent_bars_ema_distances <= 0.5944158853
+        and entry_bar_body > 0.36835787
+        and entry_bar_macd_to_previous > 0.5655529421
+        and gains_until_entry_bar <= 5.075028692
+        and previous_bar_already_crossed_highest_high <= 0.0892275428
+        and recent_bars_up_trend_pct > 0.7804952703
+        and reclaim_close_strength_since_highest_high > 0.0711445648
+        and reclaim_close_strength_since_highest_high <= 0.8034318679
+        and reclaim_speed_from_lowest_low <= 0.5568540645
+        and strong_vwap_volume_reentry <= 0.4440994903
+        and uptrend_histogram_vs_downtrend_since_highest_high <= 2.6369301708
+    ):
+        score += 1
+        reasons.append("mined_final_fast_macd_reclaim")
+
     return score, reasons
 
 def positive_reason_groups(
@@ -2545,6 +2863,24 @@ def positive_reason_groups(
             "mined_broad_simple_low_ema_volume_efficiency",
             "mined_untagged_body_volume_balance_reclaim",
             "mined_untagged_daily_extension_histogram_reclaim",
+        },
+        "mined_remaining_feature_only_rescue": {
+            "mined_remaining_low_rejection_volume_base",
+            "mined_remaining_controlled_rejection_body_reclaim",
+            "mined_remaining_histogram_vwap_reclaim",
+            "mined_remaining_clean_reentry_volume_balance",
+            "mined_remaining_high_ema_body_reclaim",
+            "mined_remaining_clean_breakout_failed_pressure_reclaim",
+            "mined_remaining_compressed_body_volume_reclaim",
+            "mined_remaining_clean_reentry_fake_pressure_reclaim",
+        },
+        "mined_final_feature_only_rescue": {
+            "mined_final_body_high_reclaim_balance",
+            "mined_final_histogram_volume_reclaim",
+            "mined_final_early_uptrend_low_rejection_reclaim",
+            "mined_final_high_quality_wick_reclaim",
+            "mined_final_high_recent_day_quiet_volume_reclaim",
+            "mined_final_fast_macd_reclaim",
         },
     }
 
