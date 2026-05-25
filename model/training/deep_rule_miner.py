@@ -980,7 +980,10 @@ def local_expand_rules(
 # ======================================================================================
 
 def write_variable_declarations(feature_cols: Sequence[str], outpath: Path) -> None:
-    lines = []
+    lines = [
+        f"{"#type: ignore"}\n",
+        f"{"#pylint: skip-file"}\n",
+    ]
     for feat in sorted(feature_cols):
         var = feature_to_var(feat)
         lines.append(f'{var} = features_data["{feat}"]')

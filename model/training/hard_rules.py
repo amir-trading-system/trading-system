@@ -1118,6 +1118,18 @@ def success_patterns(
     uptrend_histogram_vs_downtrend_since_highest_high = features_data["feature_uptrend_histogram_vs_downtrend_since_highest_high"]
     entry_followthrough_after_near_reclaim = features_data["feature_entry_followthrough_after_near_reclaim"]
     entry_close_to_previous_bar_close = features_data["feature_entry_close_to_previous_bar_close"]
+    bars_above_volume_average_vs_under_since_highest_high = features_data["feature_bars_above_volume_average_vs_under_since_highest_high"]
+    clean_breakout_efficiency = features_data["feature_clean_breakout_efficiency"]
+    current_day_ema_20_to_recent_days_ema_20 = features_data["feature_current_day_ema_20_to_recent_days_ema_20"]
+    current_day_volume_to_recent_days_volume = features_data["feature_current_day_volume_to_recent_days_volume"]
+    entry_bar_ema_9_to_ema_20 = features_data["feature_entry_bar_ema_9_to_ema_20"]
+    entry_bar_lower_wick = features_data["feature_entry_bar_lower_wick"]
+    entry_bar_upper_wick = features_data["feature_entry_bar_upper_wick"]
+    entry_close_to_lowest_low_recovery = features_data["feature_entry_close_to_lowest_low_recovery"]
+    entry_close_to_vwap = features_data["feature_entry_close_to_vwap"]
+    failed_pressure_to_followthrough = features_data["feature_failed_pressure_to_followthrough"]
+    lowest_low_to_entry_elapsed_minutes = features_data["feature_lowest_low_to_entry_elapsed_minutes"]
+    macd_recovery_followthrough_quality = features_data["feature_macd_recovery_followthrough_quality"]
 
     # Success Pattern 1:
     # Clean high breakout continuation.
@@ -1965,6 +1977,369 @@ def success_patterns(
         score += 1
         reasons.append("safe_refined_base_reclaim_efficiency_volume_control")
 
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_distance_body_macd_reclaim
+    # Covers: 32 positives / 0 FP
+    # Includes: 12 currently untagged positives, 20 already-tagged positives
+    # Conditions: 16
+    if (
+        current_day_volume_to_recent_days_volume <= 1103.55899
+        and distance_from_highest_high > 4.5
+        and emas_distances_to_recent_bars_ema_distances > 0.1017406285
+        and entry_bar_body > 0.5407562554
+        and entry_bar_body <= 0.9875641167
+        and entry_bar_histogram_to_lowest_histogram <= 2.350764155
+        and entry_bar_lower_wick <= 0.1653926373
+        and entry_bar_macd_to_previous > 0.5137349814
+        and entry_bar_movement_recent_bars_average > 4.379752636
+        and entry_close_strength_to_highest_high_close_strength <= 5.48837018
+        and entry_close_to_previous_bar_close > 1.069625795
+        and entry_close_to_previous_bar_high <= 1.20044136
+        and macd_recovery_followthrough_quality <= 36.72091484
+        and minutes_since_market_open > 12.5
+        and price_movement_from_highest_high_to_lowest_low > 0.3549499959
+        and reclaim_speed_from_lowest_low > 0.09627187625
+    ):
+        score += 1
+        reasons.append("mined_broad_distance_body_macd_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_daily_ema_distance_clean_reclaim
+    # Covers: 33 positives / 0 FP
+    # Includes: 4 currently untagged positives, 29 already-tagged positives
+    # Conditions: 17
+    if (
+        current_day_ema_9_to_ema_20_distance_to_recent_days > 3.230713725
+        and current_day_movement_to_recent_days_movement > 1.175007463
+        and emas_distances_to_recent_bars_ema_distances > 0.0807254687
+        and entry_bar_ema_9_to_vwap <= 1.296068549
+        and entry_bar_low_to_ema_9 > 0.98511976
+        and entry_bar_lower_wick <= 0.2738636434
+        and entry_bar_upper_wick <= 0.2641544789
+        and entry_bar_volume_to_previous_bar_volume > 1.154551983
+        and entry_bar_volume_to_recent_bars_average > 1.799685419
+        and entry_bar_vwap_to_ema_20 <= 1.021435022
+        and entry_body_to_previous_bar_body <= 58
+        and entry_close_strength_to_highest_high_close_strength <= 3.271921515
+        and entry_extension_pressure <= 0.650565505
+        and entry_rejection_pressure <= 0.2157036513
+        and entry_volume_price_efficiency > 0.0350418631
+        and pre_market_gains <= 0.06031775661
+        and price_movement_from_highest_high_to_lowest_low > 0.05749999918
+    ):
+        score += 1
+        reasons.append("mined_broad_daily_ema_distance_clean_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_volume_controlled_histogram_reclaim
+    # Covers: 24 positives / 0 FP
+    # Includes: 7 currently untagged positives, 17 already-tagged positives
+    # Conditions: 16
+    if (
+        current_day_high_to_previous_high <= 2.46967268
+        and entry_bar_histogram_to_previous <= 1.709322274
+        and entry_bar_low_to_ema_9 > 0.9854449034
+        and entry_bar_volume <= 972500
+        and entry_body_to_highest_high_body > 0.6324675381
+        and entry_body_to_previous_bar_body > 0.9956383705
+        and entry_body_to_recent_bars_body_average > 1.353095055
+        and entry_rejection_pressure <= 0.7701000273
+        and entry_volume_spike_without_high_context > 1.034627497
+        and macd_recovery_age_quality <= 33.87496567
+        and macd_recovery_followthrough_quality > 17.47827625
+        and minutes_since_market_open > 16
+        and near_high_weak_followthrough > 0.6956980228
+        and price_movement_from_highest_high_to_lowest_low <= 0.6523499787
+        and profit_since_open_to_bars_count_since_open <= 0.04048698023
+        and volume_since_highest_high_to_volume_before > 0.04197785445
+    ):
+        score += 1
+        reasons.append("mined_broad_volume_controlled_histogram_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_volume_pullback_followthrough_reclaim
+    # Covers: 25 positives / 0 FP
+    # Includes: 6 currently untagged positives, 19 already-tagged positives
+    # Conditions: 16
+    if (
+        bars_above_volume_average_vs_under_since_highest_high <= 0.9204545617
+        and bars_since_highest_high_to_bars_before > 0.03110119049
+        and bars_since_highest_high_to_bars_before <= 1.154176414
+        and entry_bar_ema_9_to_ema_20 <= 1.050940275
+        and entry_bar_macd_to_previous <= 0.8789401948
+        and entry_bar_movement_recent_bars_average <= 7.791760683
+        and entry_bar_open_to_ema_9 <= 1.016707778
+        and entry_body_to_recent_bars_body_average > 1.353095055
+        and entry_followthrough_after_near_reclaim > 1.049783051
+        and gains_since_lowest_low > 0.07910162956
+        and histogram_changed_to_positive_direction_vs_negative_pct <= 1.083916128
+        and macd_recovery_age_quality <= 18.64052391
+        and previous_bar_close_to_highest_high <= 1.002683759
+        and reclaim_speed_from_lowest_low <= 2.580357194
+        and uptrend_histogram_vs_downtrend_since_highest_high > 0.169507578
+        and volume_confirmation_quality > 0.1467424929
+    ):
+        score += 1
+        reasons.append("mined_broad_volume_pullback_followthrough_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_vwap_near_high_reclaim
+    # Covers: 29 positives / 0 FP
+    # Includes: 5 currently untagged positives, 24 already-tagged positives
+    # Conditions: 17
+    if (
+        current_day_ema_20_to_recent_days_ema_20 > 0.957154423
+        and current_day_vwap_to_recent_days <= 2.003365695
+        and entry_bar_low_to_ema_9 <= 1.003329992
+        and entry_bar_lower_wick <= 0.3341038525
+        and entry_bar_volume_to_previous_bar_volume > 0.9832480252
+        and entry_body_to_previous_bar_body <= 44.33333397
+        and entry_close_position_vs_previous_close_position <= 5.702798128
+        and entry_close_strength_to_highest_high_close_strength <= 4.174242496
+        and entry_close_to_vwap <= 1.175489843
+        and entry_followthrough_after_near_reclaim > 1.064789534
+        and entry_rejection_pressure <= 0.503287673
+        and gains_since_lowest_low <= 0.1097233295
+        and gains_until_entry_bar > 0.08884497359
+        and highest_high_to_entry_elapsed_minutes <= 6.5
+        and minutes_since_market_open <= 236.5
+        and pre_market_gains <= 0.1151857935
+        and previous_bar_high_to_highest_high > 0.9713801146
+    ):
+        score += 1
+        reasons.append("mined_broad_vwap_near_high_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_clean_breakout_low_extension_reclaim
+    # Covers: 25 positives / 0 FP
+    # Includes: 5 currently untagged positives, 20 already-tagged positives
+    # Conditions: 16
+    if (
+        clean_breakout_efficiency > 0.9007738363
+        and current_day_volume_to_recent_days_volume <= 249.5097034
+        and entry_bar_body > 0.2449956579
+        and entry_bar_low_to_ema_9 > 0.9860114588
+        and entry_bar_open_to_ema_9 <= 1.002428166
+        and entry_close_to_previous_bar_high <= 1.199881299
+        and entry_extension_pressure <= 0.3690450781
+        and failed_pressure_to_followthrough <= 0.4338370434
+        and lowest_low_to_entry_elapsed_minutes <= 327.132818
+        and macd_recovery_age_quality <= 60.99647227
+        and near_high_weak_followthrough > 0.5921348188
+        and previous_bar_high_to_highest_high > 0.8516965427
+        and previous_bar_high_to_highest_high <= 0.9876069991
+        and pullback_health <= 21.28503248
+        and reclaim_speed_from_lowest_low <= 0.5354329004
+        and uptrend_histogram_vs_downtrend_since_highest_high <= 1.180022583
+    ):
+        score += 1
+        reasons.append("mined_broad_clean_breakout_low_extension_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_daily_ema20_pullback_volume_reclaim
+    # Covers: 24 positives / 0 FP
+    # Includes: 3 currently untagged positives, 21 already-tagged positives
+    # Conditions: 12
+    if (
+        current_day_ema_20_to_recent_days_ema_20 > 1.20306015
+        and current_day_movement_to_recent_days_movement <= 2.683113694
+        and distance_from_highest_high > 3.5
+        and entry_bar_lower_wick <= 0.2582051307
+        and entry_bar_volume > 50127.69922
+        and entry_bar_volume_to_volume_average > 1.68495214
+        and entry_followthrough_after_near_reclaim <= 1.245562553
+        and entry_rejection_pressure <= 0.9439071715
+        and minutes_since_market_open <= 224.5
+        and price_movement_from_highest_high_to_lowest_low > 0.3450000137
+        and pullback_depth_vs_pre_high_move <= 1.832362473
+        and pullback_health > 0.5647868365
+    ):
+        score += 1
+        reasons.append("mined_broad_daily_ema20_pullback_volume_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_macd_body_followthrough_reclaim
+    # Covers: 22 positives / 0 FP
+    # Includes: 4 currently untagged positives, 18 already-tagged positives
+    # Conditions: 12
+    if (
+        entry_bar_macd_to_previous > 0.1987970918
+        and entry_bar_movement_recent_bars_average > 4.328333378
+        and entry_body_to_highest_high_body > 0.8069075644
+        and entry_close_position_vs_previous_close_position > 0.9121666551
+        and entry_close_position_vs_previous_close_position <= 3.385722995
+        and entry_close_to_previous_bar_close <= 1.069153547
+        and entry_close_to_previous_bar_high <= 1.06344974
+        and entry_extension_pressure > 0.1087492928
+        and entry_extension_pressure <= 0.2566989362
+        and highest_high_quality <= 5.118121624
+        and positive_vs_negative_volume_during_pullback > 0.9160264134
+        and pullback_depth_vs_pre_high_move > 0.4379407912
+    ):
+        score += 1
+        reasons.append("mined_broad_macd_body_followthrough_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_high_volume_pullback_depth_reclaim
+    # Covers: 20 positives / 0 FP
+    # Includes: 5 currently untagged positives, 15 already-tagged positives
+    # Conditions: 10
+    if (
+        current_day_low_to_ema_9 > 0.4760414362
+        and entry_bar_close_to_highest_high > 1.023502707
+        and entry_bar_volume > 180632.0781
+        and entry_bar_volume_to_recent_bars_average > 1.105450094
+        and macd_recovery_followthrough_quality <= 33.15610123
+        and minutes_since_market_open > 43.5
+        and near_high_weak_followthrough <= 0.7820093036
+        and previous_bar_close_to_highest_high <= 0.9897916019
+        and profit_since_open_to_bars_count_since_open > 0.008917489089
+        and pullback_depth_vs_pre_high_move > 0.4489547014
+    ):
+        score += 1
+        reasons.append("mined_broad_high_volume_pullback_depth_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_ema_distance_low_reclaim
+    # Covers: 20 positives / 0 FP
+    # Includes: 4 currently untagged positives, 16 already-tagged positives
+    # Conditions: 12
+    if (
+        current_day_ema_9_to_ema_20_distance_to_recent_days > 4.735637903
+        and current_day_low_to_ema_9 > 1.052269518
+        and entry_bar_lower_wick > 0.005828819005
+        and entry_bar_volume_to_previous_bar_volume > 1.36056
+        and entry_close_position_vs_previous_close_position > 0.7339743674
+        and entry_close_to_previous_bar_high <= 1.086722314
+        and entry_rejection_pressure <= 0.9581117034
+        and entry_volume_price_efficiency <= 0.4431177378
+        and gains_since_lowest_low <= 0.0954590328
+        and macd_recovery_followthrough_quality <= 37.9438839
+        and positive_vs_negative_volume_during_pullback <= 2.102654755
+        and profit_since_open_to_bars_count_since_open <= 0.008038461208
+    ):
+        score += 1
+        reasons.append("mined_broad_ema_distance_low_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_fast_low_recovery_reclaim
+    # Covers: 18 positives / 0 FP
+    # Includes: 4 currently untagged positives, 14 already-tagged positives
+    # Conditions: 6
+    if (
+        distance_from_highest_high <= 4.5
+        and entry_close_to_lowest_low_recovery > 1.337715328
+        and entry_extension_pressure <= 0.2844875157
+        and minutes_since_market_open > 20
+        and pre_market_gains <= 0.1601275057
+        and previous_bar_high_to_highest_high <= 0.9842794836
+    ):
+        score += 1
+        reasons.append("mined_broad_fast_low_recovery_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_controlled_volume_recovery_reclaim
+    # Covers: 18 positives / 0 FP
+    # Includes: 4 currently untagged positives, 14 already-tagged positives
+    # Conditions: 10
+    if (
+        current_day_high_to_previous_high <= 1.734777689
+        and entry_bar_low_to_ema_9 <= 1.024830222
+        and entry_bar_upper_wick > 0.0571895428
+        and entry_bar_volume_to_recent_bars_average <= 2.46436727
+        and entry_bar_volume_to_total_volume > 0.01952039357
+        and entry_close_to_lowest_low_recovery <= 1.456912279
+        and entry_extension_pressure > 0.3120003194
+        and gains_since_lowest_low > 0.0726512745
+        and pre_market_volume <= 3405334.875
+        and previous_bar_high_to_highest_high <= 0.9976538718
+    ):
+        score += 1
+        reasons.append("mined_broad_controlled_volume_recovery_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_volume_compression_entry_reclaim
+    # Covers: 23 positives / 0 FP
+    # Includes: 0 currently untagged positives, 23 already-tagged positives
+    # Conditions: 12
+    if (
+        current_day_ema_9_to_ema_20 <= 1.139072895
+        and entry_bar_open_to_ema_9 > 0.9915205538
+        and entry_bar_open_to_ema_9 <= 1.011562109
+        and entry_bar_volume_to_highest_high_volume > 1.264354348
+        and entry_bar_volume_to_highest_volume_in_pullback <= 3.908864975
+        and entry_bar_volume_to_recent_bars_average > 1.729531705
+        and entry_close_position_vs_previous_close_position > 0.7275024951
+        and entry_followthrough_after_near_reclaim <= 1.267271578
+        and entry_volume_price_efficiency > 0.02633171901
+        and minutes_since_market_open > 29.5
+        and previous_bar_close_to_highest_high <= 1.004442811
+        and reclaim_speed_from_lowest_low > 0.6453338563
+    ):
+        score += 1
+        reasons.append("mined_broad_volume_compression_entry_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_broad_simple_low_ema_volume_efficiency
+    # Covers: 15 positives / 0 FP
+    # Includes: 1 currently untagged positives, 14 already-tagged positives
+    # Conditions: 5
+    if (
+        bars_above_volume_average_vs_under_since_highest_high <= 0.7239304781
+        and current_day_ema_9_to_recent_days_ema_9 > 0.9933525026
+        and current_day_high_to_recent_days_highs <= 1.664610028
+        and entry_bar_low_to_ema_9 <= 1.002914965
+        and entry_volume_price_efficiency <= 0.01573944604
+    ):
+        score += 1
+        reasons.append("mined_broad_simple_low_ema_volume_efficiency")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_untagged_body_volume_balance_reclaim
+    # Covers: 22 positives / 0 FP
+    # Includes: 9 currently untagged positives, 13 already-tagged positives
+    # Conditions: 19
+    if (
+        bars_since_highest_high_to_bars_before <= 1.029506207
+        and current_day_movement_to_recent_days_movement <= 5.163761616
+        and entry_bar_ema_9_to_vwap > 1.028492451
+        and entry_bar_histogram_to_highest_high > -0.3267802149
+        and entry_bar_volume_to_recent_bars_average > 1.629383028
+        and entry_body_to_previous_bar_body > 1.588558018
+        and entry_body_to_recent_bars_body_average > 0.9495838881
+        and entry_body_to_recent_bars_body_average <= 7.812668562
+        and gains_since_lowest_low > 0.08101280406
+        and gains_since_lowest_low <= 0.3771048337
+        and macd_recovery_age_quality > 9.024832726
+        and macd_recovery_followthrough_quality <= 54.54345131
+        and previous_bar_close_to_highest_high <= 1.004442811
+        and previous_bar_high_to_highest_high <= 1.021455824
+        and pullback_health > 0.8466237783
+        and recent_bars_up_trend_pct > 0.3500000089
+        and reclaim_close_strength_since_highest_high <= 0.6553650796
+        and reclaim_speed_from_lowest_low <= 0.6381656229
+        and volume_since_lowest_low_to_entry_vs_since_highest_high > 0.5224396288
+    ):
+        score += 1
+        reasons.append("mined_untagged_body_volume_balance_reclaim")
+
+    # Mined Feature-Only Positive Pattern:
+    # mined_untagged_daily_extension_histogram_reclaim
+    # Covers: 11 positives / 0 FP
+    # Includes: 7 currently untagged positives, 4 already-tagged positives
+    # Conditions: 7
+    if (
+        current_day_ema_9_to_ema_20 > 1.071515799
+        and current_day_movement_to_recent_days_movement > 2.089119077
+        and entry_bar_histogram_to_lowest_histogram > 1.000385642
+        and entry_body_to_previous_bar_body <= 0.9876294434
+        and entry_close_to_vwap <= 1.368021071
+        and entry_volume_spike_without_high_context > 1.215853035
+        and minutes_since_market_open > 63
+    ):
+        score += 1
+        reasons.append("mined_untagged_daily_extension_histogram_reclaim")
+
     return score, reasons
 
 def positive_reason_groups(
@@ -2152,6 +2527,24 @@ def positive_reason_groups(
         },
         "untagged_clean_rejection_volume_reclaim": {
             "untagged_clean_rejection_volume_reclaim",
+        },
+        "mined_feature_only_broad_rescue": {
+            "mined_broad_distance_body_macd_reclaim",
+            "mined_broad_daily_ema_distance_clean_reclaim",
+            "mined_broad_volume_controlled_histogram_reclaim",
+            "mined_broad_volume_pullback_followthrough_reclaim",
+            "mined_broad_vwap_near_high_reclaim",
+            "mined_broad_clean_breakout_low_extension_reclaim",
+            "mined_broad_daily_ema20_pullback_volume_reclaim",
+            "mined_broad_macd_body_followthrough_reclaim",
+            "mined_broad_high_volume_pullback_depth_reclaim",
+            "mined_broad_ema_distance_low_reclaim",
+            "mined_broad_fast_low_recovery_reclaim",
+            "mined_broad_controlled_volume_recovery_reclaim",
+            "mined_broad_volume_compression_entry_reclaim",
+            "mined_broad_simple_low_ema_volume_efficiency",
+            "mined_untagged_body_volume_balance_reclaim",
+            "mined_untagged_daily_extension_histogram_reclaim",
         },
     }
 

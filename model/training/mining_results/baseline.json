@@ -1,8 +1,0 @@
-{
-  "positives": 586,
-  "false_positives": 872,
-  "tagged_positives": 498,
-  "untagged_positives": 88,
-  "success_pattern_fps": 79,
-  "feature_count": 97
-}
