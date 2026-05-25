@@ -25,18 +25,44 @@ python -m model.training.deep_reject_rule_miner \
   --time-budget-minutes 360 \
   --max-depth 40 \
   --n-estimators 6000 \
-  --beam-width 20000 \
+  --beam-width 10000 \
   --beam-max-atoms 6000 \
-  --beam-max-conditions 40 \
+  --beam-max-conditions 60 \
   --min-fp 10 \
-  --max-selected-rules 60 \
+  --max-selected-rules 40 \
   --min-new-fp 3 \
   --local-expansion \
-  --local-expansion-trials 20000 \
+  --local-expansion-trials 10000 \
+  --target-overall-legit-trade-fps \
   --n-jobs 4
 
 If you only want to mine rules for FPs not already rejected by the current hard rules:
   --target-mode currently_unrejected_fps
+
+If you want to mine broad reject rules specifically for FPs that currently have
+feature_overall_legit_trade == True, add:
+  --target-overall-legit-trade-fps
+
+Command for feature_overall_legit_trade == True:
+python -m model.training.deep_reject_rule_miner \
+  --outdir model/training/mining_results \
+  --time-budget-minutes 360 \
+  --max-depth 60 \
+  --n-estimators 10000 \
+  --beam-width 30000 \
+  --beam-max-atoms 6000 \
+  --beam-max-conditions 60 \
+  --min-fp 10 \
+  --max-selected-rules 60 \
+  --min-new-fp 3 \
+  --local-expansion \
+  --local-expansion-trials 30000 \
+  --target-overall-legit-trade-fps \
+  --n-jobs 4
+
+This keeps the normal zero-positive-damage requirement, but the greedy objective
+focuses coverage on that FP subset even if those rows are already rejected by
+existing rules. Default behavior is unchanged when the flag is not used.
 
 Default target mode is all_fps, which is better for finding broader/simpler replacement reject rules.
 
@@ -971,6 +997,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--n-jobs", type=int, default=4)
 
     p.add_argument("--target-mode", choices=["all_fps", "currently_unrejected_fps"], default="all_fps")
+    p.add_argument(
+        "--target-overall-legit-trade-fps",
+        action="store_true",
+        help=(
+            "Mine broad zero-positive-damage reject rules specifically for false-positive rows "
+            "where feature_overall_legit_trade is True/nonzero. This overrides --target-mode "
+            "for the mining target mask, but does not add feature_overall_legit_trade to the "
+            "candidate feature set."
+        ),
+    )
 
     p.add_argument("--min-fp", type=int, default=10)
     p.add_argument("--max-depth", type=int, default=22)
@@ -1037,12 +1073,26 @@ def main() -> None:
         current_fp_rejected.append(safe_reject(reject_fn, row.to_dict()))
     current_fp_rejected = np.array(current_fp_rejected, dtype=bool)
 
-    if args.target_mode == "currently_unrejected_fps":
+    if args.target_overall_legit_trade_fps:
+        overall_col = "feature_overall_legit_trade"
+        if overall_col not in fp_df.columns:
+            raise ValueError(
+                "--target-overall-legit-trade-fps was passed, but "
+                "feature_overall_legit_trade is missing from the false-positive CSV."
+            )
+        fp_target_mask = fp_df[overall_col].fillna(0).astype(float).to_numpy() != 0
+        target_description = "overall_legit_trade_true_fps"
+    elif args.target_mode == "currently_unrejected_fps":
         fp_target_mask = ~current_fp_rejected
+        target_description = "currently_unrejected_fps"
     else:
         fp_target_mask = np.ones(len(fp_df), dtype=bool)
+        target_description = "all_fps"
 
-    print(f"Target FPs for mining: {int(fp_target_mask.sum())} / {len(fp_df)}")
+    print(
+        f"Target FPs for mining: {int(fp_target_mask.sum())} / {len(fp_df)} "
+        f"({target_description})"
+    )
 
     if fp_target_mask.sum() == 0:
         print("No target FPs to mine. Current reject rules already reject all target FPs.")
@@ -1050,6 +1100,8 @@ def main() -> None:
         summary = {
             **current_summary,
             "target_mode": args.target_mode,
+            "target_overall_legit_trade_fps": bool(args.target_overall_legit_trade_fps),
+            "target_description": target_description,
             "target_fp_count": int(fp_target_mask.sum()),
             "feature_count": int(len(feature_cols)),
             "all_zero_positive_damage_candidates": 0,
@@ -1155,6 +1207,8 @@ def main() -> None:
     summary = {
         **current_summary,
         "target_mode": args.target_mode,
+        "target_overall_legit_trade_fps": bool(args.target_overall_legit_trade_fps),
+        "target_description": target_description,
         "target_fp_count": int(fp_target_mask.sum()),
         "feature_count": int(len(feature_cols)),
         "all_zero_positive_damage_candidates": int(len(final_rules)),
