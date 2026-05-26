@@ -221,8 +221,8 @@ def run_retroactive_check():
     symbols = [
         common.objects.SymbolTest(
             name="VCIG",
-            datetime_str="05.26.26T13:27:00",
-            is_positive=False,
+            datetime_str="05.26.26T12:44:00",
+            is_positive=True,
         ),
     ]
     # symbols = explore_past_potential_symbols()

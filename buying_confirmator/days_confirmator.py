@@ -338,6 +338,7 @@ class Confirmator:
                         msg = "Bar got denied by model but has positive family tag, so bar confirmed"
                         entry_position_bar = potential_confirmation_bar
                         confirmed_evidence = evidence_obj.name
+                        score.should_take_trade = True
                     else:
                         msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
                 else:
@@ -550,9 +551,6 @@ class Confirmator:
         order_has_been_placed = False
         transmit = False
 
-        if potential_confirmation_bar.bar_time + datetime.timedelta(minutes=20) < current_bar.bar_time:
-            return True
-
         relevant_bars = [
             bar_object
             for bar_object in one_minute_timeframe_stock.bars
@@ -571,21 +569,22 @@ class Confirmator:
             # meaning that this trend is not relevant anymore - not a real trend.
             return True
 
-        had_pullback = False
-        if any(
+        previous_crossed_resistance_became_to_support_level = any(
             bar_object
             for bar_object in relevant_bars
-            if (
-                True
-                and (
-                    bar_object.low <= bar_object.ema_9
-                    or bar_object.low/bar_object.ema_9 > 0.95
-                    or not bar_object.is_positive
-                )
-            )
-        ):
-            # meaning that this trend is healthy.
-            had_pullback = True
+            if bar_object.low >= previous_highest_high
+            and previous_highest_high/bar_object.low >= 0.97
+            and bar_object.low < bar_object.close
+        ) and not any(
+            bar_object
+            for bar_object in relevant_bars
+            if bar_object.low < previous_highest_high
+        )
+
+        current_bar_is_highest = max(
+            bar_object.high
+            for bar_object in relevant_bars
+        ) == current_bar.high
 
         previous_bar = one_minute_timeframe_stock.previous_bar(
             bar_object=current_bar,
@@ -598,29 +597,13 @@ class Confirmator:
             and current_bar.volume > current_bar.volume_average
             and current_bar.close > current_bar.ema_20
             and current_bar.ema_9 > current_bar.ema_20
+            and previous_crossed_resistance_became_to_support_level
+            and current_bar_is_highest
             and current_bar.high - current_bar.low > distance_from_ema_9
             and previous_bar is not None
             and current_bar.volume > previous_bar.volume
-            and had_pullback
             and current_bar.macd > 0
             and current_bar.body_percentage > 0.4
-            and distance_from_ema_9/(current_bar.high - current_bar.low) < 0.45
-            and any(
-                bar_object
-                for bar_object in relevant_bars
-                if (
-                    0.95 < bar_object.low/previous_highest_high < 1.05
-                    or 0.95 < bar_object.low/potential_confirmation_bar.high < 1.05
-                )
-            )
-            and any(
-                bar_object
-                for bar_object in relevant_bars
-                if (
-                    not bar_object.is_positive
-                    or bar_object.body_percentage < 0.6
-                )
-            )
         )
 
         if validation_for_placing_order:

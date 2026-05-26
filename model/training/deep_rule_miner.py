@@ -7,21 +7,21 @@ Deep zero-FP positive rule miner for hard_rules.py + positive/false-positive CSV
 COMMAND:
 python -m model.training.deep_rule_miner \
   --outdir model/training/mining_results \
-  --time-budget-minutes 360 \
-  --max-depth 24 \
-  --n-estimators 1800 \
-  --beam-width 6000 \
-  --beam-max-atoms 1400 \
-  --beam-max-conditions 24 \
-  --reason-max-conditions 6 \
+  --time-budget-minutes 500 \
+  --max-depth 20 \
+  --n-estimators 3000 \
+  --beam-width 7000 \
+  --beam-max-atoms 2000 \
+  --beam-max-conditions 20 \
+  --reason-max-conditions 15 \
   --reason-top-k 2500 \
   --min-pos-broad 25 \
-  --min-pos-untagged 10 \
+  --min-pos-untagged 0 \
   --min-untagged 0 \
-  --max-selected-rules 60 \
-  --min-new-untagged 5 \
+  --max-selected-rules 30 \
+  --min-new-untagged 0 \
   --local-expansion \
-  --local-expansion-trials 6000 \
+  --local-expansion-trials 7000 \
   --n-jobs 4
 
 Purpose
@@ -42,6 +42,13 @@ python deep_rule_miner.py \
   --max-depth 20 \
   --time-budget-minutes 180 \
   --n-jobs -1
+
+
+Optional all-positive mining mode
+-------------------------------
+By default, beam/tree/local-expansion passes focus on currently untagged positives.
+To mine broad 0-FP rules across all positives instead, add:
+  --mine-all-positives
 
 Important notes
 ---------------
@@ -1077,6 +1084,15 @@ def parse_args() -> argparse.Namespace:
 
     p.add_argument("--max-selected-rules", type=int, default=30)
     p.add_argument("--min-new-untagged", type=int, default=3, help="In this broad version, this means minimum NEW positives per selected rule.")
+    p.add_argument(
+        "--mine-all-positives",
+        action="store_true",
+        help=(
+            "Use all positive rows as the mining focus for beam/tree/local-expansion scoring, "
+            "instead of only positives that are currently untagged by success_patterns. "
+            "Default behavior remains the old mode: focus on currently untagged positives."
+        ),
+    )
 
     p.add_argument("--checkpoint-chunk-size", type=int, default=5000)
     # p.add_argument(
@@ -1130,6 +1146,17 @@ def main() -> None:
     tagged_pos_mask = pos_scores > 0
     untagged_pos_mask = ~tagged_pos_mask
 
+    # Mining focus:
+    # - default: keep old behavior and focus on currently untagged positives.
+    # - --mine-all-positives: focus beam/tree/local expansion on all positive rows.
+    actual_untagged_pos_mask = untagged_pos_mask.copy()
+    if args.mine_all_positives:
+        mining_focus_pos_mask = np.ones(len(pos_df), dtype=bool)
+        mining_target_mode = "all_positives"
+    else:
+        mining_focus_pos_mask = actual_untagged_pos_mask
+        mining_target_mode = "currently_untagged_positives"
+
     baseline = {
         "positives": int(len(pos_df)),
         "false_positives": int(len(fp_df)),
@@ -1137,8 +1164,11 @@ def main() -> None:
         "untagged_positives": int(untagged_pos_mask.sum()),
         "success_pattern_fps": int((fp_scores > 0).sum()),
         "feature_count": int(len(feature_cols)),
+        "mining_target_mode": mining_target_mode,
+        "mining_focus_positive_count": int(mining_focus_pos_mask.sum()),
     }
     print("Baseline:", baseline)
+    print(f"Mining target mode: {mining_target_mode} ({int(mining_focus_pos_mask.sum())} focus positives)")
     (args.outdir / "baseline.json").write_text(json.dumps(baseline, indent=2), encoding="utf-8")
 
     pd.DataFrame({
@@ -1177,7 +1207,7 @@ def main() -> None:
         feature_cols=feature_cols,
         pos_reasons=pos_reasons,
         fp_reasons=fp_reasons,
-        untagged_pos_mask=untagged_pos_mask,
+        untagged_pos_mask=mining_focus_pos_mask,
         quantiles=broad_quantiles,
         min_pos=args.min_pos_broad,
         max_conditions=args.reason_max_conditions,
@@ -1196,7 +1226,7 @@ def main() -> None:
         pos_df=pos_df,
         fp_df=fp_df,
         feature_cols=feature_cols,
-        untagged_pos_mask=untagged_pos_mask,
+        untagged_pos_mask=mining_focus_pos_mask,
         quantiles=beam_quantiles,
         min_pos=args.min_pos_untagged,
         min_untagged=args.min_untagged,
@@ -1218,7 +1248,7 @@ def main() -> None:
         pos_df=pos_df,
         fp_df=fp_df,
         feature_cols=feature_cols,
-        untagged_pos_mask=untagged_pos_mask,
+        untagged_pos_mask=mining_focus_pos_mask,
         max_depth=args.max_depth,
         min_pos=args.min_pos_untagged,
         min_untagged=0,
@@ -1247,7 +1277,7 @@ def main() -> None:
             pos_df=pos_df,
             fp_df=fp_df,
             feature_cols=feature_cols,
-            untagged_pos_mask=untagged_pos_mask,
+            untagged_pos_mask=mining_focus_pos_mask,
             quantiles=beam_quantiles,
             max_conditions=args.beam_max_conditions,
             min_pos=args.min_pos_untagged,
@@ -1282,7 +1312,7 @@ def main() -> None:
         rules=final_rules,
         pos_df=pos_df,
         fp_df=fp_df,
-        untagged_pos_mask=untagged_pos_mask,
+        untagged_pos_mask=mining_focus_pos_mask,
         max_rules=args.max_selected_rules,
         min_new_untagged=args.min_new_untagged,
     )
@@ -1296,7 +1326,7 @@ def main() -> None:
         for a in r.atoms:
             pm &= mask_for_atom(pos_df[a.feature].to_numpy(float), a)
         selected_pos_mask |= pm
-        selected_untagged_mask |= (pm & untagged_pos_mask)
+        selected_untagged_mask |= (pm & actual_untagged_pos_mask)
 
     final_summary = {
         **baseline,
@@ -1304,7 +1334,7 @@ def main() -> None:
         "selected_rules": int(len(selected)),
         "selected_unique_positives_covered": int(selected_pos_mask.sum()),
         "selected_unique_untagged_covered": int(selected_untagged_mask.sum()),
-        "selected_unique_untagged_coverage_pct": float(selected_untagged_mask.sum() / max(1, untagged_pos_mask.sum())),
+        "selected_unique_untagged_coverage_pct": float(selected_untagged_mask.sum() / max(1, actual_untagged_pos_mask.sum())),
         "elapsed_minutes": round((time.time() - started) / 60.0, 2),
     }
     print("Final summary:", final_summary)
