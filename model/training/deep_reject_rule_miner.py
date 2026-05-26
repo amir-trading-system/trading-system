@@ -25,17 +25,16 @@ Typical command
 python -m model.training.deep_reject_rule_miner \
   --outdir model/training/mining_results \
   --time-budget-minutes 360 \
-  --max-depth 40 \
-  --n-estimators 6000 \
-  --beam-width 10000 \
-  --beam-max-atoms 6000 \
+  --max-depth 60 \
+  --n-estimators 10000 \
+  --beam-width 20000 \
+  --beam-max-atoms 20000 \
   --beam-max-conditions 60 \
   --min-fp 10 \
   --max-selected-rules 40 \
-  --min-new-fp 3 \
+  --min-new-fp 1 \
   --local-expansion \
   --local-expansion-trials 10000 \
-  --target-overall-legit-trade-fps \
   --n-jobs 4
 
 If you only want to mine rules for FPs not already rejected by the current hard rules:
@@ -56,7 +55,7 @@ python -m model.training.deep_reject_rule_miner \
   --beam-max-conditions 60 \
   --min-fp 10 \
   --max-selected-rules 60 \
-  --min-new-fp 3 \
+  --min-new-fp 1 \
   --local-expansion \
   --local-expansion-trials 30000 \
   --target-overall-legit-trade-fps \

@@ -325,24 +325,24 @@ class Confirmator:
                 msg = "Bar confirmed by model"
 
                 if not score.should_take_trade:
-                    msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
+                    most_of_body_above_highest_high = (
+                        True
+                        and highest_high_one_minute_bar is not None
+                        and potential_confirmation_bar.close - highest_high_one_minute_bar.high > highest_high_one_minute_bar.high - potential_confirmation_bar.open_value
+                    )
+
+                    if positive_tier not in [
+                        "no_known_tag_trade",
+                        "soft_tag_trade",
+                    ] and most_of_body_above_highest_high:
+                        msg = "Bar got denied by model but has positive family tag, so bar confirmed"
+                        entry_position_bar = potential_confirmation_bar
+                        confirmed_evidence = evidence_obj.name
+                    else:
+                        msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
                 else:
                     entry_position_bar = potential_confirmation_bar
                     confirmed_evidence = evidence_obj.name
-
-                # if not self.is_retro:
-                #     with open(f"model/training/data/next_training/{stock.symbol_name}-{potential_confirmation_bar.bar_time}-PROD.json", "wb") as f:
-                #         pickle.dump(
-                #             {
-                #                 "day_timeframe_stock": stock,
-                #                 "one_minute_timeframe_stock": one_minute_timeframe_stock,
-                #                 "potential_confirmation_bar": potential_confirmation_bar,
-                #                 "highest_high_one_minute_bar": highest_high_one_minute_bar,
-                #                 "volume_sum_since_market_open": stock.volume_sum_since_market_open,
-                #                 "one_minute_bars": one_minute_bars,
-                #             },
-                #             f,
-                #         )
 
                 self.logger.info(
                     msg=msg,
