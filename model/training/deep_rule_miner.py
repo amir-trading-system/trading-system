@@ -8,7 +8,7 @@ COMMAND:
 python -m model.training.deep_rule_miner \
   --outdir model/training/mining_results \
   --time-budget-minutes 500 \
-  --max-depth 20 \
+  --max-depth 40 \
   --n-estimators 3000 \
   --beam-width 7000 \
   --beam-max-atoms 2000 \
@@ -22,6 +22,7 @@ python -m model.training.deep_rule_miner \
   --min-new-untagged 0 \
   --local-expansion \
   --local-expansion-trials 7000 \
+  --mine-all-positives \
   --n-jobs 4
 
 Purpose
