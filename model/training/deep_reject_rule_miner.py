@@ -1,3 +1,5 @@
+# pylint: skip-file
+# type: ignore
 #!/usr/bin/env python3
 """
 Feature-only reject-rule miner for false positives.
