@@ -1339,6 +1339,7 @@ def success_patterns(
         and entry_body_to_previous_bar_body >= 7.89129069
         and entry_bar_histogram_to_lowest_histogram <= 1
         and entry_rejection_pressure <= 0.2498751041
+        and entry_breakout_efficiency_from_ema_9 > 0.28193128446857685
         and (
             entry_breakout_efficiency_from_ema_9 <= 0.4935715804
             or reclaim_close_strength_since_highest_high <= 0.4322637363
@@ -1473,6 +1474,7 @@ def success_patterns(
         and entry_bar_histogram_to_highest_histogram > 1.398955523967743
         and fake_reclaim_pressure <= 0.15265937894582748
         and entry_bar_close_to_highest_high <= 1.106389022
+        and entry_breakout_efficiency_from_ema_9 > 0.23894240653459617
     ):
         score += 1
         reasons.append("supported_ema_histogram_reclaim")
@@ -1507,6 +1509,7 @@ def success_patterns(
         and entry_close_position_vs_previous_close_position <= 2.037855386734009
         and entry_bar_movement_recent_bars_average <= 9.0991530418396
         and price_movement_from_highest_high_to_lowest_low > 0.24994999915361404
+        and current_day_high_to_previous_high > 1.0389189189189187
         and (
             entry_upper_wick_to_recent_upper_wick_average <= 1.489878601
             or entry_volume_price_efficiency <= 0.0914612848
@@ -1668,6 +1671,7 @@ def success_patterns(
         profit_since_open_to_bars_count_since_open <= 0.0011123761300984101
         and entry_body_to_highest_high_body > 5.93333333333328
         and reclaim_speed_from_lowest_low <= 0.6875694444444458
+        and controlled_volume_entry_quality > 0.26191178523047526
     ):
         score += 1
         reasons.append("quiet_open_controlled_body_reclaim")
@@ -1707,6 +1711,7 @@ def success_patterns(
         previous_bar_volume_to_its_previous_volume > 2.940825425613
         and entry_bar_ema_9_to_vwap <= 1.054934240024
         and entry_body_to_recent_bars_body_average > 4.905669490266
+        and entry_bar_low_to_ema_9 > 0.9972093493205755
     ):
         score += 1
         reasons.append("previous_volume_spike_body_expansion_not_vwap_chase")
@@ -1720,6 +1725,7 @@ def success_patterns(
         entry_bar_volume_to_highest_volume_in_pullback > 3.830134920395
         and previous_bar_high_to_highest_high <= 0.980774337661
         and entry_body_to_recent_bars_body_average > 4.050921052632
+        and uptrend_histogram_vs_downtrend_since_highest_high <= 0.2307692307692307
     ):
         score += 1
         reasons.append("pullback_volume_dominance_body_expansion")
@@ -1770,6 +1776,7 @@ def success_patterns(
         and current_day_ema_9_to_ema_20_distance_to_recent_days <= 1.410308
         and emas_distances_to_recent_bars_ema_distances <= 0.2497
         and entry_upper_wick_to_recent_upper_wick_average <= 1.0
+        and entry_bar_histogram_to_highest_histogram <= 1.377835226325808
     ):
         score += 1
         reasons.append("supported_volume_ownership_above_ema9")
@@ -2090,6 +2097,7 @@ def success_patterns(
         and highest_high_quality <= 5.118121624
         and positive_vs_negative_volume_during_pullback > 0.9160264134
         and pullback_depth_vs_pre_high_move > 0.4379407912
+        and entry_bar_volume_to_highest_volume_in_pullback > 1.0192219262524285
     ):
         score += 1
         reasons.append("mined_broad_macd_body_followthrough_reclaim")
@@ -2316,6 +2324,7 @@ def success_patterns(
         and entry_bar_vwap_to_ema_20 <= 0.9723256055
         and entry_bar_histogram_to_highest_histogram <= 10.67842787
         and histogram_changed_to_positive_direction_vs_negative_pct > 1.074236088
+        and controlled_volume_entry_quality <= 79.51599724742799
     ):
         score += 1
         reasons.append("mined_remaining_histogram_vwap_reclaim")
@@ -2398,6 +2407,7 @@ def success_patterns(
         and positive_vs_negative_volume_during_pullback <= 1.14657416
         and entry_bar_volume_to_previous_bar_volume > 1.725867421
         and entry_bar_volume_to_previous_bar_volume <= 47.81485838
+        and controlled_volume_entry_quality > 0.19849641316811606
     ):
         score += 1
         reasons.append("mined_remaining_compressed_body_volume_reclaim")

@@ -140,7 +140,6 @@ if __name__ == "__main__":
         bars_ready_to_analyze_queue=bars_ready_to_analyze_queue,
         waiting_for_confirmation_queue=waiting_for_confirmation_queue,
         request_id_to_symbol=request_id_to_symbol,
-        alerter_object=alerter_object,
         tws_client=tws_client,
         logger=logger_object,
         get_only_statistics=False,

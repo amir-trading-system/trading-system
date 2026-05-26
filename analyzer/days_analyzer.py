@@ -2,7 +2,6 @@ import datetime
 import logging
 import queue
 
-import alerter
 import analyzer.indicators
 import common
 from tws import client
@@ -15,11 +14,9 @@ class Analyzer:
         waiting_for_confirmation_queue: queue.Queue[common.objects.BarData],
         request_id_to_symbol: dict[int,common.objects.Stock],
         tws_client: client.Client,
-        alerter_object: alerter.alerter.Alerter = None,
     ):
         self.logger = logger
         self.waiting_for_confirmation_queue = waiting_for_confirmation_queue
-        self.alerter_object = alerter_object
         self.tws_client = tws_client
 
         self.request_id_to_symbol = request_id_to_symbol

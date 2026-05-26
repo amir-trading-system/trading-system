@@ -8,7 +8,6 @@ import logging
 import threading
 
 
-import alerter
 from tws import client
 import common
 import model
@@ -24,7 +23,6 @@ class Analyzer:
         request_id_to_symbol: dict[int,common.objects.Stock],
         logger: logging.Logger,
         tws_client: client.Client,
-        alerter_object: alerter.alerter.Alerter = None,
         get_only_statistics: bool = False,
     ):
         self.bars_ready_to_analyze_queue = bars_ready_to_analyze_queue
@@ -33,7 +31,6 @@ class Analyzer:
         self.get_only_statistics = get_only_statistics
 
         self.days_analyzer = days_analyzer.Analyzer(
-            alerter_object=alerter_object,
             waiting_for_confirmation_queue=waiting_for_confirmation_queue,
             request_id_to_symbol=request_id_to_symbol,
             tws_client=tws_client,

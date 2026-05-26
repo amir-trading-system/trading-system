@@ -33,8 +33,8 @@ class Scanner():
             tag_value.TagValue("volumeAbove", "200000"),
             tag_value.TagValue("priceAbove", "1"),
             tag_value.TagValue("priceBelow", "100"),
-            tag_value.TagValue("marketCapBelow1e6", "200"),
-            tag_value.TagValue("numSharesBelow", "40000000"),
+            tag_value.TagValue("marketCapBelow1e6", "100"),
+            tag_value.TagValue("numSharesBelow", "20000000"),
             tag_value.TagValue("changePercAbove", "10"),
         ]
 
