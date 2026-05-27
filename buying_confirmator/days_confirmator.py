@@ -569,16 +569,32 @@ class Confirmator:
             # meaning that this trend is not relevant anymore - not a real trend.
             return True
 
-        previous_crossed_resistance_became_to_support_level = any(
+        lowest_bar_since_now_from_relevant_bars = None
+        lowest_low = 100.0
+        for bar_object in relevant_bars:
+            if bar_object.low < lowest_low:
+                lowest_bar_since_now_from_relevant_bars = bar_object
+                lowest_low = bar_object.low
+
+        previous_crossed_resistance_became_to_support_level = (
+            True
+            and lowest_bar_since_now_from_relevant_bars is not None
+            and (
+                previous_highest_high/lowest_low >= 0.95
+                or potential_confirmation_bar.high/lowest_low >= 0.95
+            )
+            and not any(
+                bar_object
+                for bar_object in relevant_bars
+                if bar_object.close < previous_highest_high
+                and bar_object.close < bar_object.ema_20
+            )
+        )
+
+        there_was_any_retracement_movement = any(
             bar_object
             for bar_object in relevant_bars
-            if bar_object.low >= previous_highest_high
-            and previous_highest_high/bar_object.low >= 0.97
-            and bar_object.low < bar_object.close
-        ) and not any(
-            bar_object
-            for bar_object in relevant_bars
-            if bar_object.low < previous_highest_high
+            if bar_object.histogram < 0
         )
 
         current_bar_is_highest = max(
@@ -598,12 +614,14 @@ class Confirmator:
             and current_bar.close > current_bar.ema_20
             and current_bar.ema_9 > current_bar.ema_20
             and previous_crossed_resistance_became_to_support_level
+            and there_was_any_retracement_movement
             and current_bar_is_highest
             and current_bar.high - current_bar.low > distance_from_ema_9
             and previous_bar is not None
             and current_bar.volume > previous_bar.volume
             and current_bar.macd > 0
             and current_bar.body_percentage > 0.4
+            and previous_bar.histogram < current_bar.histogram
         )
 
         if validation_for_placing_order:
@@ -626,7 +644,7 @@ class Confirmator:
                 if not self.is_retro:
                     self.tws_client.place_buy_order(
                         symbol=original_bar_to_confirm.symbol,
-                        price=potential_confirmation_bar.close,
+                        price=current_bar.close,
                         transmit=transmit,
                         score=score,
                     )

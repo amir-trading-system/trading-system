@@ -1313,6 +1313,7 @@ def success_patterns(
             or entry_bar_open_to_ema_9 <= 1.0051742
             or gains_since_lowest_low <= 0.0664616589
         )
+        and entry_bar_histogram_to_previous <= 1.267360974621521
     ):
         score += 1
         reasons.append("fresh_early_reclaim")
@@ -1599,6 +1600,7 @@ def success_patterns(
             or entry_bar_movement_recent_bars_average <= 3.982817294
             or entry_bar_lower_wick > 0.1253896104
         )
+        and entry_volume_spike_without_high_context <= 8.057409172757124
     ):
         score += 1
         reasons.append("fresh_supported_reclaim_before_macd_stale")
@@ -1672,6 +1674,7 @@ def success_patterns(
         and entry_body_to_highest_high_body > 5.93333333333328
         and reclaim_speed_from_lowest_low <= 0.6875694444444458
         and controlled_volume_entry_quality > 0.26191178523047526
+        and entry_close_strength_to_highest_high_close_strength > 1.1229946524064298
     ):
         score += 1
         reasons.append("quiet_open_controlled_body_reclaim")
@@ -1685,6 +1688,7 @@ def success_patterns(
         profit_since_open_to_bars_count_since_open <= 0.0011123761300984101
         and volume_since_highest_high_to_volume_before > 0.13026786204894306
         and entry_bar_histogram_to_highest_histogram <= 0.9568272235385898
+        and pullback_depth_vs_pre_high_move <= 5.122711300887382
     ):
         score += 1
         reasons.append("delayed_volume_rebuild_controlled_histogram")
@@ -1739,6 +1743,7 @@ def success_patterns(
         highest_high_to_entry_elapsed_minutes > 131.0
         and current_day_high_to_recent_days_highs <= 1.430637402494
         and entry_bar_body > 0.80619589516
+        and failed_pressure_to_followthrough <= 0.4069854363632191
     ):
         score += 1
         reasons.append("late_body_continuation_non_extreme_daily_context")
@@ -1948,6 +1953,7 @@ def success_patterns(
         and entry_volume_price_efficiency > 0.0350418631
         and pre_market_gains <= 0.06031775661
         and price_movement_from_highest_high_to_lowest_low > 0.05749999918
+        and entry_close_position_vs_previous_close_position > 0.899350649350649
     ):
         score += 1
         reasons.append("mined_broad_daily_ema_distance_clean_reclaim")
@@ -2487,6 +2493,7 @@ def success_patterns(
         and recent_bars_up_trend_pct > 0.684337374
         and strong_vwap_volume_reentry <= 0.7865783888
         and volume_confirmation_quality <= 12.316440904
+        and volume_without_macd_confirmation <= 5.745776039866115
     ):
         score += 1
         reasons.append("mined_final_early_uptrend_low_rejection_reclaim")
@@ -2558,6 +2565,7 @@ def success_patterns(
         and reclaim_speed_from_lowest_low <= 0.5568540645
         and strong_vwap_volume_reentry <= 0.4440994903
         and uptrend_histogram_vs_downtrend_since_highest_high <= 2.6369301708
+        and pullback_health > 0.5648384804851242
     ):
         score += 1
         reasons.append("mined_final_fast_macd_reclaim")
