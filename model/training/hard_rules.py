@@ -2704,13 +2704,13 @@ def positive_reason_groups(
         "safe_refined_base_reclaim_efficiency_volume_control": {
             "safe_refined_base_reclaim_efficiency_volume_control",
         },
-    }
-
-    soft_groups = {
         "broad_reset_buyer_volume": {
             "broad_reset_buyer_volume_confirmation",
             "broad_reset_efficiency_reclaim",
         },
+    }
+
+    soft_groups = {
         "low_float_volume_ownership": {
             "supported_low_float_volume_ownership",
         },

@@ -999,7 +999,10 @@ def write_variable_declarations(feature_cols: Sequence[str], outpath: Path) -> N
 
 
 def write_python_blocks(rules: Sequence[Rule], outpath: Path, prefix: str) -> None:
-    chunks = []
+    chunks = [
+        f"{"#type: ignore"}\n",
+        f"{"#pylint: skip-file"}\n",
+    ]
     for i, r in enumerate(rules, start=1):
         reason = f"{prefix}_{i:02d}"
         chunks.append("# " + "=" * 88)
