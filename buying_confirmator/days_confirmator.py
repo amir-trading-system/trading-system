@@ -331,10 +331,7 @@ class Confirmator:
                         and potential_confirmation_bar.close - highest_high_one_minute_bar.high > highest_high_one_minute_bar.high - potential_confirmation_bar.open_value
                     )
 
-                    if positive_tier not in [
-                        "no_known_tag_trade",
-                        "soft_tag_trade",
-                    ] and most_of_body_above_highest_high:
+                    if most_of_body_above_highest_high:
                         msg = "Bar got denied by model but has positive family tag, so bar confirmed"
                         entry_position_bar = potential_confirmation_bar
                         confirmed_evidence = evidence_obj.name
@@ -550,6 +547,9 @@ class Confirmator:
     ) -> bool:
         order_has_been_placed = False
         transmit = False
+
+        if current_bar.close < previous_highest_high:
+            return True
 
         relevant_bars = [
             bar_object
