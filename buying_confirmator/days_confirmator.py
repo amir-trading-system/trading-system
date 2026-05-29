@@ -219,6 +219,17 @@ class Confirmator:
             highest_high=highest_high,
         )
 
+        has_valid_breakout = self.has_valid_breakout(
+            potential_confirmation_bar=potential_confirmation_bar,
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+        )
+
+        if not has_valid_breakout:
+            return (
+                score,
+                highest_high,
+            )
+
         if not bar_has_potential:
             self.logger.info(
                 msg="Bar does not have a potential",
@@ -270,14 +281,6 @@ class Confirmator:
                 highest_high_one_minute_bar=highest_high_one_minute_bar,
                 one_minute_bars=temp_one_minute_bars,
             ):
-                continue
-
-            has_valid_breakout = self.has_valid_breakout(
-                potential_confirmation_bar=potential_confirmation_bar,
-                one_minute_timeframe_stock=one_minute_timeframe_stock,
-            )
-
-            if not has_valid_breakout:
                 continue
 
             self.logger.info(
@@ -332,25 +335,9 @@ class Confirmator:
                 )
                 stock.number_of_potential_entry_points += 1
 
-                msg = "Bar confirmed by model"
-
-                if not score.should_take_trade:
-                    most_of_body_above_highest_high = (
-                        True
-                        and highest_high_one_minute_bar is not None
-                        and potential_confirmation_bar.close - highest_high_one_minute_bar.high > highest_high_one_minute_bar.high - potential_confirmation_bar.open_value
-                    )
-
-                    if most_of_body_above_highest_high:
-                        msg = "Bar got denied by model but has positive family tag, so bar confirmed"
-                        entry_position_bar = potential_confirmation_bar
-                        confirmed_evidence = evidence_obj.name
-                        score.should_take_trade = True
-                    else:
-                        msg = "Bar confirmed by static confirmation, but got denied on model confirmation"
-                else:
-                    entry_position_bar = potential_confirmation_bar
-                    confirmed_evidence = evidence_obj.name
+                msg = "Bar analyzed by AI model"
+                entry_position_bar = potential_confirmation_bar
+                confirmed_evidence = evidence_obj.name
 
                 self.logger.info(
                     msg=msg,
@@ -553,14 +540,16 @@ class Confirmator:
             bar_object
             for bar_object in one_minute_timeframe_stock.bars
             if bar_object.bar_time.date() == potential_confirmation_bar.bar_time.date()
-            and bar_object.index > potential_confirmation_bar.index
+            and bar_object.bar_time < potential_confirmation_bar.bar_time
         ]
-        recent_bars = [
-            bar_object
-            for bar_object in one_minute_timeframe_stock.bars
-            if bar_object.bar_time.date() == potential_confirmation_bar.bar_time.date()
-            and bar_object.index - 10 <= potential_confirmation_bar.index
-        ]
+        recent_bars = bars_until_now[:10]
+
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=potential_confirmation_bar,
+        )
+
+        if previous_bar is None:
+            return False
 
         resistance_zones = self.find_meaningful_resistance_zones(
             bars_until_now=bars_until_now,
@@ -595,6 +584,17 @@ class Confirmator:
             resistance_zone=selected_zone,
             recent_bars=recent_bars,
         )
+
+        if (
+            self.pct_change(
+                from_value=selected_zone.zone_high,
+                to_value=potential_confirmation_bar.close,
+            ) < 0.02
+            or not selected_zone.touch_count <= 6
+            or (previous_bar.ema_9 - previous_bar.vwap)/previous_bar.vwap < 0
+        ):
+            is_valid = False
+            valid_reason = "breakout didnt passed post conditions"
 
         log_message = "breakout is invalid, waiting for another bar"
         if is_valid:
@@ -636,14 +636,14 @@ class Confirmator:
         if len(bars_until_now) < min_prior_bars:
             return []
 
-        bars = bars_until_now[-lookback_bars:]
+        last_90_bars = bars_until_now[:90]
 
         candidate_levels: list[float] = []
 
-        for i in range(1, len(bars) - 1):
-            prev_bar = bars[i - 1]
-            bar_object = bars[i]
-            next_bar = bars[i + 1]
+        for i in range(1, len(last_90_bars) - 1):
+            prev_bar = last_90_bars[i - 1]
+            bar_object = last_90_bars[i]
+            next_bar = last_90_bars[i + 1]
 
             high = self.safe_float(bar_object.high, 0.0)
 
@@ -653,7 +653,7 @@ class Confirmator:
             )
 
             rejected, _, _ = self.bar_rejected_from_level(
-                bars=bars,
+                bars=last_90_bars,
                 touch_index=i,
                 level=high,
                 lookahead_bars=5,
@@ -665,14 +665,14 @@ class Confirmator:
 
         # Also include the highest high so far if it caused rejection.
         highest_bar_index = max(
-            range(len(bars)),
-            key=lambda idx: self.safe_float(bars[idx].high, 0.0),
+            range(len(last_90_bars)),
+            key=lambda idx: self.safe_float(last_90_bars[idx].high, 0.0),
         )
 
-        highest_high = self.safe_float(bars[highest_bar_index].high, 0.0)
+        highest_high = self.safe_float(last_90_bars[highest_bar_index].high, 0.0)
 
         rejected, _, _ = self.bar_rejected_from_level(
-            bars=bars,
+            bars=last_90_bars,
             touch_index=highest_bar_index,
             level=highest_high,
             lookahead_bars=8,
@@ -687,7 +687,7 @@ class Confirmator:
         for level in candidate_levels:
             tolerance = self.calculate_dynamic_zone_tolerance(
                 price=level,
-                recent_bars=bars,
+                recent_bars=last_90_bars,
             )
 
             zone_low = level - tolerance
@@ -698,7 +698,7 @@ class Confirmator:
             max_rejection_pct = 0.0
             max_rejection_abs = 0.0
 
-            for i, bar_object in enumerate(bars):
+            for i, bar_object in enumerate(last_90_bars):
                 high = self.safe_float(bar_object.high, 0.0)
                 close = self.safe_float(bar_object.close, 0.0)
 
@@ -712,7 +712,7 @@ class Confirmator:
                     continue
 
                 rejected, rejection_pct, rejection_abs = self.bar_rejected_from_level(
-                    bars=bars,
+                    bars=last_90_bars,
                     touch_index=i,
                     level=level,
                     lookahead_bars=5,
