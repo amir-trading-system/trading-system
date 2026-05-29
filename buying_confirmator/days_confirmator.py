@@ -1,6 +1,8 @@
 import copy
 import datetime
 import logging
+import math
+import statistics
 import queue
 
 import alerter
@@ -270,6 +272,14 @@ class Confirmator:
             ):
                 continue
 
+            has_valid_breakout = self.has_valid_breakout(
+                potential_confirmation_bar=potential_confirmation_bar,
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+            )
+
+            if not has_valid_breakout:
+                continue
+
             self.logger.info(
                 msg="Potential confirmation bar has passed static confirmation, waiting for model confirmation",
                 extra={
@@ -533,6 +543,452 @@ class Confirmator:
         current_bar_crossed_stock_highest_high = potential_confirmation_bar.low < stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close
 
         return current_bar_is_highest_high and previous_bar_was_highest_high and not current_bar_crossed_stock_highest_high
+
+    def has_valid_breakout(
+        self,
+        potential_confirmation_bar: common.objects.BarData,
+        one_minute_timeframe_stock: common.objects.Stock
+    ) -> bool:
+        bars_until_now = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if bar_object.bar_time.date() == potential_confirmation_bar.bar_time.date()
+            and bar_object.index > potential_confirmation_bar.index
+        ]
+        recent_bars = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if bar_object.bar_time.date() == potential_confirmation_bar.bar_time.date()
+            and bar_object.index - 10 <= potential_confirmation_bar.index
+        ]
+
+        resistance_zones = self.find_meaningful_resistance_zones(
+            bars_until_now=bars_until_now,
+            min_prior_bars=8,
+            min_touches=1,
+            min_rejections=1,
+            lookback_bars=90,
+        )
+
+        if not resistance_zones:
+            return False
+
+        candidate_zones = [
+            zone
+            for zone in resistance_zones
+            if self.safe_float(potential_confirmation_bar.high, 0.0) > zone.zone_high
+        ]
+
+        if not candidate_zones:
+            return False
+
+        # Use the highest broken resistance, so one candle does not create
+        # duplicate rows for every lower old resistance.
+        selected_zone = sorted(
+            candidate_zones,
+            key=lambda zone: zone.resistance_price,
+            reverse=True,
+        )[0]
+
+        is_valid, valid_reason = self.is_valid_breakout_bar(
+            bar_object=potential_confirmation_bar,
+            resistance_zone=selected_zone,
+            recent_bars=recent_bars,
+        )
+
+        log_message = "breakout is invalid, waiting for another bar"
+        if is_valid:
+            log_message = "breakout is valid"
+
+        self.logger.info(
+            msg=log_message,
+            extra={
+                "worker": "Confirmator",
+                "symbol": potential_confirmation_bar.symbol,
+                "timeframe": potential_confirmation_bar.timeframe,
+                "timeframe_type": potential_confirmation_bar.timeframe_type.value,
+                "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                "bar_time": potential_confirmation_bar.bar_time,
+                "request_id": one_minute_timeframe_stock.request_id,
+                "valid_reason": valid_reason,
+            },
+        )
+
+        return is_valid
+
+    def find_meaningful_resistance_zones(
+        self,
+        bars_until_now: list[common.objects.BarData],
+        min_prior_bars: int = 8,
+        min_touches: int = 1,
+        min_rejections: int = 1,
+        lookback_bars: int = 90,
+    ) -> list[common.objects.ResistanceZone]:
+        """
+        Finds meaningful prior resistance zones before the current breakout candidate.
+
+        Meaningful resistance:
+        - local swing high
+        - caused rejection
+        - optionally repeated touches around same zone
+        """
+
+        if len(bars_until_now) < min_prior_bars:
+            return []
+
+        bars = bars_until_now[-lookback_bars:]
+
+        candidate_levels: list[float] = []
+
+        for i in range(1, len(bars) - 1):
+            prev_bar = bars[i - 1]
+            bar_object = bars[i]
+            next_bar = bars[i + 1]
+
+            high = self.safe_float(bar_object.high, 0.0)
+
+            is_local_swing_high = (
+                high >= self.safe_float(prev_bar.high, 0.0)
+                and high >= self.safe_float(next_bar.high, 0.0)
+            )
+
+            rejected, _, _ = self.bar_rejected_from_level(
+                bars=bars,
+                touch_index=i,
+                level=high,
+                lookahead_bars=5,
+                min_rejection_pct=0.018,
+            )
+
+            if is_local_swing_high and rejected:
+                candidate_levels.append(high)
+
+        # Also include the highest high so far if it caused rejection.
+        highest_bar_index = max(
+            range(len(bars)),
+            key=lambda idx: self.safe_float(bars[idx].high, 0.0),
+        )
+
+        highest_high = self.safe_float(bars[highest_bar_index].high, 0.0)
+
+        rejected, _, _ = self.bar_rejected_from_level(
+            bars=bars,
+            touch_index=highest_bar_index,
+            level=highest_high,
+            lookahead_bars=8,
+            min_rejection_pct=0.018,
+        )
+
+        if rejected:
+            candidate_levels.append(highest_high)
+
+        zones: list[common.objects.ResistanceZone] = []
+
+        for level in candidate_levels:
+            tolerance = self.calculate_dynamic_zone_tolerance(
+                price=level,
+                recent_bars=bars,
+            )
+
+            zone_low = level - tolerance
+            zone_high = level + tolerance
+
+            touches: list[common.objects.BarData] = []
+            rejection_count = 0
+            max_rejection_pct = 0.0
+            max_rejection_abs = 0.0
+
+            for i, bar_object in enumerate(bars):
+                high = self.safe_float(bar_object.high, 0.0)
+                close = self.safe_float(bar_object.close, 0.0)
+
+                touched_zone = (
+                    zone_low <= high <= zone_high
+                    or zone_low <= close <= zone_high
+                    or high > zone_high and close < zone_high
+                )
+
+                if not touched_zone:
+                    continue
+
+                rejected, rejection_pct, rejection_abs = self.bar_rejected_from_level(
+                    bars=bars,
+                    touch_index=i,
+                    level=level,
+                    lookahead_bars=5,
+                    min_rejection_pct=0.012,
+                )
+
+                touches.append(bar_object)
+
+                if rejected:
+                    rejection_count += 1
+                    max_rejection_pct = max(max_rejection_pct, rejection_pct)
+                    max_rejection_abs = max(max_rejection_abs, rejection_abs)
+
+            if len(touches) < min_touches:
+                continue
+
+            if rejection_count < min_rejections:
+                continue
+
+            zones.append(
+                common.objects.ResistanceZone(
+                    resistance_price=level,
+                    zone_low=zone_low,
+                    zone_high=zone_high,
+                    first_touch_time=touches[0].bar_time,
+                    last_touch_time=touches[-1].bar_time,
+                    touch_count=len(touches),
+                    rejection_count=rejection_count,
+                    max_rejection_pct=max_rejection_pct,
+                    max_rejection_abs=max_rejection_abs,
+                    source="swing_high_with_rejection",
+                )
+            )
+
+        zones = sorted(
+            zones,
+            key=lambda zone: zone.resistance_price,
+        )
+
+        deduped: list[common.objects.ResistanceZone] = []
+
+        for zone in zones:
+            if not deduped:
+                deduped.append(zone)
+                continue
+
+            previous = deduped[-1]
+            zones_overlap = zone.zone_low <= previous.zone_high
+
+            if zones_overlap:
+                previous_score = (
+                    previous.touch_count * 1.0
+                    + previous.rejection_count * 2.0
+                    + previous.max_rejection_pct * 100.0
+                )
+
+                current_score = (
+                    zone.touch_count * 1.0
+                    + zone.rejection_count * 2.0
+                    + zone.max_rejection_pct * 100.0
+                )
+
+                if current_score > previous_score:
+                    deduped[-1] = zone
+            else:
+                deduped.append(zone)
+
+        return deduped
+
+    def safe_float(
+        self,
+        value: any,
+        default: float,
+    ) -> float:
+        try:
+            if value is None:
+                return default
+
+            float_value = float(value)
+
+            if math.isnan(float_value):
+                return default
+
+            return float_value
+
+        except Exception:
+            return default
+
+    def bar_rejected_from_level(
+        self,
+        bars: list[common.objects.BarData],
+        touch_index: int,
+        level: float,
+        lookahead_bars: int = 5,
+        min_rejection_pct: float = 0.018,
+    ) -> tuple[bool, float, float]:
+        """
+        Checks whether price touched a level and then rejected from it.
+
+        Returns:
+            rejected
+            rejection_pct
+            rejection_abs
+        """
+
+        if touch_index >= len(bars):
+            return False, 0.0, 0.0
+
+        touch_bar = bars[touch_index]
+        touch_high = self.safe_float(touch_bar.high, 0.0)
+
+        future_bars = bars[touch_index + 1: touch_index + 1 + lookahead_bars]
+
+        if not future_bars:
+            return False, 0.0, 0.0
+
+        min_future_low = min(
+            self.safe_float(bar_object.low, touch_high)
+            for bar_object in future_bars
+        )
+
+        rejection_abs = max(0.0, touch_high - min_future_low)
+        rejection_pct = rejection_abs / level if level > 0 else 0.0
+
+        return rejection_pct >= min_rejection_pct, rejection_pct, rejection_abs
+
+    def calculate_dynamic_zone_tolerance(
+        self,
+        price: float,
+        recent_bars: list[common.objects.BarData],
+    ) -> float:
+        """
+        Resistance should be a zone, not one exact price.
+
+        This gives larger tolerance when the stock is volatile,
+        but still keeps the zone tight enough for low-priced stocks.
+        """
+
+        recent_ranges = [
+            self.get_bar_range(bar_object)
+            for bar_object in recent_bars[-20:]
+            if self.safe_float(bar_object.high, 0.0) > self.safe_float(bar_object.low, 0.0)
+        ]
+
+        median_range = statistics.median(recent_ranges) if recent_ranges else price * 0.005
+
+        return max(
+            0.01,
+            price * 0.004,
+            median_range * 0.25,
+        )
+
+    def get_bar_range(
+        self,
+        bar_object: common.objects.BarData,
+    ) -> float:
+        high = self.safe_float(bar_object.high, 0.0)
+        low = self.safe_float(bar_object.low, 0.0)
+
+        return max(0.000001, high - low)
+
+    def is_valid_breakout_bar(
+        self,
+        bar_object: common.objects.BarData,
+        resistance_zone: common.objects.ResistanceZone,
+        recent_bars: list[common.objects.BarData],
+    ) -> tuple[bool, str]:
+        """
+        Valid breakout means:
+        - high breaks above zone
+        - close confirms above zone
+        - volume confirms
+        - candle is not mostly upper wick
+        - close is strong inside candle range
+        """
+
+        open_value = self.safe_float(bar_object.open_value, 0.0)
+        high = self.safe_float(bar_object.high, 0.0)
+        close = self.safe_float(bar_object.close, 0.0)
+
+        volume_ratio = self.get_volume_ratio(bar_object)
+        candle_stats = self.get_candle_stats(bar_object)
+
+        zone_high = resistance_zone.zone_high
+        zone_width = resistance_zone.zone_high - resistance_zone.zone_low
+
+        min_close_above = max(
+            0.005,
+            close * 0.0015,
+            zone_width * 0.25,
+        )
+
+        high_above_zone = high > zone_high + min_close_above
+        close_above_zone = close > zone_high + min_close_above
+
+        if not high_above_zone:
+            return False, "high_did_not_clear_zone"
+
+        if not close_above_zone:
+            return False, "high_broke_zone_but_close_did_not_confirm"
+
+        if close <= open_value:
+            return False, "red_breakout_candle"
+
+        if volume_ratio < 1.5:
+            return False, "volume_ratio_too_low"
+
+        if candle_stats["close_position_in_range"] < 0.60:
+            return False, "close_not_strong_enough_in_range"
+
+        if candle_stats["upper_wick_pct_of_range"] > 0.45:
+            return False, "upper_wick_too_large"
+
+        # This marks very late/extended moves as not "clean structure breakouts".
+        # If this filters out too many good positive examples, loosen or remove it.
+        last_5 = recent_bars[-5:]
+
+        if len(last_5) >= 5:
+            green_count = sum(
+                1
+                for b in last_5
+                if self.safe_float(b.close, 0.0) > self.safe_float(b.open_value, 0.0)
+            )
+
+            move_from_5_bars_ago = self.pct_change(
+                self.safe_float(last_5[0].close, close),
+                close,
+            )
+
+            if green_count >= 5 and move_from_5_bars_ago > 0.25:
+                return False, "too_extended_after_5_green_bars"
+
+        return True, "valid_breakout_confirmed"
+
+    def pct_change(
+        self,
+        from_value: float,
+        to_value: float,
+    ) -> float:
+        if from_value == 0:
+            return 0.0
+
+        return (to_value - from_value) / from_value
+
+    def get_candle_stats(
+        self,
+        bar_object: common.objects.BarData,
+    ) -> dict[str, float]:
+        open_value = self.safe_float(bar_object.open_value, 0.0)
+        high = self.safe_float(bar_object.high, 0.0)
+        low = self.safe_float(bar_object.low, 0.0)
+        close = self.safe_float(bar_object.close, 0.0)
+
+        bar_range = max(0.000001, high - low)
+        body = abs(close - open_value)
+        upper_wick = high - max(open_value, close)
+        lower_wick = min(open_value, close) - low
+
+        return {
+            "body_pct_of_range": body / bar_range,
+            "upper_wick_pct_of_range": max(0.0, upper_wick / bar_range),
+            "lower_wick_pct_of_range": max(0.0, lower_wick / bar_range),
+            "close_position_in_range": (close - low) / bar_range,
+        }
+
+    def get_volume_ratio(
+        self,
+        bar_object: common.objects.BarData,
+    ) -> float:
+        volume = self.safe_float(bar_object.volume, 0.0)
+        volume_average = self.safe_float(bar_object.volume_average, 0.0)
+
+        if volume_average <= 0:
+            return 0.0
+
+        return volume / volume_average
 
     def confirm_bar_for_placing_order(
         self,

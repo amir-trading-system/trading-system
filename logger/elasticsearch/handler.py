@@ -84,6 +84,7 @@ class Handler(
             "strong_positive_group_reasons",
             "soft_positive_group_score",
             "soft_positive_group_reasons",
+            "valid_reason",
         ]
 
         for field in fields:

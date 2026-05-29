@@ -220,8 +220,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="MASK",
-            datetime_str="05.28.26T10:33:00",
+            name="NEXR",
+            datetime_str="05.29.26T10:17:00",
             is_positive=True,
         ),
     ]
