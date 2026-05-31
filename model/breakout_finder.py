@@ -347,7 +347,6 @@ def calculate_lowest_low_break_before_10_percent_gain_next_30_minutes(
         "lowest_low_break_before_10_percent_gain_30_minutes_price": None,
     }
 
-
 def _is_valid_breakout(
     potential_confirmation_bar: common.objects.BarData,
     one_minute_timeframe_stock: common.objects.Stock,
@@ -369,6 +368,12 @@ def _is_valid_breakout(
     if not previous_highest_high_bar_is_recent:
         return False
 
+    if potential_confirmation_bar.bar_lower_wick_percentage > 0.3:
+        return False
+
+    if potential_confirmation_bar.body_percentage < 0.4:
+        return False
+
     lowest_low_bar_since_highest_high = one_minute_timeframe_stock.get_lowest_low_bar_between_bars(
         from_bar=previous_highest_high_one_minute_bar,
         to_bar=potential_confirmation_bar,
@@ -382,32 +387,34 @@ def _is_valid_breakout(
             continue
 
         if bar_object.bar_time < lowest_low_bar_since_highest_high.bar_time - datetime.timedelta(
-            minutes=30,
+            hours=2,
         ):
             continue
 
-        highest_high_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
-            current_one_minute_bar=bar_object,
-            only_before_current_bar=True,
+        previous_bar = one_minute_timeframe_stock.previous_bar(
+            bar_object=bar_object,
         )
 
         if (
             True
-            and highest_high_bar is not None
-            and 0.97 <= highest_high_bar.high/lowest_low_bar_since_highest_high.low <= 1.03
-            and highest_high_bar.close <= lowest_low_bar_since_highest_high.low
-            and lowest_low_bar_since_highest_high.bar_lower_wick_percentage >= 0.2
-            and highest_high_bar.bar_wick_percentage >= 0.1
-            and highest_high_bar.above_volume_average
-            and highest_high_bar.ema_9 > highest_high_bar.vwap
-            and highest_high_bar.ema_9 > highest_high_bar.ema_20
-            and highest_high_bar.high > highest_high_bar.ema_9
+            and 0.97 <= bar_object.high/lowest_low_bar_since_highest_high.low <= 1.03
+            and bar_object.high - bar_object.low > 0
+            and abs(lowest_low_bar_since_highest_high.low - bar_object.high)/(bar_object.high - bar_object.low) <= 0.7
+            and lowest_low_bar_since_highest_high.close >= bar_object.high
+            and previous_bar is not None
+            and previous_bar.high <= bar_object.high
+            and bar_object.close <= lowest_low_bar_since_highest_high.low
+            and bar_object.bar_wick_percentage >= 0.1
+            and bar_object.above_volume_average
+            and bar_object.ema_9 > bar_object.vwap
+            and bar_object.ema_9 > bar_object.ema_20
+            and bar_object.high > bar_object.ema_9
+            and (potential_confirmation_bar.low - potential_confirmation_bar.ema_9)/(potential_confirmation_bar.high - potential_confirmation_bar.low) < 0.2
         ):
             lowest_low_became_support_or_previous_resistance = True
             break
 
     return lowest_low_became_support_or_previous_resistance
-
 
 def build_breakout_result(
     data: dict[str, Any],

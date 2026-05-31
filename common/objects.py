@@ -239,7 +239,6 @@ class Stock:
         total_price_volume: float = 0.0,
         volume_sum_since_4_am_today: float = 0.0,
         volume_sum_since_market_open: float = 0.0,
-        number_of_potential_entry_points: int = 0,
     ):
         self.request_id = request_id
         self.symbol_name = symbol_name
@@ -262,7 +261,6 @@ class Stock:
         self.day_request_id = day_request_id
         self.total_volume = total_volume
         self.total_price_volume = total_price_volume
-        self.number_of_potential_entry_points = number_of_potential_entry_points
 
     def __getstate__(self):
         # Return a dictionary of attributes to pickle, excluding 'lock'
@@ -394,6 +392,22 @@ class Stock:
     ) -> BarData:
         highest_high_one_minute_bar: BarData = None
         for bar_object in self.bars:
+            previous_bar = self.previous_bar(
+                bar_object=bar_object,
+            )
+
+            if (
+                True
+                and (
+                    previous_bar is None
+                    or (
+                        previous_bar is not None
+                        and previous_bar.high > bar_object.high
+                    )
+                )
+            ):
+                continue
+
             if datetime.datetime(
                 year=current_one_minute_bar.bar_time.year,
                 month=current_one_minute_bar.bar_time.month,
@@ -411,9 +425,11 @@ class Stock:
             if (
                 True
                 and only_before_current_bar
-                and bar_object.bar_time >= current_one_minute_bar.bar_time
-                and bar_object.bar_time < current_one_minute_bar.bar_time - datetime.timedelta(
-                    minutes=20,
+                and (
+                    bar_object.bar_time >= current_one_minute_bar.bar_time
+                    or bar_object.bar_time < current_one_minute_bar.bar_time - datetime.timedelta(
+                        hours=1,
+                    )
                 )
             ):
                 continue
@@ -442,7 +458,7 @@ class Stock:
     ) -> BarData:
         lowest_low_bar: BarData = None
         for bar_object in self.bars:
-            if bar_object.bar_time < from_bar.bar_time:
+            if bar_object.bar_time <= from_bar.bar_time:
                 continue
 
             if bar_object.bar_time > to_bar.bar_time:
