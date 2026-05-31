@@ -386,9 +386,11 @@ class Stock:
 
     # // Gets the highest high since 04:00 AM of current bar.
     # // Excluding bars with reports, usually between 08:00 Am to 08:05 AM.
+    # // Has only_before_current_bar flag for filtering future results for retro check and run only on previous 20 minutes.
     def get_highest_high_one_minute_bar(
         self,
         current_one_minute_bar: BarData,
+        only_before_current_bar: bool,
     ) -> BarData:
         highest_high_one_minute_bar: BarData = None
         for bar_object in self.bars:
@@ -403,6 +405,16 @@ class Stock:
                 day=current_one_minute_bar.bar_time.day,
                 hour=8,
                 minute=5,
+            ):
+                continue
+
+            if (
+                True
+                and only_before_current_bar
+                and bar_object.bar_time >= current_one_minute_bar.bar_time
+                and bar_object.bar_time < current_one_minute_bar.bar_time - datetime.timedelta(
+                    minutes=20,
+                )
             ):
                 continue
 
@@ -422,6 +434,30 @@ class Stock:
                     highest_high_one_minute_bar = bar_object
 
         return highest_high_one_minute_bar
+
+    def get_lowest_low_bar_between_bars(
+        self,
+        from_bar: BarData,
+        to_bar: BarData,
+    ) -> BarData:
+        lowest_low_bar: BarData = None
+        for bar_object in self.bars:
+            if bar_object.bar_time < from_bar.bar_time:
+                continue
+
+            if bar_object.bar_time > to_bar.bar_time:
+                continue
+
+            if (
+                lowest_low_bar is None
+                or (
+                    lowest_low_bar is not None
+                    and lowest_low_bar.low > bar_object.low
+                )
+            ):
+                lowest_low_bar = bar_object
+
+        return lowest_low_bar
 
     def get_one_minutes_bars_since_market_open(
         self,

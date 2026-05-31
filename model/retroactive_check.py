@@ -219,9 +219,14 @@ def run_retroactive_check():
     get_only_statistics = False
     symbols_data = []
     symbols = [
+        # common.objects.SymbolTest(
+        #     name="NEXR",
+        #     datetime_str="05.29.26T10:17:00",
+        #     is_positive=True,
+        # ),
         common.objects.SymbolTest(
-            name="NEXR",
-            datetime_str="05.29.26T10:17:00",
+            name="ASTC",
+            datetime_str="05.29.26T11:41:00",
             is_positive=True,
         ),
     ]

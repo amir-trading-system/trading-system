@@ -1,2 +1,5 @@
 Need to do the following:
- - Write script that checks for each symbol you add if its getting reject by any rules or rescued.
+ - resistance becode to support check:
+  - create a function that checks if since last high the previous resistance became to support patterns.
+    - check it on the potential entry bar, if it is - place buy order.
+    - If not - call this function on each bar after that.

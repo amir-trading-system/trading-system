@@ -169,6 +169,7 @@ class Analyzer:
 
         highest_high_one_minute_bar: common.objects.BarData = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
             current_one_minute_bar=current_bar,
+            only_before_current_bar=False,
         )
         one_minute_bars: list[common.objects.BarData] = one_minute_timeframe_stock.get_one_minutes_bars_since_market_open(
             current_one_minute_bar=current_bar,
