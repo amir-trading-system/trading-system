@@ -224,21 +224,16 @@ def run_retroactive_check():
         #     datetime_str="05.06.26T10:17:00",
         #     is_positive=True,
         # ),
-        # common.objects.SymbolTest(
-        #     name="NEXR",
-        #     datetime_str="05.29.26T10:17:00",
-        #     is_positive=True,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="ASTC",
-        #     datetime_str="05.29.26T11:41:00",
-        #     is_positive=True,
-        # ),
         common.objects.SymbolTest(
-            name="WOK",
-            datetime_str="05.11.26T15:37:00",
+            name="ASTC",
+            datetime_str="05.29.26T11:41:00",
             is_positive=True,
         ),
+        # common.objects.SymbolTest(
+        #     name="WOK",
+        #     datetime_str="05.11.26T15:37:00",
+        #     is_positive=True,
+        # ),
     ]
     # symbols = explore_past_potential_symbols()
 

@@ -461,7 +461,7 @@ class Stock:
             if bar_object.bar_time <= from_bar.bar_time:
                 continue
 
-            if bar_object.bar_time > to_bar.bar_time:
+            if bar_object.bar_time >= to_bar.bar_time:
                 continue
 
             if (

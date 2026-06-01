@@ -374,6 +374,16 @@ def _is_valid_breakout(
     if potential_confirmation_bar.body_percentage < 0.4:
         return False
 
+    if any(
+        bar_object
+        for bar_object in one_minute_timeframe_stock.bars
+        if previous_highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
+        and 0.99 <= bar_object.high/previous_highest_high_one_minute_bar.high <= 1.01
+        and bar_object.bar_wick_percentage > 0.2
+        and bar_object.volume > bar_object.volume_average
+    ):
+        return False
+
     lowest_low_bar_since_highest_high = one_minute_timeframe_stock.get_lowest_low_bar_between_bars(
         from_bar=previous_highest_high_one_minute_bar,
         to_bar=potential_confirmation_bar,
@@ -410,11 +420,30 @@ def _is_valid_breakout(
             and bar_object.ema_9 > bar_object.ema_20
             and bar_object.high > bar_object.ema_9
             and (potential_confirmation_bar.low - potential_confirmation_bar.ema_9)/(potential_confirmation_bar.high - potential_confirmation_bar.low) < 0.2
+            and not any(
+                bar_obj
+                for bar_obj in one_minute_timeframe_stock.bars
+                if bar_object.bar_time < bar_obj.bar_time < lowest_low_bar_since_highest_high.bar_time
+                and bar_obj.close > bar_object.high
+                and bar_obj.bar_time < lowest_low_bar_since_highest_high.bar_time - datetime.timedelta(
+                    minutes=10,
+                )
+            )
+            and not any(
+                b
+                for b in one_minute_timeframe_stock.bars
+                if b.bar_time < bar_object.bar_time
+                and b.high > bar_object.high
+                and b.bar_time > bar_object.bar_time - datetime.timedelta(
+                    minutes=30,
+                )
+            )
         ):
             lowest_low_became_support_or_previous_resistance = True
             break
 
     return lowest_low_became_support_or_previous_resistance
+
 
 def build_breakout_result(
     data: dict[str, Any],
