@@ -219,14 +219,19 @@ def run_retroactive_check():
     get_only_statistics = True
     symbols_data = []
     symbols = [
-        common.objects.SymbolTest(
-            name="HKIT",
-            datetime_str="06.01.26T11:01:00",
-            is_positive=True,
-        ),
+        # common.objects.SymbolTest(
+        #     name="RYOJ",
+        #     datetime_str="05.22.26T11:01:00",
+        #     is_positive=True,
+        # ),
+        # common.objects.SymbolTest(
+        #     name="HKIT",
+        #     datetime_str="06.01.26T11:01:00",
+        #     is_positive=True,
+        # ),
         common.objects.SymbolTest(
             name="MASK",
-            datetime_str="06.01.26T11:01:00",
+            datetime_str="06.01.26T09:30:00",
             is_positive=True,
         ),
         # common.objects.SymbolTest(
