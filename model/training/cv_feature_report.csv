@@ -1,7 +1,0 @@
-feature,mean_importance,std_importance,top_k_frequency
-feature_overall_legit_trade,0.9188157195387326,0.004997643541554724,1.0
-feature_entry_close_strength_to_highest_high_close_strength,0.02556495349285756,0.0026417203994596934,1.0
-feature_controlled_volume_entry_quality,0.015922054508385866,0.00145112463753247,1.0
-feature_current_day_high_to_previous_high,0.015086293811083493,0.0017183873468584038,1.0
-feature_current_day_high_to_recent_days_highs,0.012341130783174779,0.0015133810681573728,1.0
-feature_current_day_vwap_to_recent_days,0.012269847865765515,0.0014216953006813428,1.0
