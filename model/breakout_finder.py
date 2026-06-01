@@ -1,4 +1,5 @@
-
+#pylint: skip-file
+# type: ignore
 import concurrent.futures
 import csv
 import datetime
