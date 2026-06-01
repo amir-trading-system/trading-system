@@ -73,21 +73,23 @@ class BreakoutResult:
     lower_wick_pct_of_range: float
     close_position_in_range: float
 
-    previous_highest_high_time: Optional[datetime.datetime]
-    previous_highest_high: Optional[float]
-    previous_highest_high_close: Optional[float]
-    previous_highest_high_volume: Optional[float]
-    previous_highest_high_volume_average: Optional[float]
-    previous_highest_high_bar_wick_percentage: Optional[float]
+    resistance_bar_time: Optional[datetime.datetime]
+    resistance_price: Optional[float]
+    resistance_bar_close: Optional[float]
+    resistance_bar_volume: Optional[float]
+    resistance_bar_volume_average: Optional[float]
+    resistance_bar_wick_percentage: Optional[float]
 
-    lowest_low_since_previous_high_time: Optional[datetime.datetime]
-    lowest_low_since_previous_high: Optional[float]
-    lowest_low_since_previous_high_close: Optional[float]
-    lowest_low_since_previous_high_bar_lower_wick_percentage: Optional[float]
+    lowest_low_since_resistance_time: Optional[datetime.datetime]
+    lowest_low_since_resistance: Optional[float]
+    lowest_low_since_resistance_close: Optional[float]
+    lowest_low_since_resistance_bar_lower_wick_percentage: Optional[float]
 
-    previous_high_to_lowest_low_pullback_pct: Optional[float]
-    breakout_close_above_previous_high_pct: Optional[float]
-    minutes_since_previous_high: Optional[float]
+    pullback_from_resistance_pct: Optional[float]
+    breakout_close_above_resistance_pct: Optional[float]
+    minutes_since_resistance: Optional[float]
+    volume_vs_previous_bar_ratio: Optional[float]
+    volume_vs_average_ratio: Optional[float]
 
     max_gain_after_breakout_pct: float
     max_gain_after_breakout_abs: float
@@ -347,103 +349,836 @@ def calculate_lowest_low_break_before_10_percent_gain_next_30_minutes(
         "lowest_low_break_before_10_percent_gain_30_minutes_price": None,
     }
 
+def find_volume_resistance_breakout_context(
+    potential_confirmation_bar: common.objects.BarData,
+    one_minute_timeframe_stock: common.objects.Stock,
+) -> Optional[dict[str, Any]]:
+    """
+    Finds the actual resistance context used by the current volume-resistance breakout logic.
+
+    This uses only bars known before/at the potential confirmation bar.
+    """
+
+    lookback_minutes = 30
+    min_pullback_from_resistance_pct = 0.03
+    min_close_above_resistance_pct = 0.02
+    min_volume_expansion_vs_previous_bar = 1.8
+    min_volume_expansion_vs_average = 1.8
+    min_close_position_in_range = 0.70
+
+    bars_before_current = sorted(
+        [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if (
+                potential_confirmation_bar.bar_time - datetime.timedelta(minutes=lookback_minutes)
+                <= bar_object.bar_time
+                < potential_confirmation_bar.bar_time
+            )
+        ],
+        key=lambda bar_object: bar_object.bar_time,
+    )
+
+    if len(bars_before_current) < 3:
+        return None
+
+    previous_bar = bars_before_current[-1]
+
+    current_open = safe_float(potential_confirmation_bar.open_value, 0.0)
+    current_high = safe_float(potential_confirmation_bar.high, 0.0)
+    current_low = safe_float(potential_confirmation_bar.low, 0.0)
+    current_close = safe_float(potential_confirmation_bar.close, 0.0)
+    current_volume = safe_float(potential_confirmation_bar.volume, 0.0)
+    current_volume_average = safe_float(potential_confirmation_bar.volume_average, 0.0)
+    previous_volume = safe_float(previous_bar.volume, 0.0)
+
+    if current_close <= 0 or current_volume <= 0:
+        return None
+
+    if previous_volume <= 0:
+        return None
+
+    if current_volume_average <= 0:
+        return None
+
+    if current_close <= current_open:
+        return None
+
+    current_range = current_high - current_low
+    if current_range <= 0:
+        return None
+
+    close_position_in_range = (current_close - current_low) / current_range
+    if close_position_in_range < min_close_position_in_range:
+        return None
+
+    volume_vs_previous_bar_ratio = current_volume / previous_volume
+    if volume_vs_previous_bar_ratio < min_volume_expansion_vs_previous_bar:
+        return None
+
+    volume_vs_average_ratio = current_volume / current_volume_average
+    if volume_vs_average_ratio < min_volume_expansion_vs_average:
+        return None
+
+    candidate_contexts: list[dict[str, Any]] = []
+
+    for i in range(1, len(bars_before_current) - 1):
+        previous_local_bar = bars_before_current[i - 1]
+        resistance_bar = bars_before_current[i]
+        next_local_bar = bars_before_current[i + 1]
+
+        resistance_price = safe_float(resistance_bar.high, 0.0)
+        if resistance_price <= 0:
+            continue
+
+        is_local_high = (
+            resistance_price >= safe_float(previous_local_bar.high, 0.0)
+            and resistance_price >= safe_float(next_local_bar.high, 0.0)
+        )
+
+        if not is_local_high:
+            continue
+
+        breakout_close_above_resistance_pct = pct_change(
+            resistance_price,
+            current_close,
+        )
+
+        if breakout_close_above_resistance_pct < min_close_above_resistance_pct:
+            continue
+
+        bars_after_resistance_before_current = [
+            bar_object
+            for bar_object in bars_before_current
+            if resistance_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
+        ]
+
+        if not bars_after_resistance_before_current:
+            continue
+
+        lowest_low_since_resistance_bar = min(
+            bars_after_resistance_before_current,
+            key=lambda bar_object: safe_float(bar_object.low, resistance_price),
+        )
+
+        lowest_low_since_resistance = safe_float(
+            lowest_low_since_resistance_bar.low,
+            resistance_price,
+        )
+
+        pullback_from_resistance_pct = pct_change(
+            resistance_price,
+            lowest_low_since_resistance,
+        ) * -1
+
+        if pullback_from_resistance_pct < min_pullback_from_resistance_pct:
+            continue
+
+        prior_close_above_resistance = any(
+            safe_float(bar_object.close, 0.0) > resistance_price
+            for bar_object in bars_after_resistance_before_current
+        )
+
+        if prior_close_above_resistance:
+            continue
+
+        candidate_contexts.append(
+            {
+                "resistance_bar": resistance_bar,
+                "resistance_price": resistance_price,
+                "lowest_low_since_resistance_bar": lowest_low_since_resistance_bar,
+                "lowest_low_since_resistance": lowest_low_since_resistance,
+                "pullback_from_resistance_pct": pullback_from_resistance_pct,
+                "breakout_close_above_resistance_pct": breakout_close_above_resistance_pct,
+                "minutes_since_resistance": (
+                    potential_confirmation_bar.bar_time - resistance_bar.bar_time
+                ).total_seconds() / 60.0,
+                "volume_vs_previous_bar_ratio": volume_vs_previous_bar_ratio,
+                "volume_vs_average_ratio": volume_vs_average_ratio,
+            }
+        )
+
+    if not candidate_contexts:
+        return None
+
+    # Prefer the highest valid resistance that the current bar is breaking.
+    return max(
+        candidate_contexts,
+        key=lambda context: context["resistance_price"],
+    )
+
+
+
+
+def find_market_open_premarket_runner_reclaim_context(
+    potential_confirmation_bar: common.objects.BarData,
+    one_minute_timeframe_stock: common.objects.Stock,
+) -> Optional[dict[str, Any]]:
+    """
+    Finds the MASK-09:30 style pattern:
+    premarket runner -> controlled pullback/reset above VWAP -> 09:30/early-open
+    volume shock -> reclaim/break of recent micro resistance with a strong close.
+
+    This is live-safe: it only uses bars before the potential confirmation bar
+    plus the potential confirmation bar itself.
+    """
+
+    current_time = potential_confirmation_bar.bar_time.time()
+    if not (datetime.time(9, 30) <= current_time <= datetime.time(9, 35)):
+        return None
+
+    current_date = potential_confirmation_bar.bar_time.date()
+
+    bars_before_current = sorted(
+        [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if (
+                bar_object.bar_time.date() == current_date
+                and bar_object.bar_time < potential_confirmation_bar.bar_time
+            )
+        ],
+        key=lambda bar_object: bar_object.bar_time,
+    )
+
+    if len(bars_before_current) < 15:
+        return None
+
+    previous_bar = bars_before_current[-1]
+
+    current_open = safe_float(potential_confirmation_bar.open_value, 0.0)
+    current_high = safe_float(potential_confirmation_bar.high, 0.0)
+    current_low = safe_float(potential_confirmation_bar.low, 0.0)
+    current_close = safe_float(potential_confirmation_bar.close, 0.0)
+    current_volume = safe_float(potential_confirmation_bar.volume, 0.0)
+    current_volume_average = safe_float(potential_confirmation_bar.volume_average, 0.0)
+    previous_volume = safe_float(previous_bar.volume, 0.0)
+
+    if current_close <= 0 or current_volume <= 0 or current_volume_average <= 0 or previous_volume <= 0:
+        return None
+
+    premarket_bars = [
+        bar_object
+        for bar_object in bars_before_current
+        if datetime.time(4, 0) <= bar_object.bar_time.time() < datetime.time(9, 30)
+    ]
+
+    if len(premarket_bars) < 10:
+        return None
+
+    # 1. The stock should already be a premarket runner with earlier ignition volume.
+    earlier_ignition_bars = []
+    for bar_object in premarket_bars:
+        volume_average = safe_float(bar_object.volume_average, 0.0)
+        if volume_average <= 0:
+            continue
+
+        bar_range = get_bar_range(bar_object)
+        close_position_in_range = (safe_float(bar_object.close, 0.0) - safe_float(bar_object.low, 0.0)) / bar_range
+
+        if (
+            safe_float(bar_object.volume, 0.0) / volume_average >= 4.0
+            and safe_float(bar_object.close, 0.0) > safe_float(bar_object.vwap, 0.0)
+            and safe_float(bar_object.close, 0.0) > safe_float(bar_object.ema_9, 0.0)
+            and safe_float(bar_object.close, 0.0) > safe_float(bar_object.open_value, 0.0)
+            and close_position_in_range >= 0.50
+        ):
+            earlier_ignition_bars.append(bar_object)
+
+    if not earlier_ignition_bars:
+        return None
+
+    premarket_high_bar = max(
+        premarket_bars,
+        key=lambda bar_object: safe_float(bar_object.high, 0.0),
+    )
+
+    premarket_high = safe_float(premarket_high_bar.high, 0.0)
+    if premarket_high <= current_low * 1.08:
+        return None
+
+    # 2. Recent pullback/reset before the open.
+    recent_pullback_bars = [
+        bar_object
+        for bar_object in bars_before_current
+        if (
+            potential_confirmation_bar.bar_time - datetime.timedelta(minutes=15)
+            <= bar_object.bar_time
+            < potential_confirmation_bar.bar_time
+        )
+    ]
+
+    if len(recent_pullback_bars) < 5:
+        return None
+
+    had_recent_close_below_ema9 = any(
+        safe_float(bar_object.close, 0.0) < safe_float(bar_object.ema_9, 0.0)
+        for bar_object in recent_pullback_bars
+    )
+
+    if not had_recent_close_below_ema9:
+        return None
+
+    closes_above_vwap_count = sum(
+        1
+        for bar_object in recent_pullback_bars
+        if safe_float(bar_object.close, 0.0) > safe_float(bar_object.vwap, 0.0)
+    )
+
+    if closes_above_vwap_count < len(recent_pullback_bars) * 0.70:
+        return None
+
+    recent_volume_ratios = [
+        safe_float(bar_object.volume, 0.0) / safe_float(bar_object.volume_average, 0.0)
+        for bar_object in recent_pullback_bars
+        if safe_float(bar_object.volume_average, 0.0) > 0
+    ]
+
+    if not recent_volume_ratios:
+        return None
+
+    average_recent_volume_ratio = sum(recent_volume_ratios) / len(recent_volume_ratios)
+    if average_recent_volume_ratio > 1.00:
+        return None
+
+    # 3. The open bar should retest the pullback shelf, not deeply break it.
+    pullback_support_bar = min(
+        recent_pullback_bars,
+        key=lambda bar_object: safe_float(bar_object.low, 0.0),
+    )
+    pullback_support_low = safe_float(pullback_support_bar.low, 0.0)
+
+    if pullback_support_low <= 0:
+        return None
+
+    retested_support = current_low <= pullback_support_low * 1.02
+    deeply_broke_support = current_low < pullback_support_low * 0.97
+
+    if not retested_support or deeply_broke_support:
+        return None
+
+    # 4. Break recent micro-resistance from the compressed pullback.
+    recent_micro_resistance_bars = recent_pullback_bars[-7:]
+    micro_resistance_bar = max(
+        recent_micro_resistance_bars,
+        key=lambda bar_object: safe_float(bar_object.high, 0.0),
+    )
+    micro_resistance_price = safe_float(micro_resistance_bar.high, 0.0)
+
+    if micro_resistance_price <= 0:
+        return None
+
+    breakout_close_above_resistance_pct = pct_change(
+        micro_resistance_price,
+        current_close,
+    )
+
+    if breakout_close_above_resistance_pct < 0.02:
+        return None
+
+    # 5. Market-open volume shock.
+    volume_vs_previous_bar_ratio = current_volume / previous_volume
+    if volume_vs_previous_bar_ratio < 5.0:
+        return None
+
+    volume_vs_average_ratio = current_volume / current_volume_average
+    if volume_vs_average_ratio < 1.5:
+        return None
+
+    # 6. Candle quality and reclaim alignment.
+    if current_close <= current_open:
+        return None
+
+    current_range = current_high - current_low
+    if current_range <= 0:
+        return None
+
+    close_position_in_range = (current_close - current_low) / current_range
+    if close_position_in_range < 0.80:
+        return None
+
+    upper_wick_pct_of_range = (
+        current_high - max(current_open, current_close)
+    ) / current_range
+    if upper_wick_pct_of_range > 0.25:
+        return None
+
+    if current_close <= safe_float(potential_confirmation_bar.ema_9, 0.0):
+        return None
+
+    if current_close <= safe_float(potential_confirmation_bar.ema_20, 0.0):
+        return None
+
+    if current_close <= safe_float(potential_confirmation_bar.vwap, 0.0):
+        return None
+
+    if safe_float(potential_confirmation_bar.ema_9, 0.0) <= safe_float(potential_confirmation_bar.ema_20, 0.0):
+        return None
+
+    return {
+        "breakout_type": "market_open_premarket_runner_reclaim",
+        "reason": "premarket_runner_pullback_reset_open_volume_reclaim",
+        "resistance_bar": micro_resistance_bar,
+        "resistance_price": micro_resistance_price,
+        "lowest_low_since_resistance_bar": pullback_support_bar,
+        "lowest_low_since_resistance": pullback_support_low,
+        "pullback_from_resistance_pct": max(0.0, pct_change(micro_resistance_price, pullback_support_low) * -1),
+        "breakout_close_above_resistance_pct": breakout_close_above_resistance_pct,
+        "minutes_since_resistance": (
+            potential_confirmation_bar.bar_time - micro_resistance_bar.bar_time
+        ).total_seconds() / 60.0,
+        "volume_vs_previous_bar_ratio": volume_vs_previous_bar_ratio,
+        "volume_vs_average_ratio": volume_vs_average_ratio,
+    }
+
+
+def find_intraday_extreme_volume_ignition_context(
+    potential_confirmation_bar: common.objects.BarData,
+    one_minute_timeframe_stock: common.objects.Stock,
+) -> Optional[dict[str, Any]]:
+    """
+    Finds the AIIO-13:00 style pattern:
+    a very fresh intraday resistance gets crossed by an explosive volume shock candle.
+
+    This detector intentionally does NOT require a large pullback from resistance;
+    the defining edge is the extreme volume shock + large decisive close above a
+    fresh level. That is what separated the AIIO 13:00 bar.
+    """
+
+    current_time = potential_confirmation_bar.bar_time.time()
+    if not (datetime.time(9, 30) <= current_time < datetime.time(16, 0)):
+        return None
+
+    current_date = potential_confirmation_bar.bar_time.date()
+
+    bars_before_current = sorted(
+        [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if (
+                bar_object.bar_time.date() == current_date
+                and potential_confirmation_bar.bar_time - datetime.timedelta(minutes=12)
+                <= bar_object.bar_time
+                < potential_confirmation_bar.bar_time
+            )
+        ],
+        key=lambda bar_object: bar_object.bar_time,
+    )
+
+    if len(bars_before_current) < 2:
+        return None
+
+    previous_bar = bars_before_current[-1]
+
+    current_open = safe_float(potential_confirmation_bar.open_value, 0.0)
+    current_high = safe_float(potential_confirmation_bar.high, 0.0)
+    current_low = safe_float(potential_confirmation_bar.low, 0.0)
+    current_close = safe_float(potential_confirmation_bar.close, 0.0)
+    current_volume = safe_float(potential_confirmation_bar.volume, 0.0)
+    current_volume_average = safe_float(potential_confirmation_bar.volume_average, 0.0)
+    previous_volume = safe_float(previous_bar.volume, 0.0)
+
+    if current_close <= 0 or current_volume <= 0 or current_volume_average <= 0 or previous_volume <= 0:
+        return None
+
+    if current_close <= current_open:
+        return None
+
+    current_range = current_high - current_low
+    if current_range <= 0:
+        return None
+
+    close_position_in_range = (current_close - current_low) / current_range
+    if close_position_in_range < 0.80:
+        return None
+
+    upper_wick_pct_of_range = (
+        current_high - max(current_open, current_close)
+    ) / current_range
+    if upper_wick_pct_of_range > 0.25:
+        return None
+
+    volume_vs_previous_bar_ratio = current_volume / previous_volume
+    if volume_vs_previous_bar_ratio < 10.0:
+        return None
+
+    volume_vs_average_ratio = current_volume / current_volume_average
+    if volume_vs_average_ratio < 5.0:
+        return None
+
+    candidate_contexts: list[dict[str, Any]] = []
+
+    for i, resistance_bar in enumerate(bars_before_current):
+        resistance_price = safe_float(resistance_bar.high, 0.0)
+        if resistance_price <= 0:
+            continue
+
+        minutes_since_resistance = (
+            potential_confirmation_bar.bar_time - resistance_bar.bar_time
+        ).total_seconds() / 60.0
+
+        if minutes_since_resistance <= 0 or minutes_since_resistance > 10:
+            continue
+
+        breakout_close_above_resistance_pct = pct_change(
+            resistance_price,
+            current_close,
+        )
+
+        if breakout_close_above_resistance_pct < 0.08:
+            continue
+
+        bars_after_resistance_before_current = [
+            bar_object
+            for bar_object in bars_before_current
+            if resistance_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
+        ]
+
+        prior_close_above_resistance = any(
+            safe_float(bar_object.close, 0.0) > resistance_price
+            for bar_object in bars_after_resistance_before_current
+        )
+
+        if prior_close_above_resistance:
+            continue
+
+        lowest_low_since_resistance_bar = None
+        lowest_low_since_resistance = None
+        pullback_from_resistance_pct = 0.0
+
+        if bars_after_resistance_before_current:
+            lowest_low_since_resistance_bar = min(
+                bars_after_resistance_before_current,
+                key=lambda bar_object: safe_float(bar_object.low, resistance_price),
+            )
+            lowest_low_since_resistance = safe_float(
+                lowest_low_since_resistance_bar.low,
+                resistance_price,
+            )
+            pullback_from_resistance_pct = max(
+                0.0,
+                pct_change(resistance_price, lowest_low_since_resistance) * -1,
+            )
+        else:
+            lowest_low_since_resistance_bar = previous_bar
+            lowest_low_since_resistance = safe_float(previous_bar.low, resistance_price)
+            pullback_from_resistance_pct = max(
+                0.0,
+                pct_change(resistance_price, lowest_low_since_resistance) * -1,
+            )
+
+        candidate_contexts.append(
+            {
+                "breakout_type": "intraday_extreme_volume_ignition",
+                "reason": "fresh_resistance_cross_with_extreme_volume_shock",
+                "resistance_bar": resistance_bar,
+                "resistance_price": resistance_price,
+                "lowest_low_since_resistance_bar": lowest_low_since_resistance_bar,
+                "lowest_low_since_resistance": lowest_low_since_resistance,
+                "pullback_from_resistance_pct": pullback_from_resistance_pct,
+                "breakout_close_above_resistance_pct": breakout_close_above_resistance_pct,
+                "minutes_since_resistance": minutes_since_resistance,
+                "volume_vs_previous_bar_ratio": volume_vs_previous_bar_ratio,
+                "volume_vs_average_ratio": volume_vs_average_ratio,
+            }
+        )
+
+    if not candidate_contexts:
+        return None
+
+    # Prefer the freshest high-quality level, then the highest resistance.
+    return max(
+        candidate_contexts,
+        key=lambda context: (
+            -context["minutes_since_resistance"],
+            context["resistance_price"],
+        ),
+    )
+
+
+
+def find_deep_pullback_support_reclaim_context(
+    potential_confirmation_bar: common.objects.BarData,
+    one_minute_timeframe_stock: common.objects.Stock,
+) -> Optional[dict[str, Any]]:
+    """
+    Finds the HKIT-11:01 style pattern:
+    major intraday runner -> deep pullback into earlier support/shelf -> support holds ->
+    first strong reclaim candle back above recent micro resistance / EMA 9 / EMA 20.
+
+    This is NOT an extreme volume ignition pattern. It is an early reclaim after a washout,
+    so EMA 9 is allowed to still be below EMA 20. The confirmation comes from:
+    - large prior run
+    - deep but not fatal pullback
+    - pullback low holds for a few bars
+    - current bar reclaims local resistance and moving averages
+    - volume expands enough, but does not need to be extreme
+    - candle closes very strong with small/no upper wick
+    """
+
+    current_time = potential_confirmation_bar.bar_time.time()
+    if not (datetime.time(9, 30) <= current_time < datetime.time(16, 0)):
+        return None
+
+    current_date = potential_confirmation_bar.bar_time.date()
+
+    bars_before_current = sorted(
+        [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if (
+                bar_object.bar_time.date() == current_date
+                and bar_object.bar_time < potential_confirmation_bar.bar_time
+            )
+        ],
+        key=lambda bar_object: bar_object.bar_time,
+    )
+
+    if len(bars_before_current) < 20:
+        return None
+
+    current_open = safe_float(potential_confirmation_bar.open_value, 0.0)
+    current_high = safe_float(potential_confirmation_bar.high, 0.0)
+    current_low = safe_float(potential_confirmation_bar.low, 0.0)
+    current_close = safe_float(potential_confirmation_bar.close, 0.0)
+    current_volume = safe_float(potential_confirmation_bar.volume, 0.0)
+    current_volume_average = safe_float(potential_confirmation_bar.volume_average, 0.0)
+
+    if current_close <= 0 or current_volume <= 0 or current_volume_average <= 0:
+        return None
+
+    # Use the last 90 minutes to find the prior major runner high.
+    recent_90_min_bars = [
+        bar_object
+        for bar_object in bars_before_current
+        if bar_object.bar_time >= potential_confirmation_bar.bar_time - datetime.timedelta(minutes=90)
+    ]
+
+    if len(recent_90_min_bars) < 10:
+        return None
+
+    prior_high_bar = max(
+        recent_90_min_bars,
+        key=lambda bar_object: safe_float(bar_object.high, 0.0),
+    )
+    prior_high = safe_float(prior_high_bar.high, 0.0)
+
+    if prior_high <= 0:
+        return None
+
+    bars_after_prior_high_before_current = [
+        bar_object
+        for bar_object in bars_before_current
+        if prior_high_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
+    ]
+
+    if len(bars_after_prior_high_before_current) < 3:
+        return None
+
+    pullback_low_bar = min(
+        bars_after_prior_high_before_current,
+        key=lambda bar_object: safe_float(bar_object.low, prior_high),
+    )
+    pullback_low = safe_float(pullback_low_bar.low, 0.0)
+
+    if pullback_low <= 0:
+        return None
+
+    # The setup needs a real washout from a meaningful prior high.
+    prior_high_to_pullback_low_pct = (prior_high - pullback_low) / prior_high
+
+    if prior_high_to_pullback_low_pct < 0.20:
+        return None
+
+    # Avoid cases where the stock is completely destroyed rather than reclaiming.
+    if prior_high_to_pullback_low_pct > 0.60:
+        return None
+
+    # The pullback low should be recent enough to be the active support/invalidation level.
+    minutes_since_pullback_low = (
+        potential_confirmation_bar.bar_time - pullback_low_bar.bar_time
+    ).total_seconds() / 60.0
+
+    if minutes_since_pullback_low <= 0 or minutes_since_pullback_low > 15:
+        return None
+
+    bars_after_pullback_low_before_current = [
+        bar_object
+        for bar_object in bars_before_current
+        if pullback_low_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
+    ]
+
+    # After the washout low forms, support should not be materially broken before the reclaim.
+    broke_pullback_low_after_it_formed = any(
+        safe_float(bar_object.low, 0.0) < pullback_low * 0.997
+        for bar_object in bars_after_pullback_low_before_current
+    )
+
+    if broke_pullback_low_after_it_formed:
+        return None
+
+    # The reclaim bar itself should also hold above the pullback low.
+    if current_low < pullback_low * 0.997:
+        return None
+
+    # Current low should not be wildly far above the pullback low; otherwise it may be too late,
+    # not the first reclaim from that support zone.
+    current_low_above_pullback_low_pct = pct_change(pullback_low, current_low)
+    if current_low_above_pullback_low_pct > 0.12:
+        return None
+
+    # Define recent micro resistance from the bounce/reclaim area.
+    recent_reclaim_window_bars = [
+        bar_object
+        for bar_object in bars_before_current
+        if bar_object.bar_time >= potential_confirmation_bar.bar_time - datetime.timedelta(minutes=10)
+    ]
+
+    if len(recent_reclaim_window_bars) < 3:
+        return None
+
+    micro_resistance_bar = max(
+        recent_reclaim_window_bars,
+        key=lambda bar_object: safe_float(bar_object.high, 0.0),
+    )
+    micro_resistance_price = safe_float(micro_resistance_bar.high, 0.0)
+
+    if micro_resistance_price <= 0:
+        return None
+
+    breakout_close_above_resistance_pct = pct_change(
+        micro_resistance_price,
+        current_close,
+    )
+
+    # HKIT 11:01 was a reclaim, not a giant expansion; require meaningful but not huge clearance.
+    if breakout_close_above_resistance_pct < 0.015:
+        return None
+
+    # The reclaim candle should clear EMA 9, EMA 20, and VWAP.
+    current_ema_9 = safe_float(potential_confirmation_bar.ema_9, 0.0)
+    current_ema_20 = safe_float(potential_confirmation_bar.ema_20, 0.0)
+    current_vwap = safe_float(potential_confirmation_bar.vwap, 0.0)
+
+    if current_ema_9 <= 0 or current_ema_20 <= 0 or current_vwap <= 0:
+        return None
+
+    if current_close <= current_ema_9:
+        return None
+
+    if current_close <= current_ema_20:
+        return None
+
+    if current_close <= current_vwap:
+        return None
+
+    # Do NOT require EMA 9 > EMA 20. In this pattern, buyers may enter before full trend alignment returns.
+
+    previous_bar = bars_before_current[-1]
+    previous_volume = safe_float(previous_bar.volume, 0.0)
+
+    if previous_volume <= 0:
+        return None
+
+    volume_vs_previous_bar_ratio = current_volume / previous_volume
+    if volume_vs_previous_bar_ratio < 1.5:
+        return None
+
+    volume_vs_average_ratio = current_volume / current_volume_average
+    if volume_vs_average_ratio < 1.5:
+        return None
+
+    # Candle quality: green, closes near high, small upper wick.
+    if current_close <= current_open:
+        return None
+
+    current_range = current_high - current_low
+    if current_range <= 0:
+        return None
+
+    close_position_in_range = (current_close - current_low) / current_range
+    if close_position_in_range < 0.80:
+        return None
+
+    upper_wick_pct_of_range = (
+        current_high - max(current_open, current_close)
+    ) / current_range
+
+    if upper_wick_pct_of_range > 0.20:
+        return None
+
+    return {
+        "breakout_type": "deep_pullback_support_reclaim_breakout",
+        "reason": "major_runner_deep_pullback_support_hold_micro_resistance_reclaim",
+        "resistance_bar": micro_resistance_bar,
+        "resistance_price": micro_resistance_price,
+        "lowest_low_since_resistance_bar": pullback_low_bar,
+        "lowest_low_since_resistance": pullback_low,
+        "pullback_from_resistance_pct": max(
+            0.0,
+            pct_change(micro_resistance_price, pullback_low) * -1,
+        ),
+        "breakout_close_above_resistance_pct": breakout_close_above_resistance_pct,
+        "minutes_since_resistance": (
+            potential_confirmation_bar.bar_time - micro_resistance_bar.bar_time
+        ).total_seconds() / 60.0,
+        "volume_vs_previous_bar_ratio": volume_vs_previous_bar_ratio,
+        "volume_vs_average_ratio": volume_vs_average_ratio,
+    }
+
+def find_breakout_context(
+    potential_confirmation_bar: common.objects.BarData,
+    one_minute_timeframe_stock: common.objects.Stock,
+) -> Optional[dict[str, Any]]:
+    """
+    Unified live-safe breakout detector.
+
+    Pattern order matters:
+    1. Market-open premarket runner reclaim catches MASK 09:30-like bars.
+    2. Intraday extreme volume ignition catches AIIO 13:00-like bars.
+    3. Deep pullback support reclaim catches HKIT 11:01-like bars.
+    4. Standard volume-resistance breakout catches the broader pattern.
+    """
+
+    context = find_market_open_premarket_runner_reclaim_context(
+        potential_confirmation_bar=potential_confirmation_bar,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
+    )
+    if context is not None:
+        return context
+
+    context = find_intraday_extreme_volume_ignition_context(
+        potential_confirmation_bar=potential_confirmation_bar,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
+    )
+    if context is not None:
+        return context
+
+    context = find_deep_pullback_support_reclaim_context(
+        potential_confirmation_bar=potential_confirmation_bar,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
+    )
+    if context is not None:
+        return context
+
+    context = find_volume_resistance_breakout_context(
+        potential_confirmation_bar=potential_confirmation_bar,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
+    )
+    if context is not None:
+        context["breakout_type"] = "volume_resistance_breakout"
+        context["reason"] = "resistance_cross_with_volume_expansion"
+        return context
+
+    return None
 def _is_valid_breakout(
     potential_confirmation_bar: common.objects.BarData,
     one_minute_timeframe_stock: common.objects.Stock,
 ) -> bool:
-    previous_highest_high_one_minute_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
-        current_one_minute_bar=potential_confirmation_bar,
-        only_before_current_bar=True,
-    )
-    if previous_highest_high_one_minute_bar is None:
-        return False
-
-    crossed_previous_highest_high = previous_highest_high_one_minute_bar.high < potential_confirmation_bar.close
-    if not crossed_previous_highest_high:
-        return False
-
-    previous_highest_high_bar_is_recent = previous_highest_high_one_minute_bar.bar_time > potential_confirmation_bar.bar_time - datetime.timedelta(
-        minutes=30,
-    )
-    if not previous_highest_high_bar_is_recent:
-        return False
-
-    if potential_confirmation_bar.bar_lower_wick_percentage > 0.3:
-        return False
-
-    if potential_confirmation_bar.body_percentage < 0.4:
-        return False
-
-    if any(
-        bar_object
-        for bar_object in one_minute_timeframe_stock.bars
-        if previous_highest_high_one_minute_bar.bar_time < bar_object.bar_time < potential_confirmation_bar.bar_time
-        and 0.99 <= bar_object.high/previous_highest_high_one_minute_bar.high <= 1.01
-        and bar_object.bar_wick_percentage > 0.2
-        and bar_object.volume > bar_object.volume_average
-    ):
-        return False
-
-    lowest_low_bar_since_highest_high = one_minute_timeframe_stock.get_lowest_low_bar_between_bars(
-        from_bar=previous_highest_high_one_minute_bar,
-        to_bar=potential_confirmation_bar,
-    )
-    if lowest_low_bar_since_highest_high is None:
-        return False
-
-    lowest_low_became_support_or_previous_resistance = False
-    for bar_object in one_minute_timeframe_stock.bars:
-        if bar_object.bar_time >= previous_highest_high_one_minute_bar.bar_time:
-            continue
-
-        if bar_object.bar_time < lowest_low_bar_since_highest_high.bar_time - datetime.timedelta(
-            hours=2,
-        ):
-            continue
-
-        previous_bar = one_minute_timeframe_stock.previous_bar(
-            bar_object=bar_object,
-        )
-
-        if (
-            True
-            and 0.97 <= bar_object.high/lowest_low_bar_since_highest_high.low <= 1.03
-            and bar_object.high - bar_object.low > 0
-            and abs(lowest_low_bar_since_highest_high.low - bar_object.high)/(bar_object.high - bar_object.low) <= 0.7
-            and lowest_low_bar_since_highest_high.close >= bar_object.high
-            and previous_bar is not None
-            and previous_bar.high <= bar_object.high
-            and bar_object.close <= lowest_low_bar_since_highest_high.low
-            and bar_object.bar_wick_percentage >= 0.1
-            and bar_object.above_volume_average
-            and bar_object.ema_9 > bar_object.vwap
-            and bar_object.ema_9 > bar_object.ema_20
-            and bar_object.high > bar_object.ema_9
-            and (potential_confirmation_bar.low - potential_confirmation_bar.ema_9)/(potential_confirmation_bar.high - potential_confirmation_bar.low) < 0.2
-            and not any(
-                bar_obj
-                for bar_obj in one_minute_timeframe_stock.bars
-                if bar_object.bar_time < bar_obj.bar_time < lowest_low_bar_since_highest_high.bar_time
-                and bar_obj.close > bar_object.high
-                and bar_obj.bar_time < lowest_low_bar_since_highest_high.bar_time - datetime.timedelta(
-                    minutes=10,
-                )
-            )
-            and not any(
-                b
-                for b in one_minute_timeframe_stock.bars
-                if b.bar_time < bar_object.bar_time
-                and b.high > bar_object.high
-                and b.bar_time > bar_object.bar_time - datetime.timedelta(
-                    minutes=30,
-                )
-            )
-        ):
-            lowest_low_became_support_or_previous_resistance = True
-            break
-
-    return lowest_low_became_support_or_previous_resistance
-
+    return find_breakout_context(
+        potential_confirmation_bar=potential_confirmation_bar,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
+    ) is not None
 
 def build_breakout_result(
     data: dict[str, Any],
@@ -456,17 +1191,35 @@ def build_breakout_result(
     specific_bar_time: datetime.datetime = data["day_timeframe_stock"].specific_bar_time
     is_positive: bool = data["day_timeframe_stock"].is_positive
 
-    previous_highest_high_one_minute_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
-        current_one_minute_bar=bar_object,
-        only_before_current_bar=True,
+    breakout_context = find_breakout_context(
+        potential_confirmation_bar=bar_object,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
     )
 
-    lowest_low_bar_since_highest_high = None
-    if previous_highest_high_one_minute_bar is not None:
-        lowest_low_bar_since_highest_high = one_minute_timeframe_stock.get_lowest_low_bar_between_bars(
-            from_bar=previous_highest_high_one_minute_bar,
-            to_bar=bar_object,
-        )
+    resistance_bar = None
+    lowest_low_since_resistance_bar = None
+    resistance_price = None
+    lowest_low_since_resistance = None
+    pullback_from_resistance_pct = None
+    breakout_close_above_resistance_pct = None
+    minutes_since_resistance = None
+    volume_vs_previous_bar_ratio = None
+    volume_vs_average_ratio = None
+    breakout_type = "unknown_breakout"
+    reason = "unknown_reason"
+
+    if breakout_context is not None:
+        resistance_bar = breakout_context["resistance_bar"]
+        lowest_low_since_resistance_bar = breakout_context["lowest_low_since_resistance_bar"]
+        resistance_price = breakout_context["resistance_price"]
+        lowest_low_since_resistance = breakout_context["lowest_low_since_resistance"]
+        pullback_from_resistance_pct = breakout_context["pullback_from_resistance_pct"]
+        breakout_close_above_resistance_pct = breakout_context["breakout_close_above_resistance_pct"]
+        minutes_since_resistance = breakout_context["minutes_since_resistance"]
+        volume_vs_previous_bar_ratio = breakout_context["volume_vs_previous_bar_ratio"]
+        volume_vs_average_ratio = breakout_context["volume_vs_average_ratio"]
+        breakout_type = breakout_context.get("breakout_type", "unknown_breakout")
+        reason = breakout_context.get("reason", "unknown_reason")
 
     open_value = safe_float(bar_object.open_value, 0.0)
     high = safe_float(bar_object.high, 0.0)
@@ -489,39 +1242,11 @@ def build_breakout_result(
         bars=bars,
     )
 
-    previous_highest_high = (
-        safe_float(previous_highest_high_one_minute_bar.high, 0.0)
-        if previous_highest_high_one_minute_bar is not None
-        else None
-    )
-
-    lowest_low_since_previous_high = (
-        safe_float(lowest_low_bar_since_highest_high.low, 0.0)
-        if lowest_low_bar_since_highest_high is not None
-        else None
-    )
-
     lowest_low_break_before_10_percent_gain_30_minutes_stats = calculate_lowest_low_break_before_10_percent_gain_next_30_minutes(
         bar_index=bar_index,
         bars=bars,
-        lowest_low_since_previous_high=lowest_low_since_previous_high,
+        lowest_low_since_previous_high=lowest_low_since_resistance,
     )
-
-    previous_high_to_lowest_low_pullback_pct = None
-    if previous_highest_high is not None and lowest_low_since_previous_high is not None and previous_highest_high > 0:
-        previous_high_to_lowest_low_pullback_pct = (
-            (previous_highest_high - lowest_low_since_previous_high) / previous_highest_high
-        )
-
-    breakout_close_above_previous_high_pct = None
-    if previous_highest_high is not None and previous_highest_high > 0:
-        breakout_close_above_previous_high_pct = pct_change(previous_highest_high, close)
-
-    minutes_since_previous_high = None
-    if previous_highest_high_one_minute_bar is not None:
-        minutes_since_previous_high = (
-            (bar_object.bar_time - previous_highest_high_one_minute_bar.bar_time).total_seconds() / 60.0
-        )
 
     return BreakoutResult(
         symbol=bar_object.symbol,
@@ -529,8 +1254,8 @@ def build_breakout_result(
         bar_time=bar_time,
         is_positive=is_positive,
 
-        breakout_type="clean_breakout",
-        reason="previous_high_break_with_pullback_low_support_or_previous_resistance",
+        breakout_type=breakout_type,
+        reason=reason,
 
         open=open_value,
         high=high,
@@ -545,53 +1270,55 @@ def build_breakout_result(
         lower_wick_pct_of_range=candle_stats["lower_wick_pct_of_range"],
         close_position_in_range=candle_stats["close_position_in_range"],
 
-        previous_highest_high_time=(
-            previous_highest_high_one_minute_bar.bar_time
-            if previous_highest_high_one_minute_bar is not None
+        resistance_bar_time=(
+            resistance_bar.bar_time
+            if resistance_bar is not None
             else None
         ),
-        previous_highest_high=previous_highest_high,
-        previous_highest_high_close=(
-            safe_float(previous_highest_high_one_minute_bar.close, 0.0)
-            if previous_highest_high_one_minute_bar is not None
+        resistance_price=resistance_price,
+        resistance_bar_close=(
+            safe_float(resistance_bar.close, 0.0)
+            if resistance_bar is not None
             else None
         ),
-        previous_highest_high_volume=(
-            safe_float(previous_highest_high_one_minute_bar.volume, 0.0)
-            if previous_highest_high_one_minute_bar is not None
+        resistance_bar_volume=(
+            safe_float(resistance_bar.volume, 0.0)
+            if resistance_bar is not None
             else None
         ),
-        previous_highest_high_volume_average=(
-            safe_float(previous_highest_high_one_minute_bar.volume_average, 0.0)
-            if previous_highest_high_one_minute_bar is not None
+        resistance_bar_volume_average=(
+            safe_float(resistance_bar.volume_average, 0.0)
+            if resistance_bar is not None
             else None
         ),
-        previous_highest_high_bar_wick_percentage=(
-            safe_float(getattr(previous_highest_high_one_minute_bar, "bar_wick_percentage", None), 0.0)
-            if previous_highest_high_one_minute_bar is not None
-            else None
-        ),
-
-        lowest_low_since_previous_high_time=(
-            lowest_low_bar_since_highest_high.bar_time
-            if lowest_low_bar_since_highest_high is not None
-            else None
-        ),
-        lowest_low_since_previous_high=lowest_low_since_previous_high,
-        lowest_low_since_previous_high_close=(
-            safe_float(lowest_low_bar_since_highest_high.close, 0.0)
-            if lowest_low_bar_since_highest_high is not None
-            else None
-        ),
-        lowest_low_since_previous_high_bar_lower_wick_percentage=(
-            safe_float(getattr(lowest_low_bar_since_highest_high, "bar_lower_wick_percentage", None), 0.0)
-            if lowest_low_bar_since_highest_high is not None
+        resistance_bar_wick_percentage=(
+            safe_float(getattr(resistance_bar, "bar_wick_percentage", None), 0.0)
+            if resistance_bar is not None
             else None
         ),
 
-        previous_high_to_lowest_low_pullback_pct=previous_high_to_lowest_low_pullback_pct,
-        breakout_close_above_previous_high_pct=breakout_close_above_previous_high_pct,
-        minutes_since_previous_high=minutes_since_previous_high,
+        lowest_low_since_resistance_time=(
+            lowest_low_since_resistance_bar.bar_time
+            if lowest_low_since_resistance_bar is not None
+            else None
+        ),
+        lowest_low_since_resistance=lowest_low_since_resistance,
+        lowest_low_since_resistance_close=(
+            safe_float(lowest_low_since_resistance_bar.close, 0.0)
+            if lowest_low_since_resistance_bar is not None
+            else None
+        ),
+        lowest_low_since_resistance_bar_lower_wick_percentage=(
+            safe_float(getattr(lowest_low_since_resistance_bar, "bar_lower_wick_percentage", None), 0.0)
+            if lowest_low_since_resistance_bar is not None
+            else None
+        ),
+
+        pullback_from_resistance_pct=pullback_from_resistance_pct,
+        breakout_close_above_resistance_pct=breakout_close_above_resistance_pct,
+        minutes_since_resistance=minutes_since_resistance,
+        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
+        volume_vs_average_ratio=volume_vs_average_ratio,
 
         max_gain_after_breakout_pct=max_gain_after_breakout_stats["max_gain_after_breakout_pct"],
         max_gain_after_breakout_abs=max_gain_after_breakout_stats["max_gain_after_breakout_abs"],
@@ -616,7 +1343,6 @@ def build_breakout_result(
         histogram=safe_float(getattr(bar_object, "histogram", 0), 0),
         signal_line=safe_float(getattr(bar_object, "signal_line", 0), 0),
     )
-
 
 def find_breakouts_for_trade(
     data: dict[str, Any],
@@ -659,7 +1385,7 @@ def find_breakouts_for_trade(
             hour=16,
         )
 
-        if current_bar.bar_time <= market_open_time or current_bar.bar_time >= market_close_time:
+        if current_bar.bar_time < market_open_time or current_bar.bar_time >= market_close_time:
             continue
 
         if not _is_valid_breakout(

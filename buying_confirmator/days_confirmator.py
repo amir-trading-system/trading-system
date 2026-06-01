@@ -609,6 +609,16 @@ class Confirmator:
                         minutes=30,
                     )
                 )
+                and any(
+                    bar_obj
+                    for bar_obj in one_minute_timeframe_stock.bars
+                    if bar_obj.bar_time > lowest_low_bar_since_highest_high.bar_time - datetime.timedelta(
+                        minutes=10,
+                    )
+                    and bar_obj.bar_time > bar_object.bar_time
+                    and bar_obj.above_volume_average
+                    and bar_obj.open_value < bar_object.high < bar_obj.close
+                )
             ):
                 lowest_low_became_support_or_previous_resistance = True
                 break
