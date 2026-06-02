@@ -3,7 +3,6 @@ import logging
 import queue
 
 import alerter
-import analyzer.evidences
 import common
 import model
 from tws import client

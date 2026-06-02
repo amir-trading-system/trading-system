@@ -1,7 +1,8 @@
 import datetime
 
 import common
-import model
+
+from . import hard_rules
 
 class DataExtractor:
     def safe_divide(
@@ -692,17 +693,17 @@ class DataExtractor:
 
         features = base_features | complex_features | recent_days_structure_features | breakout_structure_features | volume_structure_features | macd_structure_features | pre_market_structure_features
 
-        should_be_rejected_by_hard_rules = model.training.hard_rules.should_be_rejected_by_hard_rules(
+        should_be_rejected_by_hard_rules = hard_rules.should_be_rejected_by_hard_rules(
             features_data=features,
         )
-        positive_score, positive_reasons = model.training.hard_rules.success_patterns(
+        positive_score, positive_reasons = hard_rules.success_patterns(
             features_data=features,
         )
-        positive_score_statistics = model.training.hard_rules.positive_reason_groups(
+        positive_score_statistics = hard_rules.positive_reason_groups(
             positive_reasons=positive_reasons,
         )
 
-        positive_tier = model.training.hard_rules.positive_tier(
+        positive_tier = hard_rules.positive_tier(
             strong_positive_group_score=positive_score_statistics["strong_positive_group_score"],
             soft_positive_group_score=positive_score_statistics["soft_positive_group_score"],
             positive_score=positive_score,
