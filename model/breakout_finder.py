@@ -1685,26 +1685,239 @@ def find_helper_secondary_base_ignition_context(
     )
 
 
-def find_breakout_context(
+def find_helper_aligned_higher_low_buyer_ignition_context(
     current_bar: Any,
     bars: list[Any],
 ) -> Optional[BreakoutContext]:
+    """
+    Uses Helper.is_aligned_higher_low_buyer_ignition(...) as a separate
+    detector inside this exporter.
+
+    This is the common 50% positive-trend pattern:
+    EMA/VWAP alignment + higher/flat lows + buyer-control candle + volume.
+    It is not necessarily a classic resistance breakout, so the exported
+    resistance/support fields are rebuilt from the recent 10-bar structure.
+    """
+
+    stock_wrapper = _LiveStockWrapper(bars=bars)
+    helper = buying_confirmator.helper.Helper()
+
+    if not hasattr(helper, "is_aligned_higher_low_buyer_ignition"):
+        return None
+
+    has_pattern = helper.is_aligned_higher_low_buyer_ignition(
+        one_minute_timeframe_stock=stock_wrapper,
+        potential_confirmation_bar=current_bar,
+    )
+
+    if not has_pattern:
+        return None
+
+    bars_before_current = get_bars_same_day_until(
+        bars=bars,
+        current_bar=current_bar,
+        include_current=False,
+    )
+
+    if len(bars_before_current) < 10:
+        return None
+
+    recent_bars = bars_before_current[-10:]
+
+    resistance_bar = max(
+        recent_bars,
+        key=lambda bar_object: safe_float(getattr(bar_object, "high", None), 0.0),
+    )
+
+    support_low_bar = min(
+        recent_bars,
+        key=lambda bar_object: safe_float(getattr(bar_object, "low", None), float("inf")),
+    )
+
+    resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
+    support_low = safe_float(getattr(support_low_bar, "low", None), None)
+    breakout_close = safe_float(getattr(current_bar, "close", None), None)
+
+    if (
+        resistance_price is None
+        or resistance_price <= 0
+        or support_low is None
+        or support_low <= 0
+        or breakout_close is None
+        or breakout_close <= 0
+    ):
+        return None
+
+    previous_bar = bars_before_current[-1]
+
+    volume_vs_previous_bar_ratio = ratio(
+        safe_float(getattr(current_bar, "volume", None), None),
+        safe_float(getattr(previous_bar, "volume", None), None),
+    ) or 0.0
+
+    volume_vs_average_ratio = ratio(
+        safe_float(getattr(current_bar, "volume", None), None),
+        safe_float(getattr(current_bar, "volume_average", None), None),
+    ) or 0.0
+
+    return BreakoutContext(
+        breakout_type="aligned_higher_low_buyer_ignition",
+        reason="ema_vwap_aligned_higher_lows_buyer_control_candle",
+        breakout_bar=current_bar,
+        resistance_bar=resistance_bar,
+        resistance_price=resistance_price,
+        lowest_low_since_resistance_bar=support_low_bar,
+        pullback_from_resistance_pct=(resistance_price - support_low) / resistance_price,
+        breakout_close_above_resistance_pct=(breakout_close - resistance_price) / resistance_price,
+        minutes_since_resistance=minutes_between(resistance_bar.bar_time, current_bar.bar_time),
+        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
+        volume_vs_average_ratio=volume_vs_average_ratio,
+    )
+
+
+def find_helper_prior_resistance_support_reclaim_continuation_context(
+    current_bar: Any,
+    bars: list[Any],
+) -> Optional[BreakoutContext]:
+    """
+    HKIT-style detector wrapper.
+
+    This pattern is a low-volume reclaim after a prior high-volume breakout:
+    resistance bar -> breakout bar -> support retest bar -> reclaim entry bar.
+    The helper owns the sequence detection; this wrapper exports its context.
+    """
+
+    stock_wrapper = _LiveStockWrapper(bars=bars)
+    helper = buying_confirmator.helper.Helper()
+
+    context_method = None
+    if hasattr(helper, "_find_prior_resistance_support_reclaim_continuation_context"):
+        context_method = getattr(helper, "_find_prior_resistance_support_reclaim_continuation_context")
+
+    helper_context = None
+    if context_method is not None:
+        helper_context = context_method(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        )
+        if helper_context is None:
+            return None
+    else:
+        method = None
+        for method_name in (
+            "is_prior_resistance_support_reclaim_continuation",
+            "is_prior_resistance_support_reclaim_continuation_breakout",
+            "_is_prior_resistance_support_reclaim_continuation",
+        ):
+            if hasattr(helper, method_name):
+                method = getattr(helper, method_name)
+                break
+
+        if method is None:
+            return None
+
+        if not method(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        ):
+            return None
+
+    bars_before_current = get_bars_same_day_until(
+        bars=bars,
+        current_bar=current_bar,
+        include_current=False,
+    )
+
+    if len(bars_before_current) < 3:
+        return None
+
+    if helper_context is not None:
+        resistance_bar = helper_context.get("resistance_bar")
+        resistance_price = safe_float(helper_context.get("resistance_price"), None)
+        support_low_bar = helper_context.get("support_low_bar") or helper_context.get("support_test_bar")
+        support_low = safe_float(helper_context.get("support_low"), None)
+        pullback_from_resistance_pct = safe_float(helper_context.get("pullback_from_resistance_pct"), None)
+        breakout_close_above_resistance_pct = safe_float(helper_context.get("breakout_close_above_resistance_pct"), None)
+        minutes_since_resistance = safe_float(helper_context.get("minutes_since_resistance"), None)
+    else:
+        recent_bars = bars_before_current[-10:]
+        resistance_bar = max(recent_bars, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
+        support_low_bar = min(recent_bars, key=lambda b: safe_float(getattr(b, "low", None), float("inf")))
+        resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
+        support_low = safe_float(getattr(support_low_bar, "low", None), None)
+        breakout_close = safe_float(getattr(current_bar, "close", None), None)
+        if resistance_price is None or support_low is None or breakout_close is None or resistance_price <= 0:
+            return None
+        pullback_from_resistance_pct = (resistance_price - support_low) / resistance_price
+        breakout_close_above_resistance_pct = (breakout_close - resistance_price) / resistance_price
+        minutes_since_resistance = minutes_between(resistance_bar.bar_time, current_bar.bar_time)
+
+    if (
+        resistance_bar is None
+        or support_low_bar is None
+        or resistance_price is None
+        or resistance_price <= 0
+        or support_low is None
+        or support_low <= 0
+        or pullback_from_resistance_pct is None
+        or breakout_close_above_resistance_pct is None
+        or minutes_since_resistance is None
+    ):
+        return None
+
+    previous_bar = bars_before_current[-1]
+
+    return BreakoutContext(
+        breakout_type="prior_resistance_support_reclaim_continuation",
+        reason="high_volume_breakout_low_volume_support_retest_reclaim",
+        breakout_bar=current_bar,
+        resistance_bar=resistance_bar,
+        resistance_price=resistance_price,
+        lowest_low_since_resistance_bar=support_low_bar,
+        pullback_from_resistance_pct=pullback_from_resistance_pct,
+        breakout_close_above_resistance_pct=breakout_close_above_resistance_pct,
+        minutes_since_resistance=minutes_since_resistance,
+        volume_vs_previous_bar_ratio=ratio(getattr(current_bar, "volume", None), getattr(previous_bar, "volume", None)) or 0.0,
+        volume_vs_average_ratio=ratio(getattr(current_bar, "volume", None), getattr(current_bar, "volume_average", None)) or 0.0,
+    )
+
+def find_breakout_context(
+    current_bar: Any,
+    bars: list[Any],
+    allow_aligned_higher_low_buyer_ignition: bool = True,
+) -> Optional[BreakoutContext]:
     # Detector priority matters:
     # specific patterns first, broad fallback last.
-    for detector in (
+    #
+    # aligned_higher_low_buyer_ignition is intentionally broad. The helper
+    # limits it to max 2 accepted aligned entries per symbol/day, but the
+    # export showed it is cleanest when it appears very early in the broader
+    # breakout sequence. The caller disables it once too many prior detected
+    # breakouts already exist, while still allowing lower-priority detectors
+    # to classify the bar if they match.
+    detectors = [
         find_market_open_premarket_runner_reclaim_context,
         find_helper_market_open_premarket_support_reclaim_ignition_context,
         find_intraday_extreme_volume_ignition_context,
         find_deep_pullback_support_reclaim_context,
+        find_helper_prior_resistance_support_reclaim_continuation_context,
         find_helper_strong_live_trend_start_context,
         find_helper_secondary_base_ignition_context,
+    ]
+
+    if allow_aligned_higher_low_buyer_ignition:
+        detectors.append(find_helper_aligned_higher_low_buyer_ignition_context)
+
+    detectors.extend([
         find_vwap_reclaim_trend_start_context,
         find_ema_reclaim_after_pullback_context,
         find_volume_dryup_expansion_context,
         find_higher_low_compression_breakout_context,
         find_first_pullback_hold_above_vwap_context,
         find_volume_resistance_breakout_context,
-    ):
+    ])
+
+    for detector in detectors:
         context = detector(current_bar, bars)
         if context is not None:
             return context
@@ -2211,7 +2424,25 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
 
         update_tracked_breakouts(tracked_breakouts, current_bar)
 
-        context = find_breakout_context(current_bar, bars)
+        history_before_current = get_previous_breakout_history(
+            tracked_breakouts=tracked_breakouts,
+            current_bar=current_bar,
+        )
+
+        # The aligned-higher-low pattern is a broad confirmed-trend pattern.
+        # Latest profiling showed it works best only in the first 1-2 broader
+        # detected setups of the day, so allow it only when there is at most
+        # one previous detected breakout before the current bar. Other detector
+        # families are still allowed after this point.
+        allow_aligned_higher_low_buyer_ignition = (
+            history_before_current["clean_breakout_count_today_before_current"] <= 1
+        )
+
+        context = find_breakout_context(
+            current_bar=current_bar,
+            bars=bars,
+            allow_aligned_higher_low_buyer_ignition=allow_aligned_higher_low_buyer_ignition,
+        )
 
         if context is None:
             continue

@@ -1134,31 +1134,586 @@ class Helper:
 
         return True
 
-    def bar_has_potential(
+    def _find_prior_resistance_support_reclaim_continuation_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """
+        HKIT 10:08-style detector context.
+
+        This is NOT a fresh volume-ignition entry. It is a sequence:
+        1. Prior resistance is created.
+        2. A later bar breaks above that resistance with volume.
+        3. Price pulls back and retests the old resistance as support on lower volume.
+        4. Current bar confirms reclaim/continuation.
+
+        Important: the current entry bar is allowed to have low/normal volume.
+        For HKIT, volume came in on the 10:05 breakout; 10:08 was the
+        lower-volume reclaim after the 10:07 support test.
+        """
+
+        if potential_confirmation_bar.bar_time.time() >= datetime.time(12, 0):
+            return None
+
+        bars_until_current = self._get_today_bars_until_current(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+
+        previous_bars = [
+            bar_object
+            for bar_object in bars_until_current
+            if bar_object.bar_time < potential_confirmation_bar.bar_time
+        ]
+
+        if len(previous_bars) < 8:
+            return None
+
+        entry_bar = potential_confirmation_bar
+
+        # --------------------------------------------------
+        # Entry/reclaim bar quality.
+        # Do NOT require volume expansion here.
+        # --------------------------------------------------
+        if entry_bar.close <= entry_bar.open_value:
+            return None
+
+        candle_range = entry_bar.high - entry_bar.low
+
+        if candle_range <= 0:
+            return None
+
+        entry_close_position = (entry_bar.close - entry_bar.low) / candle_range
+        entry_upper_wick_pct = (
+            entry_bar.high - max(entry_bar.open_value, entry_bar.close)
+        ) / candle_range
+
+        if entry_close_position < 0.75:
+            return None
+
+        if entry_upper_wick_pct > 0.25:
+            return None
+
+        if entry_bar.close <= entry_bar.vwap:
+            return None
+
+        if entry_bar.close <= entry_bar.ema_9:
+            return None
+
+        if entry_bar.close <= entry_bar.ema_20:
+            return None
+
+        # --------------------------------------------------
+        # Prior trend already started.
+        # Keep this broader than the aligned pattern, because HKIT 10:08 is
+        # a reclaim after trend volume, not a fresh volume bar.
+        # --------------------------------------------------
+        trend_window = previous_bars[-8:]
+
+        if len(trend_window) < 8:
+            return None
+
+        trend_start_close = trend_window[0].close
+        trend_end_close = trend_window[-1].close
+
+        if trend_start_close <= 0:
+            return None
+
+        trend_window_gain_pct = (trend_end_close - trend_start_close) / trend_start_close
+
+        trend_window_volume_ratios = [
+            bar_object.volume / bar_object.volume_average
+            for bar_object in trend_window
+            if bar_object.volume_average > 0
+        ]
+
+        if not trend_window_volume_ratios:
+            return None
+
+        trend_window_average_volume_ratio = (
+            sum(trend_window_volume_ratios) / len(trend_window_volume_ratios)
+        )
+
+        trend_window_above_volume_average_count = sum(
+            1
+            for bar_object in trend_window
+            if bar_object.volume_average > 0
+            and bar_object.volume / bar_object.volume_average >= 1.0
+        )
+
+        trend_window_green_count = sum(
+            1
+            for bar_object in trend_window
+            if bar_object.close > bar_object.open_value
+        )
+
+        trend_window_close_above_vwap_count = sum(
+            1
+            for bar_object in trend_window
+            if bar_object.close > bar_object.vwap
+        )
+
+        trend_window_close_above_ema9_count = sum(
+            1
+            for bar_object in trend_window
+            if bar_object.close > bar_object.ema_9
+        )
+
+        if trend_window_gain_pct < 0.08:
+            return None
+
+        if trend_window_average_volume_ratio < 1.05:
+            return None
+
+        if trend_window_above_volume_average_count < 3:
+            return None
+
+        if trend_window_green_count < 3:
+            return None
+
+        if trend_window_close_above_vwap_count < 5:
+            return None
+
+        if trend_window_close_above_ema9_count < 3:
+            return None
+
+        # --------------------------------------------------
+        # Find the sequence:
+        # resistance bar -> high-volume breakout bar -> lower-volume support test -> current reclaim.
+        # --------------------------------------------------
+        search_bars = previous_bars[-20:]
+        best_context = None
+        best_score = None
+
+        for resistance_index in range(0, len(search_bars) - 3):
+            resistance_bar = search_bars[resistance_index]
+            resistance_price = resistance_bar.high
+
+            if resistance_price <= 0:
+                continue
+
+            # Resistance should be meaningful, not just a random tiny candle.
+            resistance_range = resistance_bar.high - resistance_bar.low
+            if resistance_range <= 0:
+                continue
+
+            resistance_close_position = (resistance_bar.close - resistance_bar.low) / resistance_range
+            if resistance_close_position < 0.55:
+                continue
+
+            # Breakout must happen after resistance and before the current entry.
+            for breakout_index in range(resistance_index + 1, len(search_bars) - 1):
+                breakout_bar = search_bars[breakout_index]
+
+                breakout_close_above_resistance_pct = (
+                    breakout_bar.close - resistance_price
+                ) / resistance_price
+
+                if breakout_close_above_resistance_pct < 0.03:
+                    continue
+
+                if breakout_bar.close <= breakout_bar.open_value:
+                    continue
+
+                if breakout_bar.volume_average <= 0:
+                    continue
+
+                breakout_volume_vs_average = breakout_bar.volume / breakout_bar.volume_average
+
+                # HKIT 10:05 was ~2.28x average. Keep 1.5x minimum.
+                if breakout_volume_vs_average < 1.5:
+                    continue
+
+                if breakout_bar.close <= breakout_bar.vwap:
+                    continue
+
+                if breakout_bar.close <= breakout_bar.ema_9:
+                    continue
+
+                # Support test must happen after the breakout and before entry.
+                support_candidates = search_bars[breakout_index + 1:]
+
+                if not support_candidates:
+                    continue
+
+                for support_test_bar in support_candidates:
+                    minutes_from_breakout_to_test = (
+                        support_test_bar.bar_time - breakout_bar.bar_time
+                    ).total_seconds() / 60.0
+
+                    if minutes_from_breakout_to_test < 1:
+                        continue
+
+                    if minutes_from_breakout_to_test > 8:
+                        continue
+
+                    # The support test should retest the old resistance zone.
+                    support_distance_to_resistance_pct = abs(
+                        support_test_bar.low - resistance_price
+                    ) / resistance_price
+
+                    if support_distance_to_resistance_pct > 0.02:
+                        continue
+
+                    # Small undercut is okay; deep break is not.
+                    if support_test_bar.low < resistance_price * 0.98:
+                        continue
+
+                    # Retest should be controlled: volume lower than breakout volume.
+                    if support_test_bar.volume >= breakout_bar.volume:
+                        continue
+
+                    # Current entry should happen quickly after the support test.
+                    minutes_from_test_to_entry = (
+                        entry_bar.bar_time - support_test_bar.bar_time
+                    ).total_seconds() / 60.0
+
+                    if minutes_from_test_to_entry < 1:
+                        continue
+
+                    if minutes_from_test_to_entry > 3:
+                        continue
+
+                    # Entry confirms that support held.
+                    if entry_bar.close <= support_test_bar.close:
+                        continue
+
+                    if entry_bar.close <= support_test_bar.high * 0.995:
+                        continue
+
+                    # Avoid entering too far from the reclaimed support shelf.
+                    entry_close_above_resistance_pct = (
+                        entry_bar.close - resistance_price
+                    ) / resistance_price
+
+                    if entry_close_above_resistance_pct > 0.14:
+                        continue
+
+                    score = (
+                        breakout_close_above_resistance_pct * 100.0
+                        + breakout_volume_vs_average * 2.0
+                        + entry_close_position * 5.0
+                        - support_distance_to_resistance_pct * 100.0
+                        - minutes_from_test_to_entry * 0.3
+                    )
+
+                    if best_score is None or score > best_score:
+                        best_score = score
+                        best_context = {
+                            "resistance_bar": resistance_bar,
+                            "resistance_price": resistance_price,
+                            "breakout_bar": breakout_bar,
+                            "support_test_bar": support_test_bar,
+                            "support_low_bar": support_test_bar,
+                            "support_low": support_test_bar.low,
+                            "pullback_from_resistance_pct": (
+                                resistance_price - support_test_bar.low
+                            ) / resistance_price,
+                            "breakout_close_above_resistance_pct": entry_close_above_resistance_pct,
+                            "minutes_since_resistance": (
+                                entry_bar.bar_time - resistance_bar.bar_time
+                            ).total_seconds() / 60.0,
+                            "breakout_volume_vs_average": breakout_volume_vs_average,
+                            "support_test_volume_vs_breakout": (
+                                support_test_bar.volume / breakout_bar.volume
+                                if breakout_bar.volume > 0 else None
+                            ),
+                        }
+
+        return best_context
+
+    def is_prior_resistance_support_reclaim_continuation(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
     ) -> bool:
+        return self._find_prior_resistance_support_reclaim_continuation_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        ) is not None
+
+
+    def _is_aligned_higher_low_buyer_ignition_base(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> bool:
+        """
+        Practical aligned-higher-low buyer ignition check, without the
+        per-day/cooldown limiter.
+
+        This is the version tested on the positive 50% trend-start cases:
+        - before 11:00
+        - buyer-control candle, but not too strict
+        - enough volume confirmation
+        - price above VWAP / EMA 9 / EMA 20
+        - EMA 9 above EMA 20
+        - previous 10 bars mostly held VWAP / EMA 9
+        - previous 10 lows mostly higher/flat
+        """
+
+        if potential_confirmation_bar.bar_time.time() >= datetime.time(11, 0):
+            return False
+
+        bars_before_current = self._get_bars_before_current(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+
+        if len(bars_before_current) < 10:
+            return False
+
+        previous_bar = bars_before_current[-1]
+        last_10_bars = bars_before_current[-10:]
+
+        candle_range = potential_confirmation_bar.high - potential_confirmation_bar.low
+
+        if candle_range <= 0:
+            return False
+
+        # -------------------------------
+        # 1. Practical buyer-control candle
+        # -------------------------------
+        if potential_confirmation_bar.close <= potential_confirmation_bar.open_value:
+            return False
+
+        close_position_in_range = (
+            potential_confirmation_bar.close - potential_confirmation_bar.low
+        ) / candle_range
+
+        if close_position_in_range < 0.80:
+            return False
+
+        upper_wick_pct = (
+            potential_confirmation_bar.high
+            - max(
+                potential_confirmation_bar.open_value,
+                potential_confirmation_bar.close,
+            )
+        ) / candle_range
+
+        if upper_wick_pct > 0.20:
+            return False
+
+        candle_body_pct = abs(
+            potential_confirmation_bar.close - potential_confirmation_bar.open_value
+        ) / candle_range
+
+        if candle_body_pct < 0.45:
+            return False
+
+        # -------------------------------
+        # 2. Practical buyer volume
+        # -------------------------------
+        if previous_bar.volume <= 0:
+            return False
+
+        volume_vs_previous_bar_ratio = (
+            potential_confirmation_bar.volume / previous_bar.volume
+        )
+
+        if volume_vs_previous_bar_ratio < 1.40:
+            return False
+
+        if potential_confirmation_bar.volume_average <= 0:
+            return False
+
+        volume_vs_average_ratio = (
+            potential_confirmation_bar.volume / potential_confirmation_bar.volume_average
+        )
+
+        if volume_vs_average_ratio < 1.20:
+            return False
+
+        # -------------------------------
+        # 3. Current trend alignment
+        # -------------------------------
+        if potential_confirmation_bar.close <= potential_confirmation_bar.vwap:
+            return False
+
+        if potential_confirmation_bar.close <= potential_confirmation_bar.ema_9:
+            return False
+
+        if potential_confirmation_bar.close <= potential_confirmation_bar.ema_20:
+            return False
+
+        if potential_confirmation_bar.ema_9 <= potential_confirmation_bar.ema_20:
+            return False
+
+        # -------------------------------
+        # 4. Previous 10-bar structure
+        # -------------------------------
+        close_above_vwap_count = sum(
+            1
+            for bar_object in last_10_bars
+            if bar_object.close > bar_object.vwap
+        )
+
+        if close_above_vwap_count < 8:
+            return False
+
+        close_above_ema9_count = sum(
+            1
+            for bar_object in last_10_bars
+            if bar_object.close > bar_object.ema_9
+        )
+
+        if close_above_ema9_count < 5:
+            return False
+
+        higher_or_flat_low_count = 0
+
+        for index in range(1, len(last_10_bars)):
+            previous_low = last_10_bars[index - 1].low
+            current_low = last_10_bars[index].low
+
+            if previous_low > 0 and current_low >= previous_low * 0.985:
+                higher_or_flat_low_count += 1
+
+        if higher_or_flat_low_count < 7:
+            return False
+
+        return True
+
+    def _get_previous_aligned_higher_low_buyer_ignition_times(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+        cooldown_minutes: int = 20,
+        max_results: int = 2,
+    ) -> list[datetime.datetime]:
+        """
+        Live-safe greedy limiter for aligned-higher-low entries.
+
+        We only want the first one or two real aligned-buyer-control entries
+        per symbol/day. This prevents repeated signals inside the same trend.
+        """
+
+        bars_until_current = self._get_today_bars_until_current(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+
+        previous_bars = [
+            bar_object
+            for bar_object in bars_until_current
+            if bar_object.bar_time < potential_confirmation_bar.bar_time
+        ]
+
+        accepted_times: list[datetime.datetime] = []
+
+        for bar_object in previous_bars:
+            if not self._is_aligned_higher_low_buyer_ignition_base(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=bar_object,
+            ):
+                continue
+
+            if accepted_times:
+                minutes_since_last_accept = (
+                    bar_object.bar_time - accepted_times[-1]
+                ).total_seconds() / 60.0
+
+                if minutes_since_last_accept < cooldown_minutes:
+                    continue
+
+            accepted_times.append(bar_object.bar_time)
+
+            if len(accepted_times) >= max_results:
+                break
+
+        return accepted_times
+
+    def is_aligned_higher_low_buyer_ignition(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> bool:
+        """
+        Practical aligned-higher-low buyer ignition.
+
+        Selection policy from the 50% positive-trend test:
+        - no more than 2 accepted aligned-higher-low entries per symbol/day
+        - at least 20 minutes between accepted entries
+        - only before 11:00
+
+        Note: the breakout_finder also applies the broader sequence filter
+        clean_breakout_count_today_before_current <= 1 before allowing this
+        detector. That keeps this broad confirmed-trend pattern limited to the
+        first 1-2 broader detected setups of the day.
+
+        This keeps the pattern from firing repeatedly inside the same trend.
+        """
+
+        if not self._is_aligned_higher_low_buyer_ignition_base(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        ):
+            return False
+
+        previous_accepted_times = self._get_previous_aligned_higher_low_buyer_ignition_times(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+            cooldown_minutes=20,
+            max_results=2,
+        )
+
+        # Max 2 per symbol/day. Since current would be the next accepted one,
+        # reject if two already exist before current.
+        if len(previous_accepted_times) >= 2:
+            return False
+
+        # Enforce 20-minute cooldown from the most recent accepted aligned entry.
+        if previous_accepted_times:
+            minutes_since_last_accept = (
+                potential_confirmation_bar.bar_time - previous_accepted_times[-1]
+            ).total_seconds() / 60.0
+
+            if minutes_since_last_accept < 20:
+                return False
+
+        return True
+
+    def bar_has_potential(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> tuple[bool, str]:
         has_good_live_trend_start_context = self.has_good_live_trend_start_context(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
+        if has_good_live_trend_start_context:
+            return True, "has_good_live_trend_start_context"
 
         has_secondary_base_ignition = self.is_secondary_base_ignition_breakout(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
+        if has_secondary_base_ignition:
+            return True, "has_secondary_base_ignition"
 
         has_market_open_premarket_support_reclaim_ignition = self.is_market_open_premarket_support_reclaim_ignition(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
+        if has_market_open_premarket_support_reclaim_ignition:
+            return True, "has_market_open_premarket_support_reclaim_ignition"
 
-        if not (
-            has_good_live_trend_start_context
-            or has_secondary_base_ignition
-            or has_market_open_premarket_support_reclaim_ignition
-        ):
-            return False
+        has_aligned_higher_low_buyer_ignition = self.is_aligned_higher_low_buyer_ignition(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if has_aligned_higher_low_buyer_ignition:
+            return True, "has_aligned_higher_low_buyer_ignition"
 
-        return True
+        has_prior_resistance_support_reclaim_continuation = self.is_prior_resistance_support_reclaim_continuation(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+
+        if has_prior_resistance_support_reclaim_continuation:
+            return True, "has_prior_resistance_support_reclaim_continuation"
+
+        return False, "bar has no potential"

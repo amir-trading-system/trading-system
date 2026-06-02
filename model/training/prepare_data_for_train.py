@@ -129,7 +129,7 @@ def load_data_for_training_model() -> list[dict[str, any]]:
     return pickled_data
 
 def extract_one_minute_timeframe_data_into_csv():
-    with open("model/training/data/next_training/MASK-2026-06-01 11:01:00.json", "rb") as f:
+    with open("model/training/data/HKIT-2026-06-01 11:01:00.json", "rb") as f:
         obj = pickle.load(f)
 
     potential_confirmation_bar = obj["potential_confirmation_bar"]
