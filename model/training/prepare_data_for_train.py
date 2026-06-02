@@ -128,68 +128,7 @@ def load_data_for_training_model() -> list[dict[str, any]]:
 
     return pickled_data
 
-def extract_one_minute_timeframe_data_into_csv():
-    with open("model/training/data/HKIT-2026-06-01 11:01:00.json", "rb") as f:
-        obj = pickle.load(f)
-
-    potential_confirmation_bar = obj["potential_confirmation_bar"]
-
-    relevant_bars = [
-        bar_object
-        for bar_object in obj["one_minute_timeframe_stock"].bars
-        if bar_object.bar_time.date() == potential_confirmation_bar.bar_time.date()
-    ]
-
-    columns = [
-        "symbol",
-        "bar_time",
-        "high",
-        "low",
-        "open",
-        "close",
-        "volume",
-        "volume_average",
-        "ema_9",
-        "ema_20",
-        "vwap",
-        "macd",
-        "histogram",
-        "signal_line",
-    ]
-
-    file_name = f"{potential_confirmation_bar.symbol}-{potential_confirmation_bar.bar_time.date()}.csv"
-
-    with open(file_name, mode="w") as f:
-        writer = csv.writer(f)
-        writer.writerow(columns)
-        f.flush()
-
-    for bar_object in relevant_bars:
-        row_data = [
-            bar_object.symbol,
-            bar_object.bar_time,
-            bar_object.high,
-            bar_object.low,
-            bar_object.open_value,
-            bar_object.close,
-            bar_object.volume,
-            bar_object.volume_average,
-            bar_object.ema_9,
-            bar_object.ema_20,
-            bar_object.vwap,
-            bar_object.macd,
-            bar_object.histogram,
-            bar_object.signal_line,
-        ]
-
-        with open(file_name, mode="a") as f:
-            writer = csv.writer(f)
-            writer.writerow(row_data)
-
-            f.flush()
-
 if __name__ == '__main__':
-    # extract_one_minute_timeframe_data_into_csv()
     data_extractor_object = data_extractor.DataExtractor()
     symbols_data_parameters: list[dict[str, any]] = []
     training_model_data_list = load_data_for_training_model()

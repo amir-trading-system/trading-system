@@ -240,11 +240,10 @@ class Confirmator:
                 day_timeframe_stock=stock,
             )
 
-            msg = "Bar analyzed by AI model"
             entry_position_bar = potential_confirmation_bar
 
             self.logger.info(
-                msg=msg,
+                msg="Bar analyzed by AI model",
                 extra={
                     "worker": "Confirmator",
                     "symbol": stock.symbol_name,

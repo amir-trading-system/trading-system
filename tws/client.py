@@ -252,9 +252,6 @@ class Client(client.EClient, wrapper.EWrapper):
         transmit: bool,
         score: common.objects.Score,
     ) -> int:
-        if not score.should_take_trade:
-            return 0
-
         pct = 0
         if 50 < score.score < 60:
             pct = 0.2
