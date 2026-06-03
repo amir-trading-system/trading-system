@@ -26,11 +26,27 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "one minute bars creator",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "model.one_minute_bars_creator",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "train model",
             "type": "debugpy",
             "request": "launch",
             "justMyCode": false,
             "module": "model.training.train_model",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "breakout finder",
+            "type": "debugpy",
+            "request": "launch",
+            "justMyCode": false,
+            "module": "model.breakout_finder",
             "console": "integratedTerminal"
         },
         {
@@ -66,8 +82,8 @@
                 "--min-new-untagged", "2",
                 "--local-expansion",
                 "--local-expansion-trials", "2000",
-                "--n-jobs", "4",
-            ],
-        },
+                "--n-jobs", "4"
+            ]
+        }
     ]
 }

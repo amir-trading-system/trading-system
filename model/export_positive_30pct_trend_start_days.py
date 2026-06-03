@@ -17,8 +17,8 @@ from typing import Any, Optional
 
 INPUT_FILES_GLOB = "model/training/data/*.json"
 
-OUTPUT_ALL_BARS_FILE = "model/training/positive_50pct_trend_start_days_all_bars.csv"
-OUTPUT_TREND_STARTS_FILE = "model/training/positive_50pct_trend_start_candidates.csv"
+OUTPUT_ALL_BARS_FILE = "model/positive_30pct_trend_start_days_all_bars.csv"
+OUTPUT_TREND_STARTS_FILE = "model/positive_30pct_trend_start_candidates.csv"
 
 MAX_WORKERS = 10
 
@@ -26,17 +26,17 @@ MARKET_OPEN = datetime.time(9, 30)
 MARKET_CLOSE = datetime.time(16, 0)
 
 # We only search positive cases.
-ONLY_POSITIVE_CASES = True
+ONLY_POSITIVE_CASES = False
 
 # A selected trend-start bar must have at least this gain after it.
-MIN_GAIN_AFTER_ENTRY_PCT = 0.50
+MIN_GAIN_AFTER_ENTRY_PCT = 0.1
 
 # Search only earlier/midday bars. Change if needed.
 MAX_ENTRY_TIME = datetime.time(12, 30)
 
 # Future path quality.
 # To avoid selecting bars that only eventually run after a huge failure,
-# we require support low not to break before the 50% move.
+# we require support low not to break before the 30% move.
 SUPPORT_LOOKBACK_BARS = 30
 SUPPORT_LOW_INVALIDATION_TOLERANCE_PCT = 0.003
 
@@ -115,14 +115,14 @@ class TrendStartCandidateRow:
     max_gain_after_entry_full_session_high_time: Optional[datetime.datetime]
     minutes_until_max_gain_full_session: Optional[float]
 
-    reached_50pct_before_support_low_break: bool
-    minutes_until_50pct_gain: Optional[float]
+    reached_30pct_before_support_low_break: bool
+    minutes_until_30pct_gain: Optional[float]
 
-    support_low_broke_before_50pct: bool
+    support_low_broke_before_30pct: bool
     support_low_break_time: Optional[datetime.datetime]
     support_low_break_price: Optional[float]
 
-    max_drawdown_before_50pct_or_break_pct: Optional[float]
+    max_drawdown_before_30pct_or_break_pct: Optional[float]
 
     trend_start_reason_tags: str
     selection_score: float
@@ -478,7 +478,7 @@ def looks_like_trend_start(
     return True, tags, context
 
 
-def future_reaches_50pct_before_support_break(
+def future_reaches_30pct_before_support_break(
     bars: list[Any],
     current_index: int,
     support_low: Optional[float],
@@ -494,14 +494,14 @@ def future_reaches_50pct_before_support_break(
     max_gain_high = None
     max_gain_time = None
 
-    reached_50 = False
-    minutes_until_50 = None
+    reached_30 = False
+    minutes_until_30 = None
 
-    support_broke_before_50 = False
+    support_broke_before_30 = False
     support_break_time = None
     support_break_price = None
 
-    max_drawdown_before_50_or_break_pct = 0.0
+    max_drawdown_before_30_or_break_pct = 0.0
 
     for future_bar in bars[current_index + 1:]:
         if future_bar.bar_time.time() > MARKET_CLOSE:
@@ -515,18 +515,18 @@ def future_reaches_50pct_before_support_break(
             max_gain_time = future_bar.bar_time
 
         drawdown_pct = max(0.0, (entry_close - future_bar.low) / entry_close)
-        max_drawdown_before_50_or_break_pct = max(
-            max_drawdown_before_50_or_break_pct,
+        max_drawdown_before_30_or_break_pct = max(
+            max_drawdown_before_30_or_break_pct,
             drawdown_pct,
         )
 
-        if not reached_50 and future_bar.high >= entry_close * (1 + MIN_GAIN_AFTER_ENTRY_PCT):
-            reached_50 = True
-            minutes_until_50 = minutes_between(entry_bar.bar_time, future_bar.bar_time)
+        if not reached_30 and future_bar.high >= entry_close * (1 + MIN_GAIN_AFTER_ENTRY_PCT):
+            reached_30 = True
+            minutes_until_30 = minutes_between(entry_bar.bar_time, future_bar.bar_time)
 
         if invalidation_price is not None and future_bar.low < invalidation_price:
-            if not reached_50:
-                support_broke_before_50 = True
+            if not reached_30:
+                support_broke_before_30 = True
                 support_break_time = future_bar.bar_time
                 support_break_price = future_bar.low
             break
@@ -540,12 +540,12 @@ def future_reaches_50pct_before_support_break(
         "max_gain_high": max_gain_high,
         "max_gain_time": max_gain_time,
         "minutes_to_max": minutes_to_max,
-        "reached_50": reached_50,
-        "minutes_until_50": minutes_until_50,
-        "support_broke_before_50": support_broke_before_50,
+        "reached_30": reached_30,
+        "minutes_until_30": minutes_until_30,
+        "support_broke_before_30": support_broke_before_30,
         "support_break_time": support_break_time,
         "support_break_price": support_break_price,
-        "max_drawdown_before_50_or_break_pct": max_drawdown_before_50_or_break_pct,
+        "max_drawdown_before_30_or_break_pct": max_drawdown_before_30_or_break_pct,
     }
 
 
@@ -558,7 +558,7 @@ def candidate_score(
 
     score = 0.0
     score += (future_path.get("max_gain_pct") or 0.0) * 100.0
-    score -= (future_path.get("max_drawdown_before_50_or_break_pct") or 0.0) * 120.0
+    score -= (future_path.get("max_drawdown_before_30_or_break_pct") or 0.0) * 120.0
     score += stats["close_position"] * 10.0
     score -= stats["upper_wick_pct"] * 10.0
 
@@ -661,14 +661,14 @@ def build_trend_start_candidate_row(
         max_gain_after_entry_full_session_high_time=future_path["max_gain_time"],
         minutes_until_max_gain_full_session=future_path["minutes_to_max"],
 
-        reached_50pct_before_support_low_break=future_path["reached_50"],
-        minutes_until_50pct_gain=future_path["minutes_until_50"],
+        reached_30pct_before_support_low_break=future_path["reached_30"],
+        minutes_until_30pct_gain=future_path["minutes_until_30"],
 
-        support_low_broke_before_50pct=future_path["support_broke_before_50"],
+        support_low_broke_before_30pct=future_path["support_broke_before_30"],
         support_low_break_time=future_path["support_break_time"],
         support_low_break_price=future_path["support_break_price"],
 
-        max_drawdown_before_50pct_or_break_pct=future_path["max_drawdown_before_50_or_break_pct"],
+        max_drawdown_before_30pct_or_break_pct=future_path["max_drawdown_before_30_or_break_pct"],
 
         trend_start_reason_tags="|".join(tags),
         selection_score=candidate_score(bar, tags, future_path),
@@ -802,16 +802,16 @@ def process_training_file(file_path: str) -> tuple[list[TrendStartCandidateRow],
             current_index=current_index,
         )
 
-        future_path = future_reaches_50pct_before_support_break(
+        future_path = future_reaches_30pct_before_support_break(
             bars=bars,
             current_index=current_index,
             support_low=support_low,
         )
 
-        if not future_path["reached_50"]:
+        if not future_path["reached_30"]:
             continue
 
-        if future_path["support_broke_before_50"]:
+        if future_path["support_broke_before_30"]:
             continue
 
         row = build_trend_start_candidate_row(
@@ -902,7 +902,7 @@ def main() -> None:
             except Exception as exc:
                 print(f"Failed processing {file_path}: {exc}")
 
-            if completed % 50 == 0:
+            if completed % 10 == 0:
                 print(
                     f"Completed {completed}/{len(files)} files. "
                     f"Candidates: {len(all_candidate_rows)}. "

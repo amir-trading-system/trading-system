@@ -10,6 +10,15 @@ import pickle
 from dataclasses import dataclass, asdict
 from typing import Any, Optional
 
+DISABLED_30PCT_FAMILIES = {"30pct_late_volume_shock_flat_base"}
+
+
+def _is_disabled_30pct_family_context(context: object) -> bool:
+    reason = getattr(context, "reason", None)
+    breakout_type = getattr(context, "breakout_type", None)
+    return reason in DISABLED_30PCT_FAMILIES or breakout_type in DISABLED_30PCT_FAMILIES
+
+
 import buying_confirmator
 
 # =========================
@@ -18,7 +27,7 @@ import buying_confirmator
 
 INPUT_FILES_GLOB = "model/training/data/*.json"
 
-OUTPUT_COMBINED_FILE = "model/training/breakout_profile_combined.csv"
+OUTPUT_COMBINED_FILE = "model/breakout_profile_combined.csv"
 
 MAX_WORKERS = 10
 
@@ -28,6 +37,9 @@ MARKET_CLOSE = datetime.time(16, 0)
 TARGET_GAIN_PCT = 0.20
 FUTURE_ANALYSIS_MINUTES = 30
 SUPPORT_LOW_INVALIDATION_TOLERANCE_PCT = 0.003
+EMA20_CLOSE_BREAK_TOLERANCE_PCT = 0.0
+EMA9_CLOSE_BREAK_TOLERANCE_PCT = 0.0
+
 
 
 # =========================
@@ -190,6 +202,37 @@ class BreakoutProfileRow:
     # This answers: after entry, what was the maximum gain before price went
     # below the setup support/lowest-low? If the low never breaks, it measures
     # max gain until market close.
+    # Full-session EMA20 integrity label for research only.
+    # Good entry = reaches +20% before the first future candle CLOSES below EMA20.
+    reached_20_percent_gain_before_ema20_close_break_full_session: bool
+    minutes_until_20_percent_gain_before_ema20_close_break_full_session: Optional[float]
+    twenty_percent_gain_before_ema20_close_break_time_full_session: Optional[datetime.datetime]
+    ema20_close_break_before_20_percent_gain_full_session: bool
+    ema20_close_break_before_20_percent_gain_time_full_session: Optional[datetime.datetime]
+    ema20_close_break_before_20_percent_gain_price_full_session: Optional[float]
+    ema20_value_at_close_break_before_20_percent_gain_full_session: Optional[float]
+
+    # Full-session EMA9 integrity label for research only.
+    # Good trend row = reaches +20% before the first future candle CLOSES below EMA9.
+    # Max-gain-before-EMA9-break tells us how far the trend could run while still
+    # being defended by EMA9.
+    reached_20_percent_gain_before_ema9_close_break_full_session: bool
+    minutes_until_20_percent_gain_before_ema9_close_break_full_session: Optional[float]
+    twenty_percent_gain_before_ema9_close_break_time_full_session: Optional[datetime.datetime]
+    ema9_close_break_before_20_percent_gain_full_session: bool
+    ema9_close_break_before_20_percent_gain_time_full_session: Optional[datetime.datetime]
+    ema9_close_break_before_20_percent_gain_price_full_session: Optional[float]
+    ema9_value_at_close_break_before_20_percent_gain_full_session: Optional[float]
+
+    max_gain_before_ema9_close_break_full_session_pct: Optional[float]
+    max_gain_before_ema9_close_break_full_session_abs: Optional[float]
+    max_gain_before_ema9_close_break_full_session_high: Optional[float]
+    max_gain_before_ema9_close_break_full_session_high_time: Optional[datetime.datetime]
+    minutes_until_max_gain_before_ema9_close_break_full_session: Optional[float]
+    ema9_close_break_for_max_gain_full_session: bool
+    ema9_close_break_for_max_gain_full_session_time: Optional[datetime.datetime]
+    ema9_close_break_for_max_gain_full_session_price: Optional[float]
+
     max_gain_before_lowest_low_break_full_session_pct: Optional[float]
     max_gain_before_lowest_low_break_full_session_abs: Optional[float]
     max_gain_before_lowest_low_break_full_session_high: Optional[float]
@@ -426,495 +469,16 @@ def summarize_previous_window(
 # BREAKOUT DETECTORS
 # =========================
 
-def find_recent_resistance_context(
-    current_bar: Any,
-    bars: list[Any],
-    lookback_minutes: int = 30,
-    min_pullback_from_resistance_pct: float = 0.03,
-    min_close_above_resistance_pct: float = 0.02,
-) -> Optional[BreakoutContext]:
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
 
-    if len(bars_before_current) < 3:
-        return None
 
-    lookback_start = current_bar.bar_time - datetime.timedelta(minutes=lookback_minutes)
 
-    lookback_bars = [
-        bar
-        for bar in bars_before_current
-        if lookback_start <= bar.bar_time < current_bar.bar_time
-    ]
 
-    if len(lookback_bars) < 3:
-        return None
 
-    # Find candidate resistance highs that:
-    # 1. caused a pullback,
-    # 2. were not closed above before current bar,
-    # 3. are crossed decisively by current bar.
-    candidates: list[tuple[float, Any, Any, float, float, float]] = []
 
-    for resistance_bar in lookback_bars[:-1]:
-        resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
-        if resistance_price is None or resistance_price <= 0:
-            continue
 
-        bars_after_resistance = [
-            bar
-            for bar in lookback_bars
-            if bar.bar_time > resistance_bar.bar_time
-        ]
 
-        if not bars_after_resistance:
-            continue
 
-        lowest_low_bar = min(bars_after_resistance, key=lambda b: safe_float(getattr(b, "low", None), float("inf")))
-        lowest_low = safe_float(getattr(lowest_low_bar, "low", None), None)
-        if lowest_low is None or lowest_low <= 0:
-            continue
 
-        pullback_pct = (resistance_price - lowest_low) / resistance_price
-        if pullback_pct < min_pullback_from_resistance_pct:
-            continue
-
-        prior_close_above_resistance = any(
-            safe_float(getattr(bar, "close", None), 0.0) > resistance_price
-            for bar in bars_after_resistance
-        )
-
-        if prior_close_above_resistance:
-            continue
-
-        close = safe_float(getattr(current_bar, "close", None), None)
-        if close is None:
-            continue
-
-        close_above_resistance_pct = (close - resistance_price) / resistance_price
-        if close_above_resistance_pct < min_close_above_resistance_pct:
-            continue
-
-        minutes_since_resistance = minutes_between(resistance_bar.bar_time, current_bar.bar_time)
-
-        # Prefer the closest/highest meaningful resistance.
-        # Score rewards current decisive cross and fresh pullback quality.
-        score = (
-            close_above_resistance_pct * 100
-            + pullback_pct * 50
-            - minutes_since_resistance * 0.02
-        )
-
-        candidates.append(
-            (
-                score,
-                resistance_bar,
-                lowest_low_bar,
-                resistance_price,
-                pullback_pct,
-                close_above_resistance_pct,
-            )
-        )
-
-    if not candidates:
-        return None
-
-    candidates.sort(key=lambda x: x[0], reverse=True)
-    _, resistance_bar, lowest_low_bar, resistance_price, pullback_pct, close_above_resistance_pct = candidates[0]
-
-    previous_bar = bars_before_current[-1]
-    volume_vs_previous_bar_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(previous_bar, "volume", None), None),
-    ) or 0.0
-
-    volume_vs_average_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(current_bar, "volume_average", None), None),
-    ) or 0.0
-
-    return BreakoutContext(
-        breakout_type="volume_resistance_breakout",
-        reason="resistance_cross_with_volume_expansion",
-        breakout_bar=current_bar,
-        resistance_bar=resistance_bar,
-        resistance_price=resistance_price,
-        lowest_low_since_resistance_bar=lowest_low_bar,
-        pullback_from_resistance_pct=pullback_pct,
-        breakout_close_above_resistance_pct=close_above_resistance_pct,
-        minutes_since_resistance=minutes_between(resistance_bar.bar_time, current_bar.bar_time),
-        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
-        volume_vs_average_ratio=volume_vs_average_ratio,
-    )
-
-
-def is_candle_quality_good(
-    bar: Any,
-    min_close_position: float = 0.70,
-    max_upper_wick: float = 0.25,
-) -> bool:
-    open_value = safe_float(getattr(bar, "open_value", None), None)
-    close = safe_float(getattr(bar, "close", None), None)
-
-    if open_value is None or close is None:
-        return False
-
-    if close <= open_value:
-        return False
-
-    stats = get_candle_stats(bar)
-
-    if stats["close_position_in_range"] < min_close_position:
-        return False
-
-    if stats["upper_wick_pct_of_range"] > max_upper_wick:
-        return False
-
-    return True
-
-
-def find_volume_resistance_breakout_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    context = find_recent_resistance_context(
-        current_bar=current_bar,
-        bars=bars,
-        lookback_minutes=30,
-        min_pullback_from_resistance_pct=0.03,
-        min_close_above_resistance_pct=0.02,
-    )
-
-    if context is None:
-        return None
-
-    if context.volume_vs_previous_bar_ratio < 1.8:
-        return None
-
-    if context.volume_vs_average_ratio < 1.8:
-        return None
-
-    if not is_candle_quality_good(
-        bar=current_bar,
-        min_close_position=0.70,
-        max_upper_wick=0.25,
-    ):
-        return None
-
-    return context
-
-
-def find_intraday_extreme_volume_ignition_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    context = find_recent_resistance_context(
-        current_bar=current_bar,
-        bars=bars,
-        lookback_minutes=20,
-        min_pullback_from_resistance_pct=0.01,
-        min_close_above_resistance_pct=0.08,
-    )
-
-    if context is None:
-        return None
-
-    if context.volume_vs_previous_bar_ratio < 10.0:
-        return None
-
-    if context.volume_vs_average_ratio < 5.0:
-        return None
-
-    if not is_candle_quality_good(
-        bar=current_bar,
-        min_close_position=0.80,
-        max_upper_wick=0.20,
-    ):
-        return None
-
-    context.breakout_type = "intraday_extreme_volume_ignition"
-    context.reason = "extreme_volume_ignition_through_fresh_resistance"
-
-    return context
-
-
-def find_market_open_premarket_runner_reclaim_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    if not (datetime.time(9, 30) <= current_bar.bar_time.time() <= datetime.time(9, 45)):
-        return None
-
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
-
-    if len(bars_before_current) < 15:
-        return None
-
-    previous_bar = bars_before_current[-1]
-
-    premarket_bars = [
-        bar
-        for bar in bars_before_current
-        if datetime.time(4, 0) <= bar.bar_time.time() < datetime.time(9, 30)
-    ]
-
-    if len(premarket_bars) < 10:
-        return None
-
-    # Earlier premarket ignition.
-    earlier_ignition_bars = [
-        bar
-        for bar in premarket_bars
-        if (
-            ratio(getattr(bar, "volume", None), getattr(bar, "volume_average", None)) is not None
-            and ratio(getattr(bar, "volume", None), getattr(bar, "volume_average", None)) >= 4.0
-            and safe_float(getattr(bar, "close", None), 0.0) > safe_float(getattr(bar, "vwap", None), float("inf"))
-            and safe_float(getattr(bar, "close", None), 0.0) > safe_float(getattr(bar, "ema_9", None), float("inf"))
-            and safe_float(getattr(bar, "close", None), 0.0) > safe_float(getattr(bar, "open_value", None), float("inf"))
-        )
-    ]
-
-    if not earlier_ignition_bars:
-        return None
-
-    premarket_high_bar = max(premarket_bars, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-
-    current_low = safe_float(getattr(current_bar, "low", None), None)
-    if current_low is None or current_low <= 0:
-        return None
-
-    if safe_float(getattr(premarket_high_bar, "high", None), 0.0) <= current_low * 1.08:
-        return None
-
-    recent_pullback_bars = [
-        bar
-        for bar in bars_before_current
-        if current_bar.bar_time - datetime.timedelta(minutes=15) <= bar.bar_time < current_bar.bar_time
-    ]
-
-    if len(recent_pullback_bars) < 5:
-        return None
-
-    had_recent_close_below_ema9 = any(
-        safe_float(getattr(bar, "close", None), 0.0) < safe_float(getattr(bar, "ema_9", None), -float("inf"))
-        for bar in recent_pullback_bars
-    )
-
-    if not had_recent_close_below_ema9:
-        return None
-
-    recent_closes_above_vwap_count = sum(
-        1
-        for bar in recent_pullback_bars
-        if safe_float(getattr(bar, "close", None), 0.0) > safe_float(getattr(bar, "vwap", None), float("inf"))
-    )
-
-    if recent_closes_above_vwap_count < len(recent_pullback_bars) * 0.7:
-        return None
-
-    recent_volume_ratios = [
-        ratio(getattr(bar, "volume", None), getattr(bar, "volume_average", None))
-        for bar in recent_pullback_bars
-    ]
-    recent_volume_ratios = [x for x in recent_volume_ratios if x is not None]
-
-    if not recent_volume_ratios:
-        return None
-
-    recent_average_volume_ratio = sum(recent_volume_ratios) / len(recent_volume_ratios)
-
-    if recent_average_volume_ratio > 0.8:
-        return None
-
-    pullback_support_low_bar = min(recent_pullback_bars, key=lambda b: safe_float(getattr(b, "low", None), float("inf")))
-    pullback_support_low = safe_float(getattr(pullback_support_low_bar, "low", None), None)
-
-    if pullback_support_low is None or pullback_support_low <= 0:
-        return None
-
-    if current_low > pullback_support_low * 1.015:
-        return None
-
-    if current_low < pullback_support_low * 0.985:
-        return None
-
-    recent_micro_resistance_bar = max(recent_pullback_bars[-7:], key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-    recent_micro_resistance = safe_float(getattr(recent_micro_resistance_bar, "high", None), None)
-
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-    if recent_micro_resistance is None or recent_micro_resistance <= 0 or current_close is None:
-        return None
-
-    breakout_close_above_micro_resistance_pct = (
-        current_close - recent_micro_resistance
-    ) / recent_micro_resistance
-
-    if breakout_close_above_micro_resistance_pct < 0.02:
-        return None
-
-    volume_vs_previous_bar_ratio = ratio(getattr(current_bar, "volume", None), getattr(previous_bar, "volume", None)) or 0.0
-    volume_vs_average_ratio = ratio(getattr(current_bar, "volume", None), getattr(current_bar, "volume_average", None)) or 0.0
-
-    if volume_vs_previous_bar_ratio < 5.0:
-        return None
-
-    if volume_vs_average_ratio < 1.5:
-        return None
-
-    if not is_candle_quality_good(current_bar, min_close_position=0.80, max_upper_wick=0.20):
-        return None
-
-    if current_close <= safe_float(getattr(current_bar, "ema_9", None), float("inf")):
-        return None
-
-    if current_close <= safe_float(getattr(current_bar, "ema_20", None), float("inf")):
-        return None
-
-    if current_close <= safe_float(getattr(current_bar, "vwap", None), float("inf")):
-        return None
-
-    context = BreakoutContext(
-        breakout_type="market_open_premarket_runner_reclaim",
-        reason="premarket_runner_open_reclaim_after_reset",
-        breakout_bar=current_bar,
-        resistance_bar=recent_micro_resistance_bar,
-        resistance_price=recent_micro_resistance,
-        lowest_low_since_resistance_bar=pullback_support_low_bar,
-        pullback_from_resistance_pct=(recent_micro_resistance - pullback_support_low) / recent_micro_resistance,
-        breakout_close_above_resistance_pct=breakout_close_above_micro_resistance_pct,
-        minutes_since_resistance=minutes_between(recent_micro_resistance_bar.bar_time, current_bar.bar_time),
-        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
-        volume_vs_average_ratio=volume_vs_average_ratio,
-    )
-
-    return context
-
-
-def find_deep_pullback_support_reclaim_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
-
-    if len(bars_before_current) < 20:
-        return None
-
-    recent_90_min_bars = [
-        bar
-        for bar in bars_before_current
-        if bar.bar_time >= current_bar.bar_time - datetime.timedelta(minutes=90)
-    ]
-
-    if len(recent_90_min_bars) < 10:
-        return None
-
-    prior_high_bar = max(recent_90_min_bars, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-
-    prior_high = safe_float(getattr(prior_high_bar, "high", None), None)
-    current_low = safe_float(getattr(current_bar, "low", None), None)
-
-    if prior_high is None or prior_high <= 0 or current_low is None or current_low <= 0:
-        return None
-
-    prior_high_to_current_low_pullback_pct = (prior_high - current_low) / prior_high
-
-    if prior_high_to_current_low_pullback_pct < 0.20:
-        return None
-
-    if prior_high_to_current_low_pullback_pct > 0.55:
-        return None
-
-    bars_after_prior_high = [
-        bar
-        for bar in bars_before_current
-        if bar.bar_time > prior_high_bar.bar_time
-    ]
-
-    if len(bars_after_prior_high) < 3:
-        return None
-
-    pullback_low_bar = min(bars_after_prior_high, key=lambda b: safe_float(getattr(b, "low", None), float("inf")))
-    pullback_low = safe_float(getattr(pullback_low_bar, "low", None), None)
-
-    if pullback_low is None or pullback_low <= 0:
-        return None
-
-    if pullback_low_bar.bar_time < current_bar.bar_time - datetime.timedelta(minutes=15):
-        return None
-
-    bars_after_pullback_low = [
-        bar
-        for bar in bars_before_current
-        if bar.bar_time > pullback_low_bar.bar_time
-    ]
-
-    broke_pullback_low_after_it_formed = any(
-        safe_float(getattr(bar, "low", None), float("inf")) < pullback_low * 0.997
-        for bar in bars_after_pullback_low
-    )
-
-    if broke_pullback_low_after_it_formed:
-        return None
-
-    if current_low < pullback_low * 0.997:
-        return None
-
-    recent_reclaim_window_bars = [
-        bar
-        for bar in bars_before_current
-        if bar.bar_time >= current_bar.bar_time - datetime.timedelta(minutes=10)
-    ]
-
-    if len(recent_reclaim_window_bars) < 3:
-        return None
-
-    recent_micro_resistance_bar = max(recent_reclaim_window_bars, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-    recent_micro_resistance = safe_float(getattr(recent_micro_resistance_bar, "high", None), None)
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-
-    if recent_micro_resistance is None or recent_micro_resistance <= 0 or current_close is None:
-        return None
-
-    close_above_micro_resistance_pct = (current_close - recent_micro_resistance) / recent_micro_resistance
-
-    if close_above_micro_resistance_pct < 0.015:
-        return None
-
-    if current_close <= safe_float(getattr(current_bar, "ema_9", None), float("inf")):
-        return None
-
-    if current_close <= safe_float(getattr(current_bar, "ema_20", None), float("inf")):
-        return None
-
-    if current_close <= safe_float(getattr(current_bar, "vwap", None), float("inf")):
-        return None
-
-    previous_bar = bars_before_current[-1]
-
-    volume_vs_previous_bar_ratio = ratio(getattr(current_bar, "volume", None), getattr(previous_bar, "volume", None)) or 0.0
-    volume_vs_average_ratio = ratio(getattr(current_bar, "volume", None), getattr(current_bar, "volume_average", None)) or 0.0
-
-    if volume_vs_previous_bar_ratio < 1.5:
-        return None
-
-    if volume_vs_average_ratio < 1.5:
-        return None
-
-    if not is_candle_quality_good(current_bar, min_close_position=0.80, max_upper_wick=0.20):
-        return None
-
-    return BreakoutContext(
-        breakout_type="deep_pullback_support_reclaim_breakout",
-        reason="deep_pullback_support_hold_and_reclaim",
-        breakout_bar=current_bar,
-        resistance_bar=recent_micro_resistance_bar,
-        resistance_price=recent_micro_resistance,
-        lowest_low_since_resistance_bar=pullback_low_bar,
-        pullback_from_resistance_pct=(recent_micro_resistance - pullback_low) / recent_micro_resistance,
-        breakout_close_above_resistance_pct=close_above_micro_resistance_pct,
-        minutes_since_resistance=minutes_between(recent_micro_resistance_bar.bar_time, current_bar.bar_time),
-        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
-        volume_vs_average_ratio=volume_vs_average_ratio,
-    )
 
 
 # =========================
@@ -922,455 +486,18 @@ def find_deep_pullback_support_reclaim_context(
 # =========================
 
 
-def build_micro_context(
-    current_bar: Any,
-    bars_before_current: list[Any],
-    breakout_type: str,
-    reason: str,
-    resistance_window_minutes: int = 10,
-) -> Optional[BreakoutContext]:
-    """
-    Creates a BreakoutContext for trend-start patterns that break a recent micro-resistance
-    rather than a formal swing resistance.
-    """
-    if not bars_before_current:
-        return None
 
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-    current_volume = safe_float(getattr(current_bar, "volume", None), None)
-    current_volume_average = safe_float(getattr(current_bar, "volume_average", None), None)
 
-    if current_close is None or current_close <= 0:
-        return None
 
-    recent_bars = [
-        bar
-        for bar in bars_before_current
-        if bar.bar_time >= current_bar.bar_time - datetime.timedelta(minutes=resistance_window_minutes)
-    ]
 
-    if len(recent_bars) < 3:
-        return None
 
-    resistance_bar = max(recent_bars, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-    support_bar = min(recent_bars, key=lambda b: safe_float(getattr(b, "low", None), float("inf")))
 
-    resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
-    support_low = safe_float(getattr(support_bar, "low", None), None)
 
-    if resistance_price is None or resistance_price <= 0 or support_low is None or support_low <= 0:
-        return None
 
-    previous_bar = bars_before_current[-1]
 
-    return BreakoutContext(
-        breakout_type=breakout_type,
-        reason=reason,
-        breakout_bar=current_bar,
-        resistance_bar=resistance_bar,
-        resistance_price=resistance_price,
-        lowest_low_since_resistance_bar=support_bar,
-        pullback_from_resistance_pct=(resistance_price - support_low) / resistance_price,
-        breakout_close_above_resistance_pct=(current_close - resistance_price) / resistance_price,
-        minutes_since_resistance=minutes_between(resistance_bar.bar_time, current_bar.bar_time),
-        volume_vs_previous_bar_ratio=ratio(current_volume, safe_float(getattr(previous_bar, "volume", None), None)) or 0.0,
-        volume_vs_average_ratio=ratio(current_volume, current_volume_average) or 0.0,
-    )
 
 
-def find_vwap_reclaim_trend_start_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Pattern: price was weak/near-below VWAP, then reclaims VWAP/EMA9 with volume and a strong close.
-    This tries to catch a new trend transition, not a late continuation.
-    """
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
 
-    if len(bars_before_current) < 10:
-        return None
-
-    previous_bar = bars_before_current[-1]
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-    current_vwap = safe_float(getattr(current_bar, "vwap", None), None)
-    current_ema9 = safe_float(getattr(current_bar, "ema_9", None), None)
-    previous_close = safe_float(getattr(previous_bar, "close", None), None)
-    previous_vwap = safe_float(getattr(previous_bar, "vwap", None), None)
-
-    if None in (current_close, current_vwap, current_ema9, previous_close, previous_vwap):
-        return None
-
-    if current_close <= current_vwap:
-        return None
-
-    if current_close <= current_ema9:
-        return None
-
-    # Require actual reclaim or recent weakness near/below VWAP, not already extended above VWAP.
-    recent_10 = bars_before_current[-10:]
-    closes_below_or_near_vwap = sum(
-        1
-        for bar in recent_10
-        if pct_change(safe_float(getattr(bar, "vwap", None), None), safe_float(getattr(bar, "close", None), None)) is not None
-        and pct_change(safe_float(getattr(bar, "vwap", None), None), safe_float(getattr(bar, "close", None), None)) <= 0.015
-    )
-
-    if closes_below_or_near_vwap < 3 and previous_close > previous_vwap:
-        return None
-
-    # Avoid very overheated VWAP reclaims.
-    if pct_change(current_vwap, current_close) is not None and pct_change(current_vwap, current_close) > 0.12:
-        return None
-
-    if ratio(getattr(current_bar, "volume", None), getattr(current_bar, "volume_average", None)) is None:
-        return None
-
-    if ratio(getattr(current_bar, "volume", None), getattr(current_bar, "volume_average", None)) < 1.8:
-        return None
-
-    if not is_candle_quality_good(current_bar, min_close_position=0.78, max_upper_wick=0.22):
-        return None
-
-    context = build_micro_context(
-        current_bar=current_bar,
-        bars_before_current=bars_before_current,
-        breakout_type="vwap_reclaim_trend_start",
-        reason="vwap_reclaim_with_volume_and_strong_close",
-        resistance_window_minutes=10,
-    )
-
-    if context is None:
-        return None
-
-    # It should break or at least close very near recent micro resistance.
-    if context.breakout_close_above_resistance_pct < -0.002:
-        return None
-
-    return context
-
-
-def find_ema_reclaim_after_pullback_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Pattern: existing runner pulls back, then current bar reclaims EMA9/EMA20 and recent micro resistance.
-    This is the broader version of the HKIT-type support reclaim.
-    """
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
-
-    if len(bars_before_current) < 20:
-        return None
-
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-    current_ema9 = safe_float(getattr(current_bar, "ema_9", None), None)
-    current_ema20 = safe_float(getattr(current_bar, "ema_20", None), None)
-    current_vwap = safe_float(getattr(current_bar, "vwap", None), None)
-
-    if None in (current_close, current_ema9, current_ema20, current_vwap):
-        return None
-
-    if current_close <= current_ema9 or current_close <= current_ema20 or current_close <= current_vwap:
-        return None
-
-    recent_60 = [
-        bar
-        for bar in bars_before_current
-        if bar.bar_time >= current_bar.bar_time - datetime.timedelta(minutes=60)
-    ]
-
-    if len(recent_60) < 10:
-        return None
-
-    prior_high_bar = max(recent_60, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-    prior_high = safe_float(getattr(prior_high_bar, "high", None), None)
-    current_low = safe_float(getattr(current_bar, "low", None), None)
-
-    if prior_high is None or prior_high <= 0 or current_low is None or current_low <= 0:
-        return None
-
-    pullback_from_prior_high = (prior_high - current_low) / prior_high
-
-    if pullback_from_prior_high < 0.08:
-        return None
-
-    if pullback_from_prior_high > 0.55:
-        return None
-
-    recent_10 = bars_before_current[-10:]
-
-    had_recent_close_below_ema9_or_ema20 = any(
-        safe_float(getattr(bar, "close", None), 0.0) < safe_float(getattr(bar, "ema_9", None), -float("inf"))
-        or safe_float(getattr(bar, "close", None), 0.0) < safe_float(getattr(bar, "ema_20", None), -float("inf"))
-        for bar in recent_10
-    )
-
-    if not had_recent_close_below_ema9_or_ema20:
-        return None
-
-    context = build_micro_context(
-        current_bar=current_bar,
-        bars_before_current=bars_before_current,
-        breakout_type="ema_reclaim_after_pullback",
-        reason="ema9_ema20_reclaim_after_pullback",
-        resistance_window_minutes=10,
-    )
-
-    if context is None:
-        return None
-
-    if context.breakout_close_above_resistance_pct < 0.005:
-        return None
-
-    if context.volume_vs_previous_bar_ratio < 1.4:
-        return None
-
-    if context.volume_vs_average_ratio < 1.3:
-        return None
-
-    if not is_candle_quality_good(current_bar, min_close_position=0.78, max_upper_wick=0.22):
-        return None
-
-    return context
-
-
-def find_volume_dryup_expansion_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Pattern: volume dries up during a short base/pullback, then expands through micro resistance.
-    """
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
-
-    if len(bars_before_current) < 10:
-        return None
-
-    recent_5 = bars_before_current[-5:]
-    recent_10 = bars_before_current[-10:]
-
-    pre_5_volume_ratios = [
-        ratio(getattr(bar, "volume", None), getattr(bar, "volume_average", None))
-        for bar in recent_5
-    ]
-    pre_5_volume_ratios = [x for x in pre_5_volume_ratios if x is not None]
-
-    if not pre_5_volume_ratios:
-        return None
-
-    pre_5_avg_volume_ratio = sum(pre_5_volume_ratios) / len(pre_5_volume_ratios)
-
-    if pre_5_avg_volume_ratio > 0.90:
-        return None
-
-    context = build_micro_context(
-        current_bar=current_bar,
-        bars_before_current=bars_before_current,
-        breakout_type="volume_dryup_expansion",
-        reason="volume_dryup_then_expansion_over_micro_resistance",
-        resistance_window_minutes=10,
-    )
-
-    if context is None:
-        return None
-
-    if context.breakout_close_above_resistance_pct < 0.01:
-        return None
-
-    if context.volume_vs_previous_bar_ratio < 2.5:
-        return None
-
-    if context.volume_vs_average_ratio < 1.8:
-        return None
-
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-    current_ema9 = safe_float(getattr(current_bar, "ema_9", None), None)
-    current_vwap = safe_float(getattr(current_bar, "vwap", None), None)
-
-    if current_close is None or current_ema9 is None or current_vwap is None:
-        return None
-
-    if current_close <= current_ema9 or current_close <= current_vwap:
-        return None
-
-    if not is_candle_quality_good(current_bar, min_close_position=0.75, max_upper_wick=0.25):
-        return None
-
-    return context
-
-
-def count_higher_lows(window: list[Any], tolerance_pct: float = 0.005) -> int:
-    if len(window) < 2:
-        return 0
-
-    count = 0
-    for previous_bar, current_bar in zip(window, window[1:]):
-        previous_low = safe_float(getattr(previous_bar, "low", None), None)
-        current_low = safe_float(getattr(current_bar, "low", None), None)
-        if previous_low is None or previous_low <= 0 or current_low is None:
-            continue
-        if current_low >= previous_low * (1 - tolerance_pct):
-            count += 1
-    return count
-
-
-def find_higher_low_compression_breakout_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Pattern: higher/flat lows + range compression + volume expansion through recent high.
-    """
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
-
-    if len(bars_before_current) < 20:
-        return None
-
-    recent_5 = bars_before_current[-5:]
-    recent_20 = bars_before_current[-20:]
-
-    if count_higher_lows(recent_5, tolerance_pct=0.006) < 3:
-        return None
-
-    first_close_5 = safe_float(getattr(recent_5[0], "close", None), None)
-    first_close_20 = safe_float(getattr(recent_20[0], "close", None), None)
-
-    if first_close_5 is None or first_close_5 <= 0 or first_close_20 is None or first_close_20 <= 0:
-        return None
-
-    range_5 = (max(safe_float(getattr(b, "high", None), 0.0) for b in recent_5) - min(safe_float(getattr(b, "low", None), float("inf")) for b in recent_5)) / first_close_5
-    range_20 = (max(safe_float(getattr(b, "high", None), 0.0) for b in recent_20) - min(safe_float(getattr(b, "low", None), float("inf")) for b in recent_20)) / first_close_20
-
-    if range_20 <= 0:
-        return None
-
-    # We want a recent base/compression, not already expanding wildly.
-    if range_5 > range_20 * 0.75:
-        return None
-
-    context = build_micro_context(
-        current_bar=current_bar,
-        bars_before_current=bars_before_current,
-        breakout_type="higher_low_compression_breakout",
-        reason="higher_lows_compression_then_volume_breakout",
-        resistance_window_minutes=10,
-    )
-
-    if context is None:
-        return None
-
-    if context.breakout_close_above_resistance_pct < 0.01:
-        return None
-
-    if context.volume_vs_previous_bar_ratio < 1.8:
-        return None
-
-    if context.volume_vs_average_ratio < 1.5:
-        return None
-
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-    current_ema9 = safe_float(getattr(current_bar, "ema_9", None), None)
-
-    if current_close is None or current_ema9 is None or current_close <= current_ema9:
-        return None
-
-    if not is_candle_quality_good(current_bar, min_close_position=0.75, max_upper_wick=0.25):
-        return None
-
-    return context
-
-
-def find_first_pullback_hold_above_vwap_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Pattern: prior push, first controlled pullback holds above VWAP, then breakout/reclaim with volume.
-    """
-    bars_before_current = get_bars_same_day_until(bars, current_bar, include_current=False)
-
-    if len(bars_before_current) < 20:
-        return None
-
-    recent_45 = [
-        bar
-        for bar in bars_before_current
-        if bar.bar_time >= current_bar.bar_time - datetime.timedelta(minutes=45)
-    ]
-
-    if len(recent_45) < 10:
-        return None
-
-    prior_high_bar = max(recent_45, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-    prior_high = safe_float(getattr(prior_high_bar, "high", None), None)
-
-    if prior_high is None or prior_high <= 0:
-        return None
-
-    bars_after_prior_high = [bar for bar in bars_before_current if bar.bar_time > prior_high_bar.bar_time]
-
-    if len(bars_after_prior_high) < 3:
-        return None
-
-    pullback_low_bar = min(bars_after_prior_high, key=lambda b: safe_float(getattr(b, "low", None), float("inf")))
-    pullback_low = safe_float(getattr(pullback_low_bar, "low", None), None)
-    pullback_vwap = safe_float(getattr(pullback_low_bar, "vwap", None), None)
-
-    if pullback_low is None or pullback_low <= 0 or pullback_vwap is None or pullback_vwap <= 0:
-        return None
-
-    pullback_from_high = (prior_high - pullback_low) / prior_high
-
-    if pullback_from_high < 0.03 or pullback_from_high > 0.22:
-        return None
-
-    # The pullback should hold at/above VWAP.
-    if pullback_low < pullback_vwap * 0.995:
-        return None
-
-    # Avoid late recycled patterns: recent previous lows after pullback should not break it.
-    if any(safe_float(getattr(bar, "low", None), float("inf")) < pullback_low * 0.997 for bar in bars_after_prior_high if bar.bar_time > pullback_low_bar.bar_time):
-        return None
-
-    context = build_micro_context(
-        current_bar=current_bar,
-        bars_before_current=bars_before_current,
-        breakout_type="first_pullback_hold_above_vwap",
-        reason="first_pullback_holds_vwap_then_breaks_micro_resistance",
-        resistance_window_minutes=10,
-    )
-
-    if context is None:
-        return None
-
-    if context.breakout_close_above_resistance_pct < 0.01:
-        return None
-
-    if context.volume_vs_previous_bar_ratio < 1.5:
-        return None
-
-    if context.volume_vs_average_ratio < 1.5:
-        return None
-
-    current_close = safe_float(getattr(current_bar, "close", None), None)
-    current_ema9 = safe_float(getattr(current_bar, "ema_9", None), None)
-    current_vwap = safe_float(getattr(current_bar, "vwap", None), None)
-
-    if current_close is None or current_ema9 is None or current_vwap is None:
-        return None
-
-    if current_close <= current_ema9 or current_close <= current_vwap:
-        return None
-
-    if not is_candle_quality_good(current_bar, min_close_position=0.75, max_upper_wick=0.25):
-        return None
-
-    # Override support low to the actual VWAP pullback low.
-    context.lowest_low_since_resistance_bar = pullback_low_bar
-    context.pullback_from_resistance_pct = pullback_from_high
-
-    return context
 
 
 
@@ -1384,170 +511,97 @@ class _LiveStockWrapper:
 
 
 
-def find_helper_market_open_premarket_support_reclaim_ignition_context(
+
+
+
+
+
+
+
+
+
+def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     current_bar: Any,
     bars: list[Any],
 ) -> Optional[BreakoutContext]:
     """
-    Uses Helper.is_market_open_premarket_support_reclaim_ignition(...)
-    as a separate detector for the MASK 09:30-style pattern:
-    premarket runner + pullback support shelf + volume dry-up + opening reclaim.
+    Public momentum entry-bar detector for the 20% continuation study.
+
+    This uses Helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(...) and converts
+    the matched entry bar into the same BreakoutContext used by the exporter and
+    future-label code. It intentionally detects first actionable ORB / VWAP /
+    bull-flag / EMA-MACD / volume-breakout entry bars rather than every bar that
+    remains in an uptrend.
     """
 
     stock_wrapper = _LiveStockWrapper(bars=bars)
     helper = buying_confirmator.helper.Helper()
 
-    helper_method = None
+    # Prefer the strict ORB method, but fall back to the public 20% method so
+    # a helper/finder version mismatch does not silently return zero rows.
+    if hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
+        matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        )
+    elif hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
+        matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        )
+    else:
+        return None
 
-    for method_name in (
-        "is_market_open_premarket_support_reclaim_ignition",
-        "_is_market_open_premarket_support_reclaim_ignition",
+    if not matched_family:
+        return None
+
+    bars_before_current = get_bars_same_day_until(
+        bars=bars,
+        current_bar=current_bar,
+        include_current=False,
+    )
+
+    if len(bars_before_current) < 3:
+        return None
+
+    # v22: use the exact resistance/support pair found by the helper.  Previous
+    # versions re-computed these fields generically with max(recent highs) and
+    # min(recent lows), which made the CSV look like invalid HKIT mappings even
+    # when the helper matched a different internal support structure.
+    helper_context = None
+    if hasattr(helper, "get_last_behavioral_buyer_control_phase_20pct_30min_entry_context"):
+        helper_context = helper.get_last_behavioral_buyer_control_phase_20pct_30min_entry_context()
+
+    if helper_context:
+        resistance_bar = helper_context.get("resistance_bar")
+        support_low_bar = helper_context.get("support_bar")
+        resistance_price = safe_float(helper_context.get("resistance_price"), None)
+    else:
+        # Fallback only for older helper/finder mismatches.
+        recent_bars = bars_before_current[-20:] if len(bars_before_current) >= 20 else bars_before_current
+        resistance_bar = max(
+            recent_bars,
+            key=lambda bar_object: safe_float(getattr(bar_object, "high", None), 0.0),
+        )
+        support_low_bar = min(
+            recent_bars,
+            key=lambda bar_object: safe_float(getattr(bar_object, "low", None), float("inf")),
+        )
+        resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
+
+    support_low = safe_float(getattr(support_low_bar, "low", None), None)
+    breakout_close = safe_float(getattr(current_bar, "close", None), None)
+
+    if (
+        resistance_bar is None
+        or support_low_bar is None
+        or resistance_price is None
+        or resistance_price <= 0
+        or support_low is None
+        or support_low <= 0
+        or breakout_close is None
+        or breakout_close <= 0
     ):
-        if hasattr(helper, method_name):
-            helper_method = getattr(helper, method_name)
-            break
-
-    if helper_method is None:
-        return None
-
-    has_pattern = helper_method(
-        one_minute_timeframe_stock=stock_wrapper,
-        potential_confirmation_bar=current_bar,
-    )
-
-    if not has_pattern:
-        return None
-
-    bars_before_current = get_bars_same_day_until(
-        bars=bars,
-        current_bar=current_bar,
-        include_current=False,
-    )
-
-    if len(bars_before_current) < 30:
-        return None
-
-    previous_bar = bars_before_current[-1]
-
-    premarket_bars = [
-        bar_object
-        for bar_object in bars_before_current
-        if datetime.time(4, 0) <= bar_object.bar_time.time() < datetime.time(9, 30)
-    ]
-
-    if len(premarket_bars) < 20:
-        return None
-
-    recent_preopen_bars = [
-        bar_object
-        for bar_object in premarket_bars
-        if current_bar.bar_time - datetime.timedelta(minutes=15) <= bar_object.bar_time < current_bar.bar_time
-    ]
-
-    if len(recent_preopen_bars) < 8:
-        return None
-
-    # For the MASK-style pattern, the support shelf is the key invalidation area.
-    preopen_support_low_bar = min(
-        recent_preopen_bars,
-        key=lambda bar_object: safe_float(getattr(bar_object, "low", None), float("inf")),
-    )
-
-    preopen_support_low = safe_float(getattr(preopen_support_low_bar, "low", None), None)
-
-    if preopen_support_low is None or preopen_support_low <= 0:
-        return None
-
-    # Use the last-5 preopen highs as the micro reclaim/resistance level.
-    last_5_preopen_bars = recent_preopen_bars[-5:]
-
-    micro_resistance_bar = max(
-        last_5_preopen_bars,
-        key=lambda bar_object: safe_float(getattr(bar_object, "high", None), 0.0),
-    )
-
-    micro_resistance = safe_float(getattr(micro_resistance_bar, "high", None), None)
-    breakout_close = safe_float(getattr(current_bar, "close", None), None)
-
-    if micro_resistance is None or micro_resistance <= 0 or breakout_close is None or breakout_close <= 0:
-        return None
-
-    volume_vs_previous_bar_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(previous_bar, "volume", None), None),
-    ) or 0.0
-
-    volume_vs_average_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(current_bar, "volume_average", None), None),
-    ) or 0.0
-
-    return BreakoutContext(
-        breakout_type="market_open_premarket_support_reclaim_ignition",
-        reason="premarket_runner_support_shelf_retest_open_reclaim",
-        breakout_bar=current_bar,
-        resistance_bar=micro_resistance_bar,
-        resistance_price=micro_resistance,
-        lowest_low_since_resistance_bar=preopen_support_low_bar,
-        pullback_from_resistance_pct=(micro_resistance - preopen_support_low) / micro_resistance,
-        breakout_close_above_resistance_pct=(breakout_close - micro_resistance) / micro_resistance,
-        minutes_since_resistance=minutes_between(micro_resistance_bar.bar_time, current_bar.bar_time),
-        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
-        volume_vs_average_ratio=volume_vs_average_ratio,
-    )
-
-
-def find_helper_strong_live_trend_start_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Uses the user's Helper.has_good_live_trend_start_context(...) logic as an
-    additional detector inside this exporter.
-
-    This is the live-safe profile we found from the richer analysis:
-    - before noon
-    - early breakout sequence
-    - no previous failed support-low break
-    - strong candle quality
-    - strong volume confirmation
-    - recent resistance broke by at least 4%
-    - pullback from resistance was at least 5%
-
-    The helper returns only True/False, so this wrapper rebuilds the same
-    resistance context for CSV export.
-    """
-
-    stock_wrapper = _LiveStockWrapper(bars=bars)
-
-    helper = buying_confirmator.helper.Helper()
-
-    has_good_context = helper.has_good_live_trend_start_context(
-        one_minute_timeframe_stock=stock_wrapper,
-        potential_confirmation_bar=current_bar,
-    )
-
-    if not has_good_context:
-        return None
-
-    helper_context = helper._find_live_resistance_breakout_context(
-        one_minute_timeframe_stock=stock_wrapper,
-        potential_confirmation_bar=current_bar,
-        lookback_minutes=30,
-        min_pullback_from_resistance_pct=0.05,
-        min_breakout_close_above_resistance_pct=0.04,
-    )
-
-    if helper_context is None:
-        return None
-
-    bars_before_current = get_bars_same_day_until(
-        bars=bars,
-        current_bar=current_bar,
-        include_current=False,
-    )
-
-    if not bars_before_current:
         return None
 
     previous_bar = bars_before_current[-1]
@@ -1563,154 +617,57 @@ def find_helper_strong_live_trend_start_context(
     ) or 0.0
 
     return BreakoutContext(
-        breakout_type="helper_strong_live_trend_start_context",
-        reason="helper_good_live_trend_start_context",
-        breakout_bar=current_bar,
-        resistance_bar=helper_context["resistance_bar"],
-        resistance_price=helper_context["resistance_price"],
-        lowest_low_since_resistance_bar=helper_context["lowest_low_bar_since_resistance"],
-        pullback_from_resistance_pct=helper_context["pullback_from_resistance_pct"],
-        breakout_close_above_resistance_pct=helper_context["breakout_close_above_resistance_pct"],
-        minutes_since_resistance=helper_context["minutes_since_resistance"],
-        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
-        volume_vs_average_ratio=volume_vs_average_ratio,
-    )
-
-
-def find_helper_secondary_base_ignition_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Uses the user's Helper.is_secondary_base_ignition_breakout(...) logic as
-    a separate detector inside this exporter.
-
-    This is the RYOJ 11:57-style pattern:
-    - already above VWAP / EMA 9 during the base
-    - last 20-30 bars show rebuild / higher-low behavior
-    - current bar breaks the base resistance decisively
-    - volume expands strongly
-    - candle closes near high
-
-    The helper returns only True/False, so this wrapper rebuilds a reasonable
-    resistance/support context for CSV export and future-label calculations.
-    """
-
-    stock_wrapper = _LiveStockWrapper(bars=bars)
-    helper = buying_confirmator.helper.Helper()
-
-    if not hasattr(helper, "is_secondary_base_ignition_breakout"):
-        return None
-
-    has_secondary_base_ignition = helper.is_secondary_base_ignition_breakout(
-        one_minute_timeframe_stock=stock_wrapper,
-        potential_confirmation_bar=current_bar,
-    )
-
-    if not has_secondary_base_ignition:
-        return None
-
-    bars_before_current = get_bars_same_day_until(
-        bars=bars,
-        current_bar=current_bar,
-        include_current=False,
-    )
-
-    if len(bars_before_current) < 30:
-        return None
-
-    build_window_bars = [
-        bar_object
-        for bar_object in bars_before_current
-        if bar_object.bar_time >= current_bar.bar_time - datetime.timedelta(minutes=30)
-    ]
-
-    if len(build_window_bars) < 20:
-        return None
-
-    last_20_bars = build_window_bars[-20:]
-
-    resistance_bar = max(
-        last_20_bars,
-        key=lambda bar_object: safe_float(getattr(bar_object, "high", None), 0.0),
-    )
-
-    resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
-
-    if resistance_price is None or resistance_price <= 0:
-        return None
-
-    # For this pattern, the relevant support/invalidation level is the base low,
-    # not necessarily a low after the resistance bar. This matters when the
-    # resistance is the immediately previous bar, as in RYOJ-style ignitions.
-    base_support_low_bar = min(
-        last_20_bars,
-        key=lambda bar_object: safe_float(getattr(bar_object, "low", None), float("inf")),
-    )
-
-    base_support_low = safe_float(getattr(base_support_low_bar, "low", None), None)
-
-    if base_support_low is None or base_support_low <= 0:
-        return None
-
-    breakout_close = safe_float(getattr(current_bar, "close", None), None)
-
-    if breakout_close is None or breakout_close <= 0:
-        return None
-
-    previous_bar = bars_before_current[-1]
-
-    volume_vs_previous_bar_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(previous_bar, "volume", None), None),
-    ) or 0.0
-
-    volume_vs_average_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(current_bar, "volume_average", None), None),
-    ) or 0.0
-
-    return BreakoutContext(
-        breakout_type="secondary_base_ignition_breakout",
-        reason="helper_secondary_base_ignition_after_rebuild",
+        breakout_type="behavioral_buyer_control_phase_20pct_30min_entry",
+        reason=matched_family,
         breakout_bar=current_bar,
         resistance_bar=resistance_bar,
         resistance_price=resistance_price,
-        lowest_low_since_resistance_bar=base_support_low_bar,
-        pullback_from_resistance_pct=(resistance_price - base_support_low) / resistance_price,
+        lowest_low_since_resistance_bar=support_low_bar,
+        pullback_from_resistance_pct=(resistance_price - support_low) / resistance_price,
         breakout_close_above_resistance_pct=(breakout_close - resistance_price) / resistance_price,
         minutes_since_resistance=minutes_between(resistance_bar.bar_time, current_bar.bar_time),
         volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
         volume_vs_average_ratio=volume_vs_average_ratio,
     )
 
-
-def find_helper_aligned_higher_low_buyer_ignition_context(
+def find_helper_30pct_trend_shift_candidate_context(
     current_bar: Any,
     bars: list[Any],
 ) -> Optional[BreakoutContext]:
     """
-    Uses Helper.is_aligned_higher_low_buyer_ignition(...) as a separate
-    detector inside this exporter.
+    Uses Helper.is_30pct_trend_shift_candidate(...) as a separate detector.
 
-    This is the common 50% positive-trend pattern:
-    EMA/VWAP alignment + higher/flat lows + buyer-control candle + volume.
-    It is not necessarily a classic resistance breakout, so the exported
-    resistance/support fields are rebuilt from the recent 10-bar structure.
+    This is the 30% trend-shift selector mined from the positive 30% trend
+    starts and the later theory research pass: strict ORB quality breakout,
+    aligned higher lows, dry-up reclaim, pre-20 rebuild, recent-high break,
+    resistance/support, supply/demand, or late volume-shock flat-base expansion.
+    The helper exports the matched 30% sub-family and enforces the current
+    first-alert/late-family limiter.
     """
 
     stock_wrapper = _LiveStockWrapper(bars=bars)
     helper = buying_confirmator.helper.Helper()
 
-    if not hasattr(helper, "is_aligned_higher_low_buyer_ignition"):
+    if not hasattr(helper, "is_30pct_trend_shift_candidate"):
         return None
 
-    has_pattern = helper.is_aligned_higher_low_buyer_ignition(
-        one_minute_timeframe_stock=stock_wrapper,
-        potential_confirmation_bar=current_bar,
-    )
+    matched_family = None
 
-    if not has_pattern:
+    if hasattr(helper, "get_30pct_trend_shift_candidate_family"):
+        matched_family = helper.get_30pct_trend_shift_candidate_family(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        )
+    else:
+        has_pattern = helper.is_30pct_trend_shift_candidate(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        )
+
+        if has_pattern:
+            matched_family = "30pct_unknown_family"
+
+    if not matched_family:
         return None
 
     bars_before_current = get_bars_same_day_until(
@@ -1719,10 +676,13 @@ def find_helper_aligned_higher_low_buyer_ignition_context(
         include_current=False,
     )
 
-    if len(bars_before_current) < 10:
+    # ORB can legitimately fire before 20 regular-session bars exist, so the
+    # context builder must not discard early ORB rows. Use the available bars
+    # for the generic context fields.
+    if len(bars_before_current) < 3:
         return None
 
-    recent_bars = bars_before_current[-10:]
+    recent_bars = bars_before_current[-20:]
 
     resistance_bar = max(
         recent_bars,
@@ -1761,8 +721,8 @@ def find_helper_aligned_higher_low_buyer_ignition_context(
     ) or 0.0
 
     return BreakoutContext(
-        breakout_type="aligned_higher_low_buyer_ignition",
-        reason="ema_vwap_aligned_higher_lows_buyer_control_candle",
+        breakout_type="thirty_pct_trend_shift_candidate",
+        reason=matched_family,
         breakout_bar=current_bar,
         resistance_bar=resistance_bar,
         resistance_price=resistance_price,
@@ -1775,152 +735,30 @@ def find_helper_aligned_higher_low_buyer_ignition_context(
     )
 
 
-def find_helper_prior_resistance_support_reclaim_continuation_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    HKIT-style detector wrapper.
 
-    This pattern is a low-volume reclaim after a prior high-volume breakout:
-    resistance bar -> breakout bar -> support retest bar -> reclaim entry bar.
-    The helper owns the sequence detection; this wrapper exports its context.
-    """
-
-    stock_wrapper = _LiveStockWrapper(bars=bars)
-    helper = buying_confirmator.helper.Helper()
-
-    context_method = None
-    if hasattr(helper, "_find_prior_resistance_support_reclaim_continuation_context"):
-        context_method = getattr(helper, "_find_prior_resistance_support_reclaim_continuation_context")
-
-    helper_context = None
-    if context_method is not None:
-        helper_context = context_method(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        )
-        if helper_context is None:
-            return None
-    else:
-        method = None
-        for method_name in (
-            "is_prior_resistance_support_reclaim_continuation",
-            "is_prior_resistance_support_reclaim_continuation_breakout",
-            "_is_prior_resistance_support_reclaim_continuation",
-        ):
-            if hasattr(helper, method_name):
-                method = getattr(helper, method_name)
-                break
-
-        if method is None:
-            return None
-
-        if not method(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        ):
-            return None
-
-    bars_before_current = get_bars_same_day_until(
-        bars=bars,
-        current_bar=current_bar,
-        include_current=False,
-    )
-
-    if len(bars_before_current) < 3:
-        return None
-
-    if helper_context is not None:
-        resistance_bar = helper_context.get("resistance_bar")
-        resistance_price = safe_float(helper_context.get("resistance_price"), None)
-        support_low_bar = helper_context.get("support_low_bar") or helper_context.get("support_test_bar")
-        support_low = safe_float(helper_context.get("support_low"), None)
-        pullback_from_resistance_pct = safe_float(helper_context.get("pullback_from_resistance_pct"), None)
-        breakout_close_above_resistance_pct = safe_float(helper_context.get("breakout_close_above_resistance_pct"), None)
-        minutes_since_resistance = safe_float(helper_context.get("minutes_since_resistance"), None)
-    else:
-        recent_bars = bars_before_current[-10:]
-        resistance_bar = max(recent_bars, key=lambda b: safe_float(getattr(b, "high", None), 0.0))
-        support_low_bar = min(recent_bars, key=lambda b: safe_float(getattr(b, "low", None), float("inf")))
-        resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
-        support_low = safe_float(getattr(support_low_bar, "low", None), None)
-        breakout_close = safe_float(getattr(current_bar, "close", None), None)
-        if resistance_price is None or support_low is None or breakout_close is None or resistance_price <= 0:
-            return None
-        pullback_from_resistance_pct = (resistance_price - support_low) / resistance_price
-        breakout_close_above_resistance_pct = (breakout_close - resistance_price) / resistance_price
-        minutes_since_resistance = minutes_between(resistance_bar.bar_time, current_bar.bar_time)
-
-    if (
-        resistance_bar is None
-        or support_low_bar is None
-        or resistance_price is None
-        or resistance_price <= 0
-        or support_low is None
-        or support_low <= 0
-        or pullback_from_resistance_pct is None
-        or breakout_close_above_resistance_pct is None
-        or minutes_since_resistance is None
-    ):
-        return None
-
-    previous_bar = bars_before_current[-1]
-
-    return BreakoutContext(
-        breakout_type="prior_resistance_support_reclaim_continuation",
-        reason="high_volume_breakout_low_volume_support_retest_reclaim",
-        breakout_bar=current_bar,
-        resistance_bar=resistance_bar,
-        resistance_price=resistance_price,
-        lowest_low_since_resistance_bar=support_low_bar,
-        pullback_from_resistance_pct=pullback_from_resistance_pct,
-        breakout_close_above_resistance_pct=breakout_close_above_resistance_pct,
-        minutes_since_resistance=minutes_since_resistance,
-        volume_vs_previous_bar_ratio=ratio(getattr(current_bar, "volume", None), getattr(previous_bar, "volume", None)) or 0.0,
-        volume_vs_average_ratio=ratio(getattr(current_bar, "volume", None), getattr(current_bar, "volume_average", None)) or 0.0,
-    )
 
 def find_breakout_context(
     current_bar: Any,
     bars: list[Any],
     allow_aligned_higher_low_buyer_ignition: bool = True,
 ) -> Optional[BreakoutContext]:
-    # Detector priority matters:
-    # specific patterns first, broad fallback last.
-    #
-    # aligned_higher_low_buyer_ignition is intentionally broad. The helper
-    # limits it to max 2 accepted aligned entries per symbol/day, but the
-    # export showed it is cleanest when it appears very early in the broader
-    # breakout sequence. The caller disables it once too many prior detected
-    # breakouts already exist, while still allowing lower-priority detectors
-    # to classify the bar if they match.
-    detectors = [
-        find_market_open_premarket_runner_reclaim_context,
-        find_helper_market_open_premarket_support_reclaim_ignition_context,
-        find_intraday_extreme_volume_ignition_context,
-        find_deep_pullback_support_reclaim_context,
-        find_helper_prior_resistance_support_reclaim_continuation_context,
-        find_helper_strong_live_trend_start_context,
-        find_helper_secondary_base_ignition_context,
-    ]
+    """
+    Live/export decision for the public 20% momentum-entry experiment.
 
-    if allow_aligned_higher_low_buyer_ignition:
-        detectors.append(find_helper_aligned_higher_low_buyer_ignition_context)
+    Only the public 20% entry-bar detector is allowed to create an alert here:
+    ORB5, ORB15, or 3+ confluence across VWAP reclaim, bull flag, EMA/MACD,
+    and volume breakout families.
 
-    detectors.extend([
-        find_vwap_reclaim_trend_start_context,
-        find_ema_reclaim_after_pullback_context,
-        find_volume_dryup_expansion_context,
-        find_higher_low_compression_breakout_context,
-        find_first_pullback_hold_above_vwap_context,
-        find_volume_resistance_breakout_context,
-    ])
+    `allow_aligned_higher_low_buyer_ignition` is kept in the signature for
+    backward compatibility with existing callers, but it is ignored.
+    """
+    public_20pct_context = find_behavioral_buyer_control_phase_20pct_30min_entry_context(
+        current_bar=current_bar,
+        bars=bars,
+    )
 
-    for detector in detectors:
-        context = detector(current_bar, bars)
-        if context is not None:
-            return context
+    if public_20pct_context is not None:
+        return public_20pct_context
 
     return None
 
@@ -1963,6 +801,31 @@ def calculate_future_labels(
             "lowest_low_break_before_20_percent_gain_full_session": False,
             "lowest_low_break_before_20_percent_gain_time_full_session": None,
             "lowest_low_break_before_20_percent_gain_price_full_session": None,
+            "reached_20_percent_gain_before_ema20_close_break_full_session": False,
+            "minutes_until_20_percent_gain_before_ema20_close_break_full_session": None,
+            "twenty_percent_gain_before_ema20_close_break_time_full_session": None,
+            "ema20_close_break_before_20_percent_gain_full_session": False,
+            "ema20_close_break_before_20_percent_gain_time_full_session": None,
+            "ema20_close_break_before_20_percent_gain_price_full_session": None,
+            "ema20_value_at_close_break_before_20_percent_gain_full_session": None,
+
+            "reached_20_percent_gain_before_ema9_close_break_full_session": False,
+            "minutes_until_20_percent_gain_before_ema9_close_break_full_session": None,
+            "twenty_percent_gain_before_ema9_close_break_time_full_session": None,
+            "ema9_close_break_before_20_percent_gain_full_session": False,
+            "ema9_close_break_before_20_percent_gain_time_full_session": None,
+            "ema9_close_break_before_20_percent_gain_price_full_session": None,
+            "ema9_value_at_close_break_before_20_percent_gain_full_session": None,
+
+            "max_gain_before_ema9_close_break_full_session_pct": None,
+            "max_gain_before_ema9_close_break_full_session_abs": None,
+            "max_gain_before_ema9_close_break_full_session_high": None,
+            "max_gain_before_ema9_close_break_full_session_high_time": None,
+            "minutes_until_max_gain_before_ema9_close_break_full_session": None,
+            "ema9_close_break_for_max_gain_full_session": False,
+            "ema9_close_break_for_max_gain_full_session_time": None,
+            "ema9_close_break_for_max_gain_full_session_price": None,
+
             "max_gain_before_lowest_low_break_full_session_pct": None,
             "max_gain_before_lowest_low_break_full_session_abs": None,
             "max_gain_before_lowest_low_break_full_session_high": None,
@@ -2051,6 +914,125 @@ def calculate_future_labels(
             target_time_full_session = future_bar.bar_time
             break
 
+    # EMA20 integrity sequence label:
+    # Did the breakout reach +20% before the first future candle CLOSES below EMA20?
+    # This is stricter than support-low invalidation and matches the idea that
+    # the trend should continue without losing EMA20 after the entry bar.
+    reached_target_before_ema20_close_break_full_session = False
+    minutes_until_target_before_ema20_close_break_full_session = None
+    target_before_ema20_close_break_time_full_session = None
+
+    ema20_close_broke_before_target_full_session = False
+    ema20_close_break_time_full_session = None
+    ema20_close_break_price_full_session = None
+    ema20_value_at_close_break_full_session = None
+
+    for future_bar in future_bars_full_session:
+        high = safe_float(getattr(future_bar, "high", None), None)
+        close = safe_float(getattr(future_bar, "close", None), None)
+        ema_20 = safe_float(getattr(future_bar, "ema_20", None), None)
+
+        if (
+            ema_20 is not None
+            and ema_20 > 0
+            and close is not None
+            and close < ema_20 * (1 - EMA20_CLOSE_BREAK_TOLERANCE_PCT)
+        ):
+            ema20_close_broke_before_target_full_session = True
+            ema20_close_break_time_full_session = future_bar.bar_time
+            ema20_close_break_price_full_session = close
+            ema20_value_at_close_break_full_session = ema_20
+            break
+
+        if high is not None and high >= breakout_close * (1 + target_gain_pct):
+            reached_target_before_ema20_close_break_full_session = True
+            minutes_until_target_before_ema20_close_break_full_session = minutes_between(
+                breakout_bar.bar_time,
+                future_bar.bar_time,
+            )
+            target_before_ema20_close_break_time_full_session = future_bar.bar_time
+            break
+
+    # EMA9 integrity sequence label:
+    # Did the breakout reach +20% before the first future candle CLOSES below EMA9?
+    # This is the clean "trend stayed defended by EMA9" label.
+    reached_target_before_ema9_close_break_full_session = False
+    minutes_until_target_before_ema9_close_break_full_session = None
+    target_before_ema9_close_break_time_full_session = None
+
+    ema9_close_broke_before_target_full_session = False
+    ema9_close_break_time_full_session = None
+    ema9_close_break_price_full_session = None
+    ema9_value_at_close_break_full_session = None
+
+    for future_bar in future_bars_full_session:
+        high = safe_float(getattr(future_bar, "high", None), None)
+        close = safe_float(getattr(future_bar, "close", None), None)
+        ema_9 = safe_float(getattr(future_bar, "ema_9", None), None)
+
+        if (
+            ema_9 is not None
+            and ema_9 > 0
+            and close is not None
+            and close < ema_9 * (1 - EMA9_CLOSE_BREAK_TOLERANCE_PCT)
+        ):
+            ema9_close_broke_before_target_full_session = True
+            ema9_close_break_time_full_session = future_bar.bar_time
+            ema9_close_break_price_full_session = close
+            ema9_value_at_close_break_full_session = ema_9
+            break
+
+        if high is not None and high >= breakout_close * (1 + target_gain_pct):
+            reached_target_before_ema9_close_break_full_session = True
+            minutes_until_target_before_ema9_close_break_full_session = minutes_between(
+                breakout_bar.bar_time,
+                future_bar.bar_time,
+            )
+            target_before_ema9_close_break_time_full_session = future_bar.bar_time
+            break
+
+    # Max favorable gain after entry until first future candle closes below EMA9.
+    # This answers: "how much max gain did the entry produce before the trend
+    # fell apart / stopped being defended by EMA9?"
+    max_gain_before_ema9_break_high = None
+    max_gain_before_ema9_break_high_time = None
+    ema9_break_for_max_gain = False
+    ema9_break_for_max_gain_time = None
+    ema9_break_for_max_gain_price = None
+
+    for future_bar in future_bars_full_session:
+        high = safe_float(getattr(future_bar, "high", None), None)
+        close = safe_float(getattr(future_bar, "close", None), None)
+        ema_9 = safe_float(getattr(future_bar, "ema_9", None), None)
+
+        if (
+            ema_9 is not None
+            and ema_9 > 0
+            and close is not None
+            and close < ema_9 * (1 - EMA9_CLOSE_BREAK_TOLERANCE_PCT)
+        ):
+            ema9_break_for_max_gain = True
+            ema9_break_for_max_gain_time = future_bar.bar_time
+            ema9_break_for_max_gain_price = close
+            break
+
+        if high is not None:
+            if max_gain_before_ema9_break_high is None or high > max_gain_before_ema9_break_high:
+                max_gain_before_ema9_break_high = high
+                max_gain_before_ema9_break_high_time = future_bar.bar_time
+
+    max_gain_before_ema9_break_abs = None
+    max_gain_before_ema9_break_pct = None
+    minutes_until_max_gain_before_ema9_break = None
+
+    if max_gain_before_ema9_break_high is not None:
+        max_gain_before_ema9_break_abs = max_gain_before_ema9_break_high - breakout_close
+        max_gain_before_ema9_break_pct = max_gain_before_ema9_break_abs / breakout_close
+        minutes_until_max_gain_before_ema9_break = minutes_between(
+            breakout_bar.bar_time,
+            max_gain_before_ema9_break_high_time,
+        )
+
     # Max favorable gain after entry until setup-low invalidation.
     # This is the metric for: "what was the maximum gain after entry
     # before price went below the setup low?" If the setup low never breaks,
@@ -2130,6 +1112,31 @@ def calculate_future_labels(
         "lowest_low_break_before_20_percent_gain_full_session": support_broke_before_target_full_session,
         "lowest_low_break_before_20_percent_gain_time_full_session": support_break_time_full_session,
         "lowest_low_break_before_20_percent_gain_price_full_session": support_break_price_full_session,
+
+        "reached_20_percent_gain_before_ema20_close_break_full_session": reached_target_before_ema20_close_break_full_session,
+        "minutes_until_20_percent_gain_before_ema20_close_break_full_session": minutes_until_target_before_ema20_close_break_full_session,
+        "twenty_percent_gain_before_ema20_close_break_time_full_session": target_before_ema20_close_break_time_full_session,
+        "ema20_close_break_before_20_percent_gain_full_session": ema20_close_broke_before_target_full_session,
+        "ema20_close_break_before_20_percent_gain_time_full_session": ema20_close_break_time_full_session,
+        "ema20_close_break_before_20_percent_gain_price_full_session": ema20_close_break_price_full_session,
+        "ema20_value_at_close_break_before_20_percent_gain_full_session": ema20_value_at_close_break_full_session,
+
+        "reached_20_percent_gain_before_ema9_close_break_full_session": reached_target_before_ema9_close_break_full_session,
+        "minutes_until_20_percent_gain_before_ema9_close_break_full_session": minutes_until_target_before_ema9_close_break_full_session,
+        "twenty_percent_gain_before_ema9_close_break_time_full_session": target_before_ema9_close_break_time_full_session,
+        "ema9_close_break_before_20_percent_gain_full_session": ema9_close_broke_before_target_full_session,
+        "ema9_close_break_before_20_percent_gain_time_full_session": ema9_close_break_time_full_session,
+        "ema9_close_break_before_20_percent_gain_price_full_session": ema9_close_break_price_full_session,
+        "ema9_value_at_close_break_before_20_percent_gain_full_session": ema9_value_at_close_break_full_session,
+
+        "max_gain_before_ema9_close_break_full_session_pct": max_gain_before_ema9_break_pct,
+        "max_gain_before_ema9_close_break_full_session_abs": max_gain_before_ema9_break_abs,
+        "max_gain_before_ema9_close_break_full_session_high": max_gain_before_ema9_break_high,
+        "max_gain_before_ema9_close_break_full_session_high_time": max_gain_before_ema9_break_high_time,
+        "minutes_until_max_gain_before_ema9_close_break_full_session": minutes_until_max_gain_before_ema9_break,
+        "ema9_close_break_for_max_gain_full_session": ema9_break_for_max_gain,
+        "ema9_close_break_for_max_gain_full_session_time": ema9_break_for_max_gain_time,
+        "ema9_close_break_for_max_gain_full_session_price": ema9_break_for_max_gain_price,
 
         "max_gain_before_lowest_low_break_full_session_pct": max_gain_before_low_break_pct,
         "max_gain_before_lowest_low_break_full_session_abs": max_gain_before_low_break_abs,
@@ -2376,6 +1383,31 @@ def build_profile_row(
         lowest_low_break_before_20_percent_gain_full_session=future_labels["lowest_low_break_before_20_percent_gain_full_session"],
         lowest_low_break_before_20_percent_gain_time_full_session=future_labels["lowest_low_break_before_20_percent_gain_time_full_session"],
         lowest_low_break_before_20_percent_gain_price_full_session=future_labels["lowest_low_break_before_20_percent_gain_price_full_session"],
+
+        reached_20_percent_gain_before_ema20_close_break_full_session=future_labels["reached_20_percent_gain_before_ema20_close_break_full_session"],
+        minutes_until_20_percent_gain_before_ema20_close_break_full_session=future_labels["minutes_until_20_percent_gain_before_ema20_close_break_full_session"],
+        twenty_percent_gain_before_ema20_close_break_time_full_session=future_labels["twenty_percent_gain_before_ema20_close_break_time_full_session"],
+        ema20_close_break_before_20_percent_gain_full_session=future_labels["ema20_close_break_before_20_percent_gain_full_session"],
+        ema20_close_break_before_20_percent_gain_time_full_session=future_labels["ema20_close_break_before_20_percent_gain_time_full_session"],
+        ema20_close_break_before_20_percent_gain_price_full_session=future_labels["ema20_close_break_before_20_percent_gain_price_full_session"],
+        ema20_value_at_close_break_before_20_percent_gain_full_session=future_labels["ema20_value_at_close_break_before_20_percent_gain_full_session"],
+
+        reached_20_percent_gain_before_ema9_close_break_full_session=future_labels["reached_20_percent_gain_before_ema9_close_break_full_session"],
+        minutes_until_20_percent_gain_before_ema9_close_break_full_session=future_labels["minutes_until_20_percent_gain_before_ema9_close_break_full_session"],
+        twenty_percent_gain_before_ema9_close_break_time_full_session=future_labels["twenty_percent_gain_before_ema9_close_break_time_full_session"],
+        ema9_close_break_before_20_percent_gain_full_session=future_labels["ema9_close_break_before_20_percent_gain_full_session"],
+        ema9_close_break_before_20_percent_gain_time_full_session=future_labels["ema9_close_break_before_20_percent_gain_time_full_session"],
+        ema9_close_break_before_20_percent_gain_price_full_session=future_labels["ema9_close_break_before_20_percent_gain_price_full_session"],
+        ema9_value_at_close_break_before_20_percent_gain_full_session=future_labels["ema9_value_at_close_break_before_20_percent_gain_full_session"],
+
+        max_gain_before_ema9_close_break_full_session_pct=future_labels["max_gain_before_ema9_close_break_full_session_pct"],
+        max_gain_before_ema9_close_break_full_session_abs=future_labels["max_gain_before_ema9_close_break_full_session_abs"],
+        max_gain_before_ema9_close_break_full_session_high=future_labels["max_gain_before_ema9_close_break_full_session_high"],
+        max_gain_before_ema9_close_break_full_session_high_time=future_labels["max_gain_before_ema9_close_break_full_session_high_time"],
+        minutes_until_max_gain_before_ema9_close_break_full_session=future_labels["minutes_until_max_gain_before_ema9_close_break_full_session"],
+        ema9_close_break_for_max_gain_full_session=future_labels["ema9_close_break_for_max_gain_full_session"],
+        ema9_close_break_for_max_gain_full_session_time=future_labels["ema9_close_break_for_max_gain_full_session_time"],
+        ema9_close_break_for_max_gain_full_session_price=future_labels["ema9_close_break_for_max_gain_full_session_price"],
 
         max_gain_before_lowest_low_break_full_session_pct=future_labels["max_gain_before_lowest_low_break_full_session_pct"],
         max_gain_before_lowest_low_break_full_session_abs=future_labels["max_gain_before_lowest_low_break_full_session_abs"],
