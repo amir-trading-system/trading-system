@@ -1786,7 +1786,7 @@ class Helper:
         """
 
         current_time = potential_confirmation_bar.bar_time.time()
-        if not (datetime.time(9, 35) <= current_time <= datetime.time(15, 30)):
+        if not (datetime.time(9, 35) <= current_time <= datetime.time(16, 0)):
             return False
 
         bars_until_current = self._get_bars_until_current(
@@ -1960,7 +1960,7 @@ class Helper:
         """
 
         current_time = potential_confirmation_bar.bar_time.time()
-        if not (datetime.time(9, 35) <= current_time <= datetime.time(15, 30)):
+        if not (datetime.time(9, 35) <= current_time <= datetime.time(16, 0)):
             return False
 
         bars_until_current = self._get_bars_until_current(
@@ -2139,7 +2139,7 @@ class Helper:
 
         phase_bars = bars_until_current[anchor_index:current_index + 1]
         before_current_phase_bars = bars_until_current[anchor_index:current_index]
-        if len(phase_bars) < 7 or len(phase_bars) > 42:
+        if len(phase_bars) < 5 or len(phase_bars) > 42:
             return False
 
         previous_3_bars = bars_until_current[max(0, current_index - 3):current_index]
@@ -2393,11 +2393,21 @@ class Helper:
                             and second_low >= level * 0.995
                         )
 
+                        # v27 strict double-down rule:
+                        # The second down must be the final defended low before the entry.
+                        # If any later bar makes a lower low before the entry, the double-down
+                        # absorption structure is broken and this must not qualify.
+                        # Example: NEXR valid structure has 10:14 low ~= 1.88,
+                        # 10:16 low ~= 1.87, then no lower low before 10:17 breaks the high.
                         second_down_is_lowest_after_previous_high = (
                             second_low <= min(
                                 bars_until_current[index].low
                                 for index in pullback_indices
-                            ) * 1.005
+                            ) * 1.001
+                        )
+                        no_lower_low_after_second_down_before_entry = all(
+                            bars_until_current[index].low >= second_low * 0.999
+                            for index in range(second_down_index + 1, current_index)
                         )
 
                         try:
@@ -2416,6 +2426,7 @@ class Helper:
                         if (
                             lows_form_same_defended_zone
                             and second_down_is_lowest_after_previous_high
+                            and no_lower_low_after_second_down_before_entry
                             and 1 <= minutes_since_second_down <= 5
                             and current_breaks_previous_high
                         ):
@@ -2432,6 +2443,7 @@ class Helper:
                                     "resistance_index": resistance_index,
                                     "break_index": break_index,
                                     "pattern_type": "double_down_defended_support_break",
+                                    "pattern_priority": 3,
                                     "first_down_bar": first_down_bar,
                                     "previous_high_bar": previous_high_bar,
                                 }
@@ -2440,6 +2452,216 @@ class Helper:
                     break
             if resistance_support_found:
                 break
+
+
+        # v26: WOK late-day structures.
+        #
+        # These are additional validated support/control patterns from WOK
+        # 2026-05-11.  They are intentionally separate from the original
+        # HKIT/NEXR branches because the base behavior is not always one
+        # exact resistance touch followed by one exact support retest.
+        #
+        # 1) multi_touch_resistance_support_control_break:
+        #    A resistance shelf has multiple highs near the same level, then
+        #    later two or more pullback lows defend that same zone near EMA9,
+        #    and the current bar closes through the conflict/seller high.
+        #    WOK examples:
+        #      15:27/15:29 resistance -> 15:34/15:35 support -> 15:37 entry
+        #      15:39 resistance -> 15:49/15:50/15:56 support -> 15:59 entry
+        #
+        # 2) two_support_after_breakup_high_break:
+        #    After a fast breakout leg, price prints two defended pullbacks in
+        #    the same area, then the current bar breaks the highest high formed
+        #    after those supports.  WOK example:
+        #      15:38/15:40 supports -> 15:45 breaks highest high.
+        extra_candidate_start = max(1, current_index - 35)
+
+        for resistance_index in range(extra_candidate_start, current_index - 3):
+            resistance_bar = bars_until_current[resistance_index]
+            level = resistance_bar.high
+            if level <= 0:
+                continue
+
+            # The resistance should be a visible shelf/supply level, preferably
+            # with another nearby high before the pullback support appears.
+            nearby_resistance_touches = [
+                index
+                for index in range(max(anchor_index, resistance_index - 4), min(current_index, resistance_index + 4))
+                if index != resistance_index
+                and abs(bars_until_current[index].high - level) / level <= 0.025
+            ]
+            resistance_is_visible_shelf = len(nearby_resistance_touches) >= 1
+
+            resistance_vr = volume_ratio(resistance_bar)
+            resistance_cp = close_position(resistance_bar)
+            if not (
+                resistance_is_visible_shelf
+                or (
+                    resistance_vr is not None
+                    and resistance_vr >= 1.0
+                    and (
+                        (
+                            resistance_cp is not None
+                            and resistance_cp >= 0.55
+                        )
+                        or (
+                            upper_wick_share(resistance_bar) is not None
+                            and upper_wick_share(resistance_bar) >= 0.25
+                        )
+                    )
+                )
+            ):
+                continue
+
+            # First, the shelf must actually break.  Supports that happened
+            # before the break are ignored.  This prevents lower accepted prices
+            # from being mislabeled as resistance just because later bars traded
+            # above them.
+            shelf_break_index = None
+            for candidate_break_index in range(resistance_index + 1, current_index):
+                candidate_break_bar = bars_until_current[candidate_break_index]
+                if (
+                    candidate_break_bar.close >= level * 1.035
+                    and candidate_break_bar.high > level
+                    and close_position(candidate_break_bar) is not None
+                    and close_position(candidate_break_bar) >= 0.55
+                ):
+                    shelf_break_index = candidate_break_index
+                    break
+
+            if shelf_break_index is None:
+                continue
+
+            support_indices = []
+            for support_index in range(shelf_break_index + 1, current_index):
+                support_bar = bars_until_current[support_index]
+                support_low_near_level = (
+                    support_bar.low >= level * 0.965
+                    and support_bar.low <= level * 1.035
+                )
+                support_holds_ema9 = (
+                    support_bar.close >= support_bar.ema_9 * 0.985
+                    and support_bar.low <= support_bar.ema_9 * 1.12
+                )
+                support_holds_or_reclaims_level = support_bar.close >= level * 0.985
+                if support_low_near_level and support_holds_ema9 and support_holds_or_reclaims_level:
+                    support_indices.append(support_index)
+
+            if len(support_indices) >= 2:
+                first_support_index = support_indices[0]
+                last_support_index = support_indices[-1]
+                last_support_bar = bars_until_current[last_support_index]
+                conflict_bars = bars_until_current[last_support_index + 1:current_index]
+                conflict_high = max([level] + [bar.high for bar in conflict_bars])
+                conflict_close_high = max([level] + [bar.close for bar in conflict_bars])
+
+                current_breaks_conflict = (
+                    current_bar.close >= conflict_high * 0.995
+                    and current_bar.close >= conflict_close_high * 0.995
+                    and current_cp >= 0.60
+                )
+                try:
+                    minutes_since_support = (current_bar.bar_time - last_support_bar.bar_time).total_seconds() / 60.0
+                except Exception:
+                    minutes_since_support = float(current_index - last_support_index)
+
+                if current_breaks_conflict and 2 <= minutes_since_support <= 8:
+                    valid_resistance_support_candidates.append(
+                        {
+                            "level": level,
+                            "resistance_bar": resistance_bar,
+                            "break_bar": bars_until_current[shelf_break_index],
+                            "support_bar": last_support_bar,
+                            "conflict_high": conflict_high,
+                            "conflict_close_high": conflict_close_high,
+                            "minutes_since_retest": minutes_since_support,
+                            "support_index": last_support_index,
+                            "resistance_index": resistance_index,
+                            "break_index": shelf_break_index,
+                            "pattern_type": "multi_touch_resistance_support_control_break",
+                            "pattern_priority": 2,
+                            "first_down_bar": bars_until_current[first_support_index],
+                        }
+                    )
+
+        # WOK second entry type: two defended supports after a breakout leg,
+        # then current bar breaks the highest high created after the first support.
+        two_support_search_start = max(1, current_index - 14)
+        for first_support_index in range(two_support_search_start, current_index - 3):
+            first_support_bar = bars_until_current[first_support_index]
+            for second_support_index in range(first_support_index + 1, current_index):
+                second_support_bar = bars_until_current[second_support_index]
+                first_low = first_support_bar.low
+                second_low = second_support_bar.low
+                if first_low <= 0 or second_low <= 0:
+                    continue
+
+                lows_same_defended_area = abs(second_low - first_low) / first_low <= 0.055
+                both_defend_ema9 = (
+                    first_support_bar.close >= first_support_bar.ema_9 * 0.985
+                    and second_support_bar.close >= second_support_bar.ema_9 * 0.985
+                    and first_support_bar.low <= first_support_bar.ema_9 * 1.12
+                    and second_support_bar.low <= second_support_bar.ema_9 * 1.12
+                )
+                if not (lows_same_defended_area and both_defend_ema9):
+                    continue
+
+                high_window = bars_until_current[first_support_index + 1:current_index]
+                if not high_window:
+                    continue
+                previous_high_bar = max(high_window, key=lambda bar: bar.high)
+                current_breaks_previous_high = (
+                    current_cp >= 0.60
+                    and (
+                        current_bar.close >= previous_high_bar.high * 1.015
+                        or current_bar.high >= previous_high_bar.high * 1.05
+                    )
+                )
+                try:
+                    minutes_since_second_support = (current_bar.bar_time - second_support_bar.bar_time).total_seconds() / 60.0
+                except Exception:
+                    minutes_since_second_support = float(current_index - second_support_index)
+
+                # v27 strict two-support/double-down rule:
+                # The second support must be the final lowest defended low before entry.
+                # If any later bar undercuts it before the entry, buyers did not fully defend
+                # the double-down zone yet.
+                second_support_is_lowest_defense = (
+                    second_low <= min(
+                        bars_until_current[index].low
+                        for index in range(first_support_index + 1, current_index)
+                    ) * 1.001
+                )
+                no_lower_low_after_second_support_before_entry = all(
+                    bars_until_current[index].low >= second_low * 0.999
+                    for index in range(second_support_index + 1, current_index)
+                )
+
+                if (
+                    current_breaks_previous_high
+                    and second_support_is_lowest_defense
+                    and no_lower_low_after_second_support_before_entry
+                    and 1 <= minutes_since_second_support <= 8
+                ):
+                    level = min(first_low, second_low)
+                    valid_resistance_support_candidates.append(
+                        {
+                            "level": level,
+                            "resistance_bar": previous_high_bar,
+                            "break_bar": previous_high_bar,
+                            "support_bar": second_support_bar,
+                            "conflict_high": previous_high_bar.high,
+                            "conflict_close_high": previous_high_bar.close,
+                            "minutes_since_retest": minutes_since_second_support,
+                            "support_index": second_support_index,
+                            "resistance_index": first_support_index,
+                            "break_index": shelf_break_index,
+                            "pattern_type": "two_support_after_breakup_high_break",
+                            "pattern_priority": 1,
+                            "first_down_bar": first_support_bar,
+                            "previous_high_bar": previous_high_bar,
+                        }
+                    )
 
         if valid_resistance_support_candidates:
             # v22: when more than one valid internal resistance/support structure
@@ -2454,6 +2676,8 @@ class Helper:
             best_candidate = max(
                 valid_resistance_support_candidates,
                 key=lambda candidate: (
+                    candidate.get("pattern_priority", 0),
+                    candidate.get("conflict_high", 0.0),
                     candidate["support_index"],
                     candidate["resistance_index"],
                     candidate["break_index"],
@@ -2744,6 +2968,16 @@ class Helper:
 
         not_too_far_from_ema9_ok = close_to_ema9 is not None and close_to_ema9 <= 0.22
 
+        # v25: after the resistance/support or double-down defense is proven,
+        # the actual entry bar should show that buyers took control by closing
+        # meaningfully above EMA9. This keeps HKIT 10:05 / 10:10 and NEXR
+        # 10:17, but removes many weak continuation rows that barely separate
+        # from EMA9 before rolling back.
+        current_close_has_control_above_ema9_ok = (
+            close_to_ema9 is not None
+            and close_to_ema9 >= 0.12
+        )
+
         # v8: VWAP / volume-average wake-up behavior.
         # The idea is not an exact number; it is a phase-change:
         # before the move VWAP / volume average are relatively quiet, then in
@@ -2899,25 +3133,70 @@ class Helper:
             )
         )
 
+        # v28: the WOK-style branches were still too broad.  They should
+        # represent the actual buyer-control bar after the support structure,
+        # not every late-trend continuation row.  Require the bar to expand as
+        # a real green body and to separate from EMA9 enough that buyers have
+        # visibly taken control.
+        current_body_pct_of_open = None
+        if safe(current_bar.open_value, 0.0) > 0:
+            current_body_pct_of_open = (current_bar.close - current_bar.open_value) / current_bar.open_value
+
+        wok_late_current_control_bar_ok = (
+            current_cp >= 0.60
+            and current_uw <= 0.45
+            and current_bar.close > current_bar.open_value
+            and current_bar.close >= current_bar.ema_9
+            and close_to_ema9 is not None
+            and close_to_ema9 >= 0.08
+            and current_body_pct_of_open is not None
+            and current_body_pct_of_open >= 0.08
+            and current_volume_ratio is not None
+            and current_volume_ratio >= 0.85
+            and (
+                current_body_expands_vs_previous_ok
+                or current_body_expands_vs_recent_tape_ok
+                or current_bar.close >= previous_bar.high
+                or current_bar.high >= max(bar.high for bar in previous_5_bars)
+            )
+        )
+
+        wok_late_support_control_pattern_ok = (
+            best_candidate.get("pattern_type") in {
+                "multi_touch_resistance_support_control_break",
+                "two_support_after_breakup_high_break",
+            }
+            and current_real_volume_participation_ok
+            and wok_late_current_control_bar_ok
+            and previous_tape_is_volatile_ok
+            and fresh_reacceleration_ok
+        )
+
         return (
             resistance_support_found
             and current_real_volume_participation_ok
-            and previous_tape_is_volatile_ok
-            and fresh_reacceleration_ok
-            and clean_current_bar_ok
-            and buyer_arrival_wakeup_ok
             and (
                 (
-                    active_volume_ok
-                    and ema_rising_ok
-                    and ema_expansion_ok
-                    and higher_highs_ok
-                    and sellers_defended_ok
-                    and not_too_far_from_ema9_ok
-                    and high_velocity_buyer_arrival_ok
-                    and behavior_score >= 15
+                    current_close_has_control_above_ema9_ok
+                    and previous_tape_is_volatile_ok
+                    and fresh_reacceleration_ok
+                    and clean_current_bar_ok
+                    and buyer_arrival_wakeup_ok
+                    and (
+                        (
+                            active_volume_ok
+                            and ema_rising_ok
+                            and ema_expansion_ok
+                            and higher_highs_ok
+                            and sellers_defended_ok
+                            and not_too_far_from_ema9_ok
+                            and high_velocity_buyer_arrival_ok
+                            and behavior_score >= 15
+                        )
+                        or hkit_regression_archetype_ok
+                    )
                 )
-                or hkit_regression_archetype_ok
+                or wok_late_support_control_pattern_ok
             )
         )
 
@@ -2938,7 +3217,7 @@ class Helper:
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         ):
-            return "resistance_support_or_double_down_ema9_trend_quality_v24_real_volume_participation_20pct_30min_entry"
+            return "resistance_support_or_double_down_ema9_trend_quality_v28_wok_body_ema9_control_20pct_30min_entry"
         return None
 
     def get_buyer_conviction_20pct_30min_entry_family(
@@ -2985,5 +3264,5 @@ class Helper:
         if matched_family:
             return True, matched_family
 
-        return False, "bar has no v20 validated resistance-strength EMA9 trend-quality 20pct/30min entry potential"
+        return False, "bar has no v26 WOK/HKIT/NEXR support-control 20pct/30min entry potential"
 
