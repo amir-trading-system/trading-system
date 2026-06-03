@@ -1,5 +1,9 @@
 Need to do the following:
- - resistance becode to support check:
-  - create a function that checks if since last high the previous resistance became to support patterns.
-    - check it on the potential entry bar, if it is - place buy order.
-    - If not - call this function on each bar after that.
+- cases for check:
+  - WOK - 05.11.2026T15:37
+  - WOK - 05.11.2026T15:45
+  - WOK - 05.11.2026T15:59
+  - NEXR - 05.29.2026T10:17
+  - HKIT - 06.01.2026T10:10
+  - LASE - 06.02.2026T12:20
+  - LASE - 06.03.2026T09:46

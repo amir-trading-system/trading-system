@@ -1510,7 +1510,35 @@ def write_rows_to_csv(
 ) -> None:
     os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
 
-    fieldnames = list(BreakoutProfileRow.__dataclass_fields__.keys())
+    # v33: put all event/context time columns next to each other near the
+    # beginning of the CSV so resistance/support/entry chronology is easy to
+    # inspect visually. Keep every dataclass field, only change order.
+    all_fieldnames = list(BreakoutProfileRow.__dataclass_fields__.keys())
+    leading_fields = [
+        "symbol",
+        "trade_date",
+        "is_positive",
+        "breakout_type",
+        "reason",
+    ]
+    time_fields = [
+        field_name
+        for field_name in all_fieldnames
+        if (
+            field_name not in leading_fields
+            and (
+                field_name == "breakout_time"
+                or field_name.endswith("_time")
+                or "_time_" in field_name
+            )
+        )
+    ]
+    remaining_fields = [
+        field_name
+        for field_name in all_fieldnames
+        if field_name not in leading_fields and field_name not in time_fields
+    ]
+    fieldnames = [field_name for field_name in leading_fields if field_name in all_fieldnames] + time_fields + remaining_fields
 
     with open(output_file_path, "w", newline="") as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
