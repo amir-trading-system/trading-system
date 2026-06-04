@@ -90,7 +90,6 @@ class Analyzer:
                 self.waiting_for_confirmation_queue.put(
                     {
                         "bar_to_confirm": current_bar,
-                        "milestones": milestones,
                     },
                 )
                 self.has_indication.append(unique_key)

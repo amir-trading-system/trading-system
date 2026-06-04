@@ -39,10 +39,8 @@ class Confirmator:
         self,
     ):
         while True:
-            bar_to_milestones: dict[str, any] = self.waiting_for_confirmation_queue.get()
-
-            bar_to_confirm: common.objects.BarData = bar_to_milestones["bar_to_confirm"]
-            milestones: common.objects.Milestones = bar_to_milestones["milestones"]
+            bar_to_confirm_dict: dict[str, any] = self.waiting_for_confirmation_queue.get()
+            bar_to_confirm: common.objects.BarData = bar_to_confirm_dict["bar_to_confirm"]
 
             self.logger.info(
                 msg="Got bar to confirm",
@@ -75,6 +73,5 @@ class Confirmator:
                 kwargs={
                     "stock": stock,
                     "original_bar_to_confirm": bar_to_confirm,
-                    "milestones": milestones,
                 },
             ).start()

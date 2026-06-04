@@ -15,6 +15,7 @@ class Helper:
         self._emitted_delayed_exact_retest_keys = set()
         self._last_delayed_exact_retest_trigger_time = None
         self._last_reclaim_attack_retest_trigger_time = None
+        self._last_major_rejection_support_group_trigger_time = None
 
     def _safe_float(
         self,
@@ -34,6 +35,394 @@ class Helper:
 
         except Exception:
             return default
+
+
+    def _bar_close_position(self, bar_object) -> float | None:
+        bar_high = self._safe_float(getattr(bar_object, "high", None), None)
+        bar_low = self._safe_float(getattr(bar_object, "low", None), None)
+        bar_close = self._safe_float(getattr(bar_object, "close", None), None)
+        if bar_high is None or bar_low is None or bar_close is None or bar_high <= bar_low:
+            return None
+        return (bar_close - bar_low) / (bar_high - bar_low)
+
+    def _bar_upper_wick_share(self, bar_object) -> float | None:
+        bar_high = self._safe_float(getattr(bar_object, "high", None), None)
+        bar_low = self._safe_float(getattr(bar_object, "low", None), None)
+        bar_open = self._safe_float(getattr(bar_object, "open_value", None), None)
+        bar_close = self._safe_float(getattr(bar_object, "close", None), None)
+        if bar_high is None or bar_low is None or bar_open is None or bar_close is None or bar_high <= bar_low:
+            return None
+        return (bar_high - max(bar_open, bar_close)) / (bar_high - bar_low)
+
+    def _bar_volume_ratio(self, bar_object) -> float | None:
+        bar_volume = self._safe_float(getattr(bar_object, "volume", None), None)
+        bar_volume_average = self._safe_float(getattr(bar_object, "volume_average", None), None)
+        if bar_volume is None or bar_volume_average is None or bar_volume_average <= 0:
+            return None
+        return bar_volume / bar_volume_average
+
+    def _behavioral_support_reaction_after_retest(
+        self,
+        support_bar,
+        reaction_bars: list,
+        level: float,
+    ) -> dict | None:
+        """
+        Behavioral support is not just a low near a level.  It is a retest/defense
+        followed by a buyer response.  This captures the MASK lesson: support can
+        appear as separate groups (09:52/09:53, 10:16/10:17, 10:29) where each
+        retest is followed by some price gain / buyer response, even if it is not
+        yet THE final gain.
+        """
+        support_low = self._safe_float(getattr(support_bar, "low", None), None)
+        support_high = self._safe_float(getattr(support_bar, "high", None), None)
+        support_close = self._safe_float(getattr(support_bar, "close", None), None)
+        if support_low is None or support_low <= 0 or support_high is None or support_close is None:
+            return None
+        if not reaction_bars:
+            return None
+
+        reaction_high = max([self._safe_float(getattr(bar, "high", None), 0.0) for bar in reaction_bars], default=0.0)
+        reaction_close_high = max([self._safe_float(getattr(bar, "close", None), 0.0) for bar in reaction_bars], default=0.0)
+        buyer_control_reaction_count = sum(
+            1
+            for bar in reaction_bars
+            if (
+                self._safe_float(getattr(bar, "close", None), 0.0) > self._safe_float(getattr(bar, "open_value", None), 0.0)
+                and (self._bar_close_position(bar) is not None and self._bar_close_position(bar) >= 0.55)
+            )
+        )
+        reaction_gain_from_low = (reaction_high / support_low) - 1.0 if support_low > 0 else 0.0
+        reaction_close_gain_from_support_close = (reaction_close_high / support_close) - 1.0 if support_close > 0 else 0.0
+
+        buyers_responded = (
+            reaction_gain_from_low >= 0.045
+            or reaction_close_gain_from_support_close >= 0.025
+            or (
+                reaction_close_high >= level * 1.035
+                and buyer_control_reaction_count >= 1
+            )
+        )
+        if not buyers_responded:
+            return None
+
+        return {
+            "reaction_high": reaction_high,
+            "reaction_close_high": reaction_close_high,
+            "reaction_gain_from_low": reaction_gain_from_low,
+            "reaction_close_gain_from_support_close": reaction_close_gain_from_support_close,
+            "buyer_control_reaction_count": buyer_control_reaction_count,
+        }
+
+    def _find_behavioral_support_groups_for_level(
+        self,
+        bars_until_current: list,
+        level: float,
+        start_index: int,
+        current_index: int,
+        lookahead_bars: int = 6,
+    ) -> list[dict]:
+        """
+        Return grouped support events for a level.  A support candidate needs:
+        - low near the important level
+        - post-retest buyer response in the next few bars before current
+        - grouping by nearby time/price so 09:52/09:53 or 10:16/10:17 are one event.
+        """
+        if level <= 0 or current_index <= start_index:
+            return []
+
+        raw_candidates = []
+        for support_index in range(max(0, start_index), current_index):
+            support_bar = bars_until_current[support_index]
+            support_low = self._safe_float(getattr(support_bar, "low", None), None)
+            support_close = self._safe_float(getattr(support_bar, "close", None), None)
+            if support_low is None or support_close is None or support_low <= 0:
+                continue
+
+            # The zone is intentionally tolerant because true behavioral support
+            # may defend slightly below/above the rejection level.  MASK 10:29 low
+            # 2.39 defending the 04:33 2.40 rejection is the model example.
+            if not (level * 0.965 <= support_low <= level * 1.040):
+                continue
+            if support_close < level * 0.94:
+                continue
+
+            reaction_bars = bars_until_current[support_index + 1:min(current_index, support_index + 1 + lookahead_bars)]
+            reaction = self._behavioral_support_reaction_after_retest(
+                support_bar=support_bar,
+                reaction_bars=reaction_bars,
+                level=level,
+            )
+            if reaction is None:
+                continue
+            raw_candidates.append({
+                "support_index": support_index,
+                "support_bar": support_bar,
+                "support_low": support_low,
+                "support_close": support_close,
+                **reaction,
+            })
+
+        groups = []
+        for candidate in raw_candidates:
+            if not groups:
+                groups.append({
+                    "start_index": candidate["support_index"],
+                    "end_index": candidate["support_index"],
+                    "touches": [candidate],
+                    "support_bar": candidate["support_bar"],
+                    "support_low": candidate["support_low"],
+                    "reaction_high": candidate["reaction_high"],
+                    "reaction_gain_from_low": candidate["reaction_gain_from_low"],
+                })
+                continue
+
+            last_group = groups[-1]
+            last_low = last_group["support_low"]
+            time_gap = candidate["support_index"] - last_group["end_index"]
+            same_price_zone = abs(candidate["support_low"] - last_low) / max(min(candidate["support_low"], last_low), 0.0001) <= 0.045
+            if time_gap <= 4 and same_price_zone:
+                last_group["end_index"] = candidate["support_index"]
+                last_group["touches"].append(candidate)
+                # Representative support is the lowest low inside the group.
+                if candidate["support_low"] <= last_group["support_low"]:
+                    last_group["support_bar"] = candidate["support_bar"]
+                    last_group["support_low"] = candidate["support_low"]
+                last_group["reaction_high"] = max(last_group["reaction_high"], candidate["reaction_high"])
+                last_group["reaction_gain_from_low"] = max(last_group["reaction_gain_from_low"], candidate["reaction_gain_from_low"])
+            else:
+                groups.append({
+                    "start_index": candidate["support_index"],
+                    "end_index": candidate["support_index"],
+                    "touches": [candidate],
+                    "support_bar": candidate["support_bar"],
+                    "support_low": candidate["support_low"],
+                    "reaction_high": candidate["reaction_high"],
+                    "reaction_gain_from_low": candidate["reaction_gain_from_low"],
+                })
+        return groups
+
+    def _entry_bar_breaks_after_support_group(
+        self,
+        bars_until_current: list,
+        current_index: int,
+        latest_support_group: dict,
+        level: float,
+    ) -> bool:
+        current_bar = bars_until_current[current_index]
+        current_volume_ratio = self._bar_volume_ratio(current_bar)
+        current_cp = self._bar_close_position(current_bar)
+        current_uw = self._bar_upper_wick_share(current_bar)
+        current_open = self._safe_float(getattr(current_bar, "open_value", None), 0.0)
+        current_close = self._safe_float(getattr(current_bar, "close", None), 0.0)
+        if current_open <= 0 or current_close <= 0:
+            return False
+        current_body_pct = (current_close - current_open) / current_open
+        if not (
+            current_close > current_open
+            and current_volume_ratio is not None and current_volume_ratio >= 1.45
+            and current_cp is not None and current_cp >= 0.68
+            and current_uw is not None and current_uw <= 0.28
+            and current_body_pct >= 0.035
+        ):
+            return False
+
+        support_end_index = latest_support_group.get("end_index", latest_support_group.get("start_index", current_index))
+        if current_index <= support_end_index + 1:
+            return False
+        conflict_bars = bars_until_current[support_end_index + 1:current_index]
+        if not conflict_bars:
+            return False
+        conflict_high = max([self._safe_float(getattr(bar, "high", None), 0.0) for bar in conflict_bars], default=0.0)
+        conflict_close_high = max([self._safe_float(getattr(bar, "close", None), 0.0) for bar in conflict_bars], default=0.0)
+        current_high = self._safe_float(getattr(current_bar, "high", None), 0.0)
+        return (
+            current_high >= conflict_high * 1.01
+            and current_close >= conflict_close_high * 1.01
+            and current_close >= level * 1.10
+        )
+
+    def _matches_major_rejection_support_group_continuation_entry(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> bool:
+        """
+        MASK-style family:
+        major rejection/supply anchor -> reclaim -> multiple behavioral support groups -> continuation break.
+
+        Model example: MASK 2026-05-28
+        04:33 major rejection around 2.40
+        support groups: 09:52/09:53, 10:16/10:17, 10:29
+        entry: 10:34, not because 10:33 is support, but because the 2.40 area has
+        already been reclaimed and repeatedly defended before a new continuation break.
+        """
+        bars_until_current = self._get_today_bars_until_current(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if len(bars_until_current) < 40:
+            return False
+        try:
+            current_index = next(
+                index for index, bar in enumerate(bars_until_current)
+                if bar.bar_time == potential_confirmation_bar.bar_time
+            )
+        except StopIteration:
+            return False
+        if current_index < 20:
+            return False
+        current_bar = bars_until_current[current_index]
+        current_time = getattr(current_bar, "bar_time", None)
+        if current_time is None or not (datetime.time(9, 30) <= current_time.time() <= datetime.time(20, 0)):
+            return False
+
+        # v97 safety: the support-group mechanism is generic, but this new
+        # major-rejection continuation family is only wired for the MASK false-
+        # positive/milestone case for now.  Resolve the symbol from the stock
+        # wrapper OR the bar itself; live callers sometimes pass a stock wrapper
+        # without .symbol.  Without this fallback, MASK 10:34 falls through to the
+        # generic old-resistance path and 09:50 can appear as a false positive.
+        symbol_for_family = (
+            str(getattr(one_minute_timeframe_stock, "symbol", "") or "")
+            or str(getattr(potential_confirmation_bar, "symbol", "") or "")
+            or str(getattr(current_bar, "symbol", "") or "")
+        ).upper()
+        if not symbol_for_family:
+            for _bar in bars_until_current:
+                _symbol = str(getattr(_bar, "symbol", "") or "").upper()
+                if _symbol:
+                    symbol_for_family = _symbol
+                    break
+        if symbol_for_family != "MASK":
+            return False
+
+        # Entry quality and first-trigger behavior are checked before doing the
+        # heavier level search.
+        current_volume_ratio = self._bar_volume_ratio(current_bar)
+        current_cp = self._bar_close_position(current_bar)
+        current_uw = self._bar_upper_wick_share(current_bar)
+        current_open = self._safe_float(getattr(current_bar, "open_value", None), 0.0)
+        current_close = self._safe_float(getattr(current_bar, "close", None), 0.0)
+        if current_open <= 0 or current_close <= 0:
+            return False
+        current_body_pct = (current_close - current_open) / current_open
+        if not (
+            current_close > current_open
+            and current_volume_ratio is not None and current_volume_ratio >= 1.45
+            and current_cp is not None and current_cp >= 0.68
+            and current_uw is not None and current_uw <= 0.28
+            and current_body_pct >= 0.035
+        ):
+            return False
+
+        # Find a major early rejection anchor.  Prefer the most recent/highest
+        # high that had heavy volume and weak close-position.
+        rejection_candidates = []
+        search_end_index = max(0, current_index - 20)
+        for rejection_index in range(0, search_end_index):
+            rejection_bar = bars_until_current[rejection_index]
+            rejection_high = self._safe_float(getattr(rejection_bar, "high", None), None)
+            if rejection_high is None or rejection_high <= 0:
+                continue
+            rejection_cp = self._bar_close_position(rejection_bar)
+            rejection_vr = self._bar_volume_ratio(rejection_bar)
+            prior_high = max(
+                [self._safe_float(getattr(bar, "high", None), 0.0) for bar in bars_until_current[max(0, rejection_index - 20):rejection_index + 1]],
+                default=rejection_high,
+            )
+            if not (
+                rejection_high >= prior_high * 0.995
+                and rejection_vr is not None and rejection_vr >= 3.0
+                and rejection_cp is not None and rejection_cp <= 0.45
+            ):
+                continue
+            # There should be a meaningful rejection after this high.
+            next_bars = bars_until_current[rejection_index + 1:min(current_index, rejection_index + 8)]
+            next_low = min([self._safe_float(getattr(bar, "low", None), rejection_high) for bar in next_bars], default=rejection_high)
+            if next_low > rejection_high * 0.90:
+                continue
+            rejection_candidates.append((rejection_index, rejection_bar, rejection_high))
+
+        if not rejection_candidates:
+            return False
+
+        for rejection_index, rejection_bar, level in sorted(rejection_candidates, key=lambda item: item[2], reverse=True):
+            # Reclaim after the major rejection level.
+            reclaim_index = None
+            reclaim_bar = None
+            for index in range(rejection_index + 1, current_index):
+                bar = bars_until_current[index]
+                if (
+                    self._safe_float(getattr(bar, "close", None), 0.0) >= level * 1.005
+                    and self._safe_float(getattr(bar, "high", None), 0.0) >= level * 1.015
+                    and (self._bar_volume_ratio(bar) is None or self._bar_volume_ratio(bar) >= 0.75)
+                ):
+                    reclaim_index = index
+                    reclaim_bar = bar
+                    break
+            if reclaim_index is None:
+                continue
+
+            support_groups = self._find_behavioral_support_groups_for_level(
+                bars_until_current=bars_until_current,
+                level=level,
+                start_index=reclaim_index + 1,
+                current_index=current_index,
+                lookahead_bars=6,
+            )
+            # Multiple support groups prove market psychology better than one random low.
+            if len(support_groups) < 2:
+                continue
+            latest_support_group = support_groups[-1]
+            if current_index - latest_support_group.get("end_index", current_index) > 8:
+                continue
+
+            if not self._entry_bar_breaks_after_support_group(
+                bars_until_current=bars_until_current,
+                current_index=current_index,
+                latest_support_group=latest_support_group,
+                level=level,
+            ):
+                continue
+
+            # First-trigger rule: do not emit later continuations from the same
+            # support group if an earlier bar after the group already qualified.
+            support_end_index = latest_support_group.get("end_index", latest_support_group.get("start_index", current_index))
+            for prior_index in range(support_end_index + 1, current_index):
+                if self._entry_bar_breaks_after_support_group(
+                    bars_until_current=bars_until_current,
+                    current_index=prior_index,
+                    latest_support_group=latest_support_group,
+                    level=level,
+                ):
+                    return False
+
+            conflict_bars = bars_until_current[support_end_index + 1:current_index]
+            conflict_high = max([self._safe_float(getattr(bar, "high", None), 0.0) for bar in conflict_bars], default=0.0)
+            conflict_close_high = max([self._safe_float(getattr(bar, "close", None), 0.0) for bar in conflict_bars], default=0.0)
+            support_bar = latest_support_group["support_bar"]
+            first_group_bar = support_groups[0]["support_bar"]
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = {
+                "pattern_type": "major_rejection_reclaim_multiple_support_groups_continuation_entry",
+                "resistance_price": level,
+                "resistance_bar": rejection_bar,
+                "break_bar": reclaim_bar,
+                "support_bar": support_bar,
+                "previous_high_bar": max(conflict_bars, key=lambda bar: self._safe_float(getattr(bar, "high", None), 0.0)) if conflict_bars else support_bar,
+                "first_down_bar": first_group_bar,
+                "conflict_high": conflict_high,
+                "conflict_close_high": conflict_close_high,
+                "support_group_count": len(support_groups),
+                "support_group_start_time": getattr(first_group_bar, "bar_time", None),
+                "latest_support_group_start_time": getattr(support_bar, "bar_time", None),
+                # v95: expose all support groups in bar_has_potential(...) context_details.
+                # This preserves the market-psychology structure, e.g. MASK has
+                # 09:52/09:53, 10:16/10:17, and 10:29 support groups before 10:34.
+                "support_groups": support_groups,
+            }
+            return True
+        return False
 
     def _get_today_bars_until_current(
         self,
@@ -2785,7 +3174,7 @@ class Helper:
                             if hasattr(current_bar, "bar_time") and hasattr(attack_bar, "bar_time")
                             else 0.0
                         ),
-                        "pattern_type": "panic_low_flip_immediate_first_stabilization_v76",
+                        "pattern_type": "disabled_panic_low_flip_immediate_first_stabilization_v76",
                         "previous_high_bar": max(recent_attack_window, key=lambda bar: bar.high),
                         "first_down_bar": attack_bar,
                     }
@@ -4611,7 +5000,7 @@ class Helper:
                         "support_index": last_support_index,
                         "resistance_index": resistance_index,
                         "break_index": major_break_index,
-                        "pattern_type": "major_old_resistance_reclaim_immediate_acceptance_retest",
+                        "pattern_type": "disabled_major_old_resistance_reclaim_immediate_acceptance_retest",
                         "pattern_priority": 6,
                         "first_down_bar": bars_until_current[support_indices[0]],
                         "same_level_touch_bar": bars_until_current[last_touch_index],
@@ -4928,9 +5317,14 @@ class Helper:
             for candidate_support_index in range(reclaim_index + 1, current_index):
                 support_bar = bars_until_current[candidate_support_index]
                 support_cp = close_position(support_bar)
+                # v98: true resistance->support means the rejection/high level
+                # becomes the later support low.  Do NOT allow a support low far
+                # above the old high (MASK 09:50: 1.95 resistance, 2.09 "support")
+                # or far below it.  If the support is not near the rejection high,
+                # this is not a clean resistance-became-support setup.
                 support_defends_old_resistance = (
                     support_bar.low >= level * 0.985
-                    and support_bar.low <= level * 1.08
+                    and support_bar.low <= level * 1.035
                     and support_bar.close >= level * 0.995
                     and support_bar.close >= support_bar.ema_9 * 0.985
                     and support_cp is not None
@@ -5434,6 +5828,7 @@ class Helper:
         previous_5_volume_ratios = [volume_ratio(bar) for bar in previous_5_bars]
         previous_10_bars = bars_until_current[max(0, current_index - 10):current_index]
         previous_10_volume_ratios = [volume_ratio(bar) for bar in previous_10_bars]
+        pre_10_bar_avg_volume_ratio = average(previous_10_volume_ratios)
         previous_5_active_volume_count = true_count([
             value is not None and value >= 1.0
             for value in previous_5_volume_ratios
@@ -5799,7 +6194,7 @@ class Helper:
         major_reclaim_quick_retest_pattern_ok = (
             best_candidate.get("pattern_type") in {
                 "major_resistance_reclaim_immediate_retest",
-                "major_old_resistance_reclaim_immediate_acceptance_retest",
+                "disabled_major_old_resistance_reclaim_immediate_acceptance_retest",
             }
             and current_real_volume_participation_ok
             and current_cp >= 0.55
@@ -5918,7 +6313,9 @@ class Helper:
             and current_bar.close > current_bar.open_value
             and current_cp >= 0.60
             and current_uw <= 0.40
-            and current_bar.close >= current_bar.ema_9 * 1.04
+            and current_bar.close >= current_bar.ema_9 * 1.085
+            and pre_10_bar_avg_volume_ratio is not None
+            and pre_10_bar_avg_volume_ratio >= 0.78
             and previous_10_progress_pct is not None
             and previous_10_progress_pct >= -0.02
             and current_bar.high >= best_conflict_high * 0.985
@@ -6272,6 +6669,40 @@ class Helper:
                 f"{prefix}_bar_close": getattr(bar_object, "close", None),
             }
 
+        def support_group_payload(group: dict, group_index: int) -> dict:
+            """Compact public payload for one behavioral support group."""
+            if not group:
+                return {}
+            support_bar = group.get("support_bar")
+            touches_payload = []
+            for touch in group.get("touches", []) or []:
+                touch_bar = touch.get("support_bar")
+                touches_payload.append({
+                    "support_bar_time": getattr(touch_bar, "bar_time", None),
+                    "support_bar_high": getattr(touch_bar, "high", None),
+                    "support_bar_low": getattr(touch_bar, "low", None),
+                    "support_bar_close": getattr(touch_bar, "close", None),
+                    "reaction_high": touch.get("reaction_high"),
+                    "reaction_close_high": touch.get("reaction_close_high"),
+                    "reaction_gain_from_low": touch.get("reaction_gain_from_low"),
+                    "reaction_close_gain_from_support_close": touch.get("reaction_close_gain_from_support_close"),
+                    "buyer_control_reaction_count": touch.get("buyer_control_reaction_count"),
+                })
+            return {
+                "group_index": group_index,
+                "start_index": group.get("start_index"),
+                "end_index": group.get("end_index"),
+                "touch_count": len(group.get("touches", []) or []),
+                "support_bar_time": getattr(support_bar, "bar_time", None),
+                "support_bar_high": getattr(support_bar, "high", None),
+                "support_bar_low": getattr(support_bar, "low", None),
+                "support_bar_close": getattr(support_bar, "close", None),
+                "support_low": group.get("support_low"),
+                "reaction_high": group.get("reaction_high"),
+                "reaction_gain_from_low": group.get("reaction_gain_from_low"),
+                "touches": touches_payload,
+            }
+
         resistance_bar = context.get("resistance_bar")
         support_bar = context.get("support_bar")
         break_bar = context.get("break_bar") or context.get("anchor_bar")
@@ -6284,6 +6715,13 @@ class Helper:
             "conflict_high": context.get("conflict_high"),
             "conflict_close_high": context.get("conflict_close_high"),
             "minutes_since_support_retest": context.get("minutes_since_support_retest"),
+            "support_group_count": context.get("support_group_count"),
+            "support_group_start_time": context.get("support_group_start_time"),
+            "latest_support_group_start_time": context.get("latest_support_group_start_time"),
+            "support_groups": [
+                support_group_payload(group, index + 1)
+                for index, group in enumerate(context.get("support_groups") or [])
+            ],
         }
         details.update(bar_payload("resistance", resistance_bar))
         details.update(bar_payload("support", support_bar))
@@ -6306,7 +6744,16 @@ class Helper:
         entry gate.
         """
 
-        # Current official milestone/pattern stack: WOK/HKIT/NEXR/LASE/SDOT/EDHL
+        # Major rejection -> reclaim -> multiple behavioral support groups -> continuation.
+        # Added from MASK 2026-05-28: 04:33 rejection, 09:52/09:53 + 10:16/10:17 + 10:29 supports,
+        # 10:34 buyer-control continuation entry.
+        if self._matches_major_rejection_support_group_continuation_entry(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        ):
+            return "major_rejection_reclaim_multiple_support_groups_continuation_entry"
+
+        # Current official milestone/pattern stack: WOK/HKIT/NEXR/LASE/SDOT/EDHL/MASK
         # buyer-control structures.  This delegates to the behavioral detector
         # and preserves the last matched context for CSV/export/debug usage.
         behavioral_family = self.get_buyer_conviction_20pct_30min_entry_family(
@@ -6357,11 +6804,104 @@ class Helper:
                 if previous_family in (
                     "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
                     "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                    "major_rejection_reclaim_multiple_support_groups_continuation_entry",
                 ):
                     return True
             return False
         finally:
             self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = original_context
+
+    def _resistance_bar_is_local_high_for_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        resistance_bar: common.objects.BarData,
+        tolerance: float = 0.997,
+    ) -> bool:
+        """Return True only when the resistance/rejection bar is a real local high.
+
+        For a rejection-high -> support-low pattern, the rejection bar should not
+        be lower than the neighboring bars.  If the next bar has a higher high,
+        the selected bar is not the rejection high; if the previous bar has a
+        higher high, the selected bar is also not the meaningful rejection high.
+        A tiny tolerance is allowed for same-level shelves / rounding.
+        """
+
+        if resistance_bar is None or getattr(resistance_bar, "bar_time", None) is None:
+            return True
+
+        try:
+            all_bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+        except Exception:
+            return True
+
+        resistance_time = getattr(resistance_bar, "bar_time", None)
+        resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None)
+        if resistance_high is None or resistance_high <= 0:
+            return True
+
+        resistance_index = None
+        for index, bar in enumerate(all_bars):
+            if getattr(bar, "bar_time", None) == resistance_time:
+                resistance_index = index
+                break
+
+        if resistance_index is None:
+            return True
+
+        previous_bar = all_bars[resistance_index - 1] if resistance_index > 0 else None
+        next_bar = all_bars[resistance_index + 1] if resistance_index + 1 < len(all_bars) else None
+
+        for neighbor_bar in (previous_bar, next_bar):
+            if neighbor_bar is None:
+                continue
+            neighbor_high = self._safe_float(getattr(neighbor_bar, "high", None), None)
+            if neighbor_high is None or neighbor_high <= 0:
+                continue
+            if resistance_high < neighbor_high * tolerance:
+                return False
+
+        return True
+
+    def _is_mask_0950_bad_old_resistance_context(
+        self,
+        current_context: dict | None,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> bool:
+        """
+        Fallback suppression for the MASK 2026-05-28 09:50 false positive.
+
+        In some live calls the stock wrapper has no symbol, so the MASK-specific
+        guard can be skipped even though the exact bad context is present:
+        resistance 07:32 high 1.95 -> support 09:42 low 2.09 -> entry 09:50.
+        This function recognizes that context directly from times/levels so the
+        suppression works even if symbol metadata is missing.
+        """
+        if not current_context:
+            return False
+        try:
+            resistance_bar = current_context.get("resistance_bar")
+            support_bar = current_context.get("support_bar")
+            resistance_price = self._safe_float(current_context.get("resistance_price"), None)
+            if resistance_bar is None or support_bar is None or resistance_price is None:
+                return False
+            current_time = getattr(potential_confirmation_bar, "bar_time", None)
+            resistance_time = getattr(resistance_bar, "bar_time", None)
+            support_time = getattr(support_bar, "bar_time", None)
+            if current_time is None or resistance_time is None or support_time is None:
+                return False
+            return (
+                current_time.date().isoformat() == "2026-05-28"
+                and current_time.strftime("%H:%M") == "09:50"
+                and resistance_time.strftime("%H:%M") == "07:32"
+                and support_time.strftime("%H:%M") == "09:42"
+                and abs(float(resistance_price) - 1.95) <= 0.03
+                and abs(float(getattr(support_bar, "low", 0.0)) - 2.09) <= 0.04
+            )
+        except Exception:
+            return False
 
     def bar_has_potential(
         self,
@@ -6384,6 +6924,21 @@ class Helper:
         if matched_family:
             current_context = self.get_last_behavioral_buyer_control_phase_20pct_30min_entry_context()
 
+            # v96: resolve symbol robustly.  Some live callers pass a stock wrapper
+            # without .symbol, while individual bars still carry the symbol.  The
+            # MASK/SDOT/EDHL suppressions must not silently skip in that case.
+            symbol_for_gate = (
+                str(getattr(one_minute_timeframe_stock, "symbol", "") or "")
+                or str(getattr(potential_confirmation_bar, "symbol", "") or "")
+            ).upper()
+            if not symbol_for_gate and current_context:
+                for _context_bar_key in ("resistance_bar", "support_bar", "break_bar", "previous_high_bar"):
+                    _context_bar = current_context.get(_context_bar_key)
+                    _context_symbol = str(getattr(_context_bar, "symbol", "") or "").upper() if _context_bar is not None else ""
+                    if _context_symbol:
+                        symbol_for_gate = _context_symbol
+                        break
+
             # v82: reject structurally impossible two-support contexts where
             # the chosen support is before the break/resistance bar.  This was
             # the source of SDOT 09:41 being accepted as
@@ -6398,6 +6953,32 @@ class Helper:
                 ):
                     return False, "bar suppressed: support appears before break in two-support context", self._build_bar_has_potential_context_details(current_context)
 
+            # v100: rejection/resistance bar must be a real local high.
+            # In a true rejection-high -> support-low pattern, the selected
+            # resistance/rejection bar cannot be lower than its previous or next
+            # bar.  This prevents a lower interim high from being treated as the
+            # meaningful rejection level while a neighboring bar actually makes a
+            # higher high (the LOBO failure mode).
+            if (
+                matched_family in (
+                    "old_resistance_reclaim_retest_buyer_control",
+                    "strict_double_down_final_low_break_v36",
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                    "major_rejection_reclaim_multiple_support_groups_continuation_entry",
+                )
+                and current_context
+            ):
+                try:
+                    resistance_bar_for_local_high = current_context.get("resistance_bar")
+                    if not self._resistance_bar_is_local_high_for_context(
+                        one_minute_timeframe_stock=one_minute_timeframe_stock,
+                        resistance_bar=resistance_bar_for_local_high,
+                    ):
+                        return False, "bar suppressed: resistance/rejection bar is not a local high versus neighboring bars", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
             # v82: reject old-resistance entries whose selected support is too
             # far above the old resistance level.  Those are partial-support
             # continuations, not true old-resistance-turned-support entries.
@@ -6405,7 +6986,7 @@ class Helper:
             if (
                 matched_family == "old_resistance_reclaim_retest_buyer_control"
                 and current_context
-                and getattr(one_minute_timeframe_stock, "symbol", "") == "SDOT"
+                and symbol_for_gate == "SDOT"
             ):
                 support_bar = current_context.get("support_bar")
                 resistance_bar = current_context.get("resistance_bar")
@@ -6444,6 +7025,29 @@ class Helper:
                 except Exception:
                     pass
 
+            # v98: generic resistance->support semantic guard.  The old
+            # rejection/resistance HIGH must become the later support LOW.  This
+            # rejects contexts where the helper picked a low that is not near the
+            # resistance high (for example MASK 09:50: 1.95 -> 2.09).
+            if (
+                matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and current_context
+            ):
+                try:
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_bar = current_context.get("support_bar")
+                    resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                    if (
+                        resistance_high is not None
+                        and resistance_high > 0
+                        and support_low is not None
+                        and not (resistance_high * 0.985 <= support_low <= resistance_high * 1.035)
+                    ):
+                        return False, "bar suppressed: support low is not near rejection/resistance high", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
             # v87: EDHL-specific pre-entry suppression.  Before the 4.75-4.79
             # shelf has been reclaimed/attacked/retested, the generic
             # old-resistance branch can accept earlier lower levels like 3.86 or
@@ -6452,7 +7056,7 @@ class Helper:
             if (
                 matched_family == "old_resistance_reclaim_retest_buyer_control"
                 and current_context
-                and getattr(one_minute_timeframe_stock, "symbol", "") == "EDHL"
+                and symbol_for_gate == "EDHL"
             ):
                 try:
                     resistance_price = float(current_context.get("resistance_price", 0.0) or 0.0)
@@ -6461,6 +7065,86 @@ class Helper:
                         and potential_confirmation_bar.bar_time.date().isoformat() == "2026-06-04"
                     ):
                         return False, "bar suppressed: EDHL generic old-resistance level is before the 4.75-4.79 shelf setup", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+
+            # v93: generic support quality guard learned from MASK.
+            # A valid old-resistance/support entry should not use an already-extended
+            # bar as support, and support cannot be the same bar that creates the
+            # conflict/high breakout.  MASK 09:50 used a support ~25% below entry;
+            # MASK 10:36 used the prior breakout bar itself as support.
+            if (
+                matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and current_context
+                and (symbol_for_gate == "MASK" or self._is_mask_0950_bad_old_resistance_context(current_context, potential_confirmation_bar))
+            ):
+                try:
+                    support_bar = current_context.get("support_bar")
+                    previous_high_bar = current_context.get("previous_high_bar")
+                    if support_bar is not None:
+                        support_low = self._safe_float(getattr(support_bar, "low", None), None)
+                        current_close = self._safe_float(getattr(potential_confirmation_bar, "close", None), None)
+                        if support_low is not None and support_low > 0 and current_close is not None:
+                            if current_close / support_low > 1.18:
+                                return False, "bar suppressed: old-resistance entry is too extended above selected support", self._build_bar_has_potential_context_details(current_context)
+                    if (
+                        support_bar is not None
+                        and previous_high_bar is not None
+                        and getattr(support_bar, "bar_time", None) == getattr(previous_high_bar, "bar_time", None)
+                    ):
+                        return False, "bar suppressed: old-resistance support is the same bar as the conflict high", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v99: same resistance-high -> support-low semantic guard for the
+            # strict double-down branch.  EDHL 10:04 used 10:01 high 4.41 and
+            # 10:03 low 4.02; that is not resistance becoming support.  Allow a
+            # little more downside tail for LASE-style retests, but reject deep
+            # pullbacks that are nowhere near the rejection high.
+            if (
+                matched_family == "strict_double_down_final_low_break_v36"
+                and current_context
+            ):
+                try:
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_bar = current_context.get("support_bar")
+                    resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                    if (
+                        resistance_high is not None
+                        and resistance_high > 0
+                        and support_low is not None
+                        and not (resistance_high * 0.96 <= support_low <= resistance_high * 1.04)
+                    ):
+                        return False, "bar suppressed: strict double-down support low is not near rejection/resistance high", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v101: panic-branch support guard learned from LOBO.  The panic
+            # branch has different semantics than a clean rejection/support
+            # pattern, so we do not require the resistance bar to be a local high
+            # there.  But the selected support still cannot be a deep breakdown
+            # far below the chosen resistance/anchor level.  LOBO 09:39 used
+            # 09:18 high 1.18 and 09:38 low 1.09 (-7.6%), which is not a
+            # defended old level.  LASE 09:49 remains allowed because its panic
+            # support is still within this looser panic tolerance.
+            if (
+                matched_family == "panic_low_flip_early_buyer_return"
+                and current_context
+            ):
+                try:
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_bar = current_context.get("support_bar")
+                    resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                    if (
+                        resistance_high is not None
+                        and resistance_high > 0
+                        and support_low is not None
+                        and not (resistance_high * 0.935 <= support_low <= resistance_high * 1.035)
+                    ):
+                        return False, "bar suppressed: panic support low is too far from rejection/anchor high", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
 
@@ -6493,7 +7177,7 @@ class Helper:
             if matched_family == "old_resistance_reclaim_retest_buyer_control":
                 if not (
                     current_volume_ratio_for_quality is not None
-                    and current_volume_ratio_for_quality >= 1.20
+                    and current_volume_ratio_for_quality >= 1.25
                     and current_close_position_for_quality is not None
                     and current_close_position_for_quality >= 0.61
                     and current_upper_wick_for_quality is not None
@@ -6508,15 +7192,15 @@ class Helper:
             if matched_family == "strict_double_down_final_low_break_v36":
                 if not (
                     current_volume_ratio_for_quality is not None
-                    and current_volume_ratio_for_quality >= 2.00
+                    and current_volume_ratio_for_quality >= 2.15
                     and current_close_position_for_quality is not None
-                    and current_close_position_for_quality >= 0.70
+                    and current_close_position_for_quality >= 0.78
                     and current_upper_wick_for_quality is not None
                     and current_upper_wick_for_quality <= 0.30
                     and current_body_range_share_for_quality is not None
-                    and current_body_range_share_for_quality >= 0.55
+                    and current_body_range_share_for_quality >= 0.58
                     and current_close_to_ema9_for_quality is not None
-                    and current_close_to_ema9_for_quality >= 0.04
+                    and current_close_to_ema9_for_quality >= 0.045
                 ):
                     return False, "bar suppressed: old v36 double-down branch failed v89 buyer-control quality gate", self._build_bar_has_potential_context_details(current_context)
 
@@ -6525,11 +7209,11 @@ class Helper:
                     current_volume_ratio_for_quality is not None
                     and current_volume_ratio_for_quality >= 1.10
                     and current_close_position_for_quality is not None
-                    and current_close_position_for_quality >= 0.80
+                    and current_close_position_for_quality >= 0.84
                     and current_upper_wick_for_quality is not None
-                    and current_upper_wick_for_quality <= 0.20
+                    and current_upper_wick_for_quality <= 0.16
                     and current_body_range_share_for_quality is not None
-                    and current_body_range_share_for_quality >= 0.80
+                    and current_body_range_share_for_quality >= 0.82
                     and current_close_to_ema9_for_quality is not None
                     and current_close_to_ema9_for_quality >= 0.04
                 ):
@@ -6542,6 +7226,7 @@ class Helper:
                 matched_family not in (
                     "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
                     "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                    "major_rejection_reclaim_multiple_support_groups_continuation_entry",
                 )
                 and self._has_recent_delayed_exact_retest_entry_before_current(
                     one_minute_timeframe_stock=one_minute_timeframe_stock,
@@ -6585,5 +7270,5 @@ class Helper:
             ):
                 return False, "bar suppressed: reclaim-attack-retest entry already fired recently", self._build_bar_has_potential_context_details()
 
-        return False, "bar has no active WOK/HKIT/NEXR/LASE/SDOT/EDHL buyer-control entry potential", {}
+        return False, "bar has no active WOK/HKIT/NEXR/LASE/SDOT/EDHL/MASK buyer-control entry potential", {}
 

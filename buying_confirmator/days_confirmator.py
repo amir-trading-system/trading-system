@@ -36,7 +36,6 @@ class Confirmator:
         self,
         stock: common.objects.Stock,
         original_bar_to_confirm: common.objects.BarData,
-        milestones: common.objects.Milestones,
     ):
         one_minute_bars: list[common.objects.BarData] = []
         most_updated_datetime = datetime.datetime.fromtimestamp(0)
@@ -121,7 +120,6 @@ class Confirmator:
 
             if self._confirm(
                 stock=stock,
-                milestones=milestones,
                 one_minute_bars=one_minute_bars,
                 potential_confirmation_bar=next_bar,
                 original_bar_to_confirm=original_bar_to_confirm,
@@ -146,7 +144,6 @@ class Confirmator:
     def _confirm(
         self,
         stock: common.objects.Stock,
-        milestones: common.objects.Milestones,
         one_minute_bars: list[common.objects.BarData],
         potential_confirmation_bar: common.objects.BarData,
         original_bar_to_confirm: common.objects.BarData,
@@ -175,17 +172,7 @@ class Confirmator:
             current_one_minute_bar=potential_confirmation_bar,
         )
 
-        # temp_one_minute_bars = sorted(
-        #     [
-        #         one_minute_bar
-        #         for one_minute_bar in one_minute_bars
-        #         if one_minute_bar.bar_time <= potential_confirmation_bar.bar_time
-        #     ],
-        #     key=lambda bar_object: bar_object.bar_time,
-        #     reverse=True
-        # )
-
-        bar_has_potential, reason = self.helper.bar_has_potential(
+        bar_has_potential, reason, case_details = self.helper.bar_has_potential(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
@@ -202,6 +189,7 @@ class Confirmator:
                     "entry_position_bar_time": potential_confirmation_bar.bar_time,
                     "request_id": stock.request_id,
                     "reason": reason,
+                    "case_details": case_details,
                 }
             )
             return False
@@ -273,56 +261,6 @@ class Confirmator:
             )
         else:
             score.should_take_trade = True
-
-
-        # stock_is_valid_for_evidence = False
-
-        # for evidence in analyzer.evidences.__evidences__:
-        #     evidence_obj = evidence(
-        #         logger=self.logger,
-        #         stock=stock,
-        #     )
-        #     if (
-        #         not stock_is_valid_for_evidence
-        #         and not evidence_obj.relevant_bars
-        #     ):
-        #         break
-
-        #     stock_is_valid_for_evidence = True
-        #     if not evidence_obj.find_evidence(
-        #         stock=stock,
-        #         milestones=milestones,
-        #         current_bar=original_bar_to_confirm,
-        #         is_retro=self.is_retro,
-        #     ):
-        #         continue
-
-        #     one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
-
-        #     if not evidence_obj.confirm(
-        #         stock=stock,
-        #         original_bar_to_confirm=original_bar_to_confirm,
-        #         potential_confirmation_bar=potential_confirmation_bar,
-        #         milestones=milestones,
-        #         highest_high_one_minute_bar=highest_high_one_minute_bar,
-        #         one_minute_bars=temp_one_minute_bars,
-        #     ):
-        #         continue
-
-        #     self.logger.info(
-        #         msg="Potential confirmation bar has passed static confirmation, waiting for model confirmation",
-        #         extra={
-        #             "worker": "Confirmator",
-        #             "symbol": stock.symbol_name,
-        #             "timeframe": original_bar_to_confirm.timeframe,
-        #             "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-        #             "bar_time": original_bar_to_confirm.bar_time,
-        #             "entry_position_bar_time": potential_confirmation_bar.bar_time,
-        #             "evidence_name": evidence_obj.name,
-        #             "request_id": stock.request_id,
-        #         },
-        #     )
-
 
         if entry_position_bar is not None:
             if self.alerter_object:
