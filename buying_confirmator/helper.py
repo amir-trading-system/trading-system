@@ -6939,6 +6939,12 @@ class Helper:
                         symbol_for_gate = _context_symbol
                         break
 
+            # v102: fully suppress disabled branches. Previous versions renamed
+            # weak branches with a disabled_* pattern_type but still allowed them
+            # to be exported. Disabled means not active.
+            if str(matched_family).startswith("disabled_"):
+                return False, "bar suppressed: disabled pattern family", self._build_bar_has_potential_context_details(current_context)
+
             # v82: reject structurally impossible two-support contexts where
             # the chosen support is before the break/resistance bar.  This was
             # the source of SDOT 09:41 being accepted as
@@ -7145,6 +7151,77 @@ class Helper:
                         and not (resistance_high * 0.935 <= support_low <= resistance_high * 1.035)
                     ):
                         return False, "bar suppressed: panic support low is too far from rejection/anchor high", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v102: panic-low flip should be the FIRST buyer-return trigger
+            # after the selected panic support / seller-attack context.  This
+            # removes repeated later entries from the same anchor/support pair
+            # (PROK/RMSG style) while preserving the locked LASE 09:49 first
+            # buyer-return milestone.
+            if (
+                matched_family == "panic_low_flip_early_buyer_return"
+                and current_context
+            ):
+                try:
+                    support_bar = current_context.get("support_bar")
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_time = getattr(support_bar, "bar_time", None) if support_bar is not None else None
+                    current_time = getattr(potential_confirmation_bar, "bar_time", None)
+                    resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                    current_high = self._safe_float(getattr(potential_confirmation_bar, "high", None), 0.0)
+                    current_close = self._safe_float(getattr(potential_confirmation_bar, "close", None), 0.0)
+                    current_open = self._safe_float(getattr(potential_confirmation_bar, "open_value", None), 0.0)
+                    current_low = self._safe_float(getattr(potential_confirmation_bar, "low", None), 0.0)
+                    current_range = current_high - current_low
+                    current_cp = ((current_close - current_low) / current_range) if current_range > 0 else None
+                    current_trigger_high_threshold = max(
+                        resistance_high * 1.005 if resistance_high is not None and resistance_high > 0 else 0.0,
+                        current_high * 0.985 if current_high > 0 else 0.0,
+                    )
+                    current_trigger_close_threshold = max(
+                        resistance_high * 0.995 if resistance_high is not None and resistance_high > 0 else 0.0,
+                        current_close * 0.985 if current_close > 0 else 0.0,
+                    )
+
+                    if support_time is not None and current_time is not None:
+                        bars_chronological = sorted(
+                            list(getattr(one_minute_timeframe_stock, "bars", []) or []),
+                            key=lambda bar_object: getattr(bar_object, "bar_time", current_time),
+                        )
+                        earlier_buyer_return_exists = False
+                        for earlier_bar in bars_chronological:
+                            earlier_time = getattr(earlier_bar, "bar_time", None)
+                            if earlier_time is None or earlier_time <= support_time or earlier_time >= current_time:
+                                continue
+                            earlier_high = self._safe_float(getattr(earlier_bar, "high", None), 0.0)
+                            earlier_low = self._safe_float(getattr(earlier_bar, "low", None), 0.0)
+                            earlier_open = self._safe_float(getattr(earlier_bar, "open_value", None), 0.0)
+                            earlier_close = self._safe_float(getattr(earlier_bar, "close", None), 0.0)
+                            earlier_range = earlier_high - earlier_low
+                            earlier_cp = ((earlier_close - earlier_low) / earlier_range) if earlier_range > 0 else None
+                            earlier_volume = self._safe_float(getattr(earlier_bar, "volume", None), 0.0)
+                            earlier_volume_average = self._safe_float(getattr(earlier_bar, "volume_average", None), 0.0)
+                            earlier_vr = (earlier_volume / earlier_volume_average) if earlier_volume_average > 0 else None
+
+                            # Same-family trigger behavior: green/control bar,
+                            # enough participation, and already reclaiming the
+                            # same conflict/anchor zone that the current bar is
+                            # using.  This deliberately checks behavior, not
+                            # exact helper recursion, to avoid expensive nested
+                            # calls during live scanning.
+                            if (
+                                earlier_close > earlier_open
+                                and earlier_cp is not None
+                                and earlier_cp >= 0.58
+                                and (earlier_vr is None or earlier_vr >= 0.75)
+                                and earlier_high >= current_trigger_high_threshold
+                                and earlier_close >= current_trigger_close_threshold
+                            ):
+                                earlier_buyer_return_exists = True
+                                break
+                        if earlier_buyer_return_exists:
+                            return False, "bar suppressed: earlier panic buyer-return trigger already exists for same support context", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
 
