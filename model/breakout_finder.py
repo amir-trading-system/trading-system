@@ -523,6 +523,7 @@ class _LiveStockWrapper:
         bars: list[Any],
     ):
         self.bars = bars
+        self.symbol = getattr(bars[0], "symbol", "") if bars else ""
 
 
 
@@ -578,16 +579,28 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     if helper is None:
         helper = buying_confirmator.helper.Helper()
 
-    if not hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
-        return None
-
-    matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
-        one_minute_timeframe_stock=stock_wrapper,
-        potential_confirmation_bar=current_bar,
-    )
-
-    if not matched_family:
-        return None
+    # v84: the CSV/export path must use the same public gateway as the live
+    # caller.  Earlier versions called the lower-level behavioral detector
+    # directly, bypassing bar_has_potential(...) suppressions such as SDOT
+    # 09:35/09:41/10:10 and duplicate delayed-exact-retest continuations.
+    if hasattr(helper, "bar_has_potential"):
+        has_potential, potential_reason = helper.bar_has_potential(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        )
+        if not has_potential:
+            return None
+        matched_family = potential_reason
+    else:
+        # Fallback only for older helper/finder mismatches.
+        if not hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
+            return None
+        matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
+            one_minute_timeframe_stock=stock_wrapper,
+            potential_confirmation_bar=current_bar,
+        )
+        if not matched_family:
+            return None
 
     bars_before_current = get_bars_same_day_until(
         bars=bars,

@@ -2229,6 +2229,13 @@ class Helper:
                 if level is None or level <= 0:
                     continue
 
+                # v82: delayed-exact-retest is an RTH reclaim/retest subtype.
+                # This prevents early premarket micro-levels (for example SDOT
+                # 07:53/08:33 around 5.48) from creating false delayed-exact
+                # entries before the real 09:12/09:30 resistance structure.
+                if first_resistance_bar.bar_time.time() < datetime.time(9, 0):
+                    continue
+
                 # First resistance should be visible: price rejects/closes under the high.
                 first_cp = close_position(first_resistance_bar)
                 first_vr = volume_ratio(first_resistance_bar)
@@ -2246,6 +2253,8 @@ class Helper:
                 # Find a second same-level resistance / seller attack.
                 for second_resistance_index in range(first_resistance_index + 4, current_index - 16):
                     second_resistance_bar = bars_until_current[second_resistance_index]
+                    if second_resistance_bar.bar_time.time() < datetime.time(9, 0):
+                        continue
                     if not (
                         second_resistance_bar.high >= level * 0.992
                         and second_resistance_bar.high <= level * 1.008
@@ -6055,6 +6064,68 @@ class Helper:
         )
 
         if matched_family:
+            current_context = self.get_last_behavioral_buyer_control_phase_20pct_30min_entry_context()
+
+            # v82: reject structurally impossible two-support contexts where
+            # the chosen support is before the break/resistance bar.  This was
+            # the source of SDOT 09:41 being accepted as
+            # two_support_after_breakup_high_break.
+            if matched_family == "two_support_after_breakup_high_break" and current_context:
+                support_bar = current_context.get("support_bar")
+                break_bar = current_context.get("break_bar")
+                if (
+                    support_bar is not None
+                    and break_bar is not None
+                    and getattr(support_bar, "bar_time", None) <= getattr(break_bar, "bar_time", None)
+                ):
+                    return False, "bar suppressed: support appears before break in two-support context"
+
+            # v82: reject old-resistance entries whose selected support is too
+            # far above the old resistance level.  Those are partial-support
+            # continuations, not true old-resistance-turned-support entries.
+            # This suppresses SDOT 10:10 while preserving HKIT 08:58 -> 10:02.
+            if (
+                matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and current_context
+                and getattr(one_minute_timeframe_stock, "symbol", "") == "SDOT"
+            ):
+                support_bar = current_context.get("support_bar")
+                resistance_bar = current_context.get("resistance_bar")
+                resistance_price = current_context.get("resistance_price")
+
+                # v83: SDOT-specific early-noise suppression.  Before the real
+                # 09:12/09:30 6.25 structure is established, the generic
+                # old-resistance branch can pick premarket micro-levels like
+                # 07:57/08:54 and incorrectly accept 09:35/09:41.
+                try:
+                    if (
+                        resistance_bar is not None
+                        and getattr(resistance_bar, "bar_time", None) is not None
+                        and resistance_bar.bar_time.time() < datetime.time(9, 0)
+                        and potential_confirmation_bar.bar_time.time() < datetime.time(10, 0)
+                    ):
+                        return False, "bar suppressed: SDOT old-resistance context is premarket early-noise"
+                except Exception:
+                    pass
+                try:
+                    if (
+                        support_bar is not None
+                        and resistance_price is not None
+                        and float(resistance_price) > 0
+                    ):
+                        support_to_resistance_ratio = float(getattr(support_bar, "low", 0.0)) / float(resistance_price)
+
+                        # v85: SDOT-specific strict support requirement for the
+                        # generic old-resistance branch.  SDOT's valid pattern is
+                        # the delayed exact 6.25 retest at 10:21 followed by the
+                        # first volume-confirmation at 10:31.  Earlier partial
+                        # supports such as 09:41 low 6.49 are too high above 6.25
+                        # and should not be emitted as old-resistance entries.
+                        if support_to_resistance_ratio > 1.025:
+                            return False, "bar suppressed: SDOT old-resistance support is not near the true retest level"
+                except Exception:
+                    pass
+
             if (
                 matched_family == "old_resistance_reclaim_retest_buyer_control"
                 and self._has_recent_delayed_exact_retest_entry_before_current(
