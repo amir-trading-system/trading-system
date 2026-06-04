@@ -584,10 +584,16 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     # directly, bypassing bar_has_potential(...) suppressions such as SDOT
     # 09:35/09:41/10:10 and duplicate delayed-exact-retest continuations.
     if hasattr(helper, "bar_has_potential"):
-        has_potential, potential_reason = helper.bar_has_potential(
+        bar_has_potential_result = helper.bar_has_potential(
             one_minute_timeframe_stock=stock_wrapper,
             potential_confirmation_bar=current_bar,
         )
+        # v89: bar_has_potential now returns (bool, reason, context_details).
+        # Keep backwards compatibility with older helpers returning 2-tuples.
+        if isinstance(bar_has_potential_result, tuple) and len(bar_has_potential_result) >= 3:
+            has_potential, potential_reason, _potential_context_details = bar_has_potential_result[:3]
+        else:
+            has_potential, potential_reason = bar_has_potential_result
         if not has_potential:
             return None
         matched_family = potential_reason

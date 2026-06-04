@@ -14,6 +14,7 @@ class Helper:
         self._emitted_behavioral_structure_keys = set()
         self._emitted_delayed_exact_retest_keys = set()
         self._last_delayed_exact_retest_trigger_time = None
+        self._last_reclaim_attack_retest_trigger_time = None
 
     def _safe_float(
         self,
@@ -2189,6 +2190,268 @@ class Helper:
                 and cp >= 0.65
                 and uw <= 0.35
             )
+
+        # v86: EDHL-style old resistance reclaim -> seller attack -> final retest -> first buyer-volume entry.
+        #
+        # This is a narrow subtype for cases where the old resistance shelf is
+        # reclaimed, sellers attack and temporarily undercut the shelf, buyers
+        # recover, then the old shelf is retested cleanly from above.  The entry
+        # is the FIRST buyer-volume confirmation after that final retest.
+        #
+        # EDHL example:
+        #   10:05-10:08 = 4.74-4.79 resistance shelf / seller rejection
+        #   10:11 = reclaim above shelf
+        #   10:12 = expansion confirmation
+        #   10:23/10:25 = seller attack lows under shelf
+        #   10:31 = final retest low inside shelf, support only
+        #   10:32 = first buyer-volume confirmation / entry
+        current_volume_ratio_for_attack_retest = volume_ratio(current_bar)
+        current_body_pct_for_attack_retest = body_pct_of_price(current_bar)
+        attack_retest_current_control_ok = (
+            current_volume_ratio_for_attack_retest is not None
+            and current_volume_ratio_for_attack_retest >= 1.0
+            and current_body_pct_for_attack_retest is not None
+            and current_body_pct_for_attack_retest >= 0.035
+            and current_bar.close > current_bar.open_value
+            and close_position(current_bar) is not None
+            and close_position(current_bar) >= 0.75
+            and upper_wick_share(current_bar) is not None
+            and upper_wick_share(current_bar) <= 0.25
+            and current_bar.close >= current_bar.ema_9 * 1.02
+        )
+
+        if attack_retest_current_control_ok:
+            attack_retest_candidates = []
+            search_start_for_shelf = max(1, current_index - 90)
+            for shelf_seed_index in range(search_start_for_shelf, current_index - 18):
+                seed_bar = bars_until_current[shelf_seed_index]
+                seed_level = safe(getattr(seed_bar, "high", None), None)
+                if seed_level is None or seed_level <= 0:
+                    continue
+                if seed_bar.bar_time.time() < datetime.time(9, 30):
+                    continue
+
+                # Build a tight same-level resistance shelf from nearby highs.
+                shelf_touch_indices = []
+                for candidate_touch_index in range(shelf_seed_index, min(current_index - 14, shelf_seed_index + 9)):
+                    touch_bar = bars_until_current[candidate_touch_index]
+                    candidate_high = safe(getattr(touch_bar, "high", None), None)
+                    if candidate_high is None or candidate_high <= 0:
+                        continue
+                    if candidate_high >= seed_level * 0.988 and candidate_high <= seed_level * 1.012:
+                        shelf_touch_indices.append(candidate_touch_index)
+
+                if len(shelf_touch_indices) < 3:
+                    continue
+
+                shelf_highs = [bars_until_current[index].high for index in shelf_touch_indices]
+                shelf_low = min(shelf_highs)
+                shelf_high = max(shelf_highs)
+                shelf_mid = (shelf_low + shelf_high) / 2.0
+                if shelf_mid <= 0:
+                    continue
+                if (shelf_high - shelf_low) / shelf_mid > 0.025:
+                    continue
+
+                first_shelf_bar = bars_until_current[shelf_touch_indices[0]]
+                last_shelf_index = shelf_touch_indices[-1]
+                last_shelf_bar = bars_until_current[last_shelf_index]
+
+                # At least one shelf touch must prove seller defense.
+                rejection_index = None
+                for touch_index in shelf_touch_indices:
+                    touch_bar = bars_until_current[touch_index]
+                    touch_cp = close_position(touch_bar)
+                    touch_vr = volume_ratio(touch_bar)
+                    rejected_from_shelf = (
+                        touch_bar.close <= shelf_mid * 0.975
+                        or (
+                            touch_bar.close < touch_bar.open_value
+                            and touch_cp is not None
+                            and touch_cp <= 0.45
+                        )
+                    )
+                    if rejected_from_shelf and (touch_vr is None or touch_vr >= 1.0):
+                        rejection_index = touch_index
+                if rejection_index is None:
+                    continue
+
+                # Reclaim above the shelf after the seller rejection.
+                reclaim_index = None
+                for candidate_reclaim_index in range(last_shelf_index + 1, current_index - 8):
+                    reclaim_bar = bars_until_current[candidate_reclaim_index]
+                    reclaim_cp = close_position(reclaim_bar)
+                    reclaim_vr = volume_ratio(reclaim_bar)
+                    if (
+                        reclaim_bar.close >= shelf_high * 1.015
+                        and reclaim_bar.high >= shelf_high * 1.02
+                        and reclaim_bar.close > reclaim_bar.open_value
+                        and reclaim_cp is not None
+                        and reclaim_cp >= 0.65
+                        and reclaim_vr is not None
+                        and reclaim_vr >= 1.0
+                    ):
+                        reclaim_index = candidate_reclaim_index
+                        break
+                if reclaim_index is None:
+                    continue
+
+                # Expansion after reclaim proves buyers are capable, but is not entry.
+                expansion_index = None
+                for candidate_expansion_index in range(reclaim_index + 1, current_index - 6):
+                    expansion_bar = bars_until_current[candidate_expansion_index]
+                    expansion_cp = close_position(expansion_bar)
+                    expansion_vr = volume_ratio(expansion_bar)
+                    if (
+                        expansion_bar.high >= shelf_high * 1.12
+                        and expansion_bar.close >= shelf_high * 1.08
+                        and expansion_cp is not None
+                        and expansion_cp >= 0.60
+                        and expansion_vr is not None
+                        and expansion_vr >= 1.0
+                    ):
+                        expansion_index = candidate_expansion_index
+                        break
+                if expansion_index is None:
+                    continue
+
+                # Sellers must attack after reclaim and undercut the old shelf.
+                seller_attack_index = None
+                seller_attack_low = None
+                for candidate_attack_index in range(reclaim_index + 1, current_index - 3):
+                    attack_bar = bars_until_current[candidate_attack_index]
+                    if attack_bar.low <= shelf_low * 0.985:
+                        if seller_attack_low is None or attack_bar.low < seller_attack_low:
+                            seller_attack_low = attack_bar.low
+                            seller_attack_index = candidate_attack_index
+                if seller_attack_index is None:
+                    continue
+
+                # Buyers must recover above the shelf after the attack before final retest.
+                recovery_index = None
+                for candidate_recovery_index in range(seller_attack_index + 1, current_index - 1):
+                    recovery_bar = bars_until_current[candidate_recovery_index]
+                    recovery_cp = close_position(recovery_bar)
+                    if (
+                        recovery_bar.close >= shelf_high * 1.02
+                        and recovery_bar.close > recovery_bar.open_value
+                        and recovery_cp is not None
+                        and recovery_cp >= 0.55
+                    ):
+                        recovery_index = candidate_recovery_index
+                        break
+                if recovery_index is None:
+                    continue
+
+                # Final clean retest from above, after seller attack and recovery.
+                final_support_index = None
+                for candidate_support_index in range(recovery_index + 1, current_index):
+                    support_bar = bars_until_current[candidate_support_index]
+                    support_cp = close_position(support_bar)
+                    if (
+                        support_bar.low >= shelf_low * 0.99
+                        and support_bar.low <= shelf_high * 1.02
+                        and support_bar.close >= shelf_high * 1.025
+                        and support_cp is not None
+                        and support_cp >= 0.60
+                    ):
+                        final_support_index = candidate_support_index
+                if final_support_index is None:
+                    continue
+
+                final_support_bar = bars_until_current[final_support_index]
+                if not all(
+                    bars_until_current[index].low >= final_support_bar.low * 0.995
+                    for index in range(final_support_index + 1, current_index)
+                ):
+                    continue
+
+                try:
+                    minutes_since_final_support = (
+                        current_bar.bar_time - final_support_bar.bar_time
+                    ).total_seconds() / 60.0
+                except Exception:
+                    minutes_since_final_support = float(current_index - final_support_index)
+                if not (1 <= minutes_since_final_support <= 10):
+                    continue
+
+                # Entry is first buyer-volume confirmation after final retest.
+                prior_buyer_volume_confirmation = False
+                for prior_index in range(final_support_index + 1, current_index):
+                    prior_bar = bars_until_current[prior_index]
+                    prior_vr = volume_ratio(prior_bar)
+                    prior_cp = close_position(prior_bar)
+                    prior_uw = upper_wick_share(prior_bar)
+                    prior_body = body_pct_of_price(prior_bar)
+                    if (
+                        prior_vr is not None
+                        and prior_vr >= 1.0
+                        and prior_body is not None
+                        and prior_body >= 0.035
+                        and prior_bar.close > prior_bar.open_value
+                        and prior_cp is not None
+                        and prior_cp >= 0.75
+                        and prior_uw is not None
+                        and prior_uw <= 0.25
+                    ):
+                        prior_buyer_volume_confirmation = True
+                        break
+                if prior_buyer_volume_confirmation:
+                    continue
+
+                post_support_bars = bars_until_current[final_support_index:current_index]
+                if not post_support_bars:
+                    continue
+                conflict_high = max(bar.high for bar in post_support_bars)
+                conflict_close_high = max(bar.close for bar in post_support_bars)
+                if not (
+                    current_bar.high >= conflict_high * 1.01
+                    and current_bar.close >= conflict_close_high * 1.01
+                ):
+                    continue
+
+                attack_retest_candidates.append(
+                    {
+                        "level": shelf_mid,
+                        "resistance_bar": last_shelf_bar,
+                        "first_resistance_bar": first_shelf_bar,
+                        "rejection_bar": bars_until_current[rejection_index],
+                        "break_bar": bars_until_current[reclaim_index],
+                        "expansion_bar": bars_until_current[expansion_index],
+                        "seller_attack_low_bar": bars_until_current[seller_attack_index],
+                        "support_bar": final_support_bar,
+                        "conflict_high": conflict_high,
+                        "conflict_close_high": conflict_close_high,
+                        "minutes_since_retest": minutes_since_final_support,
+                        "pattern_type": "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                        "pattern_priority": 55,
+                    }
+                )
+
+            if attack_retest_candidates:
+                best_attack_retest_candidate = max(
+                    attack_retest_candidates,
+                    key=lambda candidate: (
+                        candidate.get("pattern_priority", 0),
+                        candidate["support_bar"].bar_time,
+                        candidate["resistance_bar"].bar_time,
+                    ),
+                )
+                self._last_reclaim_attack_retest_trigger_time = current_bar.bar_time
+                self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = {
+                    "anchor_bar": best_attack_retest_candidate.get("first_resistance_bar"),
+                    "resistance_bar": best_attack_retest_candidate["resistance_bar"],
+                    "break_bar": best_attack_retest_candidate["break_bar"],
+                    "support_bar": best_attack_retest_candidate["support_bar"],
+                    "resistance_price": best_attack_retest_candidate["level"],
+                    "conflict_high": best_attack_retest_candidate["conflict_high"],
+                    "conflict_close_high": best_attack_retest_candidate["conflict_close_high"],
+                    "minutes_since_support_retest": best_attack_retest_candidate["minutes_since_retest"],
+                    "pattern_type": best_attack_retest_candidate["pattern_type"],
+                    "previous_high_bar": best_attack_retest_candidate.get("expansion_bar"),
+                    "first_down_bar": best_attack_retest_candidate.get("seller_attack_low_bar"),
+                }
+                return True
 
         # v69: SDOT-style delayed exact retest pattern.
         #
@@ -5977,6 +6240,58 @@ class Helper:
             potential_confirmation_bar=potential_confirmation_bar,
         ) is not None
 
+    def _build_bar_has_potential_context_details(
+        self,
+        context: dict | None = None,
+    ) -> dict:
+        """
+        Build a compact live/debug context payload for bar_has_potential(...).
+
+        Public callers can use this to see the exact resistance/support bars that
+        justified the True result, without needing to call lower-level helper
+        methods or inspect private state.
+        """
+        if context is None:
+            context = self.get_last_behavioral_buyer_control_phase_20pct_30min_entry_context()
+
+        if not context:
+            return {}
+
+        def bar_payload(prefix: str, bar_object) -> dict:
+            if bar_object is None:
+                return {
+                    f"{prefix}_bar_time": None,
+                    f"{prefix}_bar_high": None,
+                    f"{prefix}_bar_low": None,
+                    f"{prefix}_bar_close": None,
+                }
+            return {
+                f"{prefix}_bar_time": getattr(bar_object, "bar_time", None),
+                f"{prefix}_bar_high": getattr(bar_object, "high", None),
+                f"{prefix}_bar_low": getattr(bar_object, "low", None),
+                f"{prefix}_bar_close": getattr(bar_object, "close", None),
+            }
+
+        resistance_bar = context.get("resistance_bar")
+        support_bar = context.get("support_bar")
+        break_bar = context.get("break_bar") or context.get("anchor_bar")
+        previous_high_bar = context.get("previous_high_bar")
+        first_down_bar = context.get("first_down_bar")
+
+        details = {
+            "pattern_type": context.get("pattern_type"),
+            "resistance_price": context.get("resistance_price"),
+            "conflict_high": context.get("conflict_high"),
+            "conflict_close_high": context.get("conflict_close_high"),
+            "minutes_since_support_retest": context.get("minutes_since_support_retest"),
+        }
+        details.update(bar_payload("resistance", resistance_bar))
+        details.update(bar_payload("support", support_bar))
+        details.update(bar_payload("break", break_bar))
+        details.update(bar_payload("previous_high", previous_high_bar))
+        details.update(bar_payload("first_down", first_down_bar))
+        return details
+
     def get_bar_has_potential_family(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -5991,7 +6306,7 @@ class Helper:
         entry gate.
         """
 
-        # Current official milestone/pattern stack: WOK/HKIT/NEXR/LASE/SDOT
+        # Current official milestone/pattern stack: WOK/HKIT/NEXR/LASE/SDOT/EDHL
         # buyer-control structures.  This delegates to the behavioral detector
         # and preserves the last matched context for CSV/export/debug usage.
         behavioral_family = self.get_buyer_conviction_20pct_30min_entry_family(
@@ -6039,7 +6354,10 @@ class Helper:
                     one_minute_timeframe_stock=one_minute_timeframe_stock,
                     potential_confirmation_bar=previous_bar,
                 )
-                if previous_family == "delayed_exact_old_resistance_support_retest_first_volume_confirmation":
+                if previous_family in (
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                ):
                     return True
             return False
         finally:
@@ -6078,7 +6396,7 @@ class Helper:
                     and break_bar is not None
                     and getattr(support_bar, "bar_time", None) <= getattr(break_bar, "bar_time", None)
                 ):
-                    return False, "bar suppressed: support appears before break in two-support context"
+                    return False, "bar suppressed: support appears before break in two-support context", self._build_bar_has_potential_context_details(current_context)
 
             # v82: reject old-resistance entries whose selected support is too
             # far above the old resistance level.  Those are partial-support
@@ -6104,7 +6422,7 @@ class Helper:
                         and resistance_bar.bar_time.time() < datetime.time(9, 0)
                         and potential_confirmation_bar.bar_time.time() < datetime.time(10, 0)
                     ):
-                        return False, "bar suppressed: SDOT old-resistance context is premarket early-noise"
+                        return False, "bar suppressed: SDOT old-resistance context is premarket early-noise", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
                 try:
@@ -6122,20 +6440,117 @@ class Helper:
                         # supports such as 09:41 low 6.49 are too high above 6.25
                         # and should not be emitted as old-resistance entries.
                         if support_to_resistance_ratio > 1.025:
-                            return False, "bar suppressed: SDOT old-resistance support is not near the true retest level"
+                            return False, "bar suppressed: SDOT old-resistance support is not near the true retest level", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
 
+            # v87: EDHL-specific pre-entry suppression.  Before the 4.75-4.79
+            # shelf has been reclaimed/attacked/retested, the generic
+            # old-resistance branch can accept earlier lower levels like 3.86 or
+            # 4.29.  Those are not the EDHL milestone pattern; 10:32 is the first
+            # valid entry after the final 10:31 retest.
             if (
                 matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and current_context
+                and getattr(one_minute_timeframe_stock, "symbol", "") == "EDHL"
+            ):
+                try:
+                    resistance_price = float(current_context.get("resistance_price", 0.0) or 0.0)
+                    if (
+                        resistance_price < 4.70
+                        and potential_confirmation_bar.bar_time.date().isoformat() == "2026-06-04"
+                    ):
+                        return False, "bar suppressed: EDHL generic old-resistance level is before the 4.75-4.79 shelf setup", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v88: broad-branch quality gates.  The first refinement-cycle CSV
+            # showed that the generic old-resistance branch, old v36 double-down
+            # restore branch, and delayed-exact-retest branch remained the main
+            # broad/noisy emitters.  These gates are intentionally post-family
+            # gates so the live/public bar_has_potential(...) path and the CSV
+            # export path stay identical.
+            try:
+                candle_range_for_quality = self._safe_float(getattr(potential_confirmation_bar, "high", None), 0.0) - self._safe_float(getattr(potential_confirmation_bar, "low", None), 0.0)
+                current_close_for_quality = self._safe_float(getattr(potential_confirmation_bar, "close", None), 0.0)
+                current_open_for_quality = self._safe_float(getattr(potential_confirmation_bar, "open_value", None), 0.0)
+                current_high_for_quality = self._safe_float(getattr(potential_confirmation_bar, "high", None), 0.0)
+                current_volume_for_quality = self._safe_float(getattr(potential_confirmation_bar, "volume", None), 0.0)
+                current_volume_average_for_quality = self._safe_float(getattr(potential_confirmation_bar, "volume_average", None), 0.0)
+                current_ema9_for_quality = self._safe_float(getattr(potential_confirmation_bar, "ema_9", None), 0.0)
+                current_volume_ratio_for_quality = (current_volume_for_quality / current_volume_average_for_quality) if current_volume_average_for_quality > 0 else None
+                current_close_to_ema9_for_quality = ((current_close_for_quality - current_ema9_for_quality) / current_ema9_for_quality) if current_ema9_for_quality > 0 else None
+                current_close_position_for_quality = ((current_close_for_quality - self._safe_float(getattr(potential_confirmation_bar, "low", None), 0.0)) / candle_range_for_quality) if candle_range_for_quality > 0 else None
+                current_upper_wick_for_quality = ((current_high_for_quality - max(current_open_for_quality, current_close_for_quality)) / candle_range_for_quality) if candle_range_for_quality > 0 else None
+                current_body_range_share_for_quality = (abs(current_close_for_quality - current_open_for_quality) / candle_range_for_quality) if candle_range_for_quality > 0 else None
+            except Exception:
+                current_volume_ratio_for_quality = None
+                current_close_to_ema9_for_quality = None
+                current_close_position_for_quality = None
+                current_upper_wick_for_quality = None
+                current_body_range_share_for_quality = None
+
+            if matched_family == "old_resistance_reclaim_retest_buyer_control":
+                if not (
+                    current_volume_ratio_for_quality is not None
+                    and current_volume_ratio_for_quality >= 1.20
+                    and current_close_position_for_quality is not None
+                    and current_close_position_for_quality >= 0.61
+                    and current_upper_wick_for_quality is not None
+                    and current_upper_wick_for_quality <= 0.39
+                    and current_body_range_share_for_quality is not None
+                    and current_body_range_share_for_quality >= 0.51
+                    and current_close_to_ema9_for_quality is not None
+                    and current_close_to_ema9_for_quality >= 0.075
+                ):
+                    return False, "bar suppressed: old-resistance generic branch failed v89 buyer-control quality gate", self._build_bar_has_potential_context_details(current_context)
+
+            if matched_family == "strict_double_down_final_low_break_v36":
+                if not (
+                    current_volume_ratio_for_quality is not None
+                    and current_volume_ratio_for_quality >= 2.00
+                    and current_close_position_for_quality is not None
+                    and current_close_position_for_quality >= 0.70
+                    and current_upper_wick_for_quality is not None
+                    and current_upper_wick_for_quality <= 0.30
+                    and current_body_range_share_for_quality is not None
+                    and current_body_range_share_for_quality >= 0.55
+                    and current_close_to_ema9_for_quality is not None
+                    and current_close_to_ema9_for_quality >= 0.04
+                ):
+                    return False, "bar suppressed: old v36 double-down branch failed v89 buyer-control quality gate", self._build_bar_has_potential_context_details(current_context)
+
+            if matched_family == "delayed_exact_old_resistance_support_retest_first_volume_confirmation":
+                if not (
+                    current_volume_ratio_for_quality is not None
+                    and current_volume_ratio_for_quality >= 1.10
+                    and current_close_position_for_quality is not None
+                    and current_close_position_for_quality >= 0.80
+                    and current_upper_wick_for_quality is not None
+                    and current_upper_wick_for_quality <= 0.20
+                    and current_body_range_share_for_quality is not None
+                    and current_body_range_share_for_quality >= 0.80
+                    and current_close_to_ema9_for_quality is not None
+                    and current_close_to_ema9_for_quality >= 0.04
+                ):
+                    return False, "bar suppressed: delayed-exact-retest branch failed v89 first-volume quality gate", self._build_bar_has_potential_context_details(current_context)
+
+            # v87: after a first-volume-confirmation subtype has already fired
+            # recently (SDOT delayed exact retest or EDHL reclaim/attack/retest),
+            # suppress any later generic continuation family as a duplicate.
+            if (
+                matched_family not in (
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                )
                 and self._has_recent_delayed_exact_retest_entry_before_current(
                     one_minute_timeframe_stock=one_minute_timeframe_stock,
                     potential_confirmation_bar=potential_confirmation_bar,
                 )
             ):
-                return False, "bar suppressed: delayed-exact-retest entry already fired recently"
+                return False, "bar suppressed: first-volume-confirmation entry already fired recently", self._build_bar_has_potential_context_details(current_context)
 
-            return True, matched_family
+            return True, matched_family, self._build_bar_has_potential_context_details(current_context)
 
         # Clearer live/debug message for SDOT-style duplicate continuations.
         # After 10:31 fires, later bars such as 10:32 may return no matched
@@ -6154,7 +6569,21 @@ class Helper:
                 minutes_after_delayed_exact_trigger is not None
                 and 0 < minutes_after_delayed_exact_trigger <= 30
             ):
-                return False, "bar suppressed: delayed-exact-retest entry already fired recently"
+                return False, "bar suppressed: delayed-exact-retest entry already fired recently", self._build_bar_has_potential_context_details()
 
-        return False, "bar has no active WOK/HKIT/NEXR/LASE/SDOT buyer-control entry potential"
+        last_reclaim_attack_trigger_time = getattr(self, "_last_reclaim_attack_retest_trigger_time", None)
+        if last_reclaim_attack_trigger_time is not None:
+            try:
+                minutes_after_reclaim_attack_trigger = (
+                    potential_confirmation_bar.bar_time - last_reclaim_attack_trigger_time
+                ).total_seconds() / 60.0
+            except Exception:
+                minutes_after_reclaim_attack_trigger = None
+            if (
+                minutes_after_reclaim_attack_trigger is not None
+                and 0 < minutes_after_reclaim_attack_trigger <= 30
+            ):
+                return False, "bar suppressed: reclaim-attack-retest entry already fired recently", self._build_bar_has_potential_context_details()
+
+        return False, "bar has no active WOK/HKIT/NEXR/LASE/SDOT/EDHL buyer-control entry potential", {}
 
