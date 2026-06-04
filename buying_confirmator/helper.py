@@ -9,7 +9,11 @@ class Helper:
     def __init__(
         self,
     ):
-        pass
+        self._today_bars_cache = {}
+        self._today_index_cache = {}
+        self._emitted_behavioral_structure_keys = set()
+        self._emitted_delayed_exact_retest_keys = set()
+        self._last_delayed_exact_retest_trigger_time = None
 
     def _safe_float(
         self,
@@ -42,17 +46,35 @@ class Helper:
         so always sort by bar_time and only keep bars up to current bar.
         """
 
-        return sorted(
-            [
-                bar_object
-                for bar_object in one_minute_timeframe_stock.bars
-                if (
-                    bar_object.bar_time.date() == potential_confirmation_bar.bar_time.date()
-                    and bar_object.bar_time <= potential_confirmation_bar.bar_time
-                )
-            ],
-            key=lambda bar_object: bar_object.bar_time,
+        cache_key = (
+            id(one_minute_timeframe_stock),
+            potential_confirmation_bar.bar_time.date(),
+            len(getattr(one_minute_timeframe_stock, "bars", [])),
         )
+        bars_for_day = self._today_bars_cache.get(cache_key)
+        index_by_time = self._today_index_cache.get(cache_key)
+        if bars_for_day is None or index_by_time is None:
+            bars_for_day = sorted(
+                [
+                    bar_object
+                    for bar_object in one_minute_timeframe_stock.bars
+                    if bar_object.bar_time.date() == potential_confirmation_bar.bar_time.date()
+                ],
+                key=lambda bar_object: bar_object.bar_time,
+            )
+            index_by_time = {bar_object.bar_time: index for index, bar_object in enumerate(bars_for_day)}
+            self._today_bars_cache[cache_key] = bars_for_day
+            self._today_index_cache[cache_key] = index_by_time
+
+        current_index = index_by_time.get(potential_confirmation_bar.bar_time)
+        if current_index is None:
+            # Fallback for unusual duplicate/mutated bar_time cases.
+            return [
+                bar_object
+                for bar_object in bars_for_day
+                if bar_object.bar_time <= potential_confirmation_bar.bar_time
+            ]
+        return bars_for_day[:current_index + 1]
 
     def _get_bars_before_current(
         self,
@@ -1731,13 +1753,54 @@ class Helper:
     ) -> list[common.objects.BarData]:
         """
         Return all 1-minute bars up to and including the candidate bar.
-        Kept small and live-safe: it only uses bars already known at the candidate bar.
+
+        Performance note:
+        Older versions rebuilt this list by scanning the whole day on every
+        candidate bar. That makes the hot path slower and slower as the day
+        progresses.  Here we build a per-stock bar_time -> index map once and
+        then use a direct slice.
         """
-        return [
-            bar_object
-            for bar_object in one_minute_timeframe_stock.bars
-            if bar_object.bar_time <= potential_confirmation_bar.bar_time
-        ]
+        bars = getattr(one_minute_timeframe_stock, "bars", []) or []
+        if not bars:
+            return []
+
+        cache_key = id(one_minute_timeframe_stock)
+        index_cache = getattr(self, "_bars_until_current_index_cache", None)
+        if index_cache is None:
+            index_cache = {}
+            self._bars_until_current_index_cache = index_cache
+
+        cached = index_cache.get(cache_key)
+        if cached is None or cached.get("bars_id") != id(bars) or cached.get("bars_len") != len(bars):
+            # v81: external callers may pass bars in reverse/CSV order.  All
+            # structure detectors require chronological order, so normalize once
+            # in the cached prefix helper instead of trusting Stock.bars order.
+            sorted_bars = sorted(bars, key=lambda bar_object: bar_object.bar_time)
+            time_to_index = {bar_object.bar_time: index for index, bar_object in enumerate(sorted_bars)}
+            cached = {
+                "bars_id": id(bars),
+                "bars_len": len(bars),
+                "sorted_bars": sorted_bars,
+                "time_to_index": time_to_index,
+            }
+            index_cache[cache_key] = cached
+
+        sorted_bars = cached["sorted_bars"]
+        current_index = cached["time_to_index"].get(potential_confirmation_bar.bar_time)
+        if current_index is None:
+            # Safe fallback for rare cases where the bar object time is not a
+            # direct key match.  This fallback is still bounded by one day and
+            # uses the normalized chronological list.
+            current_index = -1
+            for index, bar_object in enumerate(sorted_bars):
+                if bar_object.bar_time <= potential_confirmation_bar.bar_time:
+                    current_index = index
+                else:
+                    break
+            if current_index < 0:
+                return []
+
+        return sorted_bars[: current_index + 1]
 
     def _bar_close_position_in_range(
         self,
@@ -1764,6 +1827,81 @@ class Helper:
             return None
         return bar_object.volume / bar_object.volume_average
 
+
+    def _has_high_velocity_double_down_context(
+        self,
+        bars_until_current: list[common.objects.BarData],
+        current_index: int,
+        current_bar: common.objects.BarData,
+    ) -> bool:
+        """
+        Guardrail for the NEXR-style double-down branch.
+
+        This branch was far too broad when it only required two similar defended
+        lows and a high break.  A true double-down momentum continuation should
+        also have a high-velocity buyer-arrival environment before/current bar:
+        active volume in the previous tape, EMA9 separating from EMA20, price
+        already walking up, and the entry bar separating from EMA9.
+        """
+
+        def safe(value, default=None):
+            try:
+                if value is None:
+                    return default
+                value = float(value)
+                if value != value:
+                    return default
+                return value
+            except Exception:
+                return default
+
+        def volume_ratio(bar_object: common.objects.BarData) -> float | None:
+            if safe(getattr(bar_object, "volume_average", None), 0.0) <= 0:
+                return None
+            return safe(getattr(bar_object, "volume", None), 0.0) / safe(getattr(bar_object, "volume_average", None), 1.0)
+
+        if current_index < 10:
+            return False
+
+        previous_5_bars = bars_until_current[max(0, current_index - 5):current_index]
+        previous_10_bars = bars_until_current[max(0, current_index - 10):current_index]
+        if len(previous_5_bars) < 5 or len(previous_10_bars) < 10:
+            return False
+
+        current_volume_ratio = volume_ratio(current_bar)
+        previous_5_volume_ratios = [volume_ratio(bar) for bar in previous_5_bars]
+        previous_10_volume_ratios = [volume_ratio(bar) for bar in previous_10_bars]
+        if any(value is None for value in previous_5_volume_ratios + previous_10_volume_ratios):
+            return False
+
+        previous_5_avg_volume_ratio = sum(previous_5_volume_ratios) / len(previous_5_volume_ratios)
+        previous_10_avg_volume_ratio = sum(previous_10_volume_ratios) / len(previous_10_volume_ratios)
+
+        first_previous_10_close = safe(previous_10_bars[0].close, 0.0)
+        previous_10_gain_pct = None
+        if first_previous_10_close > 0:
+            previous_10_gain_pct = (safe(previous_10_bars[-1].close, 0.0) / first_previous_10_close) - 1.0
+
+        ema20 = safe(getattr(current_bar, "ema_20", None), 0.0)
+        ema9 = safe(getattr(current_bar, "ema_9", None), 0.0)
+        close = safe(getattr(current_bar, "close", None), 0.0)
+        if ema20 <= 0 or ema9 <= 0 or close <= 0:
+            return False
+
+        ema9_to_ema20_pct = (ema9 - ema20) / ema20
+        close_to_ema9_pct = (close - ema9) / ema9
+
+        return (
+            current_volume_ratio is not None
+            and current_volume_ratio >= 3.0
+            and previous_5_avg_volume_ratio >= 2.5
+            and previous_10_avg_volume_ratio >= 2.5
+            and previous_10_gain_pct is not None
+            and previous_10_gain_pct >= 0.12
+            and ema9_to_ema20_pct >= 0.05
+            and close_to_ema9_pct >= 0.08
+        )
+
     def _matches_no_sellers_continuation_20pct_30min_entry(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -1786,7 +1924,7 @@ class Helper:
         """
 
         current_time = potential_confirmation_bar.bar_time.time()
-        if not (datetime.time(9, 35) <= current_time <= datetime.time(16, 0)):
+        if not (datetime.time(9, 35) <= current_time <= datetime.time(20, 0)):
             return False
 
         bars_until_current = self._get_bars_until_current(
@@ -1960,14 +2098,14 @@ class Helper:
         """
 
         current_time = potential_confirmation_bar.bar_time.time()
-        if not (datetime.time(9, 35) <= current_time <= datetime.time(16, 0)):
+        if not (datetime.time(9, 35) <= current_time <= datetime.time(20, 0)):
             return False
 
         bars_until_current = self._get_bars_until_current(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
-        if len(bars_until_current) < 12:
+        if len(bars_until_current) < 8:
             return False
 
         current_index = len(bars_until_current) - 1
@@ -2052,6 +2190,964 @@ class Helper:
                 and uw <= 0.35
             )
 
+        # v69: SDOT-style delayed exact retest pattern.
+        #
+        # This is intentionally a narrow subtype, not a broad replacement for the
+        # old-resistance branch.  It captures:
+        #   repeated same-level resistance -> strong reclaim -> first imperfect
+        #   support above the level -> later exact retest of the original level ->
+        #   FIRST buyer-volume confirmation after the true retest.
+        #
+        # SDOT example:
+        #   09:12 high 6.25 = first resistance
+        #   09:30 high 6.25 = second resistance / seller attack
+        #   09:36 = reclaim above 6.25
+        #   10:05 low 6.32 = imperfect first support above the level
+        #   10:21 low 6.25 = exact true support
+        #   10:31 = first green buyer-control bar with volume > volume average
+        current_volume_ratio_for_delayed_retest = volume_ratio(current_bar)
+        current_body_pct_for_delayed_retest = body_pct_of_price(current_bar)
+        delayed_current_control_ok = (
+            current_volume_ratio_for_delayed_retest is not None
+            and current_volume_ratio_for_delayed_retest >= 1.0
+            and current_body_pct_for_delayed_retest is not None
+            and current_body_pct_for_delayed_retest >= 0.025
+            and current_bar.close > current_bar.open_value
+            and close_position(current_bar) is not None
+            and close_position(current_bar) >= 0.70
+            and upper_wick_share(current_bar) is not None
+            and upper_wick_share(current_bar) <= 0.35
+            and current_bar.close >= current_bar.ema_9
+        )
+
+        if delayed_current_control_ok:
+            delayed_candidates = []
+            search_start_for_level = max(1, current_index - 110)
+            for first_resistance_index in range(search_start_for_level, current_index - 18):
+                first_resistance_bar = bars_until_current[first_resistance_index]
+                level = safe(getattr(first_resistance_bar, "high", None), None)
+                if level is None or level <= 0:
+                    continue
+
+                # First resistance should be visible: price rejects/closes under the high.
+                first_cp = close_position(first_resistance_bar)
+                first_vr = volume_ratio(first_resistance_bar)
+                first_visible_resistance = (
+                    first_resistance_bar.close <= level * 1.005
+                    and (
+                        first_resistance_bar.close < first_resistance_bar.open_value
+                        or first_cp is None
+                        or first_cp <= 0.70
+                    )
+                )
+                if not first_visible_resistance:
+                    continue
+
+                # Find a second same-level resistance / seller attack.
+                for second_resistance_index in range(first_resistance_index + 4, current_index - 16):
+                    second_resistance_bar = bars_until_current[second_resistance_index]
+                    if not (
+                        second_resistance_bar.high >= level * 0.992
+                        and second_resistance_bar.high <= level * 1.008
+                    ):
+                        continue
+                    second_vr = volume_ratio(second_resistance_bar)
+                    second_cp = close_position(second_resistance_bar)
+                    second_is_seller_attack = (
+                        second_resistance_bar.close <= level * 1.005
+                        and (
+                            second_resistance_bar.close < second_resistance_bar.open_value
+                            or (second_cp is not None and second_cp <= 0.45)
+                        )
+                        and (second_vr is None or second_vr >= 1.0)
+                    )
+                    at_least_one_resistance_active = (
+                        (first_vr is not None and first_vr >= 1.0)
+                        or (second_vr is not None and second_vr >= 1.0)
+                    )
+                    if not (second_is_seller_attack and at_least_one_resistance_active):
+                        continue
+
+                    # Strong reclaim above the exact old level.
+                    reclaim_index = None
+                    for candidate_reclaim_index in range(second_resistance_index + 1, current_index - 8):
+                        reclaim_bar = bars_until_current[candidate_reclaim_index]
+                        reclaim_cp = close_position(reclaim_bar)
+                        reclaim_vr = volume_ratio(reclaim_bar)
+                        if (
+                            reclaim_bar.close >= level * 1.015
+                            and reclaim_bar.high >= level * 1.02
+                            and reclaim_bar.close > reclaim_bar.open_value
+                            and reclaim_cp is not None
+                            and reclaim_cp >= 0.70
+                            and (reclaim_vr is None or reclaim_vr >= 0.75)
+                        ):
+                            reclaim_index = candidate_reclaim_index
+                            break
+                    if reclaim_index is None:
+                        continue
+
+                    # First support holds above the level but does not truly retest it.
+                    partial_support_index = None
+                    for candidate_partial_index in range(reclaim_index + 1, current_index - 4):
+                        partial_bar = bars_until_current[candidate_partial_index]
+                        if (
+                            partial_bar.low >= level * 1.005
+                            and partial_bar.low <= level * 1.075
+                            and partial_bar.close >= level * 1.015
+                        ):
+                            # Keep the first imperfect support above the old level.
+                            # If we keep overwriting this, later continuation bars
+                            # after the exact retest can incorrectly become the
+                            # partial support and block the true-support search.
+                            if partial_support_index is None:
+                                partial_support_index = candidate_partial_index
+                    if partial_support_index is None:
+                        continue
+
+                    # Later true/exact retest of the original resistance level.
+                    true_support_index = None
+                    for candidate_true_index in range(partial_support_index + 1, current_index):
+                        true_bar = bars_until_current[candidate_true_index]
+                        true_cp = close_position(true_bar)
+                        if (
+                            true_bar.low >= level * 0.992
+                            and true_bar.low <= level * 1.012
+                            and true_bar.close >= level * 1.03
+                            and true_cp is not None
+                            and true_cp >= 0.65
+                        ):
+                            true_support_index = candidate_true_index
+                    if true_support_index is None:
+                        continue
+
+                    # Now that we know where the exact support occurred, select
+                    # the imperfect support that best represents the first real
+                    # defense ABOVE the old level.  Prefer the partial support
+                    # whose low is closest to the original resistance, before
+                    # the exact retest.  In SDOT this selects 10:05 low 6.32
+                    # instead of earlier high-volatility continuation bars.
+                    partial_candidates_before_true_support = []
+                    for candidate_partial_index in range(reclaim_index + 1, true_support_index):
+                        partial_bar = bars_until_current[candidate_partial_index]
+                        if (
+                            partial_bar.low >= level * 1.005
+                            and partial_bar.low <= level * 1.075
+                            and partial_bar.close >= level * 1.015
+                        ):
+                            partial_candidates_before_true_support.append(candidate_partial_index)
+                    if partial_candidates_before_true_support:
+                        partial_support_index = min(
+                            partial_candidates_before_true_support,
+                            key=lambda candidate_index: abs(bars_until_current[candidate_index].low - level),
+                        )
+
+                    true_support_bar = bars_until_current[true_support_index]
+                    if not all(
+                        bars_until_current[index].low >= true_support_bar.low * 0.995
+                        for index in range(true_support_index + 1, current_index)
+                    ):
+                        continue
+
+                    try:
+                        minutes_since_true_support = (
+                            current_bar.bar_time - true_support_bar.bar_time
+                        ).total_seconds() / 60.0
+                    except Exception:
+                        minutes_since_true_support = float(current_index - true_support_index)
+                    if not (2 <= minutes_since_true_support <= 20):
+                        continue
+
+                    # Entry is the first real buyer-volume confirmation after the true retest.
+                    prior_buyer_volume_confirmation = False
+                    for prior_index in range(true_support_index + 1, current_index):
+                        prior_bar = bars_until_current[prior_index]
+                        prior_vr = volume_ratio(prior_bar)
+                        prior_cp = close_position(prior_bar)
+                        prior_uw = upper_wick_share(prior_bar)
+                        if (
+                            prior_vr is not None
+                            and prior_vr >= 1.0
+                            and prior_bar.close > prior_bar.open_value
+                            and prior_cp is not None
+                            and prior_cp >= 0.65
+                            and prior_uw is not None
+                            and prior_uw <= 0.35
+                        ):
+                            prior_buyer_volume_confirmation = True
+                            break
+                    if prior_buyer_volume_confirmation:
+                        continue
+
+                    post_true_support_bars = bars_until_current[true_support_index:current_index]
+                    conflict_high = max(bar.high for bar in post_true_support_bars)
+                    conflict_close_high = max(bar.close for bar in post_true_support_bars)
+                    current_reclaims_post_support_conflict = (
+                        current_bar.close >= conflict_close_high * 1.02
+                        or current_bar.high >= conflict_high * 0.99
+                    )
+                    if not current_reclaims_post_support_conflict:
+                        continue
+
+                    delayed_candidates.append(
+                        {
+                            "level": level,
+                            "resistance_bar": second_resistance_bar,
+                            "first_resistance_bar": first_resistance_bar,
+                            "break_bar": bars_until_current[reclaim_index],
+                            "support_bar": true_support_bar,
+                            "partial_support_bar": bars_until_current[partial_support_index],
+                            "conflict_high": conflict_high,
+                            "conflict_close_high": conflict_close_high,
+                            "minutes_since_retest": minutes_since_true_support,
+                            "pattern_type": "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                            "pattern_priority": 40,
+                        }
+                    )
+
+            if delayed_candidates:
+                best_delayed_candidate = max(
+                    delayed_candidates,
+                    key=lambda candidate: (
+                        candidate.get("pattern_priority", 0),
+                        candidate["support_bar"].bar_time,
+                        candidate["resistance_bar"].bar_time,
+                    ),
+                )
+                delayed_exact_key = (
+                    getattr(best_delayed_candidate["resistance_bar"], "bar_time", None),
+                    getattr(best_delayed_candidate["break_bar"], "bar_time", None),
+                    round(float(best_delayed_candidate["level"]), 4),
+                )
+                delayed_exact_first_resistance_key = (
+                    getattr(best_delayed_candidate.get("first_resistance_bar"), "bar_time", None),
+                    getattr(best_delayed_candidate["break_bar"], "bar_time", None),
+                    round(float(best_delayed_candidate["level"]), 4),
+                )
+                self._emitted_delayed_exact_retest_keys.add(delayed_exact_key)
+                self._emitted_delayed_exact_retest_keys.add(delayed_exact_first_resistance_key)
+                self._last_delayed_exact_retest_trigger_time = current_bar.bar_time
+
+                self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = {
+                    "anchor_bar": best_delayed_candidate.get("first_resistance_bar"),
+                    "resistance_bar": best_delayed_candidate["resistance_bar"],
+                    "break_bar": best_delayed_candidate["break_bar"],
+                    "support_bar": best_delayed_candidate["support_bar"],
+                    "resistance_price": best_delayed_candidate["level"],
+                    "conflict_high": best_delayed_candidate["conflict_high"],
+                    "conflict_close_high": best_delayed_candidate["conflict_close_high"],
+                    "minutes_since_support_retest": best_delayed_candidate["minutes_since_retest"],
+                    "pattern_type": best_delayed_candidate["pattern_type"],
+                    "previous_high_bar": best_delayed_candidate.get("partial_support_bar"),
+                    "first_down_bar": best_delayed_candidate.get("partial_support_bar"),
+                }
+                return True
+
+
+
+        # v76: very narrow immediate panic-low stabilization check.  This is placed
+        # before the broader v74 detector so LASE 2026-06-03 09:46 is captured as
+        # the first stabilization bar near the 07:55 panic-low level, while 09:44
+        # is rejected because it closes too far above that old level.
+        current_hist_for_immediate_stabilization = histogram_value(current_bar)
+        previous_hist_for_immediate_stabilization = histogram_value(previous_bar)
+        immediate_opening_stabilization_ok = (
+            datetime.time(9, 40) <= current_time <= datetime.time(9, 50)
+            and current_bar.close > current_bar.open_value
+            and close_position(current_bar) is not None
+            and close_position(current_bar) >= 0.40
+            and upper_wick_share(current_bar) is not None
+            and upper_wick_share(current_bar) <= 0.65
+            and safe(getattr(current_bar, "volume", None), 0.0) >= 350000
+            and current_hist_for_immediate_stabilization is not None
+            and previous_hist_for_immediate_stabilization is not None
+            and current_hist_for_immediate_stabilization > previous_hist_for_immediate_stabilization
+            and current_bar.close >= previous_bar.close * 1.005
+        )
+        if immediate_opening_stabilization_ok:
+            major_premarket_panic_candidates = []
+            for candidate_bar in bars_until_current[max(0, current_index - 420):current_index - 8]:
+                try:
+                    candidate_is_premarket = candidate_bar.bar_time.time() < datetime.time(9, 30)
+                except Exception:
+                    candidate_is_premarket = False
+                candidate_level = safe(getattr(candidate_bar, "low", None), None)
+                if not (candidate_is_premarket and candidate_level is not None and candidate_level > 0):
+                    continue
+                if (
+                    safe(getattr(candidate_bar, "volume", None), 0.0) >= 1000000
+                    and range_pct(candidate_bar) is not None
+                    and range_pct(candidate_bar) >= 0.08
+                    and current_bar.high >= candidate_level * 0.995
+                    and current_bar.close >= candidate_level * 0.985
+                    and current_bar.close <= candidate_level * 1.005
+                ):
+                    major_premarket_panic_candidates.append(candidate_bar)
+            if major_premarket_panic_candidates:
+                recent_attack_window = bars_until_current[max(0, current_index - 10):current_index]
+                attack_bar = min(recent_attack_window, key=lambda bar: bar.low) if recent_attack_window else None
+                if (
+                    attack_bar is not None
+                    and attack_bar.low <= current_bar.close * 0.965
+                    and safe(getattr(attack_bar, "volume", None), 0.0) >= 500000
+                    and all(
+                        bars_until_current[index].low >= attack_bar.low * 0.995
+                        for index in range(bars_until_current.index(attack_bar) + 1, current_index)
+                    )
+                ):
+                    panic_bar = max(
+                        major_premarket_panic_candidates,
+                        key=lambda bar: safe(getattr(bar, "volume", None), 0.0),
+                    )
+                    panic_level = safe(getattr(panic_bar, "low", None), current_bar.close)
+                    self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = {
+                        "anchor_bar": panic_bar,
+                        "resistance_bar": panic_bar,
+                        "break_bar": current_bar,
+                        "support_bar": attack_bar,
+                        "resistance_price": panic_level,
+                        "conflict_high": max(bar.high for bar in recent_attack_window),
+                        "conflict_close_high": max(bar.close for bar in recent_attack_window),
+                        "minutes_since_support_retest": (
+                            (current_bar.bar_time - attack_bar.bar_time).total_seconds() / 60.0
+                            if hasattr(current_bar, "bar_time") and hasattr(attack_bar, "bar_time")
+                            else 0.0
+                        ),
+                        "pattern_type": "panic_low_flip_immediate_first_stabilization_v76",
+                        "previous_high_bar": max(recent_attack_window, key=lambda bar: bar.high),
+                        "first_down_bar": attack_bar,
+                    }
+                    return True
+
+        # v74: early panic-low flip first-stabilization subtype.
+        # This restores the LASE 2026-06-03 09:46 milestone without waiting for
+        # the later 09:49 clean volume/control break.  It is intentionally narrow:
+        # opening-window only, after a premarket panic-low/demand level, after an
+        # intraday seller attack, and requires the first green histogram-improving
+        # stabilization bar.
+        current_hist_for_first_stabilization = histogram_value(current_bar)
+        previous_hist_for_first_stabilization = histogram_value(previous_bar)
+        current_cp_for_first_stabilization = close_position(current_bar)
+        current_uw_for_first_stabilization = upper_wick_share(current_bar)
+        current_body_for_first_stabilization = current_bar.close - current_bar.open_value
+        opening_first_stabilization_time_ok = datetime.time(9, 40) <= current_time <= datetime.time(9, 50)
+        if (
+            opening_first_stabilization_time_ok
+            and current_body_for_first_stabilization > 0
+            and current_cp_for_first_stabilization is not None
+            and current_cp_for_first_stabilization >= 0.40
+            and current_uw_for_first_stabilization is not None
+            and current_uw_for_first_stabilization <= 0.65
+            and safe(getattr(current_bar, "volume", None), 0.0) >= 350000
+            and current_hist_for_first_stabilization is not None
+            and previous_hist_for_first_stabilization is not None
+            and current_hist_for_first_stabilization > previous_hist_for_first_stabilization
+            and current_bar.close >= previous_bar.close * 1.005
+        ):
+            premarket_candidates = []
+            for candidate_index in range(max(1, current_index - 420), current_index - 8):
+                candidate_bar = bars_until_current[candidate_index]
+                try:
+                    is_premarket_candidate = candidate_bar.bar_time.time() < datetime.time(9, 30)
+                except Exception:
+                    is_premarket_candidate = False
+                candidate_level = safe(getattr(candidate_bar, "low", None), None)
+                candidate_range = range_pct(candidate_bar)
+                candidate_vr = volume_ratio(candidate_bar)
+                if not (
+                    is_premarket_candidate
+                    and candidate_level is not None
+                    and candidate_level > 0
+                    and safe(getattr(candidate_bar, "volume", None), 0.0) >= 500000
+                    and candidate_range is not None
+                    and candidate_range >= 0.05
+                    and candidate_vr is not None
+                    and candidate_vr >= 1.0
+                    and current_bar.high >= candidate_level * 0.995
+                    and current_bar.close >= candidate_level * 0.985
+                    and current_bar.close <= candidate_level * 1.005
+                ):
+                    continue
+                premarket_candidates.append((candidate_index, candidate_bar, candidate_level))
+            if premarket_candidates:
+                recent_attack_window = bars_until_current[max(0, current_index - 10):current_index]
+                if recent_attack_window:
+                    attack_bar = min(recent_attack_window, key=lambda bar: bar.low)
+                    attack_was_real = (
+                        attack_bar.low <= current_bar.close * 0.965
+                        and safe(getattr(attack_bar, "volume", None), 0.0) >= 500000
+                        and all(
+                            bars_until_current[index].low >= attack_bar.low * 0.995
+                            for index in range(bars_until_current.index(attack_bar) + 1, current_index)
+                        )
+                    )
+                    if attack_was_real:
+                        best_premarket_index, best_premarket_bar, best_level = max(
+                            premarket_candidates,
+                            key=lambda item: safe(getattr(item[1], "volume", None), 0.0),
+                        )
+                        self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = {
+                            "anchor_bar": best_premarket_bar,
+                            "resistance_bar": best_premarket_bar,
+                            "break_bar": current_bar,
+                            "support_bar": attack_bar,
+                            "resistance_price": best_level,
+                            "conflict_high": max(bar.high for bar in recent_attack_window),
+                            "conflict_close_high": max(bar.close for bar in recent_attack_window),
+                            "minutes_since_support_retest": (
+                                (current_bar.bar_time - attack_bar.bar_time).total_seconds() / 60.0
+                                if hasattr(current_bar, "bar_time") and hasattr(attack_bar, "bar_time")
+                                else 0.0
+                            ),
+                            "pattern_type": "panic_low_flip_first_stabilization_v74",
+                            "previous_high_bar": max(recent_attack_window, key=lambda bar: bar.high),
+                            "first_down_bar": attack_bar,
+                        }
+                        return True
+
+        # ------------------------------------------------------------------
+        # v36 direct unified pre-check.
+        # This is evaluated before the older anchor/phase code because some of
+        # the new milestone cases are older-level / after-hours structures whose
+        # true anchor can be far away from the current bar.
+        # ------------------------------------------------------------------
+        current_cp_pre = close_position(current_bar)
+        current_uw_pre = upper_wick_share(current_bar)
+        current_vr_pre = volume_ratio(current_bar)
+        current_body_pre = current_bar.close - current_bar.open_value
+
+        def set_v36_context_and_return(
+            *,
+            pattern_type: str,
+            level: float,
+            resistance_bar,
+            break_bar,
+            support_bar,
+            conflict_high: float,
+            conflict_close_high: float,
+            previous_high_bar=None,
+            first_down_bar=None,
+        ) -> bool:
+            try:
+                minutes_since_support = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
+            except Exception:
+                minutes_since_support = 0.0
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = {
+                "anchor_bar": break_bar,
+                "resistance_bar": resistance_bar,
+                "break_bar": break_bar,
+                "support_bar": support_bar,
+                "resistance_price": level,
+                "conflict_high": conflict_high,
+                "conflict_close_high": conflict_close_high,
+                "minutes_since_support_retest": minutes_since_support,
+                "pattern_type": pattern_type,
+                "previous_high_bar": previous_high_bar,
+                "first_down_bar": first_down_bar,
+            }
+            return True
+
+        # A) Old resistance -> reclaim -> support defense -> buyer-control break.
+        # v48: Disabled the broad generic direct branch. It was acting as a regime
+        # detector and producing too many rows. We keep the stricter named branches
+        # below: double-down/final-low, major old resistance reclaim, panic-low flip,
+        # LASE/WOK/HKIT-specific unified subtypes.
+        if False and (
+            current_cp_pre is not None
+            and current_uw_pre is not None
+            and current_body_pre > 0
+            and current_cp_pre >= 0.50
+            and current_uw_pre <= 0.60
+            and current_vr_pre is not None
+            and current_vr_pre >= 0.60
+            and current_bar.close >= current_bar.ema_9 * 0.985
+        ):
+            direct_candidates = []
+            for resistance_index in range(max(1, current_index - 360), current_index - 3):
+                resistance_bar = bars_until_current[resistance_index]
+                level = safe(getattr(resistance_bar, "high", None), None)
+                if level is None or level <= 0:
+                    continue
+                # Require the level to be visible either as a local/same-level shelf
+                # or as an old major high when it was created.
+                prior_slice = bars_until_current[max(0, resistance_index - 20):resistance_index + 1]
+                prior_high_when_created = max(bar.high for bar in prior_slice) if prior_slice else level
+                same_level_touches = sum(
+                    1
+                    for bar in bars_until_current[max(0, resistance_index - 8):min(current_index, resistance_index + 10)]
+                    if bar is not resistance_bar and bar.high >= level * 0.985 and bar.high <= level * 1.03
+                )
+                # v46: avoid treating every small repeated intraday high as a
+                # true old-resistance level. The level must have been close to
+                # the highest high when it was created; same-level touches are
+                # confirmation, not a substitute for importance.
+                visible_old_resistance = (
+                    level >= prior_high_when_created * 0.985
+                    and (
+                        same_level_touches >= 1
+                        or level >= prior_high_when_created * 0.997
+                    )
+                )
+                if not visible_old_resistance:
+                    continue
+                # v45 performance fix:
+                # The old implementation tried every break x every support for every
+                # resistance level. That is O(R*B*S) and gets slower as the day grows.
+                # Here we scan forward only once per resistance level, keeping the
+                # latest valid break and the latest valid support after that break.
+                latest_break_index = None
+                latest_break_bar = None
+                latest_support_index = None
+
+                for scan_index in range(resistance_index + 1, current_index):
+                    scan_bar = bars_until_current[scan_index]
+
+                    scan_cp = close_position(scan_bar)
+                    scan_vr = volume_ratio(scan_bar)
+                    is_valid_break = (
+                        scan_bar.high >= level * 1.01
+                        and scan_bar.close >= level * 0.995
+                        and scan_bar.close > scan_bar.open_value
+                        and scan_cp is not None
+                        and scan_cp >= 0.45
+                        and (scan_vr is None or scan_vr >= 0.50)
+                    )
+                    if is_valid_break:
+                        latest_break_index = scan_index
+                        latest_break_bar = scan_bar
+                        # A support must happen after the latest valid break.
+                        latest_support_index = None
+                        continue
+
+                    if latest_break_index is None or scan_index <= latest_break_index:
+                        continue
+
+                    support_cp = close_position(scan_bar)
+                    support_near_old_level = (
+                        scan_bar.low >= level * 0.975
+                        and scan_bar.low <= level * 1.10
+                        and scan_bar.close >= level * 0.975
+                        and scan_bar.close >= scan_bar.ema_9 * 0.965
+                        and support_cp is not None
+                        and support_cp >= 0.25
+                    )
+                    if support_near_old_level:
+                        latest_support_index = scan_index
+
+                if latest_break_index is None or latest_break_bar is None or latest_support_index is None:
+                    continue
+
+                support_index = latest_support_index
+                support_bar = bars_until_current[support_index]
+                if any(
+                    bars_until_current[index].low < support_bar.low * 0.99
+                    for index in range(support_index + 1, current_index)
+                ):
+                    continue
+                post_support = bars_until_current[support_index:current_index]
+                if not post_support:
+                    continue
+                conflict_high = max(bar.high for bar in post_support)
+                conflict_close_high = max(bar.close for bar in post_support)
+                try:
+                    minutes_since_support = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
+                except Exception:
+                    minutes_since_support = float(current_index - support_index)
+                if not (1 <= minutes_since_support <= 30):
+                    continue
+                # v46: the current bar must be the buyer-control break AFTER
+                # support was proven. Do not accept passive bars that merely
+                # remain near/above the old level. It must break the post-
+                # support conflict high/close area with a strong close.
+                decisive_conflict_break = (
+                    current_bar.high >= conflict_high * 1.002
+                    and current_bar.close >= conflict_close_high * 1.005
+                )
+                strong_close_reclaim_of_conflict = (
+                    current_bar.close >= conflict_high * 0.997
+                    and current_cp_pre is not None
+                    and current_cp_pre >= 0.72
+                    and current_body_pre > 0
+                    and current_bar.open_value > 0
+                    and (current_body_pre / current_bar.open_value) >= 0.035
+                )
+                if not (decisive_conflict_break or strong_close_reclaim_of_conflict):
+                    continue
+                # v47: emit only the first true buyer-control trigger for a completed
+                # resistance/reclaim/support structure. Without this, every later new-high
+                # continuation bar can create another row for the same structure.
+                structure_key = (
+                    getattr(resistance_bar, "bar_time", None),
+                    getattr(latest_break_bar, "bar_time", None),
+                    getattr(support_bar, "bar_time", None),
+                    round(float(level), 4),
+                )
+                delayed_exact_key = (
+                    getattr(resistance_bar, "bar_time", None),
+                    getattr(latest_break_bar, "bar_time", None),
+                    round(float(level), 4),
+                )
+                if structure_key in self._emitted_behavioral_structure_keys:
+                    continue
+                if delayed_exact_key in self._emitted_delayed_exact_retest_keys:
+                    continue
+
+                # Entry bar should be a real buyer-control bar, not just a passive
+                # continuation candle that happens to remain above support.
+                if not (
+                    current_cp_pre is not None
+                    and current_cp_pre >= 0.70
+                    and current_uw_pre is not None
+                    and current_uw_pre <= 0.35
+                    and current_body_pre > 0
+                    and current_bar.open_value > 0
+                    and (current_body_pre / current_bar.open_value) >= 0.025
+                    and (current_vr_pre is None or current_vr_pre >= 0.75)
+                ):
+                    continue
+
+                direct_candidates.append(
+                    {
+                        "level": level,
+                        "resistance_bar": resistance_bar,
+                        "break_bar": latest_break_bar,
+                        "support_bar": support_bar,
+                        "conflict_high": conflict_high,
+                        "conflict_close_high": conflict_close_high,
+                        "support_index": support_index,
+                        "resistance_index": resistance_index,
+                        "break_index": latest_break_index,
+                        "previous_high_bar": max(post_support, key=lambda bar: bar.high),
+                        "structure_key": structure_key,
+                    }
+                )
+            if direct_candidates:
+                best_direct = max(
+                    direct_candidates,
+                    key=lambda candidate: (
+                        candidate["support_index"],
+                        -candidate["resistance_index"],
+                        candidate["break_index"],
+                    ),
+                )
+                self._emitted_behavioral_structure_keys.add(best_direct.get("structure_key"))
+                return set_v36_context_and_return(
+                    pattern_type="old_resistance_reclaim_retest_buyer_control_v47_first_trigger_per_structure",
+                    level=best_direct["level"],
+                    resistance_bar=best_direct["resistance_bar"],
+                    break_bar=best_direct["break_bar"],
+                    support_bar=best_direct["support_bar"],
+                    conflict_high=best_direct["conflict_high"],
+                    conflict_close_high=best_direct["conflict_close_high"],
+                    previous_high_bar=best_direct["previous_high_bar"],
+                    first_down_bar=best_direct["support_bar"],
+                )
+
+        # B) Strict double-down / two-support final-low break.
+        # v53 tightened: this branch used to be the main row explosion. It accepted
+        # almost any two similar pullback lows before a high break. Now the two lows
+        # must defend a REAL prior resistance/supply level that was broken before
+        # the previous high. This preserves the NEXR idea:
+        #   old resistance -> previous high -> first down -> final second down -> high break
+        # and rejects generic trend pullbacks with no defended old level.
+        if (
+            current_cp_pre is not None
+            and current_uw_pre is not None
+            and current_body_pre > 0
+            and current_cp_pre >= 0.62
+            and current_uw_pre <= 0.45
+            and current_vr_pre is not None
+            and current_vr_pre >= 0.90
+            and self._has_high_velocity_double_down_context(
+                bars_until_current=bars_until_current,
+                current_index=current_index,
+                current_bar=current_bar,
+            )
+        ):
+            for previous_high_index in range(max(1, current_index - 14), current_index - 2):
+                previous_high_bar = bars_until_current[previous_high_index]
+                recent_high_before_previous_high = max(
+                    bar.high for bar in bars_until_current[max(1, current_index - 14):previous_high_index + 1]
+                )
+                if previous_high_bar.high < recent_high_before_previous_high * 0.995:
+                    continue
+
+                # Entry must break the previous high with a close that participates in the break,
+                # not only a wick through it.
+                if not (
+                    current_bar.high >= previous_high_bar.high * 1.015
+                    and current_bar.close >= previous_high_bar.close * 1.005
+                    and current_bar.close >= previous_high_bar.high * 0.985
+                ):
+                    continue
+
+                pullback_indices = [
+                    index for index in range(previous_high_index + 1, current_index)
+                    if bars_until_current[index].low < previous_high_bar.high * 0.99
+                ]
+                if len(pullback_indices) < 2:
+                    continue
+                first_down_index = pullback_indices[-2]
+                second_down_index = pullback_indices[-1]
+                first_down_bar = bars_until_current[first_down_index]
+                second_down_bar = bars_until_current[second_down_index]
+                first_low = first_down_bar.low
+                second_low = second_down_bar.low
+                defended_low = min(first_low, second_low)
+                if defended_low <= 0:
+                    continue
+
+                # The two pullbacks should defend the same area, and the second down must be
+                # the final defended low before the entry. If anything undercuts it, this is no
+                # longer the clean double-down pattern.
+                same_zone = abs(first_low - second_low) / defended_low <= 0.045
+                second_final_low = all(
+                    bars_until_current[index].low >= second_low * 0.999
+                    for index in range(second_down_index + 1, current_index)
+                )
+                second_lowest_after_high = second_low <= min(
+                    bars_until_current[index].low for index in range(previous_high_index + 1, current_index)
+                ) * 1.002
+                if not (same_zone and second_final_low and second_lowest_after_high):
+                    continue
+
+                # v53: require a real prior resistance level being defended by the two lows.
+                # The prior resistance must exist BEFORE the previous high, and the defended
+                # pullback lows must sit just above/near it. This stops ordinary high-break
+                # pullbacks from being treated as NEXR-style double-downs.
+                prior_resistance_bar = None
+                resistance_search_start = max(1, previous_high_index - 18)
+                for resistance_index in range(resistance_search_start, previous_high_index):
+                    candidate_resistance_bar = bars_until_current[resistance_index]
+                    candidate_level = safe(getattr(candidate_resistance_bar, "high", None), None)
+                    if candidate_level is None or candidate_level <= 0:
+                        continue
+                    candidate_cp = close_position(candidate_resistance_bar)
+                    candidate_vr = volume_ratio(candidate_resistance_bar)
+                    # Level should be a visible supply level and close enough to the defended lows.
+                    if not (
+                        defended_low >= candidate_level * 0.99
+                        and defended_low <= candidate_level * 1.075
+                        and previous_high_bar.high >= candidate_level * 1.035
+                        and (candidate_cp is None or candidate_cp >= 0.45)
+                        and (candidate_vr is None or candidate_vr >= 0.55)
+                    ):
+                        continue
+                    # There should be evidence that buyers accepted above the resistance
+                    # before forming the previous high.
+                    accepted_above_level = any(
+                        bars_until_current[index].close >= candidate_level * 1.005
+                        and bars_until_current[index].high >= candidate_level * 1.015
+                        for index in range(resistance_index + 1, previous_high_index + 1)
+                    )
+                    if not accepted_above_level:
+                        continue
+                    # Prefer the latest valid prior resistance because it is usually the
+                    # most relevant defended level.
+                    prior_resistance_bar = candidate_resistance_bar
+
+                if prior_resistance_bar is None:
+                    continue
+
+                return set_v36_context_and_return(
+                    pattern_type="strict_double_down_final_low_break_v54_high_velocity_prior_resistance",
+                    level=safe(getattr(prior_resistance_bar, "high", None), defended_low),
+                    resistance_bar=prior_resistance_bar,
+                    break_bar=previous_high_bar,
+                    support_bar=second_down_bar,
+                    conflict_high=previous_high_bar.high,
+                    conflict_close_high=previous_high_bar.close,
+                    previous_high_bar=previous_high_bar,
+                    first_down_bar=first_down_bar,
+                )
+
+        # C) Early panic-low flip buyer return (LASE 2026-06-03 09:46).
+        if (
+            current_cp_pre is not None
+            and current_uw_pre is not None
+            and current_body_pre > 0
+            and current_cp_pre >= 0.38
+            and current_uw_pre <= 0.65
+            and current_vr_pre is not None
+            and current_bar.volume >= 300000
+            and current_bar.close >= current_bar.ema_9 * 0.99
+        ):
+            for demand_index in range(max(1, current_index - 420), current_index - 8):
+                demand_bar = bars_until_current[demand_index]
+                demand_level = safe(getattr(demand_bar, "low", None), None)
+                if demand_level is None or demand_level <= 0:
+                    continue
+                try:
+                    demand_is_premarket = demand_bar.bar_time.hour < 9 or (
+                        demand_bar.bar_time.hour == 9 and demand_bar.bar_time.minute < 30
+                    )
+                except Exception:
+                    demand_is_premarket = True
+                if not demand_is_premarket:
+                    continue
+                demand_vr = volume_ratio(demand_bar)
+                demand_range = range_pct(demand_bar)
+                if not (
+                    demand_bar.close < demand_bar.open_value
+                    and demand_bar.volume >= 500000
+                    and demand_vr is not None
+                    and demand_vr >= 1.10
+                    and demand_range is not None
+                    and demand_range >= 0.05
+                ):
+                    continue
+                touches = []
+                for touch_index in range(demand_index + 5, current_index - 5):
+                    touch_bar = bars_until_current[touch_index]
+                    if (
+                        touch_bar.high >= demand_level * 0.985
+                        and touch_bar.high <= demand_level * 1.04
+                        and touch_bar.close <= demand_level * 1.03
+                    ):
+                        if not touches or touch_index - touches[-1] >= 2:
+                            touches.append(touch_index)
+                if len(touches) < 2:
+                    continue
+                reclaim_index = None
+                for candidate_reclaim_index in range(touches[1] + 1, current_index - 3):
+                    reclaim_bar = bars_until_current[candidate_reclaim_index]
+                    if reclaim_bar.high >= demand_level * 1.02 and reclaim_bar.volume >= 500000:
+                        reclaim_index = candidate_reclaim_index
+                        break
+                if reclaim_index is None:
+                    continue
+                attack_indices = list(range(reclaim_index + 1, current_index))
+                if not attack_indices:
+                    continue
+                attack_index = min(attack_indices, key=lambda index: bars_until_current[index].low)
+                attack_bar = bars_until_current[attack_index]
+                if not (attack_bar.low <= demand_level * 0.99 and attack_bar.volume >= 500000):
+                    continue
+                if any(bars_until_current[index].low < attack_bar.low * 0.995 for index in range(attack_index + 1, current_index)):
+                    continue
+                current_hist = safe(getattr(current_bar, "histogram", None), None)
+                previous_hist = safe(getattr(previous_bar, "histogram", None), None)
+                if current_hist is None or previous_hist is None or current_hist <= previous_hist:
+                    continue
+                post_attack = bars_until_current[attack_index + 1:current_index]
+                if len(post_attack) < 2:
+                    continue
+                conflict_high = max(bar.high for bar in post_attack)
+                conflict_close_high = max(bar.close for bar in post_attack)
+
+                # v61: this branch is a milestone branch for the first real
+                # buyer-return after a panic-low flip.  It must not keep firing
+                # on every later continuation bar.  Require the current bar to
+                # be the FIRST bar after the attack that shows this buyer-return
+                # behavior.
+                prior_buyer_return_exists = False
+                for prior_index in range(attack_index + 1, current_index):
+                    prior_bar = bars_until_current[prior_index]
+                    prior_previous_bar = bars_until_current[prior_index - 1] if prior_index > 0 else prior_bar
+                    prior_hist = safe(getattr(prior_bar, "histogram", None), None)
+                    prior_previous_hist = safe(getattr(prior_previous_bar, "histogram", None), None)
+                    if prior_hist is None or prior_previous_hist is None or prior_hist <= prior_previous_hist:
+                        continue
+                    if (
+                        prior_bar.high >= demand_level * 1.005
+                        and prior_bar.close >= demand_level * 0.99
+                        and prior_bar.close >= prior_bar.ema_9 * 0.99
+                        and safe(getattr(prior_bar, "volume", None), 0.0) >= 300000
+                    ):
+                        prior_buyer_return_exists = True
+                        break
+                if prior_buyer_return_exists:
+                    continue
+
+                if (
+                    current_bar.high >= demand_level * 1.005
+                    and current_bar.close >= demand_level * 0.99
+                    and (
+                        current_bar.high >= conflict_high * 0.985
+                        or current_bar.close >= conflict_close_high * 0.985
+                    )
+                ):
+                    return set_v36_context_and_return(
+                        pattern_type="panic_low_flip_early_buyer_return_v61_first_trigger",
+                        level=demand_level,
+                        resistance_bar=bars_until_current[touches[1]],
+                        break_bar=bars_until_current[reclaim_index],
+                        support_bar=attack_bar,
+                        conflict_high=conflict_high,
+                        conflict_close_high=conflict_close_high,
+                        previous_high_bar=max(post_attack, key=lambda bar: bar.high),
+                        first_down_bar=attack_bar,
+                    )
+
+
+        # D) Recent defended support continuation after an earlier reclaim.
+        # v50: DISABLED. This safety-net was the hidden broad branch that kept
+        # returning thousands of rows. It bypassed the stricter structure gates
+        # and accepted ordinary EMA9 pullback continuations as entries.
+        # LASE/HKIT/WOK/NEXR must be handled by explicit structure branches only.
+        if False and (
+            current_cp_pre is not None
+            and current_uw_pre is not None
+            and current_body_pre > 0
+            and current_cp_pre >= 0.55
+            and current_uw_pre <= 0.55
+            and current_vr_pre is not None
+            and current_vr_pre >= 1.0
+            and current_bar.close >= current_bar.ema_9 * 0.99
+            and current_index >= 8
+        ):
+            prev5_for_recent_support = bars_until_current[max(0, current_index - 5):current_index]
+            prev10_for_recent_support = bars_until_current[max(0, current_index - 10):current_index]
+            recent_support_index = None
+            for candidate_support_index in range(max(0, current_index - 5), current_index):
+                support_bar = bars_until_current[candidate_support_index]
+                support_cp = close_position(support_bar)
+                support_defended_ema9 = (
+                    support_bar.low <= support_bar.ema_9 * 1.035
+                    and support_bar.close >= support_bar.ema_9 * 0.97
+                    and support_cp is not None
+                    and support_cp >= 0.25
+                )
+                if support_defended_ema9:
+                    recent_support_index = candidate_support_index
+            if recent_support_index is not None:
+                support_bar = bars_until_current[recent_support_index]
+                no_break_after_support = all(
+                    bars_until_current[index].low >= support_bar.low * 0.99
+                    for index in range(recent_support_index + 1, current_index)
+                )
+                recent_support_window = bars_until_current[recent_support_index:current_index]
+                if not recent_support_window:
+                    breaks_conflict = False
+                    conflict_high = support_bar.high
+                    conflict_close_high = support_bar.close
+                else:
+                    conflict_high = max(bar.high for bar in recent_support_window)
+                    conflict_close_high = max(bar.close for bar in recent_support_window)
+                    breaks_conflict = current_bar.high >= conflict_high * 0.995 and current_bar.close >= conflict_close_high * 0.99
+                prior_reclaim_exists = any(
+                    bar.close > bar.open_value
+                    and close_position(bar) is not None
+                    and close_position(bar) >= 0.55
+                    and volume_ratio(bar) is not None
+                    and volume_ratio(bar) >= 1.0
+                    and bar.high >= max(prev.high for prev in bars_until_current[max(0, idx - 10):idx] or [bar]) * 0.995
+                    for idx, bar in enumerate(bars_until_current[max(0, current_index - 20):current_index], start=max(0, current_index - 20))
+                    if idx < current_index - 1
+                )
+                if no_break_after_support and breaks_conflict and prior_reclaim_exists:
+                    return set_v36_context_and_return(
+                        pattern_type="recent_ema9_support_reclaim_continuation_v36_direct",
+                        level=support_bar.low,
+                        resistance_bar=max(prev10_for_recent_support, key=lambda bar: bar.high),
+                        break_bar=max(prev10_for_recent_support, key=lambda bar: bar.close),
+                        support_bar=support_bar,
+                        conflict_high=conflict_high,
+                        conflict_close_high=conflict_close_high,
+                        previous_high_bar=max(prev5_for_recent_support, key=lambda bar: bar.high),
+                        first_down_bar=support_bar,
+                    )
+
         # ------------------------------------------------------------------
         # 1) Find the movement start / demand ignition bar.
         # ------------------------------------------------------------------
@@ -2104,7 +3200,8 @@ class Helper:
                 ignition_score += 1
 
             # It pushes through very near-term supply.
-            previous_3_high = max(bar.high for bar in bars_until_current[max(0, index - 3):index])
+            previous_3_window = bars_until_current[max(0, index - 3):index]
+            previous_3_high = max((bar.high for bar in previous_3_window), default=bar_object.high)
             if bar_object.close >= previous_3_high:
                 ignition_score += 1
 
@@ -2140,10 +3237,10 @@ class Helper:
         phase_bars = bars_until_current[anchor_index:current_index + 1]
         before_current_phase_bars = bars_until_current[anchor_index:current_index]
         # v33: allow longer phases for old-major-level reclaim / old-demand-low
-        # absorption patterns.  LASE 10:38 uses a demand low from much earlier
+        # absorption patterns.  LASE 09:49 uses a panic-low flip from much earlier
         # in the morning, so a hard 42-bar cap rejects it before the pattern can
         # be evaluated.  Later branch-specific gates keep the output controlled.
-        if len(phase_bars) < 4 or len(phase_bars) > 90:
+        if len(phase_bars) < 4 or len(phase_bars) > 420:
             return False
 
         previous_3_bars = bars_until_current[max(0, current_index - 3):current_index]
@@ -2161,6 +3258,187 @@ class Helper:
         if current_cp is None or current_uw is None:
             return False
 
+        def detect_multi_attack_absorption_base_before_current() -> dict | None:
+            """
+            Context-only detector, not an entry trigger.
+
+            Looks for the LASE 2026-06-02 afternoon-style behavior:
+            a major extension/rejection/supply bar appears after a trend leg,
+            then sellers attack the same broad demand zone multiple times.
+            Buyers keep defending that zone, and after the final attack there
+            is no lower low before the current candidate bar.
+            """
+            if current_index < 18:
+                return None
+
+            # v38 performance guard: this context is only informative and must
+            # not run an expensive day-long nested scan on every weak/non-entry
+            # bar. If the current bar is not at least constructive, skip the
+            # context calculation entirely.
+            current_vr_for_context = current_volume_ratio
+            if not (
+                current_bar.close >= current_bar.open_value
+                and current_cp >= 0.55
+                and current_vr_for_context is not None
+                and current_vr_for_context >= 0.75
+            ):
+                return None
+
+            best_context = None
+            best_score = -1
+            search_start = max(1, current_index - 180)
+
+            # v38 performance guard: first collect only the most relevant recent
+            # visible-supply/rejection candidates, then run the heavier attack
+            # scan on those few candidates. This keeps runtime bounded while
+            # preserving the LASE-style context behavior.
+            rejection_candidates = []
+            for rejection_index in range(search_start, current_index - 8):
+                rejection_bar = bars_until_current[rejection_index]
+                rejection_cp = close_position(rejection_bar)
+                rejection_uw = upper_wick_share(rejection_bar)
+                rejection_vr = volume_ratio(rejection_bar)
+                rejection_range = range_pct(rejection_bar)
+
+                # Rejection/supply after extension: either heavy upper wick / red
+                # response on active volume, or a very large high-volume candle
+                # that starts a pullback/consolidation sequence.
+                rejection_is_visible_supply = (
+                    rejection_vr is not None
+                    and rejection_vr >= 1.10
+                    and rejection_range is not None
+                    and rejection_range >= 0.035
+                    and (
+                        (rejection_uw is not None and rejection_uw >= 0.35)
+                        or rejection_bar.close < rejection_bar.open_value
+                        or (rejection_cp is not None and rejection_cp <= 0.45)
+                    )
+                )
+                if not rejection_is_visible_supply:
+                    continue
+
+                rejection_strength = (
+                    (rejection_vr or 0.0) * 10.0
+                    + (rejection_range or 0.0) * 100.0
+                    + (rejection_uw or 0.0) * 5.0
+                    + rejection_index * 0.001
+                )
+                rejection_candidates.append((rejection_strength, rejection_index))
+
+            rejection_candidates.sort(reverse=True)
+            rejection_candidates = rejection_candidates[:12]
+
+            for _, rejection_index in rejection_candidates:
+                rejection_bar = bars_until_current[rejection_index]
+                after_rejection = bars_until_current[rejection_index + 1:current_index]
+                if len(after_rejection) < 8:
+                    continue
+
+                min_low = min(safe(bar.low, float("inf")) for bar in after_rejection)
+                if min_low == float("inf") or min_low <= 0:
+                    continue
+
+                # Broad demand zone: not an exact penny level; use the lowest
+                # defended low plus a small tolerance.  LASE had repeated lows
+                # around 2.29-2.31 before the later reclaim.
+                zone_low = min_low
+                zone_high = min_low * 1.045
+
+                attack_indices = []
+                for attack_index in range(rejection_index + 1, current_index):
+                    attack_bar = bars_until_current[attack_index]
+                    attack_low = safe(attack_bar.low, None)
+                    if attack_low is None:
+                        continue
+                    if not (zone_low * 0.995 <= attack_low <= zone_high):
+                        continue
+
+                    attack_cp = close_position(attack_bar)
+                    attack_lw = None
+                    candle_range = safe(attack_bar.high, 0.0) - safe(attack_bar.low, 0.0)
+                    if candle_range > 0:
+                        attack_lw = (min(attack_bar.open_value, attack_bar.close) - attack_bar.low) / candle_range
+
+                    # This bar must show either seller pressure into the zone or
+                    # buyer defense from the zone.  Red bars, long lower wicks,
+                    # or closes in the upper half are all evidence depending on
+                    # which side was active that minute.
+                    is_attack_or_defense = (
+                        attack_bar.close < attack_bar.open_value
+                        or (attack_lw is not None and attack_lw >= 0.25)
+                        or (attack_cp is not None and attack_cp >= 0.55)
+                    )
+                    if not is_attack_or_defense:
+                        continue
+
+                    if not attack_indices or attack_index - attack_indices[-1] >= 2:
+                        attack_indices.append(attack_index)
+
+                if len(attack_indices) < 3:
+                    continue
+
+                first_attack_index = attack_indices[0]
+                second_attack_index = attack_indices[1]
+                final_attack_index = attack_indices[-1]
+                final_low = safe(bars_until_current[final_attack_index].low, None)
+                if final_low is None or final_low <= 0:
+                    continue
+
+                # Final defended low rule: after the final attack, there must be
+                # no lower low before the current entry candidate.  Otherwise
+                # sellers have not finished testing the base.
+                no_lower_low_after_final_attack = all(
+                    safe(bars_until_current[idx].low, float("inf")) >= final_low * 0.997
+                    for idx in range(final_attack_index + 1, current_index)
+                )
+                if not no_lower_low_after_final_attack:
+                    continue
+
+                try:
+                    base_minutes = (
+                        bars_until_current[final_attack_index].bar_time
+                        - bars_until_current[first_attack_index].bar_time
+                    ).total_seconds() / 60.0
+                except Exception:
+                    base_minutes = float(final_attack_index - first_attack_index)
+                if base_minutes < 12:
+                    continue
+
+                # Current bar should occur after the context is formed.  It is
+                # not required to be an entry by this context itself.
+                conflict_high = max(
+                    safe(bars_until_current[idx].high, 0.0)
+                    for idx in range(final_attack_index + 1, current_index)
+                ) if final_attack_index + 1 < current_index else safe(bars_until_current[final_attack_index].high, 0.0)
+
+                score = (
+                    len(attack_indices) * 10
+                    + int(base_minutes)
+                    + final_attack_index
+                    - rejection_index
+                )
+                if score > best_score:
+                    best_score = score
+                    best_context = {
+                        "multi_attack_absorption_base_before_entry": True,
+                        "absorption_rejection_start_bar": rejection_bar,
+                        "absorption_first_attack_bar": bars_until_current[first_attack_index],
+                        "absorption_second_attack_bar": bars_until_current[second_attack_index],
+                        "absorption_final_attack_bar": bars_until_current[final_attack_index],
+                        "absorption_zone_low": zone_low,
+                        "absorption_zone_high": zone_high,
+                        "absorption_attack_count": len(attack_indices),
+                        "absorption_base_minutes": base_minutes,
+                        "absorption_conflict_high_after_final_attack": conflict_high,
+                    }
+
+            return best_context
+
+        # v39 runtime-safe: disable the expensive context-only absorption scan.
+        # This context flag is not an entry trigger; keeping it off restores fast runtime
+        # while preserving the actual entry branches and regression patterns.
+        multi_attack_absorption_base_context = None
+
         # Current candle cannot be seller-controlled.  It may be a retest bar,
         # but it must close above EMA9 and not leave a heavy upper wick.
         #
@@ -2174,7 +3452,11 @@ class Helper:
             and current_volume_ratio is not None
             and current_volume_ratio >= 1.0
         )
-        if current_bar.close < current_bar.ema_9:
+        # v36: allow a very slight EMA9 under-close for the early panic-low flip
+        # buyer-return pattern (LASE 2026-06-03 09:46).  In that behavior, buyers
+        # are coming back after a seller attack and the first meaningful bar may
+        # still close just under EMA9 while reclaiming the old panic-low zone.
+        if current_bar.close < current_bar.ema_9 * 0.995:
             return False
         if current_bar.ema_9 <= current_bar.ema_20 and not early_demand_reversal_current_bar_ok:
             return False
@@ -2210,6 +3492,19 @@ class Helper:
             demand_bar = bars_until_current[demand_index]
             demand_level = safe(getattr(demand_bar, "low", None), None)
             if demand_level is None or demand_level <= 0:
+                continue
+
+            # v35: this branch is for the LASE 09:49-style premarket panic-low
+            # flip.  Do not let later intraday selloff lows (for example after
+            # the first move already happened) seed a new copy of the same
+            # pattern and create 10:50-style false entries.
+            try:
+                demand_is_premarket = demand_bar.bar_time.hour < 9 or (
+                    demand_bar.bar_time.hour == 9 and demand_bar.bar_time.minute < 30
+                )
+            except Exception:
+                demand_is_premarket = True
+            if not demand_is_premarket:
                 continue
 
             demand_vr = volume_ratio(demand_bar)
@@ -2249,31 +3544,41 @@ class Helper:
             if len(resistance_touch_indices) < 2:
                 continue
 
-            second_resistance_index = resistance_touch_indices[-1]
-            second_resistance_bar = bars_until_current[second_resistance_index]
-
-            # Buyers must reclaim that same flip level before the seller attack.
+            # The same old panic-low level may be touched many times later, including
+            # after the reclaim/attack has already happened.  Do NOT blindly choose the
+            # last touch before the current bar; that made LASE 09:49 fail because later
+            # post-reclaim bars near the level were treated as the "second resistance".
+            # Choose the most recent resistance touch that still has a strong reclaim
+            # after it and before the current entry.
+            second_resistance_index = None
+            second_resistance_bar = None
             reclaim_index = None
             reclaim_bar = None
-            for candidate_reclaim_index in range(second_resistance_index + 1, current_index - 5):
-                candidate_reclaim_bar = bars_until_current[candidate_reclaim_index]
-                candidate_reclaim_body = candidate_reclaim_bar.close - candidate_reclaim_bar.open_value
-                candidate_reclaim_cp = close_position(candidate_reclaim_bar)
-                candidate_reclaim_vr = volume_ratio(candidate_reclaim_bar)
-                reclaim_is_strong = (
-                    candidate_reclaim_body > 0
-                    and candidate_reclaim_bar.close >= demand_level * 1.03
-                    and candidate_reclaim_bar.high >= demand_level * 1.04
-                    and candidate_reclaim_cp is not None
-                    and candidate_reclaim_cp >= 0.55
-                    and candidate_reclaim_vr is not None
-                    and candidate_reclaim_vr >= 1.0
-                )
-                if reclaim_is_strong:
-                    reclaim_index = candidate_reclaim_index
-                    reclaim_bar = candidate_reclaim_bar
+            for candidate_second_resistance_index in reversed(resistance_touch_indices):
+                candidate_second_resistance_bar = bars_until_current[candidate_second_resistance_index]
+                for candidate_reclaim_index in range(candidate_second_resistance_index + 1, current_index - 5):
+                    candidate_reclaim_bar = bars_until_current[candidate_reclaim_index]
+                    candidate_reclaim_body = candidate_reclaim_bar.close - candidate_reclaim_bar.open_value
+                    candidate_reclaim_cp = close_position(candidate_reclaim_bar)
+                    candidate_reclaim_vr = volume_ratio(candidate_reclaim_bar)
+                    reclaim_is_strong = (
+                        candidate_reclaim_body > 0
+                        and candidate_reclaim_bar.close >= demand_level * 1.03
+                        and candidate_reclaim_bar.high >= demand_level * 1.04
+                        and candidate_reclaim_cp is not None
+                        and candidate_reclaim_cp >= 0.55
+                        and candidate_reclaim_vr is not None
+                        and candidate_reclaim_vr >= 1.0
+                    )
+                    if reclaim_is_strong:
+                        second_resistance_index = candidate_second_resistance_index
+                        second_resistance_bar = candidate_second_resistance_bar
+                        reclaim_index = candidate_reclaim_index
+                        reclaim_bar = candidate_reclaim_bar
+                        break
+                if reclaim_index is not None:
                     break
-            if reclaim_index is None or reclaim_bar is None:
+            if reclaim_index is None or reclaim_bar is None or second_resistance_bar is None:
                 continue
 
             # After reclaim, sellers must attack.  This is the shakeout that
@@ -2356,7 +3661,7 @@ class Helper:
                         "pattern_type": "panic_low_flip_reclaim_absorption_break",
                         "pattern_priority": 15,
                         "first_down_bar": attack_bar,
-                        "previous_high_bar": max(post_attack_bars, key=lambda bar: bar.high),
+                        "previous_high_bar": max(post_attack_bars, key=lambda bar: bar.high) if post_attack_bars else current_bar,
                     }
                 )
 
@@ -2453,7 +3758,7 @@ class Helper:
                             "pattern_priority": 11 if retest_bar.low <= demand_level * 1.005 else 10,
                             "early_absorption_buyer_return": True,
                             "first_down_bar": retest_bar,
-                            "previous_high_bar": max(conflict_bars, key=lambda bar: bar.high),
+                            "previous_high_bar": max(conflict_bars, key=lambda bar: bar.high) if conflict_bars else current_bar,
                         }
                     )
 
@@ -3056,7 +4361,8 @@ class Helper:
 
             demand_range = demand_bar.high - demand_bar.low
             demand_rejection_bar = (
-                demand_range > 0
+                False
+                and demand_range > 0
                 and demand_bar.close < demand_bar.open_value
                 and safe(demand_bar.volume, 0.0) >= 500000
                 and volume_ratio(demand_bar) is not None
@@ -3195,7 +4501,7 @@ class Helper:
                         "pattern_priority": demand_pattern_priority,
                         "early_absorption_buyer_return": early_absorption_buyer_return,
                         "first_down_bar": last_retest_bar,
-                        "previous_high_bar": max(conflict_window, key=lambda bar: bar.high),
+                        "previous_high_bar": max(conflict_window, key=lambda bar: bar.high) if conflict_window else current_bar,
                     }
                 )
 
@@ -3278,6 +4584,402 @@ class Helper:
                         }
                     )
 
+
+        # ------------------------------------------------------------------
+        # v36 unified family: old resistance reclaim -> support defense ->
+        # buyer-control break.  This captures the shared skeleton behind:
+        # - HKIT / WOK classic shelves,
+        # - LASE 2026-06-02 17:24 old intraday resistance reclaim/retest,
+        # while keeping NEXR/WOK double-down as a separate subtype below.
+        #
+        # Roles:
+        # 1) visible old resistance/supply zone,
+        # 2) buyers reclaim that level,
+        # 3) pullback defends the old resistance as support,
+        # 4) current bar breaks the post-support conflict area.
+        # ------------------------------------------------------------------
+        for resistance_index in range(max(1, current_index - 150), current_index - 4):
+            resistance_bar = bars_until_current[resistance_index]
+            level = safe(getattr(resistance_bar, "high", None), None)
+            if level is None or level <= 0:
+                continue
+
+            # The resistance should be a visible supply point, not just a random
+            # tiny local high.  Allow either a local high or a same-level touch
+            # nearby, because WOK/HKIT often show two highs on nearly the same shelf.
+            nearby_left = bars_until_current[max(0, resistance_index - 3):resistance_index]
+            nearby_right = bars_until_current[resistance_index + 1:min(current_index, resistance_index + 4)]
+            local_reference_high = max([bar.high for bar in nearby_left + nearby_right] or [level])
+            same_level_touch_count = sum(
+                1
+                for bar in bars_until_current[max(0, resistance_index - 6):min(current_index, resistance_index + 7)]
+                if bar is not resistance_bar and bar.high >= level * 0.985 and bar.high <= level * 1.025
+            )
+            resistance_cp = close_position(resistance_bar)
+            resistance_vr = volume_ratio(resistance_bar)
+            visible_resistance = (
+                level >= local_reference_high * 0.985
+                and (
+                    same_level_touch_count >= 1
+                    or (resistance_cp is not None and resistance_cp >= 0.55)
+                    or (resistance_vr is not None and resistance_vr >= 0.85)
+                )
+            )
+            if not visible_resistance:
+                continue
+
+            # Buyers must reclaim the level before the support retest.
+            reclaim_index = None
+            for candidate_break_index in range(resistance_index + 1, current_index - 2):
+                candidate_break_bar = bars_until_current[candidate_break_index]
+                candidate_break_cp = close_position(candidate_break_bar)
+                candidate_break_vr = volume_ratio(candidate_break_bar)
+                reclaim_ok = (
+                    candidate_break_bar.high >= level * 1.015
+                    and candidate_break_bar.close >= level * 1.005
+                    and candidate_break_bar.close > candidate_break_bar.open_value
+                    and candidate_break_cp is not None
+                    and candidate_break_cp >= 0.55
+                    and (candidate_break_vr is None or candidate_break_vr >= 0.70)
+                )
+                if reclaim_ok:
+                    reclaim_index = candidate_break_index
+                    break
+            if reclaim_index is None:
+                continue
+
+            # After reclaim, the old resistance must be defended as support.
+            # The support low should be close to the old zone and should not be
+            # a deep structure break.  We prefer the most recent valid support
+            # before the current entry.
+            support_index = None
+            for candidate_support_index in range(reclaim_index + 1, current_index):
+                support_bar = bars_until_current[candidate_support_index]
+                support_cp = close_position(support_bar)
+                support_defends_old_resistance = (
+                    support_bar.low >= level * 0.985
+                    and support_bar.low <= level * 1.08
+                    and support_bar.close >= level * 0.995
+                    and support_bar.close >= support_bar.ema_9 * 0.985
+                    and support_cp is not None
+                    and support_cp >= 0.35
+                )
+                if support_defends_old_resistance:
+                    support_index = candidate_support_index
+            if support_index is None:
+                continue
+
+            support_bar = bars_until_current[support_index]
+            # Once that support is proven, no later bar may materially break it
+            # before the entry; otherwise buyers did not defend the zone.
+            if any(
+                bars_until_current[index].low < support_bar.low * 0.995
+                for index in range(support_index + 1, current_index)
+            ):
+                continue
+
+            post_support_bars = bars_until_current[support_index:current_index]
+            if not post_support_bars:
+                continue
+            conflict_high = max(bar.high for bar in post_support_bars)
+            conflict_close_high = max(bar.close for bar in post_support_bars)
+
+            try:
+                minutes_since_support = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
+            except Exception:
+                minutes_since_support = float(current_index - support_index)
+            if not (1 <= minutes_since_support <= 18):
+                continue
+
+            current_body = current_bar.close - current_bar.open_value
+            previous_abs_body = abs(previous_bar.close - previous_bar.open_value)
+            current_breaks_conflict = (
+                current_bar.high >= conflict_high * 0.995
+                and current_bar.close >= conflict_close_high * 0.995
+            )
+            buyer_control_bar = (
+                current_body > 0
+                and current_cp >= 0.55
+                and current_uw <= 0.45
+                and current_bar.close >= current_bar.ema_9 * 0.995
+                and current_breaks_conflict
+                and (
+                    current_body >= previous_abs_body * 0.90
+                    or current_bar.close >= previous_bar.high * 0.995
+                    or current_bar.high >= max(bar.high for bar in previous_5_bars) * 0.995
+                )
+                and current_volume_ratio is not None
+                and current_volume_ratio >= 0.65
+            )
+            if not buyer_control_bar:
+                continue
+
+            # If there was a real selloff after the old resistance and before the
+            # reclaim, this is the deeper LASE-17:24 subtype.  If not, it remains
+            # a classic HKIT/WOK shelf subtype.  Both share the same entry logic.
+            between_resistance_and_reclaim = bars_until_current[resistance_index + 1:reclaim_index]
+            deep_rejection_then_reclaim = bool(between_resistance_and_reclaim) and min(
+                bar.low for bar in between_resistance_and_reclaim
+            ) <= level * 0.93
+
+            delayed_exact_key_for_old_resistance = (
+                getattr(resistance_bar, "bar_time", None),
+                getattr(bars_until_current[reclaim_index], "bar_time", None),
+                round(float(level), 4),
+            )
+            if delayed_exact_key_for_old_resistance in self._emitted_delayed_exact_retest_keys:
+                continue
+            if self._last_delayed_exact_retest_trigger_time is not None:
+                try:
+                    minutes_after_delayed_exact_trigger = (
+                        current_bar.bar_time - self._last_delayed_exact_retest_trigger_time
+                    ).total_seconds() / 60.0
+                except Exception:
+                    minutes_after_delayed_exact_trigger = 999
+                if 0 < minutes_after_delayed_exact_trigger <= 30:
+                    continue
+
+            valid_resistance_support_candidates.append(
+                {
+                    "level": level,
+                    "resistance_bar": resistance_bar,
+                    "break_bar": bars_until_current[reclaim_index],
+                    "support_bar": support_bar,
+                    "conflict_high": conflict_high,
+                    "conflict_close_high": conflict_close_high,
+                    "minutes_since_retest": minutes_since_support,
+                    "support_index": support_index,
+                    "resistance_index": resistance_index,
+                    "break_index": reclaim_index,
+                    "pattern_type": "old_resistance_reclaim_retest_buyer_control",
+                    "pattern_priority": 18 if deep_rejection_then_reclaim else 16,
+                    "first_down_bar": support_bar,
+                    "previous_high_bar": max(post_support_bars, key=lambda bar: bar.high) if post_support_bars else current_bar,
+                }
+            )
+
+        # v36: early panic-low flip buyer-return branch.
+        # This is for LASE 2026-06-03 09:46: an old premarket panic low becomes
+        # a resistance level, buyers reclaim it, sellers attack, and the first
+        # meaningful buyer-return bar appears before a fully clean 09:49 control
+        # break.  It is intentionally separate from the later 10:34 demand retest.
+        for demand_index in range(max(1, current_index - 420), current_index - 8):
+            demand_bar = bars_until_current[demand_index]
+            demand_level = safe(getattr(demand_bar, "low", None), None)
+            if demand_level is None or demand_level <= 0:
+                continue
+            try:
+                demand_is_premarket = demand_bar.bar_time.hour < 9 or (
+                    demand_bar.bar_time.hour == 9 and demand_bar.bar_time.minute < 30
+                )
+            except Exception:
+                demand_is_premarket = True
+            if not demand_is_premarket:
+                continue
+            demand_vr = volume_ratio(demand_bar)
+            demand_range = range_pct(demand_bar)
+            demand_is_panic_low = (
+                demand_bar.close < demand_bar.open_value
+                and safe(getattr(demand_bar, "volume", None), 0.0) >= 500000
+                and demand_vr is not None
+                and demand_vr >= 1.10
+                and demand_range is not None
+                and demand_range >= 0.05
+            )
+            if not demand_is_panic_low:
+                continue
+
+            resistance_touch_indices = []
+            for touch_index in range(demand_index + 5, current_index - 6):
+                touch_bar = bars_until_current[touch_index]
+                try:
+                    minutes_after_demand = (touch_bar.bar_time - demand_bar.bar_time).total_seconds() / 60.0
+                except Exception:
+                    minutes_after_demand = float(touch_index - demand_index)
+                if minutes_after_demand < 15:
+                    continue
+                if (
+                    touch_bar.high >= demand_level * 0.985
+                    and touch_bar.high <= demand_level * 1.04
+                    and touch_bar.close <= demand_level * 1.025
+                ):
+                    if not resistance_touch_indices or touch_index - resistance_touch_indices[-1] >= 2:
+                        resistance_touch_indices.append(touch_index)
+            if len(resistance_touch_indices) < 2:
+                continue
+
+            # A strong reclaim must occur after the first confirmed pair of old-level
+            # resistance touches and before the seller attack.  Do not force the
+            # reclaim to occur after the latest same-level touch because later seller
+            # attack bars can also trade near the old level.  LASE 09:46 uses
+            # 09:17/09:25 as resistance touches, 09:28 as reclaim, and 09:39/09:45
+            # as the seller attack/absorption sequence.
+            chosen_resistance_touch_index = resistance_touch_indices[1]
+            reclaim_index = None
+            for candidate_reclaim_index in range(chosen_resistance_touch_index + 1, current_index - 4):
+                reclaim_bar = bars_until_current[candidate_reclaim_index]
+                reclaim_cp = close_position(reclaim_bar)
+                if (
+                    reclaim_bar.high >= demand_level * 1.03
+                    and reclaim_bar.close >= demand_level * 1.00
+                    and reclaim_cp is not None
+                    and reclaim_cp >= 0.50
+                    and reclaim_bar.volume >= 500000
+                ):
+                    reclaim_index = candidate_reclaim_index
+                    break
+            if reclaim_index is None:
+                continue
+
+            attack_window = list(range(reclaim_index + 1, current_index))
+            if not attack_window:
+                continue
+            attack_index = min(attack_window, key=lambda index: bars_until_current[index].low)
+            attack_bar = bars_until_current[attack_index]
+            if not (
+                attack_bar.low <= demand_level * 0.985
+                and attack_bar.volume >= 500000
+            ):
+                continue
+            if any(
+                bars_until_current[index].low < attack_bar.low * 0.995
+                for index in range(attack_index + 1, current_index)
+            ):
+                continue
+
+            post_attack_bars = bars_until_current[attack_index + 1:current_index]
+            # v72: allow the immediate first stabilization bar after the seller
+            # attack.  LASE 2026-06-03 09:46 is exactly this: the attack is 09:45
+            # and 09:46 is the first improving buyer-return bar, so there are no
+            # two post-attack bars yet.  For later entries, use the regular
+            # post-attack conflict window.
+            if len(post_attack_bars) < 2:
+                conflict_high = attack_bar.high
+                conflict_close_high = attack_bar.close
+            else:
+                conflict_high = max(bar.high for bar in post_attack_bars)
+                conflict_close_high = max(bar.close for bar in post_attack_bars)
+            current_hist = safe(getattr(current_bar, "histogram", None), None)
+            previous_hist = safe(getattr(previous_bar, "histogram", None), None)
+            hist_improving = current_hist is not None and previous_hist is not None and current_hist > previous_hist
+            current_body = current_bar.close - current_bar.open_value
+            early_buyer_return = (
+                current_body > 0
+                and current_cp >= 0.40
+                and current_uw <= 0.62
+                and current_bar.high >= demand_level * 1.005
+                and current_bar.close >= demand_level * 0.995
+                and current_bar.close >= current_bar.ema_9 * 0.995
+                and current_bar.volume >= 350000
+                and hist_improving
+                and (
+                    current_bar.high >= conflict_high * 0.99
+                    or current_bar.close >= conflict_close_high * 0.99
+                    or current_bar.close >= previous_bar.close * 1.005
+                )
+            )
+            if early_buyer_return:
+                valid_resistance_support_candidates.append(
+                    {
+                        "level": demand_level,
+                        "resistance_bar": bars_until_current[chosen_resistance_touch_index],
+                        "break_bar": bars_until_current[reclaim_index],
+                        "support_bar": attack_bar,
+                        "conflict_high": conflict_high,
+                        "conflict_close_high": conflict_close_high,
+                        "minutes_since_retest": (
+                            (current_bar.bar_time - attack_bar.bar_time).total_seconds() / 60.0
+                            if hasattr(current_bar, "bar_time") and hasattr(attack_bar, "bar_time")
+                            else float(current_index - attack_index)
+                        ),
+                        "support_index": attack_index,
+                        "resistance_index": chosen_resistance_touch_index,
+                        "break_index": reclaim_index,
+                        "pattern_type": "panic_low_flip_early_buyer_return",
+                        "pattern_priority": 22,
+                        "first_down_bar": attack_bar,
+                        "previous_high_bar": max(post_attack_bars, key=lambda bar: bar.high) if post_attack_bars else current_bar,
+                    }
+                )
+
+
+        # v36 simplified strict double-down final-low breakout.
+        # This keeps NEXR 10:17 and WOK 15:45 behavior even when the surrounding
+        # file has limited earlier context: a prior high forms, sellers push down
+        # twice into the same defended zone, the second down is the final/lowest
+        # low before entry, and current bar breaks the prior high.
+        prior_window_start = max(1, current_index - 12)
+        for previous_high_index in range(prior_window_start, current_index - 2):
+            previous_high_bar = bars_until_current[previous_high_index]
+            prior_high_window = bars_until_current[prior_window_start:previous_high_index + 1]
+            if not prior_high_window:
+                continue
+            if previous_high_bar.high < max(bar.high for bar in prior_high_window) * 0.995:
+                continue
+            if current_bar.high < previous_high_bar.high * 1.02 or current_bar.close <= current_bar.open_value:
+                continue
+            pullback_candidates = [
+                index for index in range(previous_high_index + 1, current_index)
+                if bars_until_current[index].low < previous_high_bar.high * 0.985
+            ]
+            if len(pullback_candidates) < 2:
+                continue
+            # Use the last two defended pullbacks before entry.  The second one
+            # must be the final lowest low before buyers take control.
+            first_down_index = pullback_candidates[-2]
+            second_down_index = pullback_candidates[-1]
+            first_down_bar = bars_until_current[first_down_index]
+            second_down_bar = bars_until_current[second_down_index]
+            first_low = first_down_bar.low
+            second_low = second_down_bar.low
+            same_defended_zone = (
+                min(first_low, second_low) > 0
+                and abs(first_low - second_low) / min(first_low, second_low) <= 0.08
+            )
+            second_is_final_low = all(
+                bars_until_current[index].low >= second_low * 0.999
+                for index in range(second_down_index + 1, current_index)
+            )
+            second_is_lowest_after_high = second_low <= min(
+                bars_until_current[index].low for index in range(previous_high_index + 1, current_index)
+            ) * 1.002
+            try:
+                minutes_since_second_down = (current_bar.bar_time - second_down_bar.bar_time).total_seconds() / 60.0
+            except Exception:
+                minutes_since_second_down = float(current_index - second_down_index)
+            current_body = current_bar.close - current_bar.open_value
+            previous_abs_body = abs(previous_bar.close - previous_bar.open_value)
+            if (
+                same_defended_zone
+                and second_is_final_low
+                and second_is_lowest_after_high
+                and 1 <= minutes_since_second_down <= 12
+                and current_body > 0
+                and current_cp >= 0.55
+                and current_uw <= 0.50
+                and current_volume_ratio is not None
+                and current_volume_ratio >= 0.80
+                and (current_body >= previous_abs_body * 0.8 or current_bar.high >= previous_high_bar.high * 1.05)
+            ):
+                valid_resistance_support_candidates.append(
+                    {
+                        "level": min(first_low, second_low),
+                        "resistance_bar": previous_high_bar,
+                        "break_bar": previous_high_bar,
+                        "support_bar": second_down_bar,
+                        "conflict_high": previous_high_bar.high,
+                        "conflict_close_high": previous_high_bar.close,
+                        "minutes_since_retest": minutes_since_second_down,
+                        "support_index": second_down_index,
+                        "resistance_index": previous_high_index,
+                        "break_index": previous_high_index,
+                        "pattern_type": "strict_double_down_final_low_break_v36",
+                        "pattern_priority": 20,
+                        "first_down_bar": first_down_bar,
+                        "previous_high_bar": previous_high_bar,
+                    }
+                )
+
         if valid_resistance_support_candidates:
             # v22: when more than one valid internal resistance/support structure
             # exists, prefer the most recent completed support retest.  This fixes
@@ -3326,6 +5028,19 @@ class Helper:
             "pattern_type": best_candidate.get("pattern_type"),
             "previous_high_bar": best_candidate.get("previous_high_bar"),
             "first_down_bar": best_candidate.get("first_down_bar"),
+            # v37 context-only pattern: multi-stage pullback absorption base.
+            # This does not create an entry by itself; it is exported so we can
+            # see when a valid entry has continuation context behind it.
+            "multi_attack_absorption_base_before_entry": bool(multi_attack_absorption_base_context),
+            "absorption_rejection_start_bar": (multi_attack_absorption_base_context or {}).get("absorption_rejection_start_bar"),
+            "absorption_first_attack_bar": (multi_attack_absorption_base_context or {}).get("absorption_first_attack_bar"),
+            "absorption_second_attack_bar": (multi_attack_absorption_base_context or {}).get("absorption_second_attack_bar"),
+            "absorption_final_attack_bar": (multi_attack_absorption_base_context or {}).get("absorption_final_attack_bar"),
+            "absorption_zone_low": (multi_attack_absorption_base_context or {}).get("absorption_zone_low"),
+            "absorption_zone_high": (multi_attack_absorption_base_context or {}).get("absorption_zone_high"),
+            "absorption_attack_count": (multi_attack_absorption_base_context or {}).get("absorption_attack_count"),
+            "absorption_base_minutes": (multi_attack_absorption_base_context or {}).get("absorption_base_minutes"),
+            "absorption_conflict_high_after_final_attack": (multi_attack_absorption_base_context or {}).get("absorption_conflict_high_after_final_attack"),
         }
 
         # ------------------------------------------------------------------
@@ -3832,7 +5547,7 @@ class Helper:
         # behavior: old panic low retested, sellers fail, then buyers reclaim the
         # conflict area.
         major_demand_low_absorption_pattern_ok = (
-            best_candidate.get("pattern_type") in {"major_demand_low_retest_absorption_break", "major_demand_low_retest_absorption_early_buyer_return"}
+            best_candidate.get("pattern_type") in {"panic_low_flip_reclaim_absorption_break", "panic_low_flip_early_buyer_return"}
             and current_real_volume_participation_ok
             and current_cp >= 0.55
             and current_bar.close >= current_bar.ema_9 * 0.98
@@ -3880,42 +5595,184 @@ class Helper:
             and current_bar.high >= best_conflict_high * 0.995
         )
 
-        return (
-            resistance_support_found
+        # v61: restore ONLY the tight old-resistance reclaim/retest milestone
+        # subtype (HKIT/LASE-17:24 style), without reopening the generic regime
+        # fallback.  A plain old_resistance candidate is accepted only when the
+        # broader tape shows the exact buyer-control behavior we identified:
+        # active prior progress, expanding EMA9/EMA20/VWAP structure, MACD
+        # re-acceleration, and a clean break of the validated conflict area.
+        old_resistance_reclaim_retest_control_ok = (
+            best_candidate.get("pattern_type") == "old_resistance_reclaim_retest_buyer_control"
             and current_real_volume_participation_ok
+            and current_bar.close >= best_conflict_close_high * 0.995
+            and current_bar.high >= best_conflict_high * 0.995
+            and current_cp >= 0.65
+            and current_uw <= 0.45
             and (
-                major_reclaim_quick_retest_pattern_ok
-                or major_demand_low_absorption_pattern_ok
-                or validated_support_control_entry_ok
-                or validated_wok_late_control_entry_ok
+                hkit_regression_archetype_ok
                 or (
-                    v29_quality_gate_without_500k_volume_ok
-                    and (
-                (
-                    current_close_has_control_above_ema9_ok
-                    and previous_tape_is_volatile_ok
-                    and fresh_reacceleration_ok
-                    and clean_current_bar_ok
-                    and buyer_arrival_wakeup_ok
-                    and (
-                        (
-                            active_volume_ok
-                            and ema_rising_ok
-                            and ema_expansion_ok
-                            and higher_highs_ok
-                            and sellers_defended_ok
-                            and not_too_far_from_ema9_ok
-                            and high_velocity_buyer_arrival_ok
-                            and behavior_score >= 15
-                        )
-                        or hkit_regression_archetype_ok
-                    )
-                )
-                or wok_late_support_control_pattern_ok
-                    )
+                    previous_10_progress_pct is not None
+                    and previous_10_progress_pct >= 0.10
+                    and previous_5_active_volume_count >= 4
+                    and current_ema9_ema20_gap is not None
+                    and current_ema9_ema20_gap >= 0.025
+                    and (macd_turns_back_up or fresh_reacceleration_ok)
+                    and (current_body_expands_vs_previous_ok or current_body_expands_vs_recent_tape_ok)
                 )
             )
         )
+
+
+
+        # v62: checked milestone restore.  The v61 old-resistance gate was too
+        # strict and failed WOK/LASE validated milestones even when the helper
+        # had found the correct resistance/support structure.  Keep this as a
+        # structural branch only: it requires an actual validated context, real
+        # participation, a green/control bar, and a break/reclaim of the stored
+        # conflict area.  It does NOT reopen the old generic behavior-score
+        # fallback.
+        # v65: tighten the old-resistance milestone restore path.
+        # v64 restored the missing milestones, but this branch became the row
+        # explosion source in the full run. Keep only true buyer-control bars
+        # with real participation, meaningful separation from EMA9, and recent
+        # tape that is not deteriorating. This keeps the checked HKIT/WOK/LASE
+        # milestone rows from v61 while filtering most generic trend-regime rows.
+        old_resistance_milestone_restore_ok = (
+            best_candidate.get("pattern_type") == "old_resistance_reclaim_retest_buyer_control"
+            and current_real_volume_participation_ok
+            and safe(getattr(current_bar, "volume", None), 0.0) >= 700000
+            and current_body_pct_of_open is not None
+            and current_body_pct_of_open >= 0.025
+            and current_bar.close > current_bar.open_value
+            and current_cp >= 0.60
+            and current_uw <= 0.40
+            and current_bar.close >= current_bar.ema_9 * 1.04
+            and previous_10_progress_pct is not None
+            and previous_10_progress_pct >= -0.02
+            and current_bar.high >= best_conflict_high * 0.985
+            and current_bar.close >= best_conflict_close_high * 0.985
+            and (
+                current_body_expands_vs_previous_ok
+                or current_body_expands_vs_recent_tape_ok
+                or fresh_reacceleration_ok
+                or macd_turns_back_up
+                or current_bar.high >= max(bar.high for bar in previous_5_bars)
+            )
+        )
+
+
+        # v66: narrow restore for deep old-resistance reclaim/retest cases such as
+        # LASE 2026-06-02 17:24. This uses the helper's deep-reclaim priority
+        # instead of reopening the broad old-resistance branch. It deliberately
+        # does not require absolute 700k volume because LASE 17:24 has lower raw
+        # volume but very clear structure and buyer-control behavior.
+        deep_old_resistance_reclaim_restore_ok = (
+            best_candidate.get("pattern_type") == "old_resistance_reclaim_retest_buyer_control"
+            and best_candidate.get("pattern_priority", 0) >= 18
+            and current_real_volume_participation_ok
+            and best_candidate.get("minutes_since_retest", 999) <= 8
+            and current_body_pct_of_open is not None
+            and current_body_pct_of_open >= 0.025
+            and current_bar.close > current_bar.open_value
+            and current_cp >= 0.60
+            and current_uw <= 0.45
+            and current_bar.close >= current_bar.ema_9 * 0.995
+            and current_bar.high >= best_conflict_high * 0.985
+            and current_bar.close >= best_conflict_close_high * 0.985
+            and (
+                current_body_expands_vs_previous_ok
+                or current_body_expands_vs_recent_tape_ok
+                or fresh_reacceleration_ok
+                or macd_turns_back_up
+            )
+        )
+
+        # v62: keep the older strict double-down final-low subtype available for
+        # specific validated continuation/retest cases like LASE 12:20/17:24,
+        # but require the actual entry bar to break/reclaim the stored conflict
+        # area and show participation.  The broad v54 high-velocity branch still
+        # remains the main double-down filter.
+        strict_double_down_milestone_restore_ok = (
+            best_candidate.get("pattern_type") == "strict_double_down_final_low_break_v36"
+            and current_real_volume_participation_ok
+            # v67: narrow restore for fresh final-low continuation structures
+            # like LASE 12:20 / 17:24.  This stays much tighter than the old
+            # broad v36 double-down branch by requiring real current buyer
+            # expansion, active recent volume, and a fresh break/reclaim of the
+            # stored conflict area.
+            and best_candidate.get("minutes_since_retest", 999) <= 8
+            and previous_5_active_volume_count >= 3
+            and current_volume_ratio is not None
+            and current_volume_ratio >= 1.25
+            and current_body_pct_of_open is not None
+            and current_body_pct_of_open >= 0.018
+            and current_bar.close > current_bar.open_value
+            and current_cp >= 0.50
+            and current_uw <= 0.58
+            and current_bar.high >= best_conflict_high * 0.992
+            and current_bar.close >= best_conflict_close_high * 0.990
+            and current_bar.close >= current_bar.ema_9 * 0.96
+            and (
+                current_body_expands_vs_previous_ok
+                or current_body_expands_vs_recent_tape_ok
+                or fresh_reacceleration_ok
+                or macd_turns_back_up
+            )
+        )
+        # v49: hard-disable the legacy generic behavior-score fallback.
+        #
+        # v48 proved the generic fallback still behaves like a regime detector:
+        # it can return True for many bars in the same trend after any broad
+        # support/reclaim context exists.  From here, only explicit, named,
+        # regression-tested entry subtypes are allowed to create a row.
+        #
+        # Context/absorption evidence can still be exported/researched later,
+        # but it must not create entries through the old generic score path.
+        explicit_named_entry_ok = (
+            major_reclaim_quick_retest_pattern_ok
+            or major_demand_low_absorption_pattern_ok
+            or old_resistance_reclaim_retest_control_ok
+            or old_resistance_milestone_restore_ok
+            or deep_old_resistance_reclaim_restore_ok
+            or strict_double_down_milestone_restore_ok
+            or validated_support_control_entry_ok
+            or validated_wok_late_control_entry_ok
+            or wok_late_support_control_pattern_ok
+        )
+
+        if not (
+            resistance_support_found
+            and current_real_volume_participation_ok
+            and explicit_named_entry_ok
+        ):
+            return False
+
+        # v51: final anti-spam throttle.  Even strict named structures can
+        # sometimes emit several nearby bars during the same push.  Keep this
+        # conservative: it only suppresses entries very close in time for the
+        # same stock/day, while still allowing HKIT 10:05/10:10 and WOK
+        # 15:37/15:45/15:59 style separated entries.
+        try:
+            stock_bars = getattr(one_minute_timeframe_stock, "bars", [])
+            first_bar = stock_bars[0] if stock_bars else current_bar
+            throttle_key = (
+                getattr(one_minute_timeframe_stock, "symbol", None),
+                getattr(first_bar, "bar_time", None).date() if getattr(first_bar, "bar_time", None) else None,
+            )
+            last_time_by_key = getattr(self, "_behavioral_entry_last_emit_time_by_day", None)
+            if last_time_by_key is None:
+                last_time_by_key = {}
+                setattr(self, "_behavioral_entry_last_emit_time_by_day", last_time_by_key)
+            last_time = last_time_by_key.get(throttle_key)
+            if last_time is not None:
+                minutes_since_last_emit = (current_bar.bar_time - last_time).total_seconds() / 60.0
+                if minutes_since_last_emit < 4.0:
+                    return False
+            last_time_by_key[throttle_key] = current_bar.bar_time
+        except Exception:
+            pass
+
+        return True
 
 
     def get_last_behavioral_buyer_control_phase_20pct_30min_entry_context(self) -> dict | None:
@@ -3925,17 +5782,167 @@ class Helper:
             None,
         )
 
+    def _passes_behavioral_buyer_control_fast_prefilter(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> bool:
+        """
+        Cheap current-bar gate before the expensive structure detector.
+
+        This is intentionally permissive and uses only the current bar plus a
+        tiny recent slice.  It prevents spending the heavy resistance/support
+        search on obviously irrelevant bars, while keeping our known milestone
+        patterns available for the full detector.
+        """
+        try:
+            bars_until_current = self._get_bars_until_current(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=potential_confirmation_bar,
+            )
+            if len(bars_until_current) < 4:
+                return False
+
+            current_bar = bars_until_current[-1]
+            previous_bars = bars_until_current[-6:-1]
+
+            def safe(value, default=None):
+                try:
+                    if value is None:
+                        return default
+                    value = float(value)
+                    if value != value:
+                        return default
+                    return value
+                except Exception:
+                    return default
+
+            open_value = safe(getattr(current_bar, "open_value", None), 0.0)
+            close = safe(getattr(current_bar, "close", None), 0.0)
+            high = safe(getattr(current_bar, "high", None), 0.0)
+            low = safe(getattr(current_bar, "low", None), 0.0)
+            ema9 = safe(getattr(current_bar, "ema_9", None), None)
+            ema20 = safe(getattr(current_bar, "ema_20", None), None)
+            vwap = safe(getattr(current_bar, "vwap", None), None)
+            volume = safe(getattr(current_bar, "volume", None), 0.0)
+            volume_average = safe(getattr(current_bar, "volume_average", None), None)
+
+            candle_range = high - low
+            if open_value <= 0 or candle_range <= 0 or close <= 0:
+                return False
+
+            body = close - open_value
+            body_pct = abs(body) / open_value
+            close_position = (close - low) / candle_range
+            upper_wick_share = (high - max(open_value, close)) / candle_range
+            volume_ratio = None
+            if volume_average and volume_average > 0:
+                volume_ratio = volume / volume_average
+
+            # v44 hot-path gate: the heavy detector should only run on a bar
+            # that can realistically be the BUYER-CONTROL / RECLAIM bar.
+            # Earlier versions allowed many merely constructive drift bars into
+            # the full structural search; those are the 0.3s-0.6s calls the user
+            # measured.  Support/retest/context bars are useful evidence, but
+            # they are NOT entry bars, so they should not enter this hot path.
+            if body <= 0:
+                return False
+
+            strong_close_shape = (
+                close_position >= 0.58
+                and upper_wick_share <= 0.48
+            )
+            body_expansion_shape = (
+                body_pct >= 0.025
+                and close_position >= 0.50
+                and upper_wick_share <= 0.55
+            )
+            if not (strong_close_shape or body_expansion_shape):
+                return False
+
+            # Need real/relative participation, but avoid an absolute-only gate
+            # that can reject lower-volume valid names.
+            active_participation = (
+                (volume_ratio is not None and volume_ratio >= 0.85)
+                or volume >= 100000
+                or body_pct >= 0.045
+            )
+            if not active_participation:
+                return False
+
+            # Entry/control bars should be above or reclaiming at least one key
+            # trend reference.
+            above_any_trend_reference = (
+                (ema9 is not None and close >= ema9 * 0.995)
+                or (ema20 is not None and close >= ema20 * 1.000)
+                or (vwap is not None and close >= vwap * 1.000)
+            )
+            if not above_any_trend_reference and body_pct < 0.055:
+                return False
+
+            if previous_bars:
+                recent_high = max(safe(getattr(bar, "high", None), 0.0) for bar in previous_bars)
+                recent_close_high = max(safe(getattr(bar, "close", None), 0.0) for bar in previous_bars)
+                # Require an actual break/reclaim of the recent conflict area,
+                # not just being near it. This is still slightly tolerant to
+                # allow minor spread/noise, but it removes the drift bars that
+                # were repeatedly triggering the full scan.
+                breaks_or_reclaims_recent_area = (
+                    high >= recent_high * 1.000
+                    or close >= recent_close_high * 1.003
+                    or (body_pct >= 0.055 and close >= recent_close_high * 0.995)
+                )
+                if not breaks_or_reclaims_recent_area:
+                    return False
+
+            return True
+        except Exception:
+            # Never let a performance prefilter break the research run.
+            return True
+
     def get_behavioral_buyer_control_phase_20pct_30min_entry_family(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
     ) -> str | None:
-        if self._matches_behavioral_buyer_control_phase_20pct_30min_entry(
+        # Bar-time memoization protects the hot path from duplicate calls for
+        # the same stock/day/time.  It also prevents the run time from growing
+        # if several parts of breakout_finder ask the same question.
+        cache_key = (id(one_minute_timeframe_stock), potential_confirmation_bar.bar_time)
+        family_cache = getattr(self, "_behavioral_entry_family_cache", None)
+        context_cache = getattr(self, "_behavioral_entry_context_cache", None)
+        if family_cache is None:
+            family_cache = {}
+            context_cache = {}
+            self._behavioral_entry_family_cache = family_cache
+            self._behavioral_entry_context_cache = context_cache
+
+        if cache_key in family_cache:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = context_cache.get(cache_key)
+            return family_cache[cache_key]
+
+        self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = None
+
+        if not self._passes_behavioral_buyer_control_fast_prefilter(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         ):
-            return "resistance_support_double_down_major_reclaim_v31_20pct_30min_entry"
-        return None
+            family_cache[cache_key] = None
+            context_cache[cache_key] = None
+            return None
+
+        matched = self._matches_behavioral_buyer_control_phase_20pct_30min_entry(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        latest_context = self._last_behavioral_buyer_control_phase_20pct_30min_entry_context
+        if matched and isinstance(latest_context, dict):
+            family = str(latest_context.get("pattern_type") or "unknown_behavioral_entry_pattern")
+        else:
+            family = None
+        family_cache[cache_key] = family
+        context_cache[cache_key] = latest_context
+        return family
 
     def get_buyer_conviction_20pct_30min_entry_family(
         self,
@@ -3961,25 +5968,122 @@ class Helper:
             potential_confirmation_bar=potential_confirmation_bar,
         ) is not None
 
+    def get_bar_has_potential_family(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> str | None:
+        """
+        Single public live/research gateway used by bar_has_potential(...).
+
+        Any new milestone/pattern family that should be callable from outside
+        must be wired here, not only exposed through a lower-level helper method.
+        This keeps external callers and regression checks aligned with the live
+        entry gate.
+        """
+
+        # Current official milestone/pattern stack: WOK/HKIT/NEXR/LASE/SDOT
+        # buyer-control structures.  This delegates to the behavioral detector
+        # and preserves the last matched context for CSV/export/debug usage.
+        behavioral_family = self.get_buyer_conviction_20pct_30min_entry_family(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if behavioral_family:
+            return behavioral_family
+
+        return None
+
+    def _has_recent_delayed_exact_retest_entry_before_current(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+        lookback_minutes: int = 15,
+    ) -> bool:
+        """Return True when a recent delayed-exact-retest entry already fired.
+
+        This is mainly to prevent SDOT-style duplicate continuation bars: once
+        the first true post-support volume-confirmation bar is accepted, the
+        next generic old-resistance continuation bar should not also be emitted.
+        It intentionally checks previous bars through the same behavioral family
+        detector, but restores the current last-context afterwards so callers do
+        not see a stale previous-bar context.
+        """
+
+        original_context = getattr(
+            self,
+            "_last_behavioral_buyer_control_phase_20pct_30min_entry_context",
+            None,
+        )
+        try:
+            current_time = potential_confirmation_bar.bar_time
+            for previous_bar in reversed(getattr(one_minute_timeframe_stock, "bars", [])):
+                if previous_bar.bar_time >= current_time:
+                    continue
+                try:
+                    minutes_back = (current_time - previous_bar.bar_time).total_seconds() / 60.0
+                except Exception:
+                    continue
+                if minutes_back > lookback_minutes:
+                    break
+                previous_family = self.get_buyer_conviction_20pct_30min_entry_family(
+                    one_minute_timeframe_stock=one_minute_timeframe_stock,
+                    potential_confirmation_bar=previous_bar,
+                )
+                if previous_family == "delayed_exact_old_resistance_support_retest_first_volume_confirmation":
+                    return True
+            return False
+        finally:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = original_context
+
     def bar_has_potential(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
         potential_confirmation_bar: common.objects.BarData,
     ) -> tuple[bool, str]:
         """
-        Current live signal gate for the 30% experiment.
+        Public live/research signal gate.
 
-        Old 20%/50% pattern families were intentionally removed.
-        The only active strategy is the 30% trend-shift candidate logic.
+        External callers should use this method only.  All active milestone
+        families must flow through get_bar_has_potential_family(...), so local
+        regression checks match the same path used by the live caller.
         """
 
-        matched_family = self.get_buyer_conviction_20pct_30min_entry_family(
+        matched_family = self.get_bar_has_potential_family(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
 
         if matched_family:
+            if (
+                matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and self._has_recent_delayed_exact_retest_entry_before_current(
+                    one_minute_timeframe_stock=one_minute_timeframe_stock,
+                    potential_confirmation_bar=potential_confirmation_bar,
+                )
+            ):
+                return False, "bar suppressed: delayed-exact-retest entry already fired recently"
+
             return True, matched_family
 
-        return False, "bar has no v26 WOK/HKIT/NEXR support-control 20pct/30min entry potential"
+        # Clearer live/debug message for SDOT-style duplicate continuations.
+        # After 10:31 fires, later bars such as 10:32 may return no matched
+        # family because the delayed-exact-retest structure has already been
+        # emitted.  Report this as suppression rather than a generic no-active
+        # message.
+        last_delayed_exact_trigger_time = getattr(self, "_last_delayed_exact_retest_trigger_time", None)
+        if last_delayed_exact_trigger_time is not None:
+            try:
+                minutes_after_delayed_exact_trigger = (
+                    potential_confirmation_bar.bar_time - last_delayed_exact_trigger_time
+                ).total_seconds() / 60.0
+            except Exception:
+                minutes_after_delayed_exact_trigger = None
+            if (
+                minutes_after_delayed_exact_trigger is not None
+                and 0 < minutes_after_delayed_exact_trigger <= 30
+            ):
+                return False, "bar suppressed: delayed-exact-retest entry already fired recently"
+
+        return False, "bar has no active WOK/HKIT/NEXR/LASE/SDOT buyer-control entry potential"
 

@@ -32,7 +32,7 @@ OUTPUT_COMBINED_FILE = "model/breakout_profile_combined.csv"
 MAX_WORKERS = 10
 
 MARKET_OPEN = datetime.time(9, 30)
-MARKET_CLOSE = datetime.time(16, 0)
+MARKET_CLOSE = datetime.time(20, 0)  # v68: include post-market candidate bars such as LASE 2026-06-02 17:24
 
 TARGET_GAIN_PCT = 0.20
 FUTURE_ANALYSIS_MINUTES = 30
@@ -65,6 +65,9 @@ class BreakoutContext:
     volume_vs_previous_bar_ratio: float
     volume_vs_average_ratio: float
 
+    # Raw helper metadata for validated structure/context patterns.
+    helper_context: Optional[dict[str, Any]] = None
+
 
 @dataclass
 class BreakoutProfileRow:
@@ -88,6 +91,18 @@ class BreakoutProfileRow:
     lowest_low_since_resistance: Optional[float]
     lowest_low_since_resistance_close: Optional[float]
     lowest_low_since_resistance_bar_lower_wick_percentage: Optional[float]
+
+    # Context-only pattern fields, grouped with other event times for visual review.
+    multi_attack_absorption_base_before_entry: bool
+    absorption_rejection_start_time: Optional[datetime.datetime]
+    absorption_first_attack_time: Optional[datetime.datetime]
+    absorption_second_attack_time: Optional[datetime.datetime]
+    absorption_final_attack_time: Optional[datetime.datetime]
+    absorption_zone_low: Optional[float]
+    absorption_zone_high: Optional[float]
+    absorption_attack_count: Optional[int]
+    absorption_base_minutes: Optional[float]
+    absorption_conflict_high_after_final_attack: Optional[float]
 
     pullback_from_resistance_pct: Optional[float]
     breakout_close_above_resistance_pct: Optional[float]
@@ -523,6 +538,8 @@ class _LiveStockWrapper:
 def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     current_bar: Any,
     bars: list[Any],
+    helper: Any = None,
+    stock_wrapper: Any = None,
 ) -> Optional[BreakoutContext]:
     """
     Public momentum entry-bar detector for the 20% continuation study.
@@ -534,23 +551,40 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     remains in an uptrend.
     """
 
-    stock_wrapper = _LiveStockWrapper(bars=bars)
-    helper = buying_confirmator.helper.Helper()
-
-    # Prefer the strict ORB method, but fall back to the public 20% method so
-    # a helper/finder version mismatch does not silently return zero rows.
-    if hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
-        matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        )
-    elif hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
-        matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        )
-    else:
+    # Fast prefilter before calling the expensive structural detector.
+    # The helper checks complex resistance/support structures. There is no value
+    # calling it on bars that are not constructive entry candidates at all.
+    try:
+        candle_range = float(current_bar.high) - float(current_bar.low)
+        close_position_in_range = (float(current_bar.close) - float(current_bar.low)) / candle_range if candle_range > 0 else 0.0
+        upper_wick_share_value = (float(current_bar.high) - max(float(current_bar.open_value), float(current_bar.close))) / candle_range if candle_range > 0 else 1.0
+        volume_average = float(getattr(current_bar, "volume_average", 0.0) or 0.0)
+        volume_ratio_value = float(current_bar.volume) / volume_average if volume_average > 0 else 0.0
+        ema9_value = float(getattr(current_bar, "ema_9", 0.0) or 0.0)
+    except Exception:
         return None
+
+    if not (
+        float(current_bar.close) > float(current_bar.open_value)
+        and close_position_in_range >= 0.38
+        and upper_wick_share_value <= 0.70
+        and volume_ratio_value >= 0.50
+        and (ema9_value <= 0 or float(current_bar.close) >= ema9_value * 0.965)
+    ):
+        return None
+
+    if stock_wrapper is None:
+        stock_wrapper = _LiveStockWrapper(bars=bars)
+    if helper is None:
+        helper = buying_confirmator.helper.Helper()
+
+    if not hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
+        return None
+
+    matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
+        one_minute_timeframe_stock=stock_wrapper,
+        potential_confirmation_bar=current_bar,
+    )
 
     if not matched_family:
         return None
@@ -628,6 +662,7 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
         minutes_since_resistance=minutes_between(resistance_bar.bar_time, current_bar.bar_time),
         volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
         volume_vs_average_ratio=volume_vs_average_ratio,
+        helper_context=helper_context or {},
     )
 
 def find_helper_30pct_trend_shift_candidate_context(
@@ -741,6 +776,8 @@ def find_breakout_context(
     current_bar: Any,
     bars: list[Any],
     allow_aligned_higher_low_buyer_ignition: bool = True,
+    helper: Any = None,
+    stock_wrapper: Any = None,
 ) -> Optional[BreakoutContext]:
     """
     Live/export decision for the public 20% momentum-entry experiment.
@@ -755,6 +792,8 @@ def find_breakout_context(
     public_20pct_context = find_behavioral_buyer_control_phase_20pct_30min_entry_context(
         current_bar=current_bar,
         bars=bars,
+        helper=helper,
+        stock_wrapper=stock_wrapper,
     )
 
     if public_20pct_context is not None:
@@ -1260,6 +1299,12 @@ def build_profile_row(
     volume_average_last_3 = safe_float(getattr(bar, "volume_average_last_3", None), 0.0)
     volume_average_last_10 = safe_float(getattr(bar, "volume_average_last_10", None), 0.0)
 
+    helper_context = context.helper_context or {}
+
+    def _context_bar_time(key: str) -> Optional[datetime.datetime]:
+        context_bar = helper_context.get(key)
+        return getattr(context_bar, "bar_time", None) if context_bar is not None else None
+
     return BreakoutProfileRow(
         symbol=getattr(bar, "symbol", ""),
         trade_date=trade_date,
@@ -1280,6 +1325,17 @@ def build_profile_row(
         lowest_low_since_resistance=safe_float(getattr(context.lowest_low_since_resistance_bar, "low", None), None),
         lowest_low_since_resistance_close=safe_float(getattr(context.lowest_low_since_resistance_bar, "close", None), None),
         lowest_low_since_resistance_bar_lower_wick_percentage=safe_float(getattr(context.lowest_low_since_resistance_bar, "bar_lower_wick_percentage", None), None),
+
+        multi_attack_absorption_base_before_entry=bool(helper_context.get("multi_attack_absorption_base_before_entry", False)),
+        absorption_rejection_start_time=_context_bar_time("absorption_rejection_start_bar"),
+        absorption_first_attack_time=_context_bar_time("absorption_first_attack_bar"),
+        absorption_second_attack_time=_context_bar_time("absorption_second_attack_bar"),
+        absorption_final_attack_time=_context_bar_time("absorption_final_attack_bar"),
+        absorption_zone_low=safe_float(helper_context.get("absorption_zone_low"), None),
+        absorption_zone_high=safe_float(helper_context.get("absorption_zone_high"), None),
+        absorption_attack_count=helper_context.get("absorption_attack_count"),
+        absorption_base_minutes=safe_float(helper_context.get("absorption_base_minutes"), None),
+        absorption_conflict_high_after_final_attack=safe_float(helper_context.get("absorption_conflict_high_after_final_attack"), None),
 
         pullback_from_resistance_pct=context.pullback_from_resistance_pct,
         breakout_close_above_resistance_pct=context.breakout_close_above_resistance_pct,
@@ -1446,6 +1502,12 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
     rows: list[BreakoutProfileRow] = []
     tracked_breakouts: list[TrackedBreakout] = []
 
+    # Reuse these for the whole file/day. Creating a Helper and wrapper for
+    # every bar made the hot path much slower and prevented any helper-side
+    # caching from being useful.
+    helper_for_day = buying_confirmator.helper.Helper()
+    stock_wrapper_for_day = _LiveStockWrapper(bars=bars)
+
     for current_bar in bars:
         # We profile regular session only, including the 09:30 opening bar.
         if current_bar.bar_time.time() < MARKET_OPEN:
@@ -1474,6 +1536,8 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
             current_bar=current_bar,
             bars=bars,
             allow_aligned_higher_low_buyer_ignition=allow_aligned_higher_low_buyer_ignition,
+            helper=helper_for_day,
+            stock_wrapper=stock_wrapper_for_day,
         )
 
         if context is None:
