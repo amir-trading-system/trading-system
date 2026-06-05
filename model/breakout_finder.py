@@ -1601,11 +1601,103 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
 # CSV WRITING
 # =========================
 
+def _row_signal_key(row: BreakoutProfileRow) -> tuple:
+    """Stable de-duplication key for one detected signal/context.
+
+    The training folder can contain multiple source files for the same
+    symbol/date. Without this guard, the exporter writes the same detected
+    signal several times, which makes the CSV look like the same resistance /
+    support properties are repeated 5x, 10x, etc.  We de-dupe by the actual
+    signal identity, not by the whole row, because future-label fields can vary
+    slightly across duplicate source files while the signal itself is identical.
+    """
+    return (
+        row.symbol,
+        row.trade_date,
+        row.breakout_type,
+        row.reason,
+        row.breakout_time,
+        row.resistance_bar_time,
+        row.lowest_low_since_resistance_time,
+    )
+
+
+def dedupe_profile_rows(rows: list[BreakoutProfileRow]) -> list[BreakoutProfileRow]:
+    seen: set[tuple] = set()
+    deduped_rows: list[BreakoutProfileRow] = []
+    for row in rows:
+        key = _row_signal_key(row)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped_rows.append(row)
+    return deduped_rows
+
+
+def _training_file_symbol_date_key(file_path: str) -> tuple[str, str]:
+    """Return (SYMBOL, YYYY-MM-DD) parsed from the training filename.
+
+    Example:
+        VCIG-2026-05-26 13:27:00.json -> ("VCIG", "2026-05-26")
+        VCIG-2026-05-26 13:26:00.json -> ("VCIG", "2026-05-26")
+
+    This intentionally keeps only one file per symbol/day.  It is much cheaper
+    than loading every JSON/pickle just to discover duplicates, and it matches
+    the current research workflow where we only need one intraday bar file per
+    symbol/date.
+    """
+    filename = os.path.basename(file_path)
+    stem = os.path.splitext(filename)[0]
+
+    # Expected shape: SYMBOL-YYYY-MM-DD HH:MM:SS
+    # Keep this simple and transparent; if the filename does not match, fall
+    # back to the full stem so the file is not accidentally dropped.
+    parts = stem.split("-", 1)
+    if len(parts) != 2:
+        return (stem.upper(), "")
+
+    symbol = parts[0].upper()
+    rest = parts[1]
+    # rest starts with YYYY-MM-DD... after splitting only once.
+    trade_date = rest[:10]
+    if len(trade_date) == 10 and trade_date[4] == "-" and trade_date[7] == "-":
+        return (symbol, trade_date)
+
+    return (stem.upper(), "")
+
+
+def distinct_training_files(file_paths: list[str]) -> list[str]:
+    """Keep only one training file per SYMBOL-YYYY-MM-DD before processing."""
+    seen: dict[tuple[str, str], str] = {}
+    unique_files: list[str] = []
+    duplicate_count = 0
+
+    for file_path in sorted(file_paths):
+        key = _training_file_symbol_date_key(file_path)
+        if key in seen:
+            duplicate_count += 1
+            continue
+
+        seen[key] = file_path
+        unique_files.append(file_path)
+
+    if duplicate_count:
+        print(f"Removed {duplicate_count} duplicate symbol/day training files before processing")
+
+    return unique_files
+
+
 def write_rows_to_csv(
     rows: list[BreakoutProfileRow],
     output_file_path: str,
 ) -> None:
     os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+
+    original_row_count = len(rows)
+    rows = dedupe_profile_rows(rows)
+    duplicate_count = original_row_count - len(rows)
+    if duplicate_count:
+        print(f"Removed {duplicate_count} duplicate signal rows before writing CSV")
 
     # v33: put all event/context time columns next to each other near the
     # beginning of the CSV so resistance/support/entry chronology is easy to
@@ -1648,9 +1740,10 @@ def write_rows_to_csv(
 
 
 def main() -> None:
-    files = glob.glob(INPUT_FILES_GLOB)
+    raw_files = glob.glob(INPUT_FILES_GLOB)
+    files = distinct_training_files(raw_files)
 
-    print(f"Found {len(files)} files")
+    print(f"Found {len(raw_files)} files, processing {len(files)} distinct files")
 
     all_rows: list[BreakoutProfileRow] = []
 

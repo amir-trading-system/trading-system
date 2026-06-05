@@ -8190,6 +8190,7 @@ class Helper:
                 matched_family in (
                     "old_resistance_reclaim_retest_buyer_control",
                     "strict_double_down_final_low_break_v36",
+                    "strict_double_down_final_low_break_v54_high_velocity_prior_resistance",
                     "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
                     "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
                     "multi_touch_resistance_support_control_break",
@@ -8215,6 +8216,7 @@ class Helper:
             if (
                 matched_family in (
                     "old_resistance_reclaim_retest_buyer_control",
+                    "strict_double_down_final_low_break_v54_high_velocity_prior_resistance",
                     "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
                     "multi_touch_resistance_support_control_break",
                 )
@@ -8226,6 +8228,158 @@ class Helper:
                         current_context=current_context,
                     ):
                         return False, "bar suppressed: support ignored earlier deep lost low before selected support", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v124: selected support cannot ignore a better previous retest low.
+            # AIMD 11:53 used 11:51 as support even though 11:50 was lower and
+            # closer to the selected resistance/anchor.  That means 11:51 was
+            # buyer response/continuation, not the actual retest low.
+            if (
+                matched_family in (
+                    "old_resistance_reclaim_retest_buyer_control",
+                    "strict_double_down_final_low_break_v36",
+                    "strict_double_down_final_low_break_v54_high_velocity_prior_resistance",
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                    "multi_touch_resistance_support_control_break",
+                )
+                and current_context
+            ):
+                try:
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_bar = current_context.get("support_bar")
+                    support_time = getattr(support_bar, "bar_time", None) if support_bar is not None else None
+                    resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                    level_for_previous_retest = self._safe_float(current_context.get("resistance_price"), resistance_high)
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                    if (
+                        support_time is not None
+                        and level_for_previous_retest is not None
+                        and level_for_previous_retest > 0
+                        and support_low is not None
+                        and support_low > 0
+                    ):
+                        chronological_bars = sorted(
+                            [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                            key=lambda bar: bar.bar_time,
+                        )
+                        previous_support_bar = None
+                        for support_index, candidate_bar in enumerate(chronological_bars):
+                            if getattr(candidate_bar, "bar_time", None) == support_time:
+                                if support_index > 0:
+                                    previous_support_bar = chronological_bars[support_index - 1]
+                                break
+                        if previous_support_bar is not None:
+                            previous_low = self._safe_float(getattr(previous_support_bar, "low", None), None)
+                            if previous_low is not None and previous_low > 0 and previous_low < support_low * 0.997:
+                                support_distance = abs((support_low / level_for_previous_retest) - 1.0)
+                                previous_distance = abs((previous_low / level_for_previous_retest) - 1.0)
+                                previous_is_near_level = level_for_previous_retest <= previous_low <= level_for_previous_retest * 1.04
+                                # If the previous low slightly undercut the level, the selected support can be
+                                # the buyer-response bar in the same valid support group (WOK case).  Suppress
+                                # only when the previous lower low stayed at/above the level and was a cleaner
+                                # retest than the selected support (AIMD 11:53 case).
+                                previous_is_better_retest = previous_is_near_level and previous_distance <= support_distance * 1.05
+                                if previous_is_better_retest:
+                                    return False, "bar suppressed: selected support is higher than a better previous retest low", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v123: selected support cannot be far above the resistance/anchor level.
+            # RYOJ 11:59/12:00 used 11:31 high 2.76 and 11:48 low 2.91 (+5.4%),
+            # which is a continuation area, not old resistance becoming support.
+            if (
+                matched_family in (
+                    "old_resistance_reclaim_retest_buyer_control",
+                    "strict_double_down_final_low_break_v36",
+                    "strict_double_down_final_low_break_v54_high_velocity_prior_resistance",
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                    "multi_touch_resistance_support_control_break",
+                )
+                and current_context
+            ):
+                try:
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_bar = current_context.get("support_bar")
+                    resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                    level = self._safe_float(current_context.get("resistance_price"), resistance_high)
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                    if (
+                        level is not None
+                        and level > 0
+                        and support_low is not None
+                        and (
+                            support_low > level * 1.045
+                            or (
+                                matched_family == "strict_double_down_final_low_break_v54_high_velocity_prior_resistance"
+                                and support_low > level * 1.035
+                            )
+                        )
+                    ):
+                        return False, "bar suppressed: selected support is too far above resistance/anchor level", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v123: support cannot be the breakout/expansion candle itself.
+            # RYOJ used 11:56/11:57 as supports, but those candles are already
+            # strong buyer-control expansion bars, not sell/retest bars followed
+            # by a later rescue. A support bar may close well, but if it has a
+            # large green body, high volume, and expands above the resistance level
+            # before the entry, it is the breakout candle, not support.
+            if (
+                matched_family in (
+                    "old_resistance_reclaim_retest_buyer_control",
+                    "strict_double_down_final_low_break_v36",
+                    "strict_double_down_final_low_break_v54_high_velocity_prior_resistance",
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "old_resistance_reclaim_seller_attack_final_retest_volume_entry",
+                    "multi_touch_resistance_support_control_break",
+                )
+                and current_context
+            ):
+                try:
+                    support_bar = current_context.get("support_bar")
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_time = getattr(support_bar, "bar_time", None) if support_bar is not None else None
+                    entry_time = getattr(potential_confirmation_bar, "bar_time", None)
+                    # Do not use this guard when a special subtype intentionally
+                    # treats the same bar as support+entry; this guard targets
+                    # selected support bars that occur before the entry.
+                    if support_bar is not None and support_time is not None and entry_time is not None and support_time < entry_time:
+                        support_to_entry_minutes_for_expansion = (entry_time - support_time).total_seconds() / 60.0
+                        if matched_family == "old_resistance_reclaim_retest_buyer_control" and support_to_entry_minutes_for_expansion < 4.0:
+                            raise StopIteration
+                        level = self._safe_float(current_context.get("resistance_price"), None)
+                        if level is None:
+                            level = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                        open_value = self._safe_float(getattr(support_bar, "open_value", None), None)
+                        if open_value is None:
+                            open_value = self._safe_float(getattr(support_bar, "open", None), None)
+                        high = self._safe_float(getattr(support_bar, "high", None), None)
+                        low = self._safe_float(getattr(support_bar, "low", None), None)
+                        close = self._safe_float(getattr(support_bar, "close", None), None)
+                        volume = self._safe_float(getattr(support_bar, "volume", None), None)
+                        volume_average = self._safe_float(getattr(support_bar, "volume_average", None), None)
+                        if (
+                            level is not None and level > 0
+                            and open_value is not None and open_value > 0
+                            and high is not None and low is not None and high > low
+                            and close is not None
+                        ):
+                            support_range = high - low
+                            close_position = (close - low) / support_range if support_range > 0 else 0.0
+                            body_pct = (close - open_value) / open_value
+                            volume_ratio = (volume / volume_average) if volume is not None and volume_average is not None and volume_average > 0 else None
+                            if (
+                                close > open_value
+                                and body_pct >= 0.035
+                                and close_position >= 0.78
+                                and (volume_ratio is None or volume_ratio >= 1.65)
+                                and high >= level * 1.025
+                            ):
+                                return False, "bar suppressed: selected support is already a buyer-control breakout candle", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
 

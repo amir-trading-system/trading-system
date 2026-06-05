@@ -220,63 +220,12 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="RKTO",
-            datetime_str="05.27.26T09:44:00",
+            name="CODX",
+            datetime_str="05.22.26T11:44:00",
             is_positive=False,
         ),
-        # common.objects.SymbolTest(
-        #     name="LASE",
-        #     datetime_str="06.02.26T10:44:00",
-        #     is_positive=True,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="RKTO",
-        #     datetime_str="06.02.26T10:58:00",
-        #     is_positive=False,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="ZJYL",
-        #     datetime_str="06.02.26T10:34:00",
-        #     is_positive=False,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="LOBO",
-        #     datetime_str="06.02.26T10:00:00",
-        #     is_positive=False,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="CODX",
-        #     datetime_str="06.02.26T09:50:00",
-        #     is_positive=False,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="CING",
-        #     datetime_str="06.02.26T09:48:00",
-        #     is_positive=False,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="LOBO",
-        #     datetime_str="06.02.26T09:44:00",
-        #     is_positive=False,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="BJDX",
-        #     datetime_str="06.02.26T09:33:00",
-        #     is_positive=False,
-        # ),
-        # common.objects.SymbolTest(
-        #     name="BJDX",
-        #     datetime_str="06.02.26T09:30:00",
-        #     is_positive=False,
-        # ),
     ]
     # symbols = explore_past_potential_symbols()
-
-    if not symbols:
-        # need to find a way to create data from current symbols - load data from /data directory.
-        symbols = []
-        get_only_statistics = False
-        should_run_model = True
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
