@@ -1,15 +1,35 @@
 Need to do the following:
 - cases for check:
-  - WOK - 05.11.2026T15:37
-  - WOK - 05.11.2026T15:45
-  - WOK - 05.11.2026T15:59
-  - NEXR - 05.29.2026T10:17
-  - HKIT - 06.01.2026T10:10
-  - LASE - 06.02.2026T12:20
-  - LASE - 06.02.2026T17:24
-  - LASE - 06.03.2026T09:49
-  - SDOT - 06.03.2026T10:32
-  - EDHL - 06.04.2026T10:29
-  - EDHL - 06.04.2026T10:32
-  - NEXR - 06.04.2026T09:49
-  - MASK - 05.28.2026T10:34
+  - WOK - 05.11.2026T15:37 - exists
+  - WOK - 05.11.2026T15:45 - exists
+  - WOK - 05.11.2026T15:59 - exists
+  - NEXR - 05.29.2026T10:17 - exists
+  - NEXR - 06.04.2026T09:49 - exists
+  - HKIT - 06.01.2026T10:03 - exists
+  - HKIT - 06.01.2026T10:05 - exists
+  - HKIT - 06.01.2026T10:10 - exists
+  - LASE - 06.02.2026T12:20 - exists
+  - LASE - 06.02.2026T17:24 - exists
+  - LASE - 06.03.2026T09:49 - exists
+  - SDOT - 06.03.2026T10:31 - exists
+  - SDOT - 06.03.2026T10:32 - missing / should stay excluded
+  - EDHL - 06.04.2026T10:29 - exists
+  - EDHL - 06.04.2026T10:32 - exists
+  - EDHL - 06.04.2026T10:33 - missing / should stay excluded
+  - MASK - 05.28.2026T10:34 - exists
+  - MASK - 05.28.2026T09:50 - missing / should stay excluded
+  - MASK - 05.28.2026T10:35 - missing / should stay excluded
+  - LOBO - 06.02.2026T09:39 - missing / should stay excluded
+  - LOBO - 06.02.2026T10:02 - missing / should stay excluded
+  - ZJYL - 06.02.2026T10:28 - missing / should stay excluded
+  - MTVA - 05.20.2026T10:33 - exists
+  - MTVA - 05.20.2026T10:03 - missing / should stay excluded
+  - MTVA - 05.20.2026T10:34 - missing / should stay excluded
+  - MTVA - 05.20.2026T10:35 - missing / should stay excluded
+  - MTVA - 05.20.2026T10:51 - missing / should stay excluded
+  - RMSG - 06.05.2026T08:30 - exists
+  - RMSG - 06.05.2026T08:28 - missing / should stay excluded
+  - RMSG - 06.05.2026T08:31 - missing / should stay excluded
+  - BCDA - 06.05.2026T09:37 - missing / should stay excluded
+  - BCDA - 06.05.2026T09:39 - missing / should stay excluded
+  - BCDA - 06.05.2026T09:59 - missing / should stay excluded

@@ -1528,8 +1528,22 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
     stock_wrapper_for_day = _LiveStockWrapper(bars=bars)
 
     for current_bar in bars:
-        # We profile regular session only, including the 09:30 opening bar.
-        if current_bar.bar_time.time() < MARKET_OPEN:
+        # We normally profile regular session only, including the 09:30 opening bar.
+        # v115: preserve user change for pre-market expected entries. If the
+        # expected/target bar itself is pre-market, do not skip pre-market bars;
+        # otherwise keep the normal regular-session filter. This is required for
+        # cases like RMSG 2026-06-05 08:30.
+        expected_bar_time = getattr(stock, "expected_bar_time", None)
+        if expected_bar_time is None:
+            expected_bar_time = getattr(day_stock, "expected_bar_time", None)
+
+        if (
+            current_bar.bar_time.time() < MARKET_OPEN
+            and (
+                expected_bar_time is None
+                or expected_bar_time.time() > MARKET_OPEN
+            )
+        ):
             continue
 
         if current_bar.bar_time.time() > MARKET_CLOSE:

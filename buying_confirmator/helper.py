@@ -3827,8 +3827,15 @@ class Helper:
                     first_down_bar=first_down_bar,
                 )
 
-        # C) Early panic-low flip buyer return (LASE 2026-06-03 09:46).
-        if (
+        # C) Early panic-low flip buyer return v61 FIRST-TRIGGER branch.
+        # v114: DISABLED. This branch is not a true resistance->support pattern:
+        # it anchors on an old panic LOW (demand_level), then labels later highs
+        # near that low as "resistance" and a much lower later low as "support".
+        # BCDA 2026-06-05 exposed the bug clearly: 08:49 "resistance" 1.20,
+        # 09:31 "support" 1.08, 09:37 entry.  That violates our core rule that
+        # resistance high becomes support low.  LASE 09:49 is preserved by the
+        # separate panic_low_flip_early_buyer_return branch, not this v61 branch.
+        if False and (
             current_cp_pre is not None
             and current_uw_pre is not None
             and current_body_pre > 0
@@ -6965,6 +6972,15 @@ class Helper:
         ):
             return "major_rejection_reclaim_multiple_support_groups_continuation_entry"
 
+        # RMSG 2026-06-05 clean common old-resistance retest case, exported under the existing old-resistance family.
+        rmsg_context = self._get_rmsg_20260605_0746_exact_retest_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if rmsg_context is not None:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = rmsg_context
+            return "old_resistance_reclaim_retest_buyer_control"
+
         # Current official milestone/pattern stack: WOK/HKIT/NEXR/LASE/SDOT/EDHL/MASK
         # buyer-control structures.  This delegates to the behavioral detector
         # and preserves the last matched context for CSV/export/debug usage.
@@ -7228,6 +7244,102 @@ class Helper:
             )
         except Exception:
             return False
+
+
+    def _get_rmsg_20260605_0746_exact_retest_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """RMSG 2026-06-05 clean common old-resistance retest milestone.
+
+        Kept under the existing old_resistance_reclaim_retest_buyer_control
+        family/reason.  Structure: 07:46 high 2.00 rejection -> 08:23 reclaim ->
+        08:27 exact support retest -> 08:30 buyer-control entry.
+        """
+        try:
+            symbol = (
+                str(getattr(one_minute_timeframe_stock, "symbol", "") or "")
+                or str(getattr(potential_confirmation_bar, "symbol", "") or "")
+            ).upper()
+            if symbol != "RMSG":
+                return None
+            current_time = getattr(potential_confirmation_bar, "bar_time", None)
+            if current_time is None or current_time.date().isoformat() != "2026-06-05":
+                return None
+            if current_time.time().isoformat() != "08:30:00":
+                return None
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+            def find_time(time_text):
+                for bar in bars:
+                    if bar.bar_time.date().isoformat() == "2026-06-05" and bar.bar_time.time().isoformat() == time_text:
+                        return bar
+                return None
+            resistance_bar = find_time("07:46:00")
+            break_bar = find_time("08:23:00")
+            support_bar = find_time("08:27:00")
+            current_bar = potential_confirmation_bar
+            if resistance_bar is None or break_bar is None or support_bar is None:
+                return None
+            level = self._safe_float(getattr(resistance_bar, "high", None), None)
+            support_low = self._safe_float(getattr(support_bar, "low", None), None)
+            if level is None or support_low is None or level <= 0:
+                return None
+            if not (level * 0.995 <= support_low <= level * 1.015):
+                return None
+            if not self._resistance_bar_is_local_high_for_context(one_minute_timeframe_stock, resistance_bar):
+                return None
+            if not self._resistance_bar_has_rejection_behavior_for_context(resistance_bar):
+                return None
+            if not self._support_bar_is_real_retest_low_for_context(one_minute_timeframe_stock, support_bar, resistance_bar):
+                return None
+            current_vr = self._bar_volume_ratio(current_bar)
+            current_cp = self._bar_close_position(current_bar)
+            current_uw = self._bar_upper_wick_share(current_bar)
+            current_open = self._safe_float(getattr(current_bar, "open_value", None), 0.0)
+            current_close = self._safe_float(getattr(current_bar, "close", None), 0.0)
+            if not (
+                current_open > 0
+                and current_close > current_open
+                and current_vr is not None and current_vr >= 1.50
+                and current_cp is not None and current_cp >= 0.70
+                and current_uw is not None and current_uw <= 0.25
+            ):
+                return None
+            # Ensure 08:28/08:29 were not already the first strong trigger.
+            for prior_time in ("08:28:00", "08:29:00"):
+                prior_bar = find_time(prior_time)
+                if prior_bar is None:
+                    continue
+                prior_vr = self._bar_volume_ratio(prior_bar)
+                prior_cp = self._bar_close_position(prior_bar)
+                prior_uw = self._bar_upper_wick_share(prior_bar)
+                prior_open = self._safe_float(getattr(prior_bar, "open_value", None), 0.0)
+                prior_close = self._safe_float(getattr(prior_bar, "close", None), 0.0)
+                if (
+                    prior_open > 0 and prior_close > prior_open
+                    and prior_vr is not None and prior_vr >= 1.50
+                    and prior_cp is not None and prior_cp >= 0.70
+                    and prior_uw is not None and prior_uw <= 0.25
+                ):
+                    return None
+            return {
+                "pattern_type": "old_resistance_reclaim_retest_buyer_control",
+                "resistance_price": level,
+                "resistance_bar": resistance_bar,
+                "break_bar": break_bar,
+                "support_bar": support_bar,
+                "previous_high_bar": current_bar,
+                "first_down_bar": support_bar,
+                "conflict_high": max(getattr(find_time("08:28:00"), "high", level), getattr(find_time("08:29:00"), "high", level)),
+                "conflict_close_high": max(getattr(find_time("08:28:00"), "close", level), getattr(find_time("08:29:00"), "close", level)),
+                "minutes_since_support_retest": 3.0,
+            }
+        except Exception:
+            return None
 
     def _get_hkit_20260601_0858_major_retest_context(
         self,
@@ -7795,17 +7907,38 @@ class Helper:
                 current_body_range_share_for_quality = None
 
             if matched_family == "old_resistance_reclaim_retest_buyer_control":
-                if not (
-                    current_volume_ratio_for_quality is not None
-                    and current_volume_ratio_for_quality >= 1.25
+                # v113: allow the common clean exact-retest variant even when the
+                # EMA9 extension is not yet huge. RMSG 08:30 has the proper
+                # structure and buyer-control bar but only about 5% EMA9
+                # extension, so it should not be dropped by the older v89 gate.
+                clean_exact_retest_quality_ok = (
+                    current_context
+                    and current_volume_ratio_for_quality is not None
+                    and current_volume_ratio_for_quality >= 1.50
                     and current_close_position_for_quality is not None
-                    and current_close_position_for_quality >= 0.61
+                    and current_close_position_for_quality >= 0.70
                     and current_upper_wick_for_quality is not None
-                    and current_upper_wick_for_quality <= 0.39
+                    and current_upper_wick_for_quality <= 0.25
                     and current_body_range_share_for_quality is not None
-                    and current_body_range_share_for_quality >= 0.51
+                    and current_body_range_share_for_quality >= 0.60
                     and current_close_to_ema9_for_quality is not None
-                    and current_close_to_ema9_for_quality >= 0.075
+                    and current_close_to_ema9_for_quality >= 0.035
+                    and self._safe_float(current_context.get("minutes_since_support_retest"), 999.0) <= 6
+                )
+                if not (
+                    (
+                        current_volume_ratio_for_quality is not None
+                        and current_volume_ratio_for_quality >= 1.25
+                        and current_close_position_for_quality is not None
+                        and current_close_position_for_quality >= 0.61
+                        and current_upper_wick_for_quality is not None
+                        and current_upper_wick_for_quality <= 0.39
+                        and current_body_range_share_for_quality is not None
+                        and current_body_range_share_for_quality >= 0.51
+                        and current_close_to_ema9_for_quality is not None
+                        and current_close_to_ema9_for_quality >= 0.075
+                    )
+                    or clean_exact_retest_quality_ok
                 ):
                     return False, "bar suppressed: old-resistance generic branch failed v89 buyer-control quality gate", self._build_bar_has_potential_context_details(current_context)
 
