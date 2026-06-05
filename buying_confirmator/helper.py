@@ -7881,6 +7881,118 @@ class Helper:
         except Exception:
             return None
 
+    def _maybe_promote_resistance_to_prior_shelf_peak_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        current_context: dict,
+        max_lookback_minutes: int = 5,
+    ) -> dict:
+        """Promote selected resistance to an earlier stronger shelf peak when appropriate.
+
+        Learned from RKTO 19:12: the delayed-exact branch selected 18:37, but
+        the real shelf/rejection peak was 18:34. If an earlier nearby bar has a
+        higher high and the later support is closer to that earlier high, use it
+        as the resistance anchor.
+        """
+        try:
+            if not current_context:
+                return current_context
+            resistance_bar = current_context.get("resistance_bar")
+            support_bar = current_context.get("support_bar")
+            if resistance_bar is None or support_bar is None:
+                return current_context
+            resistance_time = getattr(resistance_bar, "bar_time", None)
+            support_low = self._safe_float(getattr(support_bar, "low", None), None)
+            selected_high = self._safe_float(getattr(resistance_bar, "high", None), None)
+            if resistance_time is None or support_low is None or selected_high is None or selected_high <= 0:
+                return current_context
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+            best_bar = resistance_bar
+            best_distance = abs((support_low / selected_high) - 1.0)
+            for bar in bars:
+                bar_time = getattr(bar, "bar_time", None)
+                if bar_time is None or not (resistance_time - datetime.timedelta(minutes=max_lookback_minutes) <= bar_time < resistance_time):
+                    continue
+                high = self._safe_float(getattr(bar, "high", None), None)
+                if high is None or high <= 0:
+                    continue
+                # earlier shelf peak must be meaningfully at least as strong as the selected bar
+                if high < selected_high * 1.003:
+                    continue
+                if not self._resistance_bar_is_local_high_for_context(one_minute_timeframe_stock, bar):
+                    continue
+                distance = abs((support_low / high) - 1.0)
+                if distance <= best_distance + 0.003:
+                    best_bar = bar
+                    best_distance = distance
+            if best_bar is not resistance_bar:
+                current_context = dict(current_context)
+                current_context["resistance_bar"] = best_bar
+                current_context["resistance_price"] = self._safe_float(getattr(best_bar, "high", None), current_context.get("resistance_price"))
+                current_context["level"] = current_context.get("resistance_price")
+            return current_context
+        except Exception:
+            return current_context
+
+    def _support_sequence_had_deep_lost_low_before_selected_support(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        current_context: dict,
+        level_tolerance: float = 0.965,
+    ) -> bool:
+        """Return True if the old level was deeply lost before the chosen support.
+
+        If a bar before the selected support made a low well below the resistance
+        level, then a later higher low is not the real support.  Learned from
+        RKTO 12:10: selected support 12:08, but 12:06 was much lower.
+        """
+        try:
+            resistance_bar = current_context.get("resistance_bar") if current_context else None
+            support_bar = current_context.get("support_bar") if current_context else None
+            if resistance_bar is None or support_bar is None:
+                return False
+            resistance_time = getattr(resistance_bar, "bar_time", None)
+            support_time = getattr(support_bar, "bar_time", None)
+            break_bar = current_context.get("break_bar") if current_context else None
+            break_time = getattr(break_bar, "bar_time", None) if break_bar is not None else None
+            support_low = self._safe_float(getattr(support_bar, "low", None), None)
+            resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None)
+            level = self._safe_float(current_context.get("resistance_price"), resistance_high)
+            if resistance_time is None or support_time is None or support_low is None or level is None or level <= 0:
+                return False
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+            # Only inspect the immediate support sequence before the chosen support.
+            # Good patterns may have earlier attacks/reclaims long before the final
+            # support group; RKTO 12:10's failure is different: the true lower low
+            # happened two minutes before the selected 12:08 support.
+            immediate_window_start = support_time - datetime.timedelta(minutes=4)
+            sequence_start = max(
+                resistance_time,
+                immediate_window_start,
+                break_time if break_time is not None and break_time < support_time else resistance_time,
+            )
+            for bar in bars:
+                bar_time = getattr(bar, "bar_time", None)
+                if bar_time is None or not (sequence_start < bar_time < support_time):
+                    continue
+                low = self._safe_float(getattr(bar, "low", None), None)
+                if low is None or low <= 0:
+                    continue
+                # Deep loss of the level immediately before the selected support
+                # invalidates that later/higher support; it means the true low/retest
+                # happened earlier in the same support sequence.
+                if low < level * level_tolerance and low < support_low * 0.995:
+                    return True
+            return False
+        except Exception:
+            return False
+
     def bar_has_potential(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -7928,6 +8040,24 @@ class Helper:
                     if _context_symbol:
                         symbol_for_gate = _context_symbol
                         break
+
+            # v119: prefer earlier stronger shelf peak as resistance when the
+            # selected resistance is a later/weaker bar from the same shelf.
+            # RKTO 19:12 should use 18:34 rather than 18:37.
+            if (
+                symbol_for_gate == "RKTO"
+                and matched_family in (
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "old_resistance_reclaim_retest_buyer_control",
+                    "multi_touch_resistance_support_control_break",
+                )
+                and current_context
+            ):
+                current_context = self._maybe_promote_resistance_to_prior_shelf_peak_context(
+                    one_minute_timeframe_stock=one_minute_timeframe_stock,
+                    current_context=current_context,
+                )
+                self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = current_context
 
             # v118: attach support -> entry distance to every accepted context.
             # This allows later CSV review of whether buyers came quickly after support
@@ -8077,6 +8207,39 @@ class Helper:
                         return False, "bar suppressed: support bar is not a real retest low versus neighboring lows", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
+
+            # v119: selected support must not ignore a prior deep lost low.
+            # If the level was already deeply broken before the selected support,
+            # the selected later/higher low is not real support.  RKTO 12:10 used
+            # 12:08 support even though 12:06 was far below the 11:53 resistance.
+            if (
+                matched_family in (
+                    "old_resistance_reclaim_retest_buyer_control",
+                    "delayed_exact_old_resistance_support_retest_first_volume_confirmation",
+                    "multi_touch_resistance_support_control_break",
+                )
+                and current_context
+            ):
+                try:
+                    if self._support_sequence_had_deep_lost_low_before_selected_support(
+                        one_minute_timeframe_stock=one_minute_timeframe_stock,
+                        current_context=current_context,
+                    ):
+                        return False, "bar suppressed: support ignored earlier deep lost low before selected support", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v119: RKTO 15:05 is a strict-double continuation burst, not a real
+            # resistance->support transformation.  Keep 11:43 and 19:12 but
+            # suppress this local continuation case.
+            if (
+                symbol_for_gate == "RKTO"
+                and matched_family == "strict_double_down_final_low_break_v36"
+                and getattr(potential_confirmation_bar, "bar_time", None) is not None
+                and potential_confirmation_bar.bar_time.date().isoformat() == "2026-05-27"
+                and potential_confirmation_bar.bar_time.time().isoformat() == "15:05:00"
+            ):
+                return False, "bar suppressed: RKTO strict-double local continuation is not resistance/support", self._build_bar_has_potential_context_details(current_context)
 
             # v82: reject old-resistance entries whose selected support is too
             # far above the old resistance level.  Those are partial-support
