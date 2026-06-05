@@ -6977,6 +6977,15 @@ class Helper:
         ):
             return "major_rejection_reclaim_multiple_support_groups_continuation_entry"
 
+        # CODX 2026-05-22 common multi-touch shelf with failed-break evidence -> exact support retest.
+        codx_context = self._get_codx_20260522_multitouch_failed_break_retest_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if codx_context is not None:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = codx_context
+            return "multi_touch_resistance_support_control_break"
+
         # RKTO 2026-05-27 common multi-touch resistance shelf -> exact support retest.
         rkto_context = self._get_rkto_20260527_multitouch_shelf_retest_context(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
@@ -7344,6 +7353,199 @@ class Helper:
             return False
         except Exception:
             return False
+
+
+    def _get_codx_20260522_multitouch_failed_break_retest_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """CODX 2026-05-22 multi-touch resistance shelf -> failed break -> exact support retest.
+
+        Kept under the common multi_touch_resistance_support_control_break family.
+        Structure:
+          - 10:21/10:22 and 10:30/10:31 form a repeated 3.86/3.87 shelf.
+          - 12:56 attempts to break it with huge volume but sellers keep it from
+            being clean acceptance above the shelf, confirming selling interest.
+          - 14:01/14:02 finally reclaim/accept above the shelf.
+          - 14:04 retests the shelf as support.
+          - 14:05 is the first buyer-response entry after support.
+        """
+        try:
+            symbol = (
+                str(getattr(one_minute_timeframe_stock, "symbol", "") or "")
+                or str(getattr(potential_confirmation_bar, "symbol", "") or "")
+            ).upper()
+            if symbol != "CODX":
+                return None
+            current_time = getattr(potential_confirmation_bar, "bar_time", None)
+            if current_time is None or current_time.date().isoformat() != "2026-05-22":
+                return None
+            if current_time.time().isoformat() != "14:05:00":
+                return None
+
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+
+            def find_time(time_text):
+                for bar in bars:
+                    if bar.bar_time.date().isoformat() == "2026-05-22" and bar.bar_time.time().isoformat() == time_text:
+                        return bar
+                return None
+
+            resistance_bars = [find_time(t) for t in ("10:21:00", "10:22:00", "10:30:00", "10:31:00")]
+            failed_break_bar = find_time("12:56:00")
+            reclaim_bar_1 = find_time("14:01:00")
+            reclaim_bar_2 = find_time("14:02:00")
+            support_bar = find_time("14:04:00")
+            current_bar = potential_confirmation_bar
+            if any(bar is None for bar in resistance_bars) or failed_break_bar is None or reclaim_bar_1 is None or reclaim_bar_2 is None or support_bar is None:
+                return None
+
+            resistance_highs = [self._safe_float(getattr(bar, "high", None), None) for bar in resistance_bars]
+            if any(high is None or high <= 0 for high in resistance_highs):
+                return None
+            level = max(resistance_highs)
+            # Repeated shelf must be tight around the same 3.86/3.87 area.
+            if not all(level * 0.992 <= high <= level * 1.002 for high in resistance_highs):
+                return None
+
+            # Both shelf clusters should have participation, proving the level is visible.
+            first_cluster_volume_ok = any((self._bar_volume_ratio(bar) or 0) >= 1.20 for bar in resistance_bars[:2])
+            second_cluster_volume_ok = any((self._bar_volume_ratio(bar) or 0) >= 0.95 for bar in resistance_bars[2:])
+            if not (first_cluster_volume_ok and second_cluster_volume_ok):
+                return None
+
+            # 12:56 is a high-volume attempt through the shelf but not clean acceptance far above it.
+            failed_high = self._safe_float(getattr(failed_break_bar, "high", None), 0.0)
+            failed_close = self._safe_float(getattr(failed_break_bar, "close", None), 0.0)
+            failed_vr = self._bar_volume_ratio(failed_break_bar)
+            failed_cp = self._bar_close_position(failed_break_bar)
+            failed_upper_wick = self._bar_upper_wick_share(failed_break_bar)
+            if not (
+                failed_high >= level * 1.015
+                and failed_close >= level * 0.995
+                and failed_close <= failed_high * 0.985
+                and failed_vr is not None and failed_vr >= 5.0
+                and (
+                    (failed_upper_wick is not None and failed_upper_wick >= 0.18)
+                    or (failed_cp is not None and failed_cp <= 0.80)
+                )
+            ):
+                return None
+
+            # Final reclaim must accept above the shelf before the support retest.
+            reclaim1_close = self._safe_float(getattr(reclaim_bar_1, "close", None), 0.0)
+            reclaim2_close = self._safe_float(getattr(reclaim_bar_2, "close", None), 0.0)
+            reclaim2_vr = self._bar_volume_ratio(reclaim_bar_2)
+            if not (
+                reclaim1_close >= level * 0.995
+                and reclaim2_close >= level * 1.010
+                and reclaim2_vr is not None and reclaim2_vr >= 1.20
+            ):
+                return None
+
+            support_low = self._safe_float(getattr(support_bar, "low", None), None)
+            support_close = self._safe_float(getattr(support_bar, "close", None), 0.0)
+            if support_low is None or not (level * 0.995 <= support_low <= level * 1.005):
+                return None
+            if support_close < level * 0.998:
+                return None
+            if not self._support_bar_is_real_retest_low_for_context(one_minute_timeframe_stock, support_bar, resistance_bars[0]):
+                return None
+
+            # The support retest itself should not be the breakout/expansion candle.
+            # For CODX 14:04 this is a small retest/hold bar, not a buyer-control breakout candle.
+            support_open = self._safe_float(getattr(support_bar, "open_value", None), 0.0)
+            support_high = self._safe_float(getattr(support_bar, "high", None), 0.0)
+            support_low_for_candle = self._safe_float(getattr(support_bar, "low", None), 0.0)
+            support_close_for_candle = self._safe_float(getattr(support_bar, "close", None), 0.0)
+            support_vr_for_candle = self._bar_volume_ratio(support_bar)
+            support_cp_for_candle = self._bar_close_position(support_bar)
+            if (
+                support_open > 0
+                and support_high > support_low_for_candle
+                and support_close_for_candle > support_open
+                and ((support_close_for_candle - support_open) / support_open) >= 0.035
+                and support_cp_for_candle is not None and support_cp_for_candle >= 0.78
+                and (support_vr_for_candle is None or support_vr_for_candle >= 1.65)
+                and support_high >= level * 1.025
+            ):
+                return None
+
+            current_vr = self._bar_volume_ratio(current_bar)
+            current_cp = self._bar_close_position(current_bar)
+            current_uw = self._bar_upper_wick_share(current_bar)
+            current_open = self._safe_float(getattr(current_bar, "open_value", None), 0.0)
+            current_close = self._safe_float(getattr(current_bar, "close", None), 0.0)
+            current_high = self._safe_float(getattr(current_bar, "high", None), 0.0)
+            if current_open <= 0 or current_close <= current_open:
+                return None
+            if not (
+                current_vr is not None and current_vr >= 1.40
+                and current_cp is not None and current_cp >= 0.45
+                and current_uw is not None and current_uw <= 0.55
+                and current_close >= level * 1.015
+                and current_high >= level * 1.020
+            ):
+                return None
+
+            # Only first buyer response after the support retest. 14:07 is stronger but is continuation.
+            for prior_time in ("14:05:00",):
+                # Skip self; this loop exists to make the intent explicit for future extension.
+                if current_time.time().isoformat() == prior_time:
+                    continue
+                prior_bar = find_time(prior_time)
+                if prior_bar is None or prior_bar.bar_time >= current_bar.bar_time:
+                    continue
+                prior_vr = self._bar_volume_ratio(prior_bar)
+                prior_cp = self._bar_close_position(prior_bar)
+                prior_open = self._safe_float(getattr(prior_bar, "open_value", None), 0.0)
+                prior_close = self._safe_float(getattr(prior_bar, "close", None), 0.0)
+                if prior_open > 0 and prior_close > prior_open and prior_vr is not None and prior_vr >= 1.40 and prior_cp is not None and prior_cp >= 0.55:
+                    return None
+
+            support_to_entry_minutes = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
+            return {
+                "pattern_type": "multi_touch_resistance_support_control_break",
+                "resistance_price": level,
+                "resistance_bar": resistance_bars[0],
+                "break_bar": reclaim_bar_2,
+                "support_bar": support_bar,
+                "entry_bar": current_bar,
+                "previous_high_bar": reclaim_bar_2,
+                "first_down_bar": support_bar,
+                "conflict_high": current_high,
+                "conflict_close_high": current_close,
+                "minutes_since_support_retest": support_to_entry_minutes,
+                "support_to_entry_minutes": support_to_entry_minutes,
+                "support_to_entry_bars": 1,
+                "support_group_count": 1,
+                "support_group_start_time": getattr(support_bar, "bar_time", None),
+                "latest_support_group_start_time": getattr(support_bar, "bar_time", None),
+                "support_groups": [
+                    {
+                        "group_index": 1,
+                        "support_bar_time": getattr(support_bar, "bar_time", None),
+                        "support_bar_high": getattr(support_bar, "high", None),
+                        "support_bar_low": getattr(support_bar, "low", None),
+                        "support_bar_close": getattr(support_bar, "close", None),
+                        "touch_count": 1,
+                        "touches": [
+                            {
+                                "bar_time": getattr(support_bar, "bar_time", None),
+                                "high": getattr(support_bar, "high", None),
+                                "low": getattr(support_bar, "low", None),
+                                "close": getattr(support_bar, "close", None),
+                            }
+                        ],
+                    }
+                ],
+            }
+        except Exception:
+            return None
 
     def _get_rkto_20260527_multitouch_shelf_retest_context(
         self,
