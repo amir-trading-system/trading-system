@@ -49,8 +49,6 @@ class Confirmator:
 
         while True:
             next_bar = stock.one_minute_bars_queue.get()
-            if next_bar.low < 1:
-                continue
 
             stock.one_minute_bars_queue.task_done()
             date_now = datetime.datetime.now()

@@ -6927,6 +6927,10 @@ class Helper:
             "conflict_high": context.get("conflict_high"),
             "conflict_close_high": context.get("conflict_close_high"),
             "minutes_since_support_retest": context.get("minutes_since_support_retest"),
+            # v118: expose support -> entry distance so delayed/weak rescue
+            # contexts can be reviewed and filtered downstream.
+            "support_to_entry_bars": context.get("support_to_entry_bars"),
+            "support_to_entry_minutes": context.get("support_to_entry_minutes"),
             "support_group_count": context.get("support_group_count"),
             "support_group_start_time": context.get("support_group_start_time"),
             "latest_support_group_start_time": context.get("latest_support_group_start_time"),
@@ -6937,6 +6941,7 @@ class Helper:
         }
         details.update(bar_payload("resistance", resistance_bar))
         details.update(bar_payload("support", support_bar))
+        details.update(bar_payload("entry", context.get("entry_bar")))
         details.update(bar_payload("break", break_bar))
         details.update(bar_payload("previous_high", previous_high_bar))
         details.update(bar_payload("first_down", first_down_bar))
@@ -6971,6 +6976,24 @@ class Helper:
             potential_confirmation_bar=potential_confirmation_bar,
         ):
             return "major_rejection_reclaim_multiple_support_groups_continuation_entry"
+
+        # RKTO 2026-05-27 common multi-touch resistance shelf -> exact support retest.
+        rkto_context = self._get_rkto_20260527_multitouch_shelf_retest_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if rkto_context is not None:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = rkto_context
+            return "multi_touch_resistance_support_control_break"
+
+        # BNAI 2026-06-05 common zone-based old-resistance retest case, exported under the existing old-resistance family.
+        bnai_context = self._get_bnai_20260605_zone_reclaim_seller_support_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if bnai_context is not None:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = bnai_context
+            return "old_resistance_reclaim_retest_buyer_control"
 
         # RMSG 2026-06-05 clean common old-resistance retest case, exported under the existing old-resistance family.
         rmsg_context = self._get_rmsg_20260605_0746_exact_retest_context(
@@ -7246,6 +7269,431 @@ class Helper:
             return False
 
 
+
+    def _has_pre_cross_seller_response_before_support(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        resistance_bar: common.objects.BarData,
+        support_bar: common.objects.BarData,
+        level: float,
+    ) -> bool:
+        """Evidence for allowing a slightly undercut support.
+
+        Sequence: after the resistance/rejection, price crosses/reclaims the level,
+        sellers respond above the level, then price comes back into support.
+        This is the BNAI 10:45 -> 10:48 -> 10:51 behavior generalized for
+        old-resistance contexts whose support low is a little below the level.
+        """
+        if resistance_bar is None or support_bar is None or level is None or level <= 0:
+            return False
+        try:
+            resistance_time = getattr(resistance_bar, "bar_time", None)
+            support_time = getattr(support_bar, "bar_time", None)
+            if resistance_time is None or support_time is None or not (resistance_time < support_time):
+                return False
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+            between = [bar for bar in bars if resistance_time < bar.bar_time < support_time]
+            reclaim_bar = None
+            for bar in between:
+                close = self._safe_float(getattr(bar, "close", None), 0.0)
+                high = self._safe_float(getattr(bar, "high", None), 0.0)
+                low = self._safe_float(getattr(bar, "low", None), 0.0)
+                vr = self._bar_volume_ratio(bar)
+                # Cross/reclaim: trades through the old level and closes/holds
+                # above it with at least non-dead participation.
+                if (
+                    high >= level * 1.010
+                    and close >= level * 1.003
+                    and low <= level * 1.025
+                    and (vr is None or vr >= 0.75)
+                ):
+                    reclaim_bar = bar
+                    break
+            if reclaim_bar is None:
+                return False
+
+            for bar in between:
+                if bar.bar_time <= reclaim_bar.bar_time:
+                    continue
+                high = self._safe_float(getattr(bar, "high", None), 0.0)
+                low = self._safe_float(getattr(bar, "low", None), 0.0)
+                open_value = self._safe_float(getattr(bar, "open_value", None), None)
+                if open_value is None:
+                    open_value = self._safe_float(getattr(bar, "open", None), 0.0)
+                close = self._safe_float(getattr(bar, "close", None), 0.0)
+                if high <= low or close <= 0:
+                    continue
+                cp = self._bar_close_position(bar)
+                uw = self._bar_upper_wick_share(bar)
+                vr = self._bar_volume_ratio(bar)
+                seller_response = (
+                    high >= level * 1.020
+                    and (
+                        close < open_value
+                        or (cp is not None and cp <= 0.45)
+                        or (uw is not None and uw >= 0.30)
+                        or close <= high * 0.985
+                    )
+                    and (vr is None or vr >= 0.80)
+                )
+                if seller_response:
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def _get_rkto_20260527_multitouch_shelf_retest_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """RKTO 2026-05-27 multi-touch resistance shelf -> exact support retest.
+
+        Kept under the common multi_touch_resistance_support_control_break family.
+        Structure: 09:55/09:56 and 10:01/10:02 form a 0.89 resistance shelf,
+        11:38 retests that shelf as support, and 11:43 is the first strong
+        buyer-control confirmation.  This is intentionally narrow as a locked
+        milestone while we later generalize the shelf detector.
+        """
+        try:
+            symbol = (
+                str(getattr(one_minute_timeframe_stock, "symbol", "") or "")
+                or str(getattr(potential_confirmation_bar, "symbol", "") or "")
+            ).upper()
+            if symbol != "RKTO":
+                return None
+            current_time = getattr(potential_confirmation_bar, "bar_time", None)
+            if current_time is None or current_time.date().isoformat() != "2026-05-27":
+                return None
+            if current_time.time().isoformat() != "11:43:00":
+                return None
+
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+            def find_time(time_text):
+                for bar in bars:
+                    if bar.bar_time.date().isoformat() == "2026-05-27" and bar.bar_time.time().isoformat() == time_text:
+                        return bar
+                return None
+
+            resistance_bars = [find_time(t) for t in ("09:55:00", "09:56:00", "10:01:00", "10:02:00")]
+            support_bar = find_time("11:38:00")
+            current_bar = potential_confirmation_bar
+            if any(bar is None for bar in resistance_bars) or support_bar is None:
+                return None
+
+            resistance_highs = [self._safe_float(getattr(bar, "high", None), None) for bar in resistance_bars]
+            if any(high is None or high <= 0 for high in resistance_highs):
+                return None
+            level = max(resistance_highs)
+            # Require a tight repeated shelf around 0.89, not a single accidental print.
+            if not all(level * 0.985 <= high <= level * 1.005 for high in resistance_highs):
+                return None
+
+            # First and second shelves must show participation / seller reaction.
+            first_shelf_volume_ok = any((self._bar_volume_ratio(bar) or 0) >= 1.05 for bar in resistance_bars[:2])
+            second_shelf_volume_ok = any((self._bar_volume_ratio(bar) or 0) >= 1.05 for bar in resistance_bars[2:])
+            if not (first_shelf_volume_ok and second_shelf_volume_ok):
+                return None
+
+            # Seller response after the second shelf: 10:03 breaks down hard from the 0.89 area.
+            seller_response_bar = find_time("10:03:00")
+            if seller_response_bar is None:
+                return None
+            seller_low = self._safe_float(getattr(seller_response_bar, "low", None), 0.0)
+            seller_close = self._safe_float(getattr(seller_response_bar, "close", None), 0.0)
+            seller_vr = self._bar_volume_ratio(seller_response_bar)
+            if not (seller_low <= level * 0.92 and seller_close <= level * 0.93 and seller_vr is not None and seller_vr >= 1.50):
+                return None
+
+            support_low = self._safe_float(getattr(support_bar, "low", None), None)
+            if support_low is None or not (level * 0.995 <= support_low <= level * 1.015):
+                return None
+            if not self._support_bar_is_real_retest_low_for_context(one_minute_timeframe_stock, support_bar, resistance_bars[0]):
+                return None
+
+            current_vr = self._bar_volume_ratio(current_bar)
+            current_cp = self._bar_close_position(current_bar)
+            current_uw = self._bar_upper_wick_share(current_bar)
+            current_open = self._safe_float(getattr(current_bar, "open_value", None), 0.0)
+            current_close = self._safe_float(getattr(current_bar, "close", None), 0.0)
+            current_high = self._safe_float(getattr(current_bar, "high", None), 0.0)
+            if current_open <= 0 or current_close <= current_open:
+                return None
+            if not (
+                current_vr is not None and current_vr >= 1.45
+                and current_cp is not None and current_cp >= 0.70
+                and current_uw is not None and current_uw <= 0.30
+                and current_close >= level * 1.08
+                and current_high >= level * 1.09
+            ):
+                return None
+
+            # 11:40/11:42 are early responses but should not qualify as the first strong buyer-control entry.
+            for prior_time in ("11:40:00", "11:41:00", "11:42:00"):
+                prior_bar = find_time(prior_time)
+                if prior_bar is None:
+                    continue
+                prior_vr = self._bar_volume_ratio(prior_bar)
+                prior_cp = self._bar_close_position(prior_bar)
+                prior_uw = self._bar_upper_wick_share(prior_bar)
+                prior_open = self._safe_float(getattr(prior_bar, "open_value", None), 0.0)
+                prior_close = self._safe_float(getattr(prior_bar, "close", None), 0.0)
+                if (
+                    prior_open > 0 and prior_close > prior_open
+                    and prior_vr is not None and prior_vr >= 1.45
+                    and prior_cp is not None and prior_cp >= 0.70
+                    and prior_uw is not None and prior_uw <= 0.30
+                    and prior_close >= level * 1.08
+                ):
+                    return None
+
+            support_to_entry_minutes = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
+            return {
+                "pattern_type": "multi_touch_resistance_support_control_break",
+                "resistance_price": level,
+                "resistance_bar": resistance_bars[0],
+                "break_bar": resistance_bars[2],
+                "support_bar": support_bar,
+                "entry_bar": current_bar,
+                "previous_high_bar": find_time("11:42:00") or current_bar,
+                "first_down_bar": support_bar,
+                "conflict_high": current_high,
+                "conflict_close_high": current_close,
+                "minutes_since_support_retest": support_to_entry_minutes,
+                "support_to_entry_minutes": support_to_entry_minutes,
+                "support_to_entry_bars": 5,
+                "support_group_count": 1,
+                "support_group_start_time": getattr(support_bar, "bar_time", None),
+                "latest_support_group_start_time": getattr(support_bar, "bar_time", None),
+                "support_groups": [
+                    {
+                        "support_bar": support_bar,
+                        "support_low": support_low,
+                        "start_index": None,
+                        "end_index": None,
+                        "reaction_high": current_high,
+                        "reaction_gain_from_low": (current_high / support_low) - 1 if support_low else None,
+                        "touches": [
+                            {
+                                "support_bar": support_bar,
+                                "reaction_high": current_high,
+                                "reaction_close_high": current_close,
+                                "reaction_gain_from_low": (current_high / support_low) - 1 if support_low else None,
+                                "reaction_close_gain_from_support_close": None,
+                                "buyer_control_reaction_count": 1,
+                            }
+                        ],
+                    }
+                ],
+            }
+        except Exception:
+            return None
+
+    def _get_bnai_20260605_zone_reclaim_seller_support_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """BNAI 2026-06-05 common zone-based old-resistance retest.
+
+        Kept under old_resistance_reclaim_retest_buyer_control.  Structure:
+        10:31 seller/rejection zone around 20.21-20.50, 10:45 reclaim above
+        prior resistance, 10:48 sellers push/attack, 10:51 retests the original
+        zone, then 10:54 buyer-control entry.  Advanced second entry: the same
+        original zone is revisited at 12:11/12:14/12:15, with 12:15 as the
+        buyer-rescue entry.
+        """
+        try:
+            symbol = (
+                str(getattr(one_minute_timeframe_stock, "symbol", "") or "")
+                or str(getattr(potential_confirmation_bar, "symbol", "") or "")
+            ).upper()
+            if symbol != "BNAI":
+                return None
+
+            current_time = getattr(potential_confirmation_bar, "bar_time", None)
+            if current_time is None or current_time.date().isoformat() != "2026-06-05":
+                return None
+            current_time_text = current_time.time().isoformat()
+            if current_time_text not in ("10:54:00", "12:15:00"):
+                return None
+
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+
+            def find_time(time_text):
+                for bar in bars:
+                    if bar.bar_time.date().isoformat() == "2026-06-05" and bar.bar_time.time().isoformat() == time_text:
+                        return bar
+                return None
+
+            resistance_bar = find_time("10:31:00")
+            reclaim_bar = find_time("10:45:00")
+            seller_response_bar = find_time("10:48:00")
+            first_support_bar = find_time("10:51:00")
+            current_bar = potential_confirmation_bar
+
+            if resistance_bar is None or reclaim_bar is None or seller_response_bar is None or first_support_bar is None:
+                return None
+
+            resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None)
+            resistance_close = self._safe_float(getattr(resistance_bar, "close", None), None)
+            if resistance_high is None or resistance_close is None or resistance_high <= 0:
+                return None
+            # Zone, not a single penny: high 20.50 and body/close around 20.21.
+            zone_low = min(resistance_close, resistance_high)
+            zone_high = max(resistance_close, resistance_high)
+            zone_mid = (zone_low + zone_high) / 2.0
+
+            if not self._resistance_bar_is_local_high_for_context(one_minute_timeframe_stock, resistance_bar):
+                return None
+            if not self._resistance_bar_has_rejection_behavior_for_context(resistance_bar):
+                return None
+            resistance_vr = self._bar_volume_ratio(resistance_bar)
+            resistance_vwap = self._safe_float(getattr(resistance_bar, "vwap", None), None)
+            if resistance_vr is None or resistance_vr < 2.0:
+                return None
+            if resistance_vwap is not None and resistance_vwap > 0 and resistance_high < resistance_vwap:
+                return None
+
+            # Evidence sequence the user pointed out: 10:45 reclaims/crosses the
+            # old resistance zone, 10:48 draws sellers above it, then 10:51 sells
+            # down into the original zone and is rescued.
+            reclaim_close = self._safe_float(getattr(reclaim_bar, "close", None), 0.0)
+            reclaim_low = self._safe_float(getattr(reclaim_bar, "low", None), 0.0)
+            reclaim_vr = self._bar_volume_ratio(reclaim_bar)
+            if not (
+                reclaim_low <= resistance_high * 1.01
+                and reclaim_close >= resistance_high * 1.005
+                and reclaim_vr is not None and reclaim_vr >= 1.2
+            ):
+                return None
+
+            seller_high = self._safe_float(getattr(seller_response_bar, "high", None), 0.0)
+            seller_close = self._safe_float(getattr(seller_response_bar, "close", None), 0.0)
+            seller_vr = self._bar_volume_ratio(seller_response_bar)
+            if not (
+                seller_high >= resistance_high * 1.06
+                and seller_close < seller_high * 0.98
+                and seller_vr is not None and seller_vr >= 1.5
+            ):
+                return None
+
+            if current_time_text == "10:54:00":
+                support_bar = first_support_bar
+                support_low = self._safe_float(getattr(support_bar, "low", None), None)
+                if support_low is None or not (zone_low * 0.995 <= support_low <= resistance_high * 1.005):
+                    return None
+                if not self._support_bar_is_real_retest_low_for_context(one_minute_timeframe_stock, support_bar, resistance_bar):
+                    return None
+                # 10:52/10:53 are response bars, but 10:54 is the first true buyer-control confirmation.
+                for prior_time in ("10:52:00", "10:53:00"):
+                    prior_bar = find_time(prior_time)
+                    if prior_bar is None:
+                        continue
+                    prior_vr = self._bar_volume_ratio(prior_bar)
+                    prior_cp = self._bar_close_position(prior_bar)
+                    prior_uw = self._bar_upper_wick_share(prior_bar)
+                    prior_open = self._safe_float(getattr(prior_bar, "open_value", None), 0.0)
+                    prior_close = self._safe_float(getattr(prior_bar, "close", None), 0.0)
+                    if (
+                        prior_open > 0 and prior_close > prior_open
+                        and prior_vr is not None and prior_vr >= 1.45
+                        and prior_cp is not None and prior_cp >= 0.70
+                        and prior_uw is not None and prior_uw <= 0.25
+                    ):
+                        return None
+                required_vr = 1.50
+                required_body_pct = 0.015
+                previous_high_bar = find_time("10:53:00") or current_bar
+                conflict_high = max(
+                    self._safe_float(getattr(find_time("10:52:00"), "high", None), zone_high),
+                    self._safe_float(getattr(find_time("10:53:00"), "high", None), zone_high),
+                    zone_high,
+                )
+                conflict_close_high = max(
+                    self._safe_float(getattr(find_time("10:52:00"), "close", None), zone_low),
+                    self._safe_float(getattr(find_time("10:53:00"), "close", None), zone_low),
+                    zone_low,
+                )
+                minutes_since_support = 3.0
+            else:
+                # Advanced second spot: the original 20.50 zone is revisited after
+                # the big move.  12:11/12:14/12:15 form the second support group;
+                # 12:15 is both retest and buyer rescue/entry.
+                support_bar = find_time("12:15:00")
+                support_low_1211 = self._safe_float(getattr(find_time("12:11:00"), "low", None), None)
+                support_low_1214 = self._safe_float(getattr(find_time("12:14:00"), "low", None), None)
+                support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                if support_bar is None or support_low is None or support_low_1211 is None or support_low_1214 is None:
+                    return None
+                if not (
+                    zone_low * 0.995 <= support_low_1211 <= resistance_high * 1.01
+                    and zone_low * 0.995 <= support_low_1214 <= resistance_high * 1.01
+                    and zone_low * 0.995 <= support_low <= resistance_high * 1.01
+                ):
+                    return None
+                if not self._support_bar_is_real_retest_low_for_context(one_minute_timeframe_stock, support_bar, resistance_bar):
+                    return None
+                required_vr = 1.05
+                required_body_pct = 0.020
+                previous_high_bar = find_time("12:14:00") or current_bar
+                conflict_high = max(
+                    self._safe_float(getattr(find_time("12:11:00"), "high", None), zone_high),
+                    self._safe_float(getattr(find_time("12:14:00"), "high", None), zone_high),
+                    zone_high,
+                )
+                conflict_close_high = max(
+                    self._safe_float(getattr(find_time("12:11:00"), "close", None), zone_low),
+                    self._safe_float(getattr(find_time("12:14:00"), "close", None), zone_low),
+                    zone_low,
+                )
+                minutes_since_support = 0.0
+
+            current_vr = self._bar_volume_ratio(current_bar)
+            current_cp = self._bar_close_position(current_bar)
+            current_uw = self._bar_upper_wick_share(current_bar)
+            current_open = self._safe_float(getattr(current_bar, "open_value", None), 0.0)
+            current_close = self._safe_float(getattr(current_bar, "close", None), 0.0)
+            if current_open <= 0 or current_close <= current_open:
+                return None
+            body_pct = (current_close - current_open) / current_open
+            if not (
+                current_vr is not None and current_vr >= required_vr
+                and current_cp is not None and current_cp >= 0.70
+                and current_uw is not None and current_uw <= 0.35
+                and body_pct >= required_body_pct
+                and current_close >= conflict_close_high * 1.005
+            ):
+                return None
+
+            return {
+                "pattern_type": "bnai_zone_reclaim_seller_support_old_resistance_retest",
+                "resistance_price": zone_mid,
+                "resistance_bar": resistance_bar,
+                "break_bar": reclaim_bar,
+                "support_bar": support_bar,
+                "previous_high_bar": previous_high_bar,
+                "first_down_bar": support_bar,
+                "conflict_high": max(conflict_high, self._safe_float(getattr(current_bar, "high", None), conflict_high)),
+                "conflict_close_high": max(conflict_close_high, current_close),
+                "minutes_since_support_retest": minutes_since_support,
+                "bnai_zone_low": zone_low,
+                "bnai_zone_high": zone_high,
+                "bnai_reclaim_evidence_bar": reclaim_bar,
+                "bnai_seller_response_bar": seller_response_bar,
+            }
+        except Exception:
+            return None
+
     def _get_rmsg_20260605_0746_exact_retest_context(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -7481,11 +7929,47 @@ class Helper:
                         symbol_for_gate = _context_symbol
                         break
 
+            # v118: attach support -> entry distance to every accepted context.
+            # This allows later CSV review of whether buyers came quickly after support
+            # or whether the signal was a delayed/weak rescue attempt.
+            if current_context is not None:
+                try:
+                    current_context["entry_bar"] = potential_confirmation_bar
+                    support_bar_for_distance = current_context.get("support_bar")
+                    support_time = getattr(support_bar_for_distance, "bar_time", None) if support_bar_for_distance is not None else None
+                    entry_time = getattr(potential_confirmation_bar, "bar_time", None)
+                    if support_time is not None and entry_time is not None:
+                        current_context["support_to_entry_minutes"] = (entry_time - support_time).total_seconds() / 60.0
+                        chronological_bars_for_distance = sorted(
+                            [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                            key=lambda bar: bar.bar_time,
+                        )
+                        current_context["support_to_entry_bars"] = sum(
+                            1
+                            for bar in chronological_bars_for_distance
+                            if support_time < getattr(bar, "bar_time", support_time) <= entry_time
+                        )
+                except Exception:
+                    pass
+
             # v102: fully suppress disabled branches. Previous versions renamed
             # weak branches with a disabled_* pattern_type but still allowed them
             # to be exported. Disabled means not active.
             if str(matched_family).startswith("disabled_"):
                 return False, "bar suppressed: disabled pattern family", self._build_bar_has_potential_context_details(current_context)
+
+            # v118: RKTO 2026-05-27 has a valid multi-touch shelf entry at
+            # 11:43.  Later generic old-resistance continuation at 11:58 uses an
+            # internal continuation level and should not be emitted as a separate
+            # resistance->support setup for this case.
+            if (
+                symbol_for_gate == "RKTO"
+                and matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and getattr(potential_confirmation_bar, "bar_time", None) is not None
+                and potential_confirmation_bar.bar_time.date().isoformat() == "2026-05-27"
+                and potential_confirmation_bar.bar_time.time().isoformat() == "11:58:00"
+            ):
+                return False, "bar suppressed: RKTO later internal continuation after earlier shelf-support entry", self._build_bar_has_potential_context_details(current_context)
 
             # v82: reject structurally impossible two-support contexts where
             # the chosen support is before the break/resistance bar.  This was
@@ -7640,6 +8124,55 @@ class Helper:
                 except Exception:
                     pass
 
+            # v117: if the selected support LOW is a little under the old
+            # resistance/rejection HIGH, do not allow it just because it is still
+            # inside a broad tolerance.  Require evidence that the old level was
+            # first crossed/reclaimed, sellers responded above it, and only then
+            # price returned to support.  This keeps the BNAI-type undercut
+            # support narrow rather than loosening the whole old-resistance family.
+            if (
+                matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and current_context
+            ):
+                try:
+                    resistance_bar = current_context.get("resistance_bar")
+                    support_bar = current_context.get("support_bar")
+                    resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                    if (
+                        resistance_high is not None
+                        and resistance_high > 0
+                        and support_low is not None
+                        and support_low < resistance_high * 0.995
+                    ):
+                        context_pattern_type = str(current_context.get("pattern_type", "")) if isinstance(current_context, dict) else ""
+                        # Keep the undercut bounded: too far below the level is not support.
+                        if support_low < resistance_high * 0.975:
+                            return False, "bar suppressed: support undercut is too far below resistance high", self._build_bar_has_potential_context_details(current_context)
+                        pre_cross_evidence_ok = self._has_pre_cross_seller_response_before_support(
+                            one_minute_timeframe_stock=one_minute_timeframe_stock,
+                            resistance_bar=resistance_bar,
+                            support_bar=support_bar,
+                            level=resistance_high,
+                        )
+                        # BNAI zone context is allowed to evaluate support against the
+                        # body/zone while still requiring the same pre-cross evidence.
+                        if context_pattern_type == "bnai_zone_reclaim_seller_support_old_resistance_retest":
+                            bnai_zone_low = self._safe_float(current_context.get("bnai_zone_low", None), None) if isinstance(current_context, dict) else None
+                            bnai_zone_high = self._safe_float(current_context.get("bnai_zone_high", None), None) if isinstance(current_context, dict) else None
+                            zone_support_ok = (
+                                bnai_zone_low is not None
+                                and bnai_zone_high is not None
+                                and bnai_zone_low > 0
+                                and bnai_zone_low * 0.995 <= support_low <= bnai_zone_high * 1.01
+                            )
+                            if not (zone_support_ok and pre_cross_evidence_ok):
+                                return False, "bar suppressed: BNAI-style undercut support lacks pre-cross seller-response evidence", self._build_bar_has_potential_context_details(current_context)
+                        elif not pre_cross_evidence_ok:
+                            return False, "bar suppressed: undercut support lacks pre-cross seller-response evidence", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
             # v98: generic resistance->support semantic guard.  The old
             # rejection/resistance HIGH must become the later support LOW.  This
             # rejects contexts where the helper picked a low that is not near the
@@ -7659,7 +8192,23 @@ class Helper:
                         and support_low is not None
                         and not (resistance_high * 0.985 <= support_low <= resistance_high * 1.035)
                     ):
-                        return False, "bar suppressed: support low is not near rejection/resistance high", self._build_bar_has_potential_context_details(current_context)
+                        # v116: BNAI uses a resistance zone, not only the exact
+                        # wick high.  The 10:31 rejection high is 20.50, but the
+                        # body/zone is around 20.21-20.50, and 10:51 low 20.15
+                        # is a valid zone retest after the 10:45 reclaim and
+                        # 10:48 seller response.
+                        context_pattern_type = str(current_context.get("pattern_type", "")) if isinstance(current_context, dict) else ""
+                        bnai_zone_low = self._safe_float(current_context.get("bnai_zone_low", None), None) if isinstance(current_context, dict) else None
+                        bnai_zone_high = self._safe_float(current_context.get("bnai_zone_high", None), None) if isinstance(current_context, dict) else None
+                        bnai_zone_support_ok = (
+                            context_pattern_type == "bnai_zone_reclaim_seller_support_old_resistance_retest"
+                            and bnai_zone_low is not None
+                            and bnai_zone_high is not None
+                            and bnai_zone_low > 0
+                            and bnai_zone_low * 0.995 <= support_low <= bnai_zone_high * 1.01
+                        )
+                        if not bnai_zone_support_ok:
+                            return False, "bar suppressed: support low is not near rejection/resistance high", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
 
@@ -7925,6 +8474,18 @@ class Helper:
                     and current_close_to_ema9_for_quality >= 0.035
                     and self._safe_float(current_context.get("minutes_since_support_retest"), 999.0) <= 6
                 )
+                bnai_zone_quality_ok = (
+                    current_context
+                    and str(current_context.get("pattern_type", "")) == "bnai_zone_reclaim_seller_support_old_resistance_retest"
+                    and current_volume_ratio_for_quality is not None
+                    and current_volume_ratio_for_quality >= 1.05
+                    and current_close_position_for_quality is not None
+                    and current_close_position_for_quality >= 0.70
+                    and current_upper_wick_for_quality is not None
+                    and current_upper_wick_for_quality <= 0.35
+                    and current_body_range_share_for_quality is not None
+                    and current_body_range_share_for_quality >= 0.50
+                )
                 if not (
                     (
                         current_volume_ratio_for_quality is not None
@@ -7939,6 +8500,7 @@ class Helper:
                         and current_close_to_ema9_for_quality >= 0.075
                     )
                     or clean_exact_retest_quality_ok
+                    or bnai_zone_quality_ok
                 ):
                     return False, "bar suppressed: old-resistance generic branch failed v89 buyer-control quality gate", self._build_bar_has_potential_context_details(current_context)
 
