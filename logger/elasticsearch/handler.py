@@ -84,8 +84,10 @@ class Handler(
             "strong_positive_group_reasons",
             "soft_positive_group_score",
             "soft_positive_group_reasons",
-            "valid_reason",
             "case_details",
+            "resistance_bar_time",
+            "support_bar_time",
+            "breakout_bar_time",
         ]
 
         for field in fields:

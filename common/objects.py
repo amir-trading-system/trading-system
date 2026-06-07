@@ -3,8 +3,6 @@ import enum
 import inspect
 import queue
 
-from dataclasses import dataclass
-
 class TimeframeType(enum.Enum):
     MINUTE = 1
     DAY = 2
@@ -872,15 +870,15 @@ class SymbolTest:
         self.date_time = datetime.datetime.strptime(datetime_str, "%m.%d.%yT%H:%M:%S")
         self.is_positive = is_positive
 
-@dataclass
-class ResistanceZone:
-    resistance_price: float
-    zone_low: float
-    zone_high: float
-    first_touch_time: datetime.datetime
-    last_touch_time: datetime.datetime
-    touch_count: int
-    rejection_count: int
-    max_rejection_pct: float
-    max_rejection_abs: float
-    source: str
+class CaseDetails:
+    def __init__(
+        self,
+        is_positive: bool,
+        support_bar: BarData,
+        resistance_bar: BarData,
+        breakout_bar: BarData,
+    ):
+        self.is_positive = is_positive
+        self.support_bar = support_bar
+        self.resistance_bar = resistance_bar
+        self.breakout_bar = breakout_bar

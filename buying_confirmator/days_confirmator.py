@@ -170,12 +170,12 @@ class Confirmator:
             current_one_minute_bar=potential_confirmation_bar,
         )
 
-        bar_has_potential, reason, case_details = self.helper.bar_has_potential(
+        case_details: common.objects.CaseDetails = self.helper.bar_potential_case_details(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
 
-        if not bar_has_potential:
+        if not case_details.is_positive:
             self.logger.info(
                 msg="Bar does not have a potential",
                 extra={
@@ -186,7 +186,6 @@ class Confirmator:
                     "bar_time": original_bar_to_confirm.bar_time,
                     "entry_position_bar_time": potential_confirmation_bar.bar_time,
                     "request_id": stock.request_id,
-                    "reason": reason,
                     "case_details": case_details,
                 }
             )
@@ -254,7 +253,9 @@ class Confirmator:
                     "strong_positive_group_reasons": strong_positive_group_reasons,
                     "soft_positive_group_score": soft_positive_group_score,
                     "soft_positive_group_reasons": soft_positive_group_reasons,
-                    "reason": reason,
+                    "support_bar_time": case_details.support_bar.bar_time if case_details.is_positive else datetime.datetime.fromisoformat(0),
+                    "resistance_bar_time": case_details.resistance_bar.bar_time if case_details.is_positive else datetime.datetime.fromisoformat(0),
+                    "breakout_bar_time": case_details.breakout_bar.bar_time if case_details.is_positive else datetime.datetime.fromisoformat(0),
                 },
             )
         else:

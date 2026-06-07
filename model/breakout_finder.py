@@ -1,5 +1,5 @@
 #pylint: skip-file
-# type: ignore
+
 import concurrent.futures
 import csv
 import datetime
@@ -9,6 +9,8 @@ import os
 import pickle
 from dataclasses import dataclass, asdict
 from typing import Any, Optional
+
+import common
 
 DISABLED_30PCT_FAMILIES = {"30pct_late_volume_shock_flat_base"}
 
@@ -502,45 +504,11 @@ def summarize_previous_window(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class _LiveStockWrapper:
-    def __init__(
-        self,
-        bars: list[Any],
-    ):
-        self.bars = bars
-        self.symbol = getattr(bars[0], "symbol", "") if bars else ""
-
-
-
-
-
-
-
-
-
-
-
-
 def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     current_bar: Any,
     bars: list[Any],
+    one_minute_timeframe_stock: common.objects.Stock,
     helper: Any = None,
-    stock_wrapper: Any = None,
 ) -> Optional[BreakoutContext]:
     """
     Public momentum entry-bar detector for the 20% continuation study.
@@ -574,16 +542,45 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     ):
         return None
 
-    if stock_wrapper is None:
-        stock_wrapper = _LiveStockWrapper(bars=bars)
     if helper is None:
         helper = buying_confirmator.helper.Helper()
 
-    # v84: the CSV/export path must use the same public gateway as the live
-    # caller.  Earlier versions called the lower-level behavioral detector
-    # directly, bypassing bar_has_potential(...) suppressions such as SDOT
-    # 09:35/09:41/10:10 and duplicate delayed-exact-retest continuations.
-    if hasattr(helper, "bar_has_potential"):
+    # v33 integration: new helpers expose bar_potential_case_details(...)
+    # instead of bar_has_potential(...). Prefer that richer public gateway when
+    # available and convert its CaseDetails object into the BreakoutContext
+    # fields below. Keep the older gateways as compatibility fallbacks.
+    matched_family = None
+    helper_context_from_case_details: Optional[dict[str, Any]] = None
+
+    if hasattr(helper, "bar_potential_case_details"):
+        case_details = helper.bar_potential_case_details(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=current_bar,
+        )
+
+        if not getattr(case_details, "is_positive", False):
+            return None
+
+        case_resistance_bar = getattr(case_details, "resistance_bar", None)
+        case_support_bar = getattr(case_details, "support_bar", None)
+        case_breakout_bar = getattr(case_details, "breakout_bar", None)
+
+        if case_resistance_bar is None or case_support_bar is None:
+            return None
+
+        matched_family = "bar_potential_case_details"
+        helper_context_from_case_details = {
+            "reason": matched_family,
+            "resistance_bar": case_resistance_bar,
+            "support_bar": case_support_bar,
+            "breakout_bar": case_breakout_bar,
+            "resistance_price": safe_float(getattr(case_resistance_bar, "high", None), None),
+        }
+
+    elif hasattr(helper, "bar_has_potential"):
+        # v84: the CSV/export path must use the same public gateway as the live
+        # caller. Earlier versions called the lower-level behavioral detector
+        # directly, bypassing bar_has_potential(...) suppressions.
         bar_has_potential_result = helper.bar_has_potential(
             one_minute_timeframe_stock=stock_wrapper,
             potential_confirmation_bar=current_bar,
@@ -621,14 +618,16 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     # versions re-computed these fields generically with max(recent highs) and
     # min(recent lows), which made the CSV look like invalid HKIT mappings even
     # when the helper matched a different internal support structure.
-    helper_context = None
-    if hasattr(helper, "get_last_behavioral_buyer_control_phase_20pct_30min_entry_context"):
+    helper_context = helper_context_from_case_details
+    if helper_context is None and hasattr(helper, "get_last_behavioral_buyer_control_phase_20pct_30min_entry_context"):
         helper_context = helper.get_last_behavioral_buyer_control_phase_20pct_30min_entry_context()
 
     if helper_context:
         resistance_bar = helper_context.get("resistance_bar")
         support_low_bar = helper_context.get("support_bar")
         resistance_price = safe_float(helper_context.get("resistance_price"), None)
+        if resistance_price is None and resistance_bar is not None:
+            resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
     else:
         # Fallback only for older helper/finder mismatches.
         recent_bars = bars_before_current[-20:] if len(bars_before_current) >= 20 else bars_before_current
@@ -684,119 +683,12 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
         helper_context=helper_context or {},
     )
 
-def find_helper_30pct_trend_shift_candidate_context(
-    current_bar: Any,
-    bars: list[Any],
-) -> Optional[BreakoutContext]:
-    """
-    Uses Helper.is_30pct_trend_shift_candidate(...) as a separate detector.
-
-    This is the 30% trend-shift selector mined from the positive 30% trend
-    starts and the later theory research pass: strict ORB quality breakout,
-    aligned higher lows, dry-up reclaim, pre-20 rebuild, recent-high break,
-    resistance/support, supply/demand, or late volume-shock flat-base expansion.
-    The helper exports the matched 30% sub-family and enforces the current
-    first-alert/late-family limiter.
-    """
-
-    stock_wrapper = _LiveStockWrapper(bars=bars)
-    helper = buying_confirmator.helper.Helper()
-
-    if not hasattr(helper, "is_30pct_trend_shift_candidate"):
-        return None
-
-    matched_family = None
-
-    if hasattr(helper, "get_30pct_trend_shift_candidate_family"):
-        matched_family = helper.get_30pct_trend_shift_candidate_family(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        )
-    else:
-        has_pattern = helper.is_30pct_trend_shift_candidate(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        )
-
-        if has_pattern:
-            matched_family = "30pct_unknown_family"
-
-    if not matched_family:
-        return None
-
-    bars_before_current = get_bars_same_day_until(
-        bars=bars,
-        current_bar=current_bar,
-        include_current=False,
-    )
-
-    # ORB can legitimately fire before 20 regular-session bars exist, so the
-    # context builder must not discard early ORB rows. Use the available bars
-    # for the generic context fields.
-    if len(bars_before_current) < 3:
-        return None
-
-    recent_bars = bars_before_current[-20:]
-
-    resistance_bar = max(
-        recent_bars,
-        key=lambda bar_object: safe_float(getattr(bar_object, "high", None), 0.0),
-    )
-
-    support_low_bar = min(
-        recent_bars,
-        key=lambda bar_object: safe_float(getattr(bar_object, "low", None), float("inf")),
-    )
-
-    resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
-    support_low = safe_float(getattr(support_low_bar, "low", None), None)
-    breakout_close = safe_float(getattr(current_bar, "close", None), None)
-
-    if (
-        resistance_price is None
-        or resistance_price <= 0
-        or support_low is None
-        or support_low <= 0
-        or breakout_close is None
-        or breakout_close <= 0
-    ):
-        return None
-
-    previous_bar = bars_before_current[-1]
-
-    volume_vs_previous_bar_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(previous_bar, "volume", None), None),
-    ) or 0.0
-
-    volume_vs_average_ratio = ratio(
-        safe_float(getattr(current_bar, "volume", None), None),
-        safe_float(getattr(current_bar, "volume_average", None), None),
-    ) or 0.0
-
-    return BreakoutContext(
-        breakout_type="thirty_pct_trend_shift_candidate",
-        reason=matched_family,
-        breakout_bar=current_bar,
-        resistance_bar=resistance_bar,
-        resistance_price=resistance_price,
-        lowest_low_since_resistance_bar=support_low_bar,
-        pullback_from_resistance_pct=(resistance_price - support_low) / resistance_price,
-        breakout_close_above_resistance_pct=(breakout_close - resistance_price) / resistance_price,
-        minutes_since_resistance=minutes_between(resistance_bar.bar_time, current_bar.bar_time),
-        volume_vs_previous_bar_ratio=volume_vs_previous_bar_ratio,
-        volume_vs_average_ratio=volume_vs_average_ratio,
-    )
-
-
-
-
 def find_breakout_context(
     current_bar: Any,
     bars: list[Any],
     allow_aligned_higher_low_buyer_ignition: bool = True,
+    one_minute_timeframe_stock = common.objects.Stock,
     helper: Any = None,
-    stock_wrapper: Any = None,
 ) -> Optional[BreakoutContext]:
     """
     Live/export decision for the public 20% momentum-entry experiment.
@@ -812,7 +704,7 @@ def find_breakout_context(
         current_bar=current_bar,
         bars=bars,
         helper=helper,
-        stock_wrapper=stock_wrapper,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
     )
 
     if public_20pct_context is not None:
@@ -1525,7 +1417,6 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
     # every bar made the hot path much slower and prevented any helper-side
     # caching from being useful.
     helper_for_day = buying_confirmator.helper.Helper()
-    stock_wrapper_for_day = _LiveStockWrapper(bars=bars)
 
     for current_bar in bars:
         # We normally profile regular session only, including the 09:30 opening bar.
@@ -1570,7 +1461,7 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
             bars=bars,
             allow_aligned_higher_low_buyer_ignition=allow_aligned_higher_low_buyer_ignition,
             helper=helper_for_day,
-            stock_wrapper=stock_wrapper_for_day,
+            one_minute_timeframe_stock=stock,
         )
 
         if context is None:
