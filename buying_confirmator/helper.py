@@ -2966,8 +2966,8 @@ class Helper:
                     ).total_seconds() / 60.0
                 except Exception:
                     minutes_since_final_support = float(current_index - final_support_index)
-                if not (1 <= minutes_since_final_support <= 10):
-                    continue
+                if False and not (1 <= minutes_since_final_support <= 10):
+                    continue  # v131 no-time-gate: replaced by structure/volume checks
 
                 # Entry is first buyer-volume confirmation after final retest.
                 prior_buyer_volume_confirmation = False
@@ -3221,8 +3221,8 @@ class Helper:
                         ).total_seconds() / 60.0
                     except Exception:
                         minutes_since_true_support = float(current_index - true_support_index)
-                    if not (2 <= minutes_since_true_support <= 20):
-                        continue
+                    if False and not (2 <= minutes_since_true_support <= 20):
+                        continue  # v131 no-time-gate
 
                     # Entry is the first real buyer-volume confirmation after the true retest.
                     prior_buyer_volume_confirmation = False
@@ -3619,8 +3619,8 @@ class Helper:
                     minutes_since_support = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
                 except Exception:
                     minutes_since_support = float(current_index - support_index)
-                if not (1 <= minutes_since_support <= 30):
-                    continue
+                if False and not (1 <= minutes_since_support <= 30):
+                    continue  # v131 no-time-gate
                 # v46: the current bar must be the buyer-control break AFTER
                 # support was proven. Do not accept passive bars that merely
                 # remain near/above the old level. It must break the post-
@@ -4274,8 +4274,8 @@ class Helper:
                     ).total_seconds() / 60.0
                 except Exception:
                     base_minutes = float(final_attack_index - first_attack_index)
-                if base_minutes < 12:
-                    continue
+                if False and base_minutes < 12:
+                    continue  # v131 no-time-gate
 
                 # Current bar should occur after the context is formed.  It is
                 # not required to be an entry by this context itself.
@@ -4404,8 +4404,8 @@ class Helper:
                     minutes_after_demand = (touch_bar.bar_time - demand_bar.bar_time).total_seconds() / 60.0
                 except Exception:
                     minutes_after_demand = float(touch_index - demand_index)
-                if minutes_after_demand < 15:
-                    continue
+                if False and minutes_after_demand < 15:
+                    continue  # v131 no-time-gate
                 touch_is_same_level_resistance = (
                     touch_bar.high >= demand_level * 0.995
                     and touch_bar.high <= demand_level * 1.035
@@ -4569,8 +4569,8 @@ class Helper:
                     minutes_between_tests = float(retest_index - demand_index)
                     minutes_since_retest = float(current_index - retest_index)
 
-                if minutes_between_tests < 25 or not (3 <= minutes_since_retest <= 6):
-                    continue
+                if False and (minutes_between_tests < 25 or not (3 <= minutes_since_retest <= 6)):
+                    continue  # v131 no-time-gate
 
                 retest_vr = volume_ratio(retest_bar)
                 retest_defends_same_demand_low = (
@@ -4766,7 +4766,7 @@ class Helper:
                         and current_breaks_conflict_area
                     )
 
-                    if 1 <= minutes_since_retest <= 8 and current_rebreaks_or_holds:
+                    if current_rebreaks_or_holds:  # v131 no-time-gate
                         valid_resistance_support_candidates.append(
                             {
                                 "level": level,
@@ -4883,7 +4883,7 @@ class Helper:
                             lows_form_same_defended_zone
                             and second_down_is_lowest_after_previous_high
                             and no_lower_low_after_second_down_before_entry
-                            and 1 <= minutes_since_second_down <= 5
+                            and True  # v131 no-time-gate removed minutes_since_second_down
                             and current_breaks_previous_high
                         ):
                             valid_resistance_support_candidates.append(
@@ -5021,7 +5021,7 @@ class Helper:
                 except Exception:
                     minutes_since_support = float(current_index - last_support_index)
 
-                if current_breaks_conflict and 2 <= minutes_since_support <= 8:
+                if current_breaks_conflict:  # v131 no-time-gate
                     valid_resistance_support_candidates.append(
                         {
                             "level": level,
@@ -5130,10 +5130,10 @@ class Helper:
                 minutes_from_touch_to_break = float(major_break_index - last_touch_index)
             old_major_timeline_ok = (
                 minutes_from_resistance_to_break >= 45
-                and minutes_from_touch_to_break >= 8
+                and True  # v131 no-time-gate removed minutes_from_touch_to_break
             )
-            if not old_major_timeline_ok:
-                continue
+            if False and not old_major_timeline_ok:
+                continue  # v131 no-time-gate
 
             # The retest must happen immediately after the reclaim and defend the exact old level.
             support_indices = []
@@ -5143,8 +5143,8 @@ class Helper:
                     minutes_after_break = (support_bar.bar_time - bars_until_current[major_break_index].bar_time).total_seconds() / 60.0
                 except Exception:
                     minutes_after_break = float(support_index - major_break_index)
-                if minutes_after_break > 2.5:
-                    continue
+                if False and minutes_after_break > 2.5:
+                    continue  # v131 no-time-gate
 
                 support_range = support_bar.high - support_bar.low
                 lower_tail_share = 0.0 if support_range <= 0 else (min(support_bar.open_value, support_bar.close) - support_bar.low) / support_range
@@ -5176,8 +5176,8 @@ class Helper:
                 minutes_since_support = (current_bar.bar_time - last_support_bar.bar_time).total_seconds() / 60.0
             except Exception:
                 minutes_since_support = float(current_index - last_support_index)
-            if not (1 <= minutes_since_support <= 3):
-                continue
+            if False and not (1 <= minutes_since_support <= 3):
+                continue  # v131 no-time-gate
 
             no_failed_old_level_after_reclaim = all(
                 bars_until_current[index].low >= level * 0.985
@@ -5281,7 +5281,7 @@ class Helper:
                     ).total_seconds() / 60.0
                 except Exception:
                     minutes_between = float(retest_index - demand_index)
-                if minutes_between >= 25:
+                if True:  # v131 no-time-gate: every structurally valid retest can be considered
                     delayed_retest_indices.append(retest_index)
 
             if not delayed_retest_indices:
@@ -5302,8 +5302,8 @@ class Helper:
                 minutes_between_demand_tests = float(last_retest_index - demand_index)
                 minutes_since_retest = float(current_index - last_retest_index)
 
-            if not (2 <= minutes_since_retest <= 18):
-                continue
+            if False and not (2 <= minutes_since_retest <= 18):
+                continue  # v131 no-time-gate
 
             demand_pattern_priority = 7 if minutes_between_demand_tests >= 120 else 5
 
@@ -5435,7 +5435,7 @@ class Helper:
                     current_breaks_previous_high
                     and second_support_is_lowest_defense
                     and no_lower_low_after_second_support_before_entry
-                    and 1 <= minutes_since_second_support <= 8
+                    and True  # v131 no-time-gate removed minutes_since_second_support
                 ):
                     level = min(first_low, second_low)
                     valid_resistance_support_candidates.append(
@@ -5566,8 +5566,8 @@ class Helper:
                 minutes_since_support = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
             except Exception:
                 minutes_since_support = float(current_index - support_index)
-            if not (1 <= minutes_since_support <= 18):
-                continue
+            if False and not (1 <= minutes_since_support <= 18):
+                continue  # v131 no-time-gate
 
             current_body = current_bar.close - current_bar.open_value
             previous_abs_body = abs(previous_bar.close - previous_bar.open_value)
@@ -5614,7 +5614,7 @@ class Helper:
                     ).total_seconds() / 60.0
                 except Exception:
                     minutes_after_delayed_exact_trigger = 999
-                if 0 < minutes_after_delayed_exact_trigger <= 30:
+                if False:  # v131 no-time-gate duplicate suppression disabled
                     continue
 
             valid_resistance_support_candidates.append(
@@ -5674,8 +5674,8 @@ class Helper:
                     minutes_after_demand = (touch_bar.bar_time - demand_bar.bar_time).total_seconds() / 60.0
                 except Exception:
                     minutes_after_demand = float(touch_index - demand_index)
-                if minutes_after_demand < 15:
-                    continue
+                if False and minutes_after_demand < 15:
+                    continue  # v131 no-time-gate
                 if (
                     touch_bar.high >= demand_level * 0.985
                     and touch_bar.high <= demand_level * 1.04
@@ -5831,7 +5831,7 @@ class Helper:
                 same_defended_zone
                 and second_is_final_low
                 and second_is_lowest_after_high
-                and 1 <= minutes_since_second_down <= 12
+                and True  # v131 no-time-gate removed minutes_since_second_down
                 and current_body > 0
                 and current_cp >= 0.55
                 and current_uw <= 0.50
@@ -6551,7 +6551,7 @@ class Helper:
             best_candidate.get("pattern_type") == "old_resistance_reclaim_retest_buyer_control"
             and best_candidate.get("pattern_priority", 0) >= 18
             and current_real_volume_participation_ok
-            and best_candidate.get("minutes_since_retest", 999) <= 8
+            and True  # v131 no-time-gate removed minutes_since_retest <= 8
             and current_body_pct_of_open is not None
             and current_body_pct_of_open >= 0.025
             and current_bar.close > current_bar.open_value
@@ -6581,7 +6581,7 @@ class Helper:
             # broad v36 double-down branch by requiring real current buyer
             # expansion, active recent volume, and a fresh break/reclaim of the
             # stored conflict area.
-            and best_candidate.get("minutes_since_retest", 999) <= 8
+            and True  # v131 no-time-gate removed minutes_since_retest <= 8
             and previous_5_active_volume_count >= 3
             and current_volume_ratio is not None
             and current_volume_ratio >= 1.25
@@ -6647,7 +6647,7 @@ class Helper:
             last_time = last_time_by_key.get(throttle_key)
             if last_time is not None:
                 minutes_since_last_emit = (current_bar.bar_time - last_time).total_seconds() / 60.0
-                if minutes_since_last_emit < 4.0:
+                if minutes_since_last_emit < 1.0:  # v131 relaxed duplicate-only cooldown
                     return False
             last_time_by_key[throttle_key] = current_bar.bar_time
         except Exception:
@@ -7098,10 +7098,10 @@ class Helper:
                         continue
                     support_minutes_after_break = (support_bar.bar_time - break_bar.bar_time).total_seconds() / 60.0
                     support_to_entry_minutes = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
-                    if support_minutes_after_break < 8.0:
-                        continue
-                    if not (1.0 <= support_to_entry_minutes <= 8.0):
-                        continue
+                    if False and support_minutes_after_break < 8.0:
+                        continue  # v131 no-time-gate
+                    if False and not (1.0 <= support_to_entry_minutes <= 8.0):
+                        continue  # v131 no-time-gate
                     if not (level * 0.995 <= support_low <= level * 1.025):
                         continue
 
@@ -7147,7 +7147,7 @@ class Helper:
                         prior_bar = bars_until_current[prior_index]
                         prior_minutes = (prior_bar.bar_time - break_bar.bar_time).total_seconds() / 60.0
                         prior_low = self._safe_float(getattr(prior_bar, "low", None), 0.0)
-                        if prior_minutes >= 8.0 and prior_low < support_low * 0.997:
+                        if prior_low < support_low * 0.997:  # v131 no-time-gate removed prior_minutes
                             mature_prior_lost = True
                             break
                     if mature_prior_lost:
@@ -7291,8 +7291,8 @@ class Helper:
                     minutes_from_anchor = (current_time - anchor_time).total_seconds() / 60.0
                 except Exception:
                     minutes_from_anchor = current_index - anchor_index
-                if minutes_from_anchor < 25 or minutes_from_anchor > 95:
-                    continue
+                if False and (minutes_from_anchor < 25 or minutes_from_anchor > 95):
+                    continue  # v131 no-time-gate
 
                 anchor_high = self._safe_float(getattr(anchor_bar, "high", None), None)
                 anchor_low = self._safe_float(getattr(anchor_bar, "low", None), None)
@@ -7368,8 +7368,8 @@ class Helper:
                         minutes_after_anchor_for_support = (getattr(support_bar, "bar_time", current_time) - anchor_time).total_seconds() / 60.0
                     except Exception:
                         minutes_after_anchor_for_support = support_index - anchor_index
-                    if minutes_after_anchor_for_support < 25:
-                        continue
+                    if False and minutes_after_anchor_for_support < 25:
+                        continue  # v131 no-time-gate
                     distance_from_anchor = (support_low - anchor_high) / anchor_high
                     low_near_or_above_anchor = -0.006 <= distance_from_anchor <= 0.018
                     closes_back_above_anchor = support_close >= anchor_high * 0.995
@@ -7387,8 +7387,8 @@ class Helper:
                     minutes_since_support = (current_time - last_support_bar.bar_time).total_seconds() / 60.0
                 except Exception:
                     minutes_since_support = current_index - last_support_index
-                if not (3 <= minutes_since_support <= 12):
-                    continue
+                if False and not (3 <= minutes_since_support <= 12):
+                    continue  # v131 no-time-gate
 
                 # Entry should be strong, but not a very late chase from the anchor.
                 if current_close > anchor_high * 1.10:
@@ -7449,6 +7449,398 @@ class Helper:
         except Exception:
             return None
 
+
+    def _get_tight_volume_backed_opening_resistance_shelf_retest_entry_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """Tight VOLUME-BACKED opening resistance shelf -> fast retest support -> volume entry.
+
+        Learned from CODX 2026-05-28:
+          09:31/09:33/09:34/09:35 repeatedly capped the stock around 9.29-9.30.
+          09:36/09:37 broke the shelf, 09:40 retested 9.31 as active support,
+          and 09:41 continued on renewed volume.
+
+        Broad principle: an early tight resistance shelf can be the important level
+        even when there is no single dramatic old-resistance bar. Volume should
+        validate both the defended retest and the continuation entry.
+        """
+        try:
+            current_bar = potential_confirmation_bar
+            current_time = getattr(current_bar, "bar_time", None)
+            if current_time is None:
+                return None
+
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+            current_index = None
+            for index, bar in enumerate(bars):
+                if bar is current_bar or getattr(bar, "bar_time", None) == current_time:
+                    current_index = index
+                    current_bar = bar
+                    break
+            if current_index is None or current_index < 8:
+                return None
+
+            current_close = self._safe_float(getattr(current_bar, "close", None), None)
+            current_high = self._safe_float(getattr(current_bar, "high", None), None)
+            current_vr = self._bar_volume_ratio(current_bar)
+            current_cp = self._bar_close_position(current_bar)
+            if current_close is None or current_high is None or current_close <= 0 or current_vr is None or current_cp is None:
+                return None
+
+            # Entry must be real renewed participation, not just another quiet bar.
+            if not (current_vr >= 2.75 and current_cp >= 0.60):
+                return None
+
+            current_ema9 = self._safe_float(getattr(current_bar, "ema_9", None), None)
+            current_ema20 = self._safe_float(getattr(current_bar, "ema_20", None), None)
+            if current_ema9 is not None and current_close < current_ema9 * 0.995:
+                return None
+            if current_ema20 is not None and current_close < current_ema20 * 0.995:
+                return None
+
+            best_context = None
+            best_score = None
+
+            # Support/retest should be recent: the next 1-4 minutes after retest are entry candidates.
+            for support_index in range(max(0, current_index - 5), current_index):
+                support_bar = bars[support_index]
+                support_time = getattr(support_bar, "bar_time", None)
+                support_low = self._safe_float(getattr(support_bar, "low", None), None)
+                support_close = self._safe_float(getattr(support_bar, "close", None), None)
+                support_high = self._safe_float(getattr(support_bar, "high", None), None)
+                if support_time is None or support_low is None or support_close is None or support_high is None or support_low <= 0:
+                    continue
+                try:
+                    minutes_since_support = (current_time - support_time).total_seconds() / 60.0
+                except Exception:
+                    minutes_since_support = current_index - support_index
+                if False and not (1 <= minutes_since_support <= 4):
+                    continue  # v131 no-time-gate
+
+                support_vr = self._bar_volume_ratio(support_bar)
+                support_cp = self._bar_close_position(support_bar)
+                if support_vr is None or support_cp is None:
+                    continue
+
+                # Look for a compact shelf before the support bar.
+                shelf_search_start = max(0, support_index - 18)
+                shelf_search_end = support_index - 2
+                if shelf_search_end <= shelf_search_start:
+                    continue
+
+                for shelf_start in range(shelf_search_start, shelf_search_end + 1):
+                    # The shelf should be short and tight, often an opening shelf.
+                    shelf_end_max = min(shelf_start + 8, shelf_search_end)
+                    for shelf_end in range(shelf_start + 2, shelf_end_max + 1):
+                        shelf_bars = bars[shelf_start:shelf_end + 1]
+                        highs = [self._safe_float(getattr(bar, "high", None), 0.0) for bar in shelf_bars]
+                        if len(highs) < 3 or min(highs) <= 0:
+                            continue
+
+                        shelf_high = max(highs)
+
+                        # Count actual high touches near the shelf high. Non-touch bars are allowed inside
+                        # the shelf window, because CODX 2026-05-28 had a 09:32 dip between 09:31/09:33/09:34/09:35 touches.
+                        touch_indices = []
+                        for local_index, bar in enumerate(shelf_bars):
+                            bar_high = self._safe_float(getattr(bar, "high", None), 0.0)
+                            if abs(bar_high - shelf_high) / shelf_high <= 0.0045:
+                                touch_indices.append(shelf_start + local_index)
+                        if len(touch_indices) < 3:
+                            continue
+
+                        resistance_bar = bars[touch_indices[0]]
+
+                        # v129 tightening: this branch is only for opening / morning
+                        # shelves that are visibly backed by participation.  The loose
+                        # v128 version allowed ordinary low-volume local shelves and
+                        # flooded the dataset.
+                        resistance_time = getattr(resistance_bar, "bar_time", None)
+                        if resistance_time is None:
+                            continue
+                        try:
+                            if resistance_time.time() > datetime.time(10, 30):
+                                continue
+                        except Exception:
+                            pass
+
+                        touch_volume_ratios = []
+                        for touch_index in touch_indices:
+                            touch_vr = self._bar_volume_ratio(bars[touch_index])
+                            if touch_vr is not None:
+                                touch_volume_ratios.append(touch_vr)
+                        if not touch_volume_ratios:
+                            continue
+                        if max(touch_volume_ratios) < 2.30:
+                            continue
+                        if sum(touch_volume_ratios) / len(touch_volume_ratios) < 2.50:
+                            continue
+
+                        last_touch_index = touch_indices[-1]
+
+                        # Price must break and accept above the shelf before the retest.
+                        break_index = None
+                        for index in range(last_touch_index + 1, support_index + 1):
+                            bar = bars[index]
+                            bar_high = self._safe_float(getattr(bar, "high", None), 0.0)
+                            bar_close = self._safe_float(getattr(bar, "close", None), 0.0)
+                            bar_cp = self._bar_close_position(bar)
+                            if bar_high >= shelf_high * 1.015 and bar_close >= shelf_high * 1.005 and (bar_cp is None or bar_cp >= 0.45):
+                                break_index = index
+                                break
+                        if break_index is None:
+                            continue
+
+                        break_vr = self._bar_volume_ratio(bars[break_index])
+                        if break_vr is None or break_vr < 2.0:
+                            continue
+
+                        # The retest should come after the breakout has had time to accept above the shelf.
+                        # This prevents the first breakout bar/push itself from being mislabeled as support.
+                        if False and support_index - break_index < 3:
+                            continue  # v131 no-time-gate
+
+                        try:
+                            minutes_shelf_to_support = (support_time - getattr(resistance_bar, "bar_time", support_time)).total_seconds() / 60.0
+                        except Exception:
+                            minutes_shelf_to_support = support_index - touch_indices[0]
+                        if False and not (3 <= minutes_shelf_to_support <= 15):
+                            continue  # v131 no-time-gate
+
+                        # Retest low should defend the shelf from above or with only a tiny flush.
+                        support_distance = (support_low - shelf_high) / shelf_high
+                        if not (-0.006 <= support_distance <= 0.018):
+                            continue
+                        if support_close < shelf_high * 1.005:
+                            continue
+
+                        # The retest itself should show active defense or very strong recovery.
+                        if not (support_vr >= 2.20 and support_cp >= 0.65):
+                            continue
+
+                        # Entry should leave the retest area, not buy too far extended.
+                        if current_close > shelf_high * 1.12:
+                            continue
+                        if current_close < max(support_high, shelf_high * 1.035) * 0.995:
+                            continue
+
+                        between_support_and_entry = bars[support_index + 1:current_index]
+                        conflict_close_high = max(
+                            [support_close]
+                            + [self._safe_float(getattr(bar, "close", None), 0.0) for bar in between_support_and_entry]
+                        )
+                        if current_close < conflict_close_high * 1.002:
+                            continue
+
+                        # One signal per shelf/support group: if an earlier bar after this
+                        # support already met the same strict entry requirements, the
+                        # current bar is a duplicate/chase continuation and should not fire.
+                        earlier_strict_entry_exists = False
+                        for prior_bar in between_support_and_entry:
+                            prior_close = self._safe_float(getattr(prior_bar, "close", None), None)
+                            prior_high = self._safe_float(getattr(prior_bar, "high", None), None)
+                            prior_vr = self._bar_volume_ratio(prior_bar)
+                            prior_cp = self._bar_close_position(prior_bar)
+                            if prior_close is None or prior_high is None or prior_vr is None or prior_cp is None:
+                                continue
+                            if (
+                                prior_vr >= 2.75
+                                and prior_cp >= 0.60
+                                and prior_close <= shelf_high * 1.12
+                                and prior_close >= max(support_high, shelf_high * 1.035) * 0.995
+                            ):
+                                earlier_strict_entry_exists = True
+                                break
+                        if earlier_strict_entry_exists:
+                            continue
+
+                        score = (
+                            len(touch_indices) * 0.5
+                            + min(current_vr, 5.0) / 5.0
+                            + min(support_vr, 4.0) / 4.0
+                            - abs(support_distance) * 10.0
+                            - max(0.0, minutes_since_support - 2.0) * 0.05
+                        )
+                        context = {
+                            "pattern_type": "tight_volume_backed_opening_resistance_shelf_retest_entry",
+                            "resistance_price": shelf_high,
+                            "level": shelf_high,
+                            "resistance_bar": resistance_bar,
+                            "support_bar": support_bar,
+                            "break_bar": bars[break_index],
+                            "previous_high_bar": current_bar,
+                            "first_down_bar": support_bar,
+                            "support_group_count": 1,
+                            "support_group_start_time": getattr(support_bar, "bar_time", None),
+                            "latest_support_group_start_time": getattr(support_bar, "bar_time", None),
+                            "shelf_touch_count": len(touch_indices),
+                            "shelf_touch_times": [getattr(bars[index], "bar_time", None) for index in touch_indices],
+                            "minutes_since_retest": minutes_since_support,
+                            "support_groups": [
+                                {
+                                    "group_index": 1,
+                                    "support_bar_time": getattr(support_bar, "bar_time", None),
+                                    "support_bar_high": getattr(support_bar, "high", None),
+                                    "support_bar_low": getattr(support_bar, "low", None),
+                                    "support_bar_close": getattr(support_bar, "close", None),
+                                    "touch_count": 1,
+                                    "touches": [
+                                        {
+                                            "bar_time": getattr(support_bar, "bar_time", None),
+                                            "high": getattr(support_bar, "high", None),
+                                            "low": getattr(support_bar, "low", None),
+                                            "close": getattr(support_bar, "close", None),
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                        if best_score is None or score > best_score:
+                            best_score = score
+                            best_context = context
+
+            return best_context
+        except Exception:
+            return None
+
+
+    def _has_prior_tight_volume_backed_opening_shelf_signal(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """
+        Detect whether a cleaner earlier volume-backed opening-shelf signal already
+        fired on the same symbol/day before the current candidate.
+
+        This is used only as a de-duplication / late-chase guard for the generic
+        multi_touch_resistance_support_control_break family. It is intentionally
+        conservative: a prior shelf only blocks a later multi-touch when the later
+        candidate is materially extended above the earlier shelf and occurs after
+        the earlier clean entry.
+        """
+        try:
+            current_time = getattr(potential_confirmation_bar, "bar_time", None)
+            if current_time is None:
+                return None
+
+            bars = [
+                bar
+                for bar in getattr(one_minute_timeframe_stock, "bars", [])
+                if getattr(bar, "bar_time", None) is not None
+                and getattr(bar, "bar_time", None) < current_time
+            ]
+            if not bars:
+                return None
+
+            best_context = None
+            best_entry_time = None
+            # Scan prior bars only. Calling the lower-level context method avoids
+            # recursive use of get_bar_has_potential_family(...).
+            for prior_bar in bars:
+                prior_time = getattr(prior_bar, "bar_time", None)
+                if prior_time is None:
+                    continue
+                prior_context = self._get_tight_volume_backed_opening_resistance_shelf_retest_entry_context(
+                    one_minute_timeframe_stock=one_minute_timeframe_stock,
+                    potential_confirmation_bar=prior_bar,
+                )
+                if prior_context is None:
+                    continue
+                if best_entry_time is None or prior_time < best_entry_time:
+                    best_context = prior_context
+                    best_entry_time = prior_time
+
+            if best_context is None:
+                return None
+
+            return {
+                "context": best_context,
+                "entry_time": best_entry_time,
+                "shelf_level": self._safe_float(best_context.get("level"), None),
+                "support_time": getattr(best_context.get("support_bar"), "bar_time", None),
+                "resistance_time": getattr(best_context.get("resistance_bar"), "bar_time", None),
+            }
+        except Exception:
+            return None
+
+    def _should_reject_late_multitouch_after_prior_opening_shelf(
+        self,
+        generic_level_context: dict,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> bool:
+        """
+        Reject weak late duplicate multi-touch entries after an earlier strict
+        volume-backed opening-shelf signal already captured the clean structure.
+
+        Example target: CODX 2026-05-28 should keep 09:41 from the strict shelf
+        branch and reject the later 10:26 multi-touch duplicate that uses 09:53
+        resistance / 10:21 support after the move is already extended.
+        """
+        try:
+            prior = self._has_prior_tight_volume_backed_opening_shelf_signal(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=potential_confirmation_bar,
+            )
+            if prior is None:
+                return False
+
+            current_time = getattr(potential_confirmation_bar, "bar_time", None)
+            prior_entry_time = prior.get("entry_time")
+            shelf_level = prior.get("shelf_level")
+            if current_time is None or prior_entry_time is None or shelf_level is None or shelf_level <= 0:
+                return False
+
+            minutes_after_prior_entry = (current_time - prior_entry_time).total_seconds() / 60.0
+            if False and (minutes_after_prior_entry < 10 or minutes_after_prior_entry > 180):
+                return False  # v131 no-time-gate
+
+            resistance_bar = generic_level_context.get("resistance_bar")
+            support_bar = generic_level_context.get("support_bar")
+            resistance_time = getattr(resistance_bar, "bar_time", None)
+            if resistance_time is not None and resistance_time <= prior_entry_time:
+                return False
+
+            current_close = self._safe_float(getattr(potential_confirmation_bar, "close", None), None)
+            support_low = self._safe_float(getattr(support_bar, "low", None), None)
+            resistance_high = self._safe_float(getattr(resistance_bar, "high", None), None)
+            if current_close is None:
+                return False
+
+            # Only block materially extended later structures. This avoids removing
+            # independent second bases that form close to the original shelf.
+            current_extension = (current_close - shelf_level) / shelf_level
+            support_extension = None if support_low is None else (support_low - shelf_level) / shelf_level
+            resistance_extension = None if resistance_high is None else (resistance_high - shelf_level) / shelf_level
+            materially_extended = current_extension >= 0.15 or (
+                support_extension is not None and support_extension >= 0.15
+            ) or (
+                resistance_extension is not None and resistance_extension >= 0.18
+            )
+            if not materially_extended:
+                return False
+
+            # Prefer the earlier strict shelf when the later generic candidate is a
+            # continuation/chase above the original defended shelf rather than a new
+            # fresh base. The generic support should also be well after the earlier
+            # shelf support.
+            prior_support_time = prior.get("support_time")
+            support_time = getattr(support_bar, "bar_time", None)
+            if prior_support_time is not None and support_time is not None:
+                minutes_after_prior_support = (support_time - prior_support_time).total_seconds() / 60.0
+                if False and minutes_after_prior_support < 10:
+                    return False  # v131 no-time-gate
+
+            return True
+        except Exception:
+            return False
+
     def get_bar_has_potential_family(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -7463,14 +7855,30 @@ class Helper:
         entry gate.
         """
 
+        # Tight opening/morning resistance shelf -> fast retest support -> volume continuation.
+        # Added from CODX 2026-05-28: 09:31/09:33/09:34/09:35 shelf around 9.30,
+        # 09:40 active support retest, 09:41 volume continuation.
+        tight_shelf_context = self._get_tight_volume_backed_opening_resistance_shelf_retest_entry_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if tight_shelf_context is not None:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = tight_shelf_context
+            return "tight_volume_backed_opening_resistance_shelf_retest_entry"
+
         # Generic level lifecycle: important resistance -> clean breakout -> mature support retest -> first buyer response.
         generic_level_context = self._get_generic_major_resistance_clean_break_mature_support_context(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
         if generic_level_context is not None:
-            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = generic_level_context
-            return "multi_touch_resistance_support_control_break"
+            if not self._should_reject_late_multitouch_after_prior_opening_shelf(
+                generic_level_context=generic_level_context,
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=potential_confirmation_bar,
+            ):
+                self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = generic_level_context
+                return "multi_touch_resistance_support_control_break"
 
         # Volume-anchor high -> accepted support -> renewed volume expansion.
         # Added from CODX 2026-05-26: 10:55 highest-volume attention bar created
@@ -8922,7 +9330,7 @@ class Helper:
                     support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
                     if break_time is not None and support_time is not None and support_low is not None and support_low > 0:
                         minutes_break_to_support = (support_time - break_time).total_seconds() / 60.0
-                        if 12.0 <= minutes_break_to_support <= 45.0:
+                        if True:  # v131 no-time-gate: run structural loss check regardless of elapsed time
                             chronological_bars = sorted(
                                 [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
                                 key=lambda bar: bar.bar_time,
@@ -9112,8 +9520,8 @@ class Helper:
                     # selected support bars that occur before the entry.
                     if support_bar is not None and support_time is not None and entry_time is not None and support_time < entry_time:
                         support_to_entry_minutes_for_expansion = (entry_time - support_time).total_seconds() / 60.0
-                        if matched_family == "old_resistance_reclaim_retest_buyer_control" and support_to_entry_minutes_for_expansion < 4.0:
-                            raise StopIteration
+                        if False and matched_family == "old_resistance_reclaim_retest_buyer_control" and support_to_entry_minutes_for_expansion < 4.0:
+                            raise StopIteration  # v131 no-time-gate
                         level = self._safe_float(current_context.get("resistance_price"), None)
                         if level is None:
                             level = self._safe_float(getattr(resistance_bar, "high", None), None) if resistance_bar is not None else None
@@ -9552,7 +9960,7 @@ class Helper:
                     and current_body_range_share_for_quality >= 0.60
                     and current_close_to_ema9_for_quality is not None
                     and current_close_to_ema9_for_quality >= 0.035
-                    and self._safe_float(current_context.get("minutes_since_support_retest"), 999.0) <= 6
+                    and True  # v131 no-time-gate removed minutes_since_support_retest <= 6
                 )
                 bnai_zone_quality_ok = (
                     current_context
@@ -9647,7 +10055,7 @@ class Helper:
                 minutes_after_delayed_exact_trigger = None
             if (
                 minutes_after_delayed_exact_trigger is not None
-                and 0 < minutes_after_delayed_exact_trigger <= 30
+                and False  # v131 no-time-gate duplicate suppression disabled
             ):
                 return False, "bar suppressed: delayed-exact-retest entry already fired recently", self._build_bar_has_potential_context_details()
 
@@ -9661,7 +10069,7 @@ class Helper:
                 minutes_after_reclaim_attack_trigger = None
             if (
                 minutes_after_reclaim_attack_trigger is not None
-                and 0 < minutes_after_reclaim_attack_trigger <= 30
+                and False  # v131 no-time-gate duplicate suppression disabled
             ):
                 return False, "bar suppressed: reclaim-attack-retest entry already fired recently", self._build_bar_has_potential_context_details()
 
