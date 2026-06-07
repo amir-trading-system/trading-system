@@ -56,11 +56,12 @@ class Confirmator:
             if (
                 True
                 and self.is_retro
-                and next_bar.bar_time > datetime.datetime(
+                and next_bar.bar_time >= datetime.datetime(
                     year=next_bar.bar_time.year,
                     month=next_bar.bar_time.month,
                     day=next_bar.bar_time.day,
-                    hour=16,
+                    hour=19,
+                    minute=20,
                 )
             ):
                 self.results_queue.put(
@@ -186,7 +187,6 @@ class Confirmator:
                     "bar_time": original_bar_to_confirm.bar_time,
                     "entry_position_bar_time": potential_confirmation_bar.bar_time,
                     "request_id": stock.request_id,
-                    "case_details": case_details,
                 }
             )
             return False
