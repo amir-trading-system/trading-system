@@ -53,7 +53,7 @@ def extract_one_minute_timeframe_data_into_csv():
         "signal_line",
     ]
 
-    file_name = f"model/{datetime.datetime.now().date()}.csv"
+    file_name = "model/one_minute_bars.csv"
 
     with open(file_name, mode="w") as f:
         writer = csv.writer(f)

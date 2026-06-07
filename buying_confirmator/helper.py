@@ -6947,6 +6947,508 @@ class Helper:
         details.update(bar_payload("first_down", first_down_bar))
         return details
 
+
+    def _get_generic_major_resistance_clean_break_mature_support_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """Generic level lifecycle detector.
+
+        Broad psychology, not symbol specific:
+          important resistance/rejection level -> no clean acceptance above it
+          -> clean breakout/reclaim -> mature pullback/retest near the level
+          -> first buyer-response entry.
+
+        Learned from CODX 2026-05-21, but intentionally generic.  The strict
+        gates are designed to avoid the bad CODX 08:53->10:06 and RYOJ/AIMD
+        continuation/support-selection failures.
+        """
+        try:
+            bars_until_current = self._get_today_bars_until_current(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=potential_confirmation_bar,
+            )
+            if len(bars_until_current) < 60:
+                return None
+            current_index = None
+            for index, bar in enumerate(bars_until_current):
+                if getattr(bar, "bar_time", None) == getattr(potential_confirmation_bar, "bar_time", None):
+                    current_index = index
+                    break
+            if current_index is None or current_index < 20:
+                return None
+            current_bar = bars_until_current[current_index]
+
+            def _open(bar):
+                value = self._safe_float(getattr(bar, "open_value", None), None)
+                if value is None:
+                    value = self._safe_float(getattr(bar, "open", None), 0.0)
+                return value
+
+            current_open = _open(current_bar)
+            current_close = self._safe_float(getattr(current_bar, "close", None), 0.0)
+            current_high = self._safe_float(getattr(current_bar, "high", None), 0.0)
+            current_cp = self._bar_close_position(current_bar)
+            current_uw = self._bar_upper_wick_share(current_bar)
+            current_vr = self._bar_volume_ratio(current_bar)
+            if current_open <= 0 or current_close <= current_open:
+                return None
+            current_body_pct = (current_close - current_open) / current_open
+            if not (
+                current_cp is not None and current_cp >= 0.68
+                and current_uw is not None and current_uw <= 0.38
+                and current_body_pct >= 0.015
+                and (current_vr is not None and current_vr >= 0.85)
+            ):
+                return None
+
+            # Candidate support must be close to the current entry, but entry
+            # cannot be the support/bar itself. Prefer the latest mature retest.
+            support_candidates = []
+            for support_index in range(max(2, current_index - 10), current_index):
+                support_bar = bars_until_current[support_index]
+                support_low = self._safe_float(getattr(support_bar, "low", None), 0.0)
+                if support_low <= 0:
+                    continue
+                support_time = getattr(support_bar, "bar_time", None)
+                if support_time is None:
+                    continue
+                support_candidates.append((support_index, support_bar, support_low))
+
+            if not support_candidates:
+                return None
+
+            # Important resistance can be old: search back several hours, but
+            # require a very visible rejection/local high.
+            for resistance_index in range(max(1, current_index - 420), current_index - 15):
+                resistance_bar = bars_until_current[resistance_index]
+                resistance_time = getattr(resistance_bar, "bar_time", None)
+                if resistance_time is None:
+                    continue
+                previous_bar = bars_until_current[resistance_index - 1] if resistance_index > 0 else None
+                next_bar = bars_until_current[resistance_index + 1] if resistance_index + 1 < len(bars_until_current) else None
+                level = self._safe_float(getattr(resistance_bar, "high", None), 0.0)
+                if level <= 0:
+                    continue
+                prev_high = self._safe_float(getattr(previous_bar, "high", None), 0.0) if previous_bar is not None else 0.0
+                next_high = self._safe_float(getattr(next_bar, "high", None), 0.0) if next_bar is not None else 0.0
+                if not (level >= prev_high * 1.006 and level >= next_high * 1.006):
+                    continue
+                resistance_vr = self._bar_volume_ratio(resistance_bar)
+                resistance_cp = self._bar_close_position(resistance_bar)
+                resistance_uw = self._bar_upper_wick_share(resistance_bar)
+                resistance_vwap = self._safe_float(getattr(resistance_bar, "vwap", None), None)
+                if not (
+                    resistance_vr is not None and resistance_vr >= 2.0
+                    and resistance_cp is not None and resistance_cp <= 0.45
+                    and resistance_uw is not None and resistance_uw >= 0.35
+                    and (resistance_vwap is None or level >= resistance_vwap)
+                ):
+                    continue
+
+                # Find first clean acceptance above the level after the rejection.
+                break_index = None
+                break_bar = None
+                for candidate_break_index in range(resistance_index + 2, current_index):
+                    candidate_break = bars_until_current[candidate_break_index]
+                    br_high = self._safe_float(getattr(candidate_break, "high", None), 0.0)
+                    br_close = self._safe_float(getattr(candidate_break, "close", None), 0.0)
+                    br_low = self._safe_float(getattr(candidate_break, "low", None), 0.0)
+                    br_cp = self._bar_close_position(candidate_break)
+                    br_vr = self._bar_volume_ratio(candidate_break)
+                    if (
+                        br_high >= level * 1.025
+                        and br_close >= level * 1.015
+                        and br_low <= br_high
+                        and br_cp is not None and br_cp >= 0.60
+                        and br_vr is not None and br_vr >= 1.20
+                    ):
+                        break_index = candidate_break_index
+                        break_bar = candidate_break
+                        break
+                if break_index is None or break_bar is None:
+                    continue
+
+                # The breakout should be clean: before the selected break there
+                # should not have been earlier accepted closes above the level.
+                prior_accepts = [
+                    bar for bar in bars_until_current[resistance_index + 1:break_index]
+                    if self._safe_float(getattr(bar, "close", None), 0.0) >= level * 1.010
+                ]
+                if prior_accepts:
+                    continue
+
+                # Also reject stale small levels that were already dominated by
+                # later highs before the selected clean break.  This prevents a
+                # breakout bar (CODX 10:23) from being emitted as an entry for an
+                # older, lower level when a more important resistance exists.
+                prior_higher_high = any(
+                    self._safe_float(getattr(bar, "high", None), 0.0) >= level * 1.025
+                    for bar in bars_until_current[resistance_index + 1:break_index]
+                )
+                if prior_higher_high:
+                    continue
+
+                # Now choose a mature support candidate after the clean breakout.
+                # Prefer the latest retest near the entry; that avoids selecting
+                # 10:39 when 10:40 is the actual lower support touch.
+                for support_index, support_bar, support_low in reversed(support_candidates):
+                    if support_index <= break_index:
+                        continue
+                    support_minutes_after_break = (support_bar.bar_time - break_bar.bar_time).total_seconds() / 60.0
+                    support_to_entry_minutes = (current_bar.bar_time - support_bar.bar_time).total_seconds() / 60.0
+                    if support_minutes_after_break < 8.0:
+                        continue
+                    if not (1.0 <= support_to_entry_minutes <= 8.0):
+                        continue
+                    if not (level * 0.995 <= support_low <= level * 1.025):
+                        continue
+
+                    # Mature retest: the post-break leg must have expanded and
+                    # then pulled back toward the old level. This rejects the
+                    # immediate 10:26 style low inside the first expansion leg.
+                    post_break_bars_before_support = bars_until_current[break_index + 1:support_index]
+                    if not post_break_bars_before_support:
+                        continue
+                    post_break_high = max(self._safe_float(getattr(bar, "high", None), 0.0) for bar in post_break_bars_before_support)
+                    if not (post_break_high >= level * 1.055 and support_low <= post_break_high * 0.965):
+                        continue
+
+                    # Support must be a real retest low, not an expansion candle
+                    # or continuation dip. Existing shared helper catches the
+                    # neighbor-low shape; extra candle-shape gate rejects RYOJ-like
+                    # breakout candles being reused as support.
+                    if not self._support_bar_is_real_retest_low_for_context(
+                        one_minute_timeframe_stock=one_minute_timeframe_stock,
+                        support_bar=support_bar,
+                        resistance_bar=resistance_bar,
+                    ):
+                        continue
+                    support_open = _open(support_bar)
+                    support_close = self._safe_float(getattr(support_bar, "close", None), 0.0)
+                    support_cp = self._bar_close_position(support_bar)
+                    support_vr = self._bar_volume_ratio(support_bar)
+                    if support_open > 0 and support_close > support_open:
+                        support_body_pct = (support_close - support_open) / support_open
+                        if (
+                            support_body_pct >= 0.030
+                            and support_cp is not None and support_cp >= 0.80
+                            and support_vr is not None and support_vr >= 1.50
+                        ):
+                            continue
+
+                    # No earlier deeper/lost low between break and selected support.
+                    # Allow immediate post-break noise only while it is not a mature
+                    # retest; after the move has expanded, the selected support must
+                    # be the actual defended low.
+                    mature_prior_lost = False
+                    for prior_index in range(break_index + 1, support_index):
+                        prior_bar = bars_until_current[prior_index]
+                        prior_minutes = (prior_bar.bar_time - break_bar.bar_time).total_seconds() / 60.0
+                        prior_low = self._safe_float(getattr(prior_bar, "low", None), 0.0)
+                        if prior_minutes >= 8.0 and prior_low < support_low * 0.997:
+                            mature_prior_lost = True
+                            break
+                    if mature_prior_lost:
+                        continue
+
+                    # First buyer response after support: no previous bar after
+                    # support should already satisfy the same entry quality.
+                    earlier_entry_exists = False
+                    for prior_entry_index in range(support_index + 1, current_index):
+                        prior_bar = bars_until_current[prior_entry_index]
+                        po = _open(prior_bar)
+                        pc = self._safe_float(getattr(prior_bar, "close", None), 0.0)
+                        pcp = self._bar_close_position(prior_bar)
+                        puw = self._bar_upper_wick_share(prior_bar)
+                        pvr = self._bar_volume_ratio(prior_bar)
+                        if po > 0 and pc > po:
+                            pbody = (pc - po) / po
+                            if pcp is not None and puw is not None and pvr is not None:
+                                if pbody >= 0.015 and pcp >= 0.68 and puw <= 0.38 and pvr >= 0.85:
+                                    earlier_entry_exists = True
+                                    break
+                    if earlier_entry_exists:
+                        continue
+
+                    conflict_bars = bars_until_current[support_index + 1:current_index]
+                    conflict_high = max([self._safe_float(getattr(bar, "high", None), 0.0) for bar in conflict_bars] + [self._safe_float(getattr(support_bar, "high", None), 0.0)])
+                    conflict_close_high = max([self._safe_float(getattr(bar, "close", None), 0.0) for bar in conflict_bars] + [self._safe_float(getattr(support_bar, "close", None), 0.0)])
+                    if not (current_high >= conflict_high * 0.995 and current_close >= conflict_close_high * 0.995):
+                        continue
+
+                    support_to_entry_bars = current_index - support_index
+                    return {
+                        "pattern_type": "multi_touch_resistance_support_control_break",
+                        "resistance_price": level,
+                        "resistance_bar": resistance_bar,
+                        "break_bar": break_bar,
+                        "support_bar": support_bar,
+                        "entry_bar": current_bar,
+                        "previous_high_bar": break_bar,
+                        "first_down_bar": support_bar,
+                        "conflict_high": max(conflict_high, current_high),
+                        "conflict_close_high": max(conflict_close_high, current_close),
+                        "minutes_since_support_retest": support_to_entry_minutes,
+                        "support_to_entry_minutes": support_to_entry_minutes,
+                        "support_to_entry_bars": support_to_entry_bars,
+                        "support_group_count": 1,
+                        "support_group_start_time": getattr(support_bar, "bar_time", None),
+                        "latest_support_group_start_time": getattr(support_bar, "bar_time", None),
+                        "support_groups": [
+                            {
+                                "group_index": 1,
+                                "support_bar_time": getattr(support_bar, "bar_time", None),
+                                "support_bar_high": getattr(support_bar, "high", None),
+                                "support_bar_low": getattr(support_bar, "low", None),
+                                "support_bar_close": getattr(support_bar, "close", None),
+                                "touch_count": 1,
+                                "touches": [
+                                    {
+                                        "bar_time": getattr(support_bar, "bar_time", None),
+                                        "high": getattr(support_bar, "high", None),
+                                        "low": getattr(support_bar, "low", None),
+                                        "close": getattr(support_bar, "close", None),
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+            return None
+        except Exception:
+            return None
+
+
+
+    def _get_volume_anchor_high_reclaim_support_continuation_context(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> dict | None:
+        """Volume-anchor high -> accepted support -> renewed volume expansion.
+
+        Learned from CODX 2026-05-26:
+          10:55 was the highest-volume bar so far, closed strong, and its high
+          became the defended level.  Later 11:32/11:37/11:50 lows held just
+          above that volume-anchor high, then 11:58 expanded on renewed volume.
+
+        Broad principle: volume can create the important resistance/anchor only
+        when the market accepts the volume instead of immediately rejecting it.
+        """
+        try:
+            current_bar = potential_confirmation_bar
+            current_time = getattr(current_bar, "bar_time", None)
+            if current_time is None:
+                return None
+
+            bars = sorted(
+                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                key=lambda bar: bar.bar_time,
+            )
+            current_index = None
+            for index, bar in enumerate(bars):
+                if bar is current_bar or getattr(bar, "bar_time", None) == current_time:
+                    current_index = index
+                    current_bar = bar
+                    break
+            if current_index is None or current_index < 20:
+                return None
+
+            current_cp = self._bar_close_position(current_bar)
+            current_vr = self._bar_volume_ratio(current_bar)
+            if current_cp is None or current_vr is None:
+                return None
+
+            # Entry should be a renewed trader-interest bar after compression/support.
+            if not (
+                current_vr >= 2.0
+                and current_cp >= 0.62
+                and self._safe_float(getattr(current_bar, "close", None), 0.0) >= self._safe_float(getattr(current_bar, "ema_9", None), 10**9) * 0.995
+                and self._safe_float(getattr(current_bar, "close", None), 0.0) >= self._safe_float(getattr(current_bar, "ema_20", None), 10**9) * 0.995
+            ):
+                return None
+
+            # Avoid accepting a late duplicate after the first expansion bar already fired.
+            recent_prior_bars = bars[max(0, current_index - 3):current_index]
+            current_close = self._safe_float(getattr(current_bar, "close", None), None)
+            if current_close is None or current_close <= 0:
+                return None
+            prior_close_high = max([self._safe_float(getattr(bar, "close", None), 0.0) for bar in recent_prior_bars] or [0.0])
+            if current_close < prior_close_high * 1.003:
+                return None
+
+            lookback_start = max(0, current_index - 120)
+            best_context = None
+            best_score = None
+
+            for anchor_index in range(lookback_start, current_index - 8):
+                anchor_bar = bars[anchor_index]
+                anchor_time = getattr(anchor_bar, "bar_time", None)
+                if anchor_time is None:
+                    continue
+                try:
+                    minutes_from_anchor = (current_time - anchor_time).total_seconds() / 60.0
+                except Exception:
+                    minutes_from_anchor = current_index - anchor_index
+                if minutes_from_anchor < 25 or minutes_from_anchor > 95:
+                    continue
+
+                anchor_high = self._safe_float(getattr(anchor_bar, "high", None), None)
+                anchor_low = self._safe_float(getattr(anchor_bar, "low", None), None)
+                anchor_close = self._safe_float(getattr(anchor_bar, "close", None), None)
+                anchor_volume = self._safe_float(getattr(anchor_bar, "volume", None), None)
+                if anchor_high is None or anchor_low is None or anchor_close is None or anchor_volume is None or anchor_high <= 0:
+                    continue
+
+                anchor_vr = self._bar_volume_ratio(anchor_bar)
+                anchor_cp = self._bar_close_position(anchor_bar)
+                if anchor_vr is None or anchor_cp is None:
+                    continue
+
+                bars_before_anchor = bars[:anchor_index + 1]
+                prior_volumes = [self._safe_float(getattr(bar, "volume", None), 0.0) for bar in bars_before_anchor]
+                if not prior_volumes:
+                    continue
+                sorted_prior_volumes = sorted(prior_volumes, reverse=True)
+                top3_cutoff = sorted_prior_volumes[min(2, len(sorted_prior_volumes) - 1)]
+                is_top_volume_so_far = anchor_volume >= top3_cutoff * 0.999
+                is_highest_volume_so_far = anchor_volume >= max(prior_volumes) * 0.999
+
+                prior_high_so_far = max(
+                    [self._safe_float(getattr(bar, "high", None), 0.0) for bar in bars_before_anchor]
+                )
+                near_prior_high_zone = anchor_high >= prior_high_so_far * 0.955
+
+                anchor_has_exceptional_volume_rank = (
+                    is_highest_volume_so_far
+                    or (is_top_volume_so_far and anchor_vr >= 5.0)
+                )
+                if not (
+                    anchor_vr >= 3.0
+                    and anchor_has_exceptional_volume_rank
+                    and near_prior_high_zone
+                    and anchor_cp >= 0.55
+                ):
+                    continue
+
+                # Huge volume must not immediately become obvious distribution.
+                immediate_after = bars[anchor_index + 1:min(current_index, anchor_index + 6)]
+                if not immediate_after:
+                    continue
+                anchor_mid = (anchor_high + anchor_low) / 2.0
+                immediate_failure = any(
+                    self._safe_float(getattr(bar, "close", None), 0.0) < anchor_mid * 0.985
+                    for bar in immediate_after
+                )
+                if immediate_failure:
+                    continue
+
+                # There must be later acceptance above the anchor high before support is validated.
+                acceptance_indices = [
+                    index
+                    for index in range(anchor_index + 1, current_index)
+                    if self._safe_float(getattr(bars[index], "close", None), 0.0) >= anchor_high * 1.003
+                    and self._bar_close_position(bars[index]) is not None
+                    and self._bar_close_position(bars[index]) >= 0.50
+                ]
+                if not acceptance_indices:
+                    continue
+                first_acceptance_index = acceptance_indices[0]
+
+                support_indices = []
+                for support_index in range(first_acceptance_index + 1, current_index):
+                    support_bar = bars[support_index]
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None)
+                    support_close = self._safe_float(getattr(support_bar, "close", None), None)
+                    support_ema9 = self._safe_float(getattr(support_bar, "ema_9", None), None)
+                    if support_low is None or support_close is None or support_ema9 is None or support_low <= 0:
+                        continue
+                    try:
+                        minutes_after_anchor_for_support = (getattr(support_bar, "bar_time", current_time) - anchor_time).total_seconds() / 60.0
+                    except Exception:
+                        minutes_after_anchor_for_support = support_index - anchor_index
+                    if minutes_after_anchor_for_support < 25:
+                        continue
+                    distance_from_anchor = (support_low - anchor_high) / anchor_high
+                    low_near_or_above_anchor = -0.006 <= distance_from_anchor <= 0.018
+                    closes_back_above_anchor = support_close >= anchor_high * 0.995
+                    holds_ema9_area = support_low <= support_ema9 * 1.08 and support_close >= support_ema9 * 0.98
+                    if low_near_or_above_anchor and closes_back_above_anchor and holds_ema9_area:
+                        if not support_indices or support_index - support_indices[-1] >= 2:
+                            support_indices.append(support_index)
+
+                if len(support_indices) < 2:
+                    continue
+
+                last_support_index = support_indices[-1]
+                last_support_bar = bars[last_support_index]
+                try:
+                    minutes_since_support = (current_time - last_support_bar.bar_time).total_seconds() / 60.0
+                except Exception:
+                    minutes_since_support = current_index - last_support_index
+                if not (3 <= minutes_since_support <= 12):
+                    continue
+
+                # Entry should be strong, but not a very late chase from the anchor.
+                if current_close > anchor_high * 1.10:
+                    continue
+
+                conflict_bars = bars[last_support_index + 1:current_index]
+                conflict_high = max([anchor_high] + [self._safe_float(getattr(bar, "high", None), 0.0) for bar in conflict_bars])
+                conflict_close_high = max([anchor_high] + [self._safe_float(getattr(bar, "close", None), 0.0) for bar in conflict_bars])
+                if not (current_close >= conflict_high * 0.995 and current_close >= conflict_close_high * 0.998):
+                    continue
+
+                score = (
+                    (1 if is_highest_volume_so_far else 0)
+                    + min(anchor_vr, 8.0) / 8.0
+                    + len(support_indices) * 0.25
+                    - abs(minutes_since_support - 8.0) * 0.02
+                )
+                context = {
+                    "pattern_type": "volume_anchor_high_reclaim_support_continuation",
+                    "resistance_price": anchor_high,
+                    "level": anchor_high,
+                    "resistance_bar": anchor_bar,
+                    "support_bar": last_support_bar,
+                    "break_bar": bars[first_acceptance_index],
+                    "previous_high_bar": current_bar,
+                    "first_down_bar": bars[support_indices[0]],
+                    "support_group_count": len(support_indices),
+                    "support_group_start_time": getattr(bars[support_indices[0]], "bar_time", None),
+                    "latest_support_group_start_time": getattr(last_support_bar, "bar_time", None),
+                    "volume_anchor_volume_ratio": anchor_vr,
+                    "volume_anchor_rank_top_n_so_far": 1 if is_highest_volume_so_far else 3,
+                    "minutes_since_retest": minutes_since_support,
+                    "support_groups": [
+                        {
+                            "group_index": group_index + 1,
+                            "support_bar_time": getattr(bars[index], "bar_time", None),
+                            "support_bar_high": getattr(bars[index], "high", None),
+                            "support_bar_low": getattr(bars[index], "low", None),
+                            "support_bar_close": getattr(bars[index], "close", None),
+                            "touch_count": 1,
+                            "touches": [
+                                {
+                                    "bar_time": getattr(bars[index], "bar_time", None),
+                                    "high": getattr(bars[index], "high", None),
+                                    "low": getattr(bars[index], "low", None),
+                                    "close": getattr(bars[index], "close", None),
+                                }
+                            ],
+                        }
+                        for group_index, index in enumerate(support_indices)
+                    ],
+                }
+                if best_score is None or score > best_score:
+                    best_score = score
+                    best_context = context
+
+            return best_context
+        except Exception:
+            return None
+
     def get_bar_has_potential_family(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -6960,6 +7462,26 @@ class Helper:
         This keeps external callers and regression checks aligned with the live
         entry gate.
         """
+
+        # Generic level lifecycle: important resistance -> clean breakout -> mature support retest -> first buyer response.
+        generic_level_context = self._get_generic_major_resistance_clean_break_mature_support_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if generic_level_context is not None:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = generic_level_context
+            return "multi_touch_resistance_support_control_break"
+
+        # Volume-anchor high -> accepted support -> renewed volume expansion.
+        # Added from CODX 2026-05-26: 10:55 highest-volume attention bar created
+        # the defended high/anchor; 11:32/11:37/11:50 held that level; 11:58 expanded.
+        volume_anchor_context = self._get_volume_anchor_high_reclaim_support_continuation_context(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=potential_confirmation_bar,
+        )
+        if volume_anchor_context is not None:
+            self._last_behavioral_buyer_control_phase_20pct_30min_entry_context = volume_anchor_context
+            return "volume_anchor_high_reclaim_support_continuation"
 
         # MTVA 2026-05-20: 04:01 body-level rejection -> repeated support groups -> first buyer confirmation.
         if self._matches_mtva_0401_body_rejection_support_group_entry(
@@ -8380,6 +8902,45 @@ class Helper:
                         and resistance_high < resistance_vwap
                     ):
                         return False, "bar suppressed: resistance/rejection high is below VWAP", self._build_bar_has_potential_context_details(current_context)
+                except Exception:
+                    pass
+
+            # v126: old-resistance support cannot have been accepted below
+            # repeatedly AFTER the claimed reclaim/break and before support.
+            # This blocks CODX 05-21 bad 09:30->10:06 context, but keeps cases
+            # like NEXR where the long seller-attack/recovery path is a different
+            # structure.
+            if (
+                matched_family == "old_resistance_reclaim_retest_buyer_control"
+                and current_context
+            ):
+                try:
+                    support_bar = current_context.get("support_bar")
+                    break_bar = current_context.get("break_bar") or current_context.get("reclaim_bar") or current_context.get("resistance_bar")
+                    break_time = getattr(break_bar, "bar_time", None) if break_bar is not None else None
+                    support_time = getattr(support_bar, "bar_time", None) if support_bar is not None else None
+                    support_low = self._safe_float(getattr(support_bar, "low", None), None) if support_bar is not None else None
+                    if break_time is not None and support_time is not None and support_low is not None and support_low > 0:
+                        minutes_break_to_support = (support_time - break_time).total_seconds() / 60.0
+                        if 12.0 <= minutes_break_to_support <= 45.0:
+                            chronological_bars = sorted(
+                                [bar for bar in getattr(one_minute_timeframe_stock, "bars", []) if getattr(bar, "bar_time", None) is not None],
+                                key=lambda bar: bar.bar_time,
+                            )
+                            lost_close_count = 0
+                            lost_low_count = 0
+                            for candidate_bar in chronological_bars:
+                                candidate_time = getattr(candidate_bar, "bar_time", None)
+                                if candidate_time is None or not (break_time < candidate_time < support_time):
+                                    continue
+                                candidate_close = self._safe_float(getattr(candidate_bar, "close", None), None)
+                                candidate_low = self._safe_float(getattr(candidate_bar, "low", None), None)
+                                if candidate_close is not None and candidate_close < support_low * 0.997:
+                                    lost_close_count += 1
+                                if candidate_low is not None and candidate_low < support_low * 0.997:
+                                    lost_low_count += 1
+                            if lost_close_count >= 8 or lost_low_count >= 12:
+                                return False, "bar suppressed: selected support level was repeatedly lost after reclaim before support", self._build_bar_has_potential_context_details(current_context)
                 except Exception:
                     pass
 
