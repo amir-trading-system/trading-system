@@ -187,7 +187,16 @@ class BarData:
     def str_bar_time(
         self,
     ) -> str:
-        return f"{self.bar_time.hour}:{self.bar_time.minute}"
+        hour = f"{self.bar_time.hour}"
+        minute = f"{self.bar_time.minute}"
+
+        if self.bar_time.hour < 10:
+            hour = f"0{self.bar_time.hour}"
+
+        if self.bar_time.minute < 10:
+            minute = f"0{self.bar_time.minute}"
+
+        return f"{hour}:{minute}"
 
     def has_strong_rejection(
         self,

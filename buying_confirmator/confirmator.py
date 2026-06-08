@@ -17,7 +17,6 @@ class Confirmator:
         results_queue: queue.Queue[dict[str,any]],
         request_id_to_symbol: dict[int,common.objects.Stock],
         logger: logging.Logger,
-        should_run_model: bool,
         alerter_object: alerter.alerter.Alerter = None,
         is_retro: bool = False,
     ):
@@ -27,7 +26,6 @@ class Confirmator:
 
         self.days_confirmator = days_confirmator.Confirmator(
             is_retro=is_retro,
-            should_run_model=should_run_model,
             tws_client=tws_client,
             request_id_to_symbol=request_id_to_symbol,
             logger=logger,

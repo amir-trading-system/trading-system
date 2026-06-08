@@ -13,7 +13,6 @@ class Confirmator:
     def __init__(
         self,
         is_retro: bool,
-        should_run_model: bool,
         tws_client: client.Client,
         logger: logging.Logger,
         request_id_to_symbol: dict[int,common.objects.Stock],
@@ -26,9 +25,6 @@ class Confirmator:
         self.alerter_object = alerter_object
         self.results_queue = results_queue
         self.request_id_to_symbol = request_id_to_symbol
-        self.model_runner = model.runner.Runner(
-            should_run_model=should_run_model,
-        )
         self.data_extractor = model.data_extractor.DataExtractor()
         self.helper = helper.Helper()
 
@@ -148,7 +144,6 @@ class Confirmator:
         original_bar_to_confirm: common.objects.BarData,
         already_sent_buy_order_for_stock: dict[str,bool],
     ) -> bool:
-        entry_position_bar: common.objects.BarData = None
         one_minute_bars.append(potential_confirmation_bar)
         confirmed_evidence: str = ""
         score = common.objects.Score(
@@ -171,12 +166,12 @@ class Confirmator:
             current_one_minute_bar=potential_confirmation_bar,
         )
 
-        case_details: common.objects.CaseDetails = self.helper.bar_potential_case_details(
+        bar_potential_case_details: common.objects.CaseDetails = self.helper.bar_potential_case_details(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
 
-        if not case_details.is_positive:
+        if not bar_potential_case_details.is_positive:
             self.logger.info(
                 msg="Bar does not have a potential",
                 extra={
@@ -200,144 +195,80 @@ class Confirmator:
         )
 
         total_volume = potential_confirmation_bar.price_movement_statistics.get("total_volume")
-        positive_tier = potential_confirmation_bar.price_movement_statistics.get("positive_tier")
-        positive_group_score = potential_confirmation_bar.price_movement_statistics.get("positive_group_score")
-        positive_group_reasons = potential_confirmation_bar.price_movement_statistics.get("positive_group_reasons")
-        positive_score = potential_confirmation_bar.price_movement_statistics.get("positive_score")
-        strong_positive_group_score = potential_confirmation_bar.price_movement_statistics.get("strong_positive_group_score")
-        strong_positive_group_reasons = potential_confirmation_bar.price_movement_statistics.get("strong_positive_group_reasons")
-        soft_positive_group_score = potential_confirmation_bar.price_movement_statistics.get("soft_positive_group_score")
-        soft_positive_group_reasons = potential_confirmation_bar.price_movement_statistics.get("soft_positive_group_reasons")
 
         if (
-            True
-            and total_volume is not None
+            total_volume is not None
+            and total_volume < 200000
+            or potential_confirmation_bar.volume < 15000
         ):
-            if (
-                total_volume < 200000
-                or potential_confirmation_bar.volume < 15000
-            ):
-                return False
+            return False
 
-        if self.model_runner.should_run_model:
-            score = self.model_runner.score_potential_confirmation_bar(
-                potential_confirmation_bar=potential_confirmation_bar,
-                day_timeframe_stock=stock,
+        self.logger.info(
+            msg="Bar confirmed with support and resistance pattern",
+            extra={
+                "worker": "Confirmator",
+                "symbol": stock.symbol_name,
+                "timeframe": original_bar_to_confirm.timeframe,
+                "bar_time": original_bar_to_confirm.bar_time,
+                "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                "highest_high_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else 0,
+                "request_id": stock.request_id,
+                "support_bar_time": bar_potential_case_details.support_bar.bar_time if bar_potential_case_details.is_positive else datetime.datetime.fromisoformat(0),
+                "resistance_bar_time": bar_potential_case_details.resistance_bar.bar_time if bar_potential_case_details.is_positive else datetime.datetime.fromisoformat(0),
+                "breakout_bar_time": bar_potential_case_details.breakout_bar.bar_time if bar_potential_case_details.is_positive else datetime.datetime.fromisoformat(0),
+            },
+        )
+
+        if self.alerter_object:
+            self.alerter_object.send_confirmation_alert(
+                sender="Confirmator",
+                stock=stock,
+                original_bar=original_bar_to_confirm,
+                entry_position_bar=potential_confirmation_bar,
+                highest_high_one_minute_bar=highest_high_one_minute_bar,
+                evidence_name=confirmed_evidence,
+                is_retro=self.is_retro,
+                request_id=stock.request_id,
             )
 
-            entry_position_bar = potential_confirmation_bar
+        unique_key_for_place_order = original_bar_to_confirm.symbol
+        if self.is_retro:
+            unique_key_for_place_order = f"{stock.symbol_name}-{stock.specific_bar_time}"
+        if (
+            not already_sent_buy_order_for_stock.get(unique_key_for_place_order, False)
+        ):
+            already_sent_buy_order_for_stock[unique_key_for_place_order] = True
 
-            self.logger.info(
-                msg="Bar analyzed by AI model",
-                extra={
-                    "worker": "Confirmator",
-                    "symbol": stock.symbol_name,
-                    "timeframe": original_bar_to_confirm.timeframe,
-                    "timeframe_type": original_bar_to_confirm.timeframe_type.value,
-                    "bar_time": original_bar_to_confirm.bar_time,
-                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                    "highest_high": highest_high_one_minute_bar.high if highest_high_one_minute_bar is not None else 0,
-                    "highest_high_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else 0,
-                    "request_id": stock.request_id,
-                    "score": score.score,
-                    "probability": score.probability,
-                    "threshold": score.threshold,
-                    "current_day_ema_9": original_bar_to_confirm.ema_9,
-                    "current_day_ema_20": original_bar_to_confirm.ema_20,
-                    "current_day_vwap": original_bar_to_confirm.vwap,
-                    "positive_tier": positive_tier,
-                    "positive_group_score": positive_group_score,
-                    "positive_group_reasons": positive_group_reasons,
-                    "positive_score": positive_score,
-                    "strong_positive_group_score": strong_positive_group_score,
-                    "strong_positive_group_reasons": strong_positive_group_reasons,
-                    "soft_positive_group_score": soft_positive_group_score,
-                    "soft_positive_group_reasons": soft_positive_group_reasons,
-                    "support_bar_time": case_details.support_bar.bar_time if case_details.is_positive else datetime.datetime.fromisoformat(0),
-                    "resistance_bar_time": case_details.resistance_bar.bar_time if case_details.is_positive else datetime.datetime.fromisoformat(0),
-                    "breakout_bar_time": case_details.breakout_bar.bar_time if case_details.is_positive else datetime.datetime.fromisoformat(0),
-                },
-            )
-        else:
-            score.should_take_trade = True
-
-        if entry_position_bar is not None:
-            if self.alerter_object:
-                self.alerter_object.send_confirmation_alert(
-                    sender="Confirmator",
-                    stock=stock,
-                    original_bar=original_bar_to_confirm,
-                    entry_position_bar=entry_position_bar,
-                    highest_high_one_minute_bar=highest_high_one_minute_bar,
-                    evidence_name=confirmed_evidence,
-                    is_retro=self.is_retro,
-                    request_id=stock.request_id,
+            if not self.is_retro:
+                self.tws_client.place_buy_order(
+                    symbol=original_bar_to_confirm.symbol,
+                    price=potential_confirmation_bar.close,
+                    transmit=False,
+                    score=score,
                 )
-
-            unique_key_for_place_order = original_bar_to_confirm.symbol
-            if self.is_retro:
-                unique_key_for_place_order = f"{stock.symbol_name}-{stock.specific_bar_time}"
-            if (
-                not already_sent_buy_order_for_stock.get(unique_key_for_place_order, False)
-            ):
-                already_sent_buy_order_for_stock[unique_key_for_place_order] = True
-
-                if not self.is_retro:
-                    self.tws_client.place_buy_order(
-                        symbol=original_bar_to_confirm.symbol,
-                        price=potential_confirmation_bar.close,
-                        transmit=False,
-                        score=score,
-                    )
-
-                self.results_queue.put(
-                    {
-                        "symbol": potential_confirmation_bar.symbol,
-                        "original_bar_time": original_bar_to_confirm.bar_time,
-                        "confirmation_bar_time": potential_confirmation_bar.bar_time,
-                        "bar_to_place_order_time": potential_confirmation_bar.bar_time,
-                        "price_movement_statistics": potential_confirmation_bar.price_movement_statistics,
-                        "score": score.score if score is not None else 0,
-                    },
-                )
-
                 self.logger.info(
-                    "Bar has confirmed by model and order has been placed",
+                    "Buy order has been placed",
                     extra={
                         "worker": "Confirmator",
                         "symbol": original_bar_to_confirm.symbol,
                         "timeframe": original_bar_to_confirm.timeframe,
                         "timeframe_type": original_bar_to_confirm.timeframe_type.value,
                         "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                        "bar_time": original_bar_to_confirm.bar_time,
                         "request_id": one_minute_timeframe_stock.request_id,
-                        "score": score.score,
                     },
                 )
+
+            self.results_queue.put(
+                {
+                    "symbol": potential_confirmation_bar.symbol,
+                    "original_bar_time": original_bar_to_confirm.bar_time,
+                    "confirmation_bar_time": potential_confirmation_bar.bar_time,
+                    "bar_to_place_order_time": potential_confirmation_bar.bar_time,
+                    "price_movement_statistics": potential_confirmation_bar.price_movement_statistics,
+                    "score": score.score if score is not None else 0,
+                },
+            )
 
             return True
 
         return False
-
-    def _highest_high_occurred_more_than_once_in_the_last_bars(
-        self,
-        stock: common.objects.Stock,
-        potential_confirmation_bar: common.objects.BarData,
-        one_minute_bars: list[common.objects.BarData],
-    ) -> bool:
-        if len(one_minute_bars) < 3:
-            return False
-
-        current_bar_is_highest_high = max(
-            bar_object.high
-            for bar_object in one_minute_bars
-        ) == potential_confirmation_bar.high
-
-        previous_bar_was_highest_high = max(
-            bar_object.high
-            for bar_object in one_minute_bars[2:]
-        )/one_minute_bars[1].high < 0.95
-
-        current_bar_crossed_stock_highest_high = potential_confirmation_bar.low < stock.last_post_pre_one_minute_highest_high < potential_confirmation_bar.close
-
-        return current_bar_is_highest_high and previous_bar_was_highest_high and not current_bar_crossed_stock_highest_high

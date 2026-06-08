@@ -30,7 +30,7 @@ class Helper:
             True
             and bar_object.ema_9 > bar_object.ema_20
             and bar_object.ema_9 > bar_object.vwap
-            and bar_object.bar_lower_wick_percentage >= 0.3
+            and bar_object.bar_lower_wick_percentage >= 0.15
             and previous_bar is not None
             and next_bar is not None
             and (
@@ -71,8 +71,8 @@ class Helper:
             True
             and previous_bar is not None
             and next_bar is not None
-            and not bar_object.high < previous_bar.high
-            and not bar_object.high < next_bar.high
+            and bar_object.high > previous_bar.high
+            and bar_object.high > next_bar.high
             and bar_object.low < support_bar.low
             and bar_object.above_volume_average
             and bar_object.high > bar_object.vwap
@@ -91,7 +91,7 @@ class Helper:
                     if bar_object.bar_time < bar_obj.bar_time < support_bar.bar_time
                     and bar_obj.low < bar_object.high < bar_obj.high
                 ]
-            ) <= 4
+            ) <= 2
         )
 
     def is_breakout_bar(
@@ -108,7 +108,7 @@ class Helper:
             and bar_object.high > support_bar.low
             and bar_object.low < resistance_bar.high < bar_object.high
             and bar_object.above_volume_average
-            and bar_object.bar_wick_percentage < 0.2
+            and bar_object.bar_wick_percentage < 0.5
             and not any(
                 bar_obj
                 for bar_obj in one_minute_timeframe_stock.bars
@@ -189,22 +189,26 @@ class Helper:
             and resistance_bar.bar_time < bar_object.bar_time < support_bar.bar_time
         ]
 
+        resistance_crossed_clean = len(
+            [
+                bar_obj
+                for bar_obj in one_minute_timeframe_stock.bars
+                if resistance_bar is not None
+                and support_bar is not None
+                and resistance_bar.bar_time < bar_obj.bar_time < support_bar.bar_time
+                and bar_obj.low < resistance_bar.high < bar_obj.high
+            ]
+        ) <= 3
+
+        if not resistance_crossed_clean:
+            return bar_potential_case_details
+
         for bar_object in bars_beetween_resistance_to_support:
-            if (
-                len(
-                    [
-                        bar_obj
-                        for bar_obj in one_minute_timeframe_stock.bars
-                        if resistance_bar.bar_time < bar_obj.bar_time < support_bar.bar_time
-                        and bar_obj.low < resistance_bar.high < bar_obj.high
-                    ]
-                ) <= 3
-                and self.is_breakout_bar(
-                    bar_object=bar_object,
-                    support_bar=support_bar,
-                    resistance_bar=resistance_bar,
-                    one_minute_timeframe_stock=one_minute_timeframe_stock,
-                )
+            if self.is_breakout_bar(
+                bar_object=bar_object,
+                support_bar=support_bar,
+                resistance_bar=resistance_bar,
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
             ):
                 breakout_bar = bar_object
 
