@@ -46,7 +46,6 @@ def wait_for_process_to_finish(
                     True
                     and result != "done"
                     and result != "failed"
-                    and float(symbol_data["score"]) > 0
                     and actual_confirmation_bar_time != "in_progress"
                 ):
                     t.update(1)
@@ -166,7 +165,6 @@ def wait_for_confirmation(
             relevant_symbol_data[0]["bar_to_place_order_time"] = confirmation_result["bar_to_place_order_time"]
             relevant_symbol_data[0]["collection_status"] = "done"
             relevant_symbol_data[0]["analysis_status"] = "done"
-            relevant_symbol_data[0]["score"] = confirmation_result["score"]
             relevant_symbol_data[0]["price_movement_statistics"] = confirmation_result.get("price_movement_statistics", {})
             continue
 
@@ -181,7 +179,6 @@ def wait_for_confirmation(
                 "bar_to_place_order_time": confirmation_result["bar_to_place_order_time"],
                 "is_new": True,
                 "price_movement_statistics": confirmation_result["price_movement_statistics"],
-                "score": confirmation_result["score"],
                 "result": "in_progress",
             },
         )
@@ -219,8 +216,8 @@ def run_retroactive_check():
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="LASE",
-            datetime_str="06.03.26T10:20:00",
+            name="PAVS",
+            datetime_str="06.09.26T10:20:00",
             is_positive=True,
         ),
     ]
@@ -340,7 +337,6 @@ def run_retroactive_check():
                 "price_movement_statistics": {},
                 "result": "in_progress",
                 "is_positive": symbol.is_positive,
-                "score": 0,
             },
         )
 

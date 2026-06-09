@@ -250,17 +250,8 @@ class Client(client.EClient, wrapper.EWrapper):
         symbol: str,
         price: float,
         transmit: bool,
-        score: common.objects.Score,
     ) -> int:
-        pct = 0
-        if 50 < score.score < 60:
-            pct = 0.2
-        if 60 <= score.score < 70:
-            pct = 0.4
-        if score.score >= 70:
-            pct = 0.5
-
-        quantity = math.floor((self.available_funds * pct) / price)
+        quantity = math.floor((self.available_funds * 0.5) / price)
         if quantity == 0:
             self.logger.info(
                 msg="Not enough available funds to buy stock",

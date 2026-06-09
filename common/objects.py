@@ -879,15 +879,65 @@ class SymbolTest:
         self.date_time = datetime.datetime.strptime(datetime_str, "%m.%d.%yT%H:%M:%S")
         self.is_positive = is_positive
 
-class CaseDetails:
+class ClassicCaseDetails:
     def __init__(
         self,
-        is_positive: bool,
-        support_bars: list[BarData],
+        support_bar: BarData,
         resistance_bar: BarData,
         breakout_bar: BarData = None,
     ):
-        self.is_positive = is_positive
-        self.support_bars = support_bars
+        self.support_bar = support_bar
         self.resistance_bar = resistance_bar
         self.breakout_bar = breakout_bar
+
+    def get_details(
+        self,
+    ) -> dict[str, any]:
+        return {
+            "support_bar_time": self.support_bar.bar_time,
+            "resistance_bar_time": self.resistance_bar.bar_time,
+            "breakout_bar_time": self.breakout_bar.bar_time,
+        }
+
+class OneSupportToManyResistanceCaseDetails:
+    def __init__(
+        self,
+        support_bar: BarData,
+        resistance_bars: list[BarData],
+        breakout_bar: BarData = None,
+    ):
+        self.support_bar = support_bar
+        self.resistance_bars = resistance_bars
+        self.breakout_bar = breakout_bar
+
+    def get_details(
+        self,
+    ) -> dict[str, any]:
+        return {
+            "support_bar_time": self.support_bar.bar_time,
+            "resistance_bars_times": [
+                bar_object.bar_time
+                for bar_object in self.resistance_bars
+            ],
+        }
+
+
+class ManySupportsToOneResistanceCaseDetails:
+    def __init__(
+        self,
+        support_bars: list[BarData],
+        resistance_bar: BarData,
+    ):
+        self.support_bars = support_bars
+        self.resistance_bar = resistance_bar
+
+    def get_details(
+        self,
+    ) -> dict[str, any]:
+        return {
+            "support_bars_times": [
+                bar_object.bar_time
+                for bar_object in self.support_bars
+            ],
+            "resistance_bar_time": self.resistance_bar.bar_time,
+        }

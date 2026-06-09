@@ -43,6 +43,7 @@ EMA9_CLOSE_BREAK_TOLERANCE_PCT = 0.0
 class BreakoutContext:
     breakout_type: str
     reason: str
+    case_type: str
 
     # Entry bar is the current/potential confirmation bar.
     entry_bar: Any
@@ -72,6 +73,7 @@ class BreakoutProfileRow:
     symbol: str
     trade_date: str
     is_positive: bool
+    case_type: Optional[str]
 
     # Core event sequence
     resistance_bar_time: Optional[datetime.datetime]
@@ -521,6 +523,7 @@ def _entry_bar_prefilter_passes(current_bar: Any) -> bool:
     )
 
 
+
 def _build_context_from_helper_context(
     current_bar: Any,
     bars: list[Any],
@@ -536,20 +539,29 @@ def _build_context_from_helper_context(
     if len(bars_before_current) < 3:
         return None
 
-    resistance_bar = helper_context.get("resistance_bar")
     support_low_bar = helper_context.get("support_bar")
     breakout_bar = helper_context.get("breakout_bar")
+
+    resistance_bar = helper_context.get("resistance_bar")
+    if resistance_bar is None or support_low_bar is None:
+        return None
+
     resistance_price = safe_float(helper_context.get("resistance_price"), None)
     if resistance_price is None and resistance_bar is not None:
         resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
 
     support_low = safe_float(getattr(support_low_bar, "low", None), None)
-    breakout_close = safe_float(getattr(current_bar, "close", None), None)
+    breakout_close = safe_float(
+        helper_context.get("breakout_close")
+        if helper_context.get("breakout_close") is not None
+        else getattr(breakout_bar, "close", None),
+        None,
+    )
+    if breakout_close is None:
+        breakout_close = safe_float(getattr(current_bar, "close", None), resistance_price) or resistance_price
 
     if (
-        resistance_bar is None
-        or support_low_bar is None
-        or resistance_price is None
+        resistance_price is None
         or resistance_price <= 0
         or support_low is None
         or support_low <= 0
@@ -573,6 +585,7 @@ def _build_context_from_helper_context(
     return BreakoutContext(
         breakout_type="behavioral_buyer_control_phase_20pct_30min_entry",
         reason=matched_family,
+        case_type=str(helper_context.get("case_type") or matched_family or ""),
         entry_bar=current_bar,
         breakout_bar=breakout_bar,
         resistance_bar=resistance_bar,
@@ -586,6 +599,121 @@ def _build_context_from_helper_context(
         helper_context=helper_context or {},
     )
 
+def _format_bar_times(bar_list: list[Any]) -> str:
+    return ";".join(
+        str(getattr(bar_object, "bar_time", ""))
+        for bar_object in bar_list
+        if bar_object is not None
+    )
+
+
+def _case_type_from_case_details(case_details: Any) -> str:
+    explicit_case_type = getattr(case_details, "case_type", None)
+    if explicit_case_type:
+        return str(explicit_case_type)
+
+    class_name = case_details.__class__.__name__
+    mapping = {
+        "ClassicCaseDetails": "classic",
+        "OneSupportToManyResistanceCaseDetails": "one_supports_many_resistance",
+        "ManySupportsToOneResistanceCaseDetails": "many_supports_one_resistance",
+    }
+    return mapping.get(class_name, class_name)
+
+
+def _choose_support_bar_for_case_details(case_details: Any) -> Any:
+    support_bar = getattr(case_details, "support_bar", None)
+    if support_bar is not None:
+        return support_bar
+
+    support_bars = [
+        bar_object
+        for bar_object in (getattr(case_details, "support_bars", None) or [])
+        if bar_object is not None
+    ]
+    if not support_bars:
+        return None
+
+    # For a support group, use the strongest invalidation reference:
+    # the lowest low in the group; if lows tie, use the latest bar.
+    return sorted(
+        support_bars,
+        key=lambda bar_object: (
+            safe_float(getattr(bar_object, "low", None), math.inf),
+            -getattr(bar_object, "bar_time", datetime.datetime.min).timestamp(),
+        ),
+    )[0]
+
+
+def _choose_resistance_bar_for_case_details(case_details: Any, support_bar: Any) -> Any:
+    resistance_bar = getattr(case_details, "resistance_bar", None)
+    if resistance_bar is not None:
+        return resistance_bar
+
+    resistance_bars = [
+        bar_object
+        for bar_object in (getattr(case_details, "resistance_bars", None) or [])
+        if bar_object is not None
+    ]
+    if not resistance_bars:
+        return None
+
+    support_low = safe_float(getattr(support_bar, "low", None), None)
+
+    if support_low is None or support_low <= 0:
+        # Fallback: use the earliest resistance bar in the group.
+        return sorted(
+            resistance_bars,
+            key=lambda bar_object: getattr(bar_object, "bar_time", datetime.datetime.max),
+        )[0]
+
+    def _resistance_rank(bar_object: Any) -> tuple[float, int, float]:
+        high = safe_float(getattr(bar_object, "high", None), None)
+        if high is None or high <= 0:
+            fit = math.inf
+        else:
+            fit = abs(high - support_low) / support_low
+
+        # Prefer a resistance that is at or below the support low when fit is similar.
+        above_support_penalty = 1 if high is not None and high > support_low * 1.002 else 0
+
+        # Prefer earlier/original resistance in a shelf if fit is similar.
+        bar_time = getattr(bar_object, "bar_time", datetime.datetime.max)
+        return (fit, above_support_penalty, bar_time.timestamp())
+
+    return sorted(resistance_bars, key=_resistance_rank)[0]
+
+
+def _case_details_group_metadata(case_details: Any) -> dict[str, Any]:
+    support_bars = [
+        bar_object
+        for bar_object in (getattr(case_details, "support_bars", None) or [])
+        if bar_object is not None
+    ]
+    resistance_bars = [
+        bar_object
+        for bar_object in (getattr(case_details, "resistance_bars", None) or [])
+        if bar_object is not None
+    ]
+
+    metadata: dict[str, Any] = {}
+
+    if support_bars:
+        metadata["support_bars"] = support_bars
+        metadata["support_bar_times"] = _format_bar_times(support_bars)
+
+    if resistance_bars:
+        metadata["resistance_bars"] = resistance_bars
+        metadata["resistance_bar_times"] = _format_bar_times(resistance_bars)
+
+    if hasattr(case_details, "get_details"):
+        try:
+            metadata["case_details_raw"] = case_details.get_details()
+        except Exception:
+            metadata["case_details_raw"] = None
+
+    return metadata
+
 
 def find_behavioral_buyer_control_phase_20pct_30min_entry_contexts(
     current_bar: Any,
@@ -593,13 +721,17 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_contexts(
     one_minute_timeframe_stock: common.objects.Stock,
     helper: Any = None,
 ) -> list[BreakoutContext]:
-    """Return one BreakoutContext per positive CaseDetails from helper.
+    """Return one BreakoutContext per CaseDetails from helper.
 
-    New helper contract only:
-        Helper.bar_potential_case_details(...) -> list[common.objects.CaseDetails]
+    Current helper contract only:
+        Helper.bar_potential_case_details(...) returns a list containing:
+        - ClassicCaseDetails
+        - OneSupportToManyResistanceCaseDetails
+        - ManySupportsToOneResistanceCaseDetails
 
-    There is intentionally no fallback to the older helper APIs here.  The
-    finder should export exactly what the helper declares through CaseDetails.
+    The group CaseDetails objects may contain many support/resistance bars.
+    The finder chooses one representative support/resistance for the existing
+    single-column export, while preserving the full bar groups in helper_context.
     """
     if not _entry_bar_prefilter_passes(current_bar):
         return []
@@ -620,35 +752,52 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_contexts(
 
     if not isinstance(case_details_list, list):
         raise TypeError(
-            "Helper.bar_potential_case_details(...) must return a list of CaseDetails. "
+            "Helper.bar_potential_case_details(...) must return a list of CaseDetails-like objects. "
             f"Got {type(case_details_list).__name__}."
         )
 
     contexts: list[BreakoutContext] = []
     for case_details in case_details_list:
-        if not getattr(case_details, "is_positive", False):
+        if case_details is None:
             continue
 
-        case_resistance_bar = getattr(case_details, "resistance_bar", None)
-        case_support_bar = getattr(case_details, "support_bar", None)
+        # helper(37) classes no longer expose is_positive. If the attribute is
+        # present and explicitly False, skip; otherwise treat returned cases as
+        # positive because the helper already filtered them.
+        if getattr(case_details, "is_positive", True) is False:
+            continue
+
+        case_type = _case_type_from_case_details(case_details)
+        case_support_bar = _choose_support_bar_for_case_details(case_details)
+        case_resistance_bar = _choose_resistance_bar_for_case_details(
+            case_details=case_details,
+            support_bar=case_support_bar,
+        )
         case_breakout_bar = getattr(case_details, "breakout_bar", None)
 
-        if case_resistance_bar is None or case_support_bar is None:
-            continue
+        if case_support_bar is None:
+            raise AttributeError(
+                "CaseDetails must expose support_bar or non-empty support_bars."
+            )
 
-        matched_family = (
-            getattr(case_details, "reason", None)
-            or getattr(case_details, "family", None)
-            or "bar_potential_case_details"
-        )
+        if case_resistance_bar is None:
+            raise AttributeError(
+                "CaseDetails must expose resistance_bar or non-empty resistance_bars."
+            )
+
+        matched_family = case_type or "bar_potential_case_details"
 
         helper_context_from_case_details = {
             "reason": matched_family,
+            "case_type": case_type,
             "resistance_bar": case_resistance_bar,
             "support_bar": case_support_bar,
             "breakout_bar": case_breakout_bar,
             "resistance_price": safe_float(getattr(case_resistance_bar, "high", None), None),
         }
+        helper_context_from_case_details.update(
+            _case_details_group_metadata(case_details)
+        )
 
         context = _build_context_from_helper_context(
             current_bar=current_bar,
@@ -1184,6 +1333,7 @@ def build_profile_row(
         symbol=getattr(bar, "symbol", ""),
         trade_date=trade_date,
         is_positive=is_positive,
+        case_type=context.case_type,
 
         resistance_bar_time=getattr(context.resistance_bar, "bar_time", None),
         support_bar_time=getattr(context.lowest_low_since_resistance_bar, "bar_time", None),
@@ -1459,6 +1609,7 @@ def _row_signal_key(row: BreakoutProfileRow) -> tuple:
         row.symbol,
         row.trade_date,
         row.entry_time,
+        row.case_type,
         row.resistance_bar_time,
         row.support_bar_time,
         row.breakout_bar_time,
@@ -1550,6 +1701,7 @@ def write_rows_to_csv(
         "symbol",
         "trade_date",
         "is_positive",
+        "case_type",
     ]
     time_fields = [
         field_name

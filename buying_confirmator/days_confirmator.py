@@ -146,12 +146,6 @@ class Confirmator:
     ) -> bool:
         one_minute_bars.append(potential_confirmation_bar)
         confirmed_evidence: str = ""
-        score = common.objects.Score(
-            score=0.0,
-            probability=0.0,
-            threshold=0.0,
-            should_take_trade=False,
-        )
 
         one_minute_timeframe_stock = self.request_id_to_symbol[stock.one_minute_request_id]
         highest_high_one_minute_bar = one_minute_timeframe_stock.get_highest_high_one_minute_bar(
@@ -166,7 +160,7 @@ class Confirmator:
             current_one_minute_bar=potential_confirmation_bar,
         )
 
-        bar_potential_case_details: list[common.objects.CaseDetails] = self.helper.bar_potential_case_details(
+        bar_potential_case_details: list[common.objects.ClassicCaseDetails | common.objects.OneSupportToManyResistanceCaseDetails | common.objects.ManySupportsToOneResistanceCaseDetails] = self.helper.bar_potential_case_details(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
@@ -214,9 +208,7 @@ class Confirmator:
                     "entry_position_bar_time": potential_confirmation_bar.bar_time,
                     "highest_high_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else 0,
                     "request_id": stock.request_id,
-                    "support_bar_time": case.support_bars[0].bar_time if case.is_positive else datetime.datetime.fromtimestamp(0),
-                    "resistance_bar_time": case.resistance_bar.bar_time if case.is_positive else datetime.datetime.fromtimestamp(0),
-                    "breakout_bar_time": case.breakout_bar.bar_time if case.is_positive and case.breakout_bar is not None else datetime.datetime.fromtimestamp(0),
+                    "case_details": case.get_details(),
                 },
             )
 
@@ -245,7 +237,6 @@ class Confirmator:
                     symbol=original_bar_to_confirm.symbol,
                     price=potential_confirmation_bar.close,
                     transmit=False,
-                    score=score,
                 )
                 self.logger.info(
                     "Buy order has been placed",
@@ -266,7 +257,6 @@ class Confirmator:
                     "confirmation_bar_time": potential_confirmation_bar.bar_time,
                     "bar_to_place_order_time": potential_confirmation_bar.bar_time,
                     "price_movement_statistics": potential_confirmation_bar.price_movement_statistics,
-                    "score": score.score if score is not None else 0,
                 },
             )
 
