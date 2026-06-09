@@ -57,7 +57,7 @@ class Confirmator:
                     month=next_bar.bar_time.month,
                     day=next_bar.bar_time.day,
                     hour=19,
-                    minute=20,
+                    minute=55,
                 )
             ):
                 self.results_queue.put(
@@ -166,12 +166,12 @@ class Confirmator:
             current_one_minute_bar=potential_confirmation_bar,
         )
 
-        bar_potential_case_details: common.objects.CaseDetails = self.helper.bar_potential_case_details(
+        bar_potential_case_details: list[common.objects.CaseDetails] = self.helper.bar_potential_case_details(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
 
-        if not bar_potential_case_details.is_positive:
+        if not bar_potential_case_details:
             self.logger.info(
                 msg="Bar does not have a potential",
                 extra={
@@ -203,21 +203,22 @@ class Confirmator:
         ):
             return False
 
-        self.logger.info(
-            msg="Bar confirmed with support and resistance pattern",
-            extra={
-                "worker": "Confirmator",
-                "symbol": stock.symbol_name,
-                "timeframe": original_bar_to_confirm.timeframe,
-                "bar_time": original_bar_to_confirm.bar_time,
-                "entry_position_bar_time": potential_confirmation_bar.bar_time,
-                "highest_high_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else 0,
-                "request_id": stock.request_id,
-                "support_bar_time": bar_potential_case_details.support_bar.bar_time if bar_potential_case_details.is_positive else datetime.datetime.fromisoformat(0),
-                "resistance_bar_time": bar_potential_case_details.resistance_bar.bar_time if bar_potential_case_details.is_positive else datetime.datetime.fromisoformat(0),
-                "breakout_bar_time": bar_potential_case_details.breakout_bar.bar_time if bar_potential_case_details.is_positive else datetime.datetime.fromisoformat(0),
-            },
-        )
+        for case in bar_potential_case_details:
+            self.logger.info(
+                msg="Bar confirmed with support and resistance pattern",
+                extra={
+                    "worker": "Confirmator",
+                    "symbol": stock.symbol_name,
+                    "timeframe": original_bar_to_confirm.timeframe,
+                    "bar_time": original_bar_to_confirm.bar_time,
+                    "entry_position_bar_time": potential_confirmation_bar.bar_time,
+                    "highest_high_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else 0,
+                    "request_id": stock.request_id,
+                    "support_bar_time": case.support_bar.bar_time if case.is_positive else datetime.datetime.fromisoformat(0),
+                    "resistance_bar_time": case.resistance_bar.bar_time if case.is_positive else datetime.datetime.fromisoformat(0),
+                    "breakout_bar_time": case.breakout_bar.bar_time if case.is_positive else datetime.datetime.fromisoformat(0),
+                },
+            )
 
         if self.alerter_object:
             self.alerter_object.send_confirmation_alert(

@@ -12,15 +12,6 @@ from typing import Any, Optional
 
 import common
 
-DISABLED_30PCT_FAMILIES = {"30pct_late_volume_shock_flat_base"}
-
-
-def _is_disabled_30pct_family_context(context: object) -> bool:
-    reason = getattr(context, "reason", None)
-    breakout_type = getattr(context, "breakout_type", None)
-    return reason in DISABLED_30PCT_FAMILIES or breakout_type in DISABLED_30PCT_FAMILIES
-
-
 import buying_confirmator
 
 # =========================
@@ -53,6 +44,11 @@ class BreakoutContext:
     breakout_type: str
     reason: str
 
+    # Entry bar is the current/potential confirmation bar.
+    entry_bar: Any
+
+    # Breakout bar is the structural bar returned by helper CaseDetails.
+    # It can be different from the entry bar.
     breakout_bar: Any
 
     resistance_bar: Any
@@ -77,19 +73,19 @@ class BreakoutProfileRow:
     trade_date: str
     is_positive: bool
 
-    breakout_type: str
-    reason: str
-    breakout_time: datetime.datetime
+    # Core event sequence
+    resistance_bar_time: Optional[datetime.datetime]
+    support_bar_time: Optional[datetime.datetime]
+    breakout_bar_time: Optional[datetime.datetime]
+    entry_time: datetime.datetime
 
     # Resistance / support structure
-    resistance_bar_time: Optional[datetime.datetime]
     resistance_price: Optional[float]
     resistance_bar_close: Optional[float]
     resistance_bar_volume: Optional[float]
     resistance_bar_volume_average: Optional[float]
     resistance_bar_wick_percentage: Optional[float]
 
-    lowest_low_since_resistance_time: Optional[datetime.datetime]
     lowest_low_since_resistance: Optional[float]
     lowest_low_since_resistance_close: Optional[float]
     lowest_low_since_resistance_bar_lower_wick_percentage: Optional[float]
@@ -262,7 +258,7 @@ class BreakoutProfileRow:
 
 @dataclass
 class TrackedBreakout:
-    breakout_bar: Any
+    entry_bar: Any
     breakout_type: str
     lowest_low_since_resistance_bar: Any
     failed_support_low: bool = False
@@ -504,25 +500,8 @@ def summarize_previous_window(
 
 
 
-def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
-    current_bar: Any,
-    bars: list[Any],
-    one_minute_timeframe_stock: common.objects.Stock,
-    helper: Any = None,
-) -> Optional[BreakoutContext]:
-    """
-    Public momentum entry-bar detector for the 20% continuation study.
-
-    This uses Helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(...) and converts
-    the matched entry bar into the same BreakoutContext used by the exporter and
-    future-label code. It intentionally detects first actionable ORB / VWAP /
-    bull-flag / EMA-MACD / volume-breakout entry bars rather than every bar that
-    remains in an uptrend.
-    """
-
-    # Fast prefilter before calling the expensive structural detector.
-    # The helper checks complex resistance/support structures. There is no value
-    # calling it on bars that are not constructive entry candidates at all.
+def _entry_bar_prefilter_passes(current_bar: Any) -> bool:
+    """Cheap entry-bar filter before calling the structural helper."""
     try:
         candle_range = float(current_bar.high) - float(current_bar.low)
         close_position_in_range = (float(current_bar.close) - float(current_bar.low)) / candle_range if candle_range > 0 else 0.0
@@ -531,80 +510,23 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
         volume_ratio_value = float(current_bar.volume) / volume_average if volume_average > 0 else 0.0
         ema9_value = float(getattr(current_bar, "ema_9", 0.0) or 0.0)
     except Exception:
-        return None
+        return False
 
-    if not (
+    return bool(
         float(current_bar.close) > float(current_bar.open_value)
         and close_position_in_range >= 0.38
         and upper_wick_share_value <= 0.70
         and volume_ratio_value >= 0.50
         and (ema9_value <= 0 or float(current_bar.close) >= ema9_value * 0.965)
-    ):
-        return None
+    )
 
-    if helper is None:
-        helper = buying_confirmator.helper.Helper()
 
-    # v33 integration: new helpers expose bar_potential_case_details(...)
-    # instead of bar_has_potential(...). Prefer that richer public gateway when
-    # available and convert its CaseDetails object into the BreakoutContext
-    # fields below. Keep the older gateways as compatibility fallbacks.
-    matched_family = None
-    helper_context_from_case_details: Optional[dict[str, Any]] = None
-
-    if hasattr(helper, "bar_potential_case_details"):
-        case_details = helper.bar_potential_case_details(
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            potential_confirmation_bar=current_bar,
-        )
-
-        if not getattr(case_details, "is_positive", False):
-            return None
-
-        case_resistance_bar = getattr(case_details, "resistance_bar", None)
-        case_support_bar = getattr(case_details, "support_bar", None)
-        case_breakout_bar = getattr(case_details, "breakout_bar", None)
-
-        if case_resistance_bar is None or case_support_bar is None:
-            return None
-
-        matched_family = "bar_potential_case_details"
-        helper_context_from_case_details = {
-            "reason": matched_family,
-            "resistance_bar": case_resistance_bar,
-            "support_bar": case_support_bar,
-            "breakout_bar": case_breakout_bar,
-            "resistance_price": safe_float(getattr(case_resistance_bar, "high", None), None),
-        }
-
-    elif hasattr(helper, "bar_has_potential"):
-        # v84: the CSV/export path must use the same public gateway as the live
-        # caller. Earlier versions called the lower-level behavioral detector
-        # directly, bypassing bar_has_potential(...) suppressions.
-        bar_has_potential_result = helper.bar_has_potential(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        )
-        # v89: bar_has_potential now returns (bool, reason, context_details).
-        # Keep backwards compatibility with older helpers returning 2-tuples.
-        if isinstance(bar_has_potential_result, tuple) and len(bar_has_potential_result) >= 3:
-            has_potential, potential_reason, _potential_context_details = bar_has_potential_result[:3]
-        else:
-            has_potential, potential_reason = bar_has_potential_result
-        if not has_potential:
-            return None
-        matched_family = potential_reason
-    else:
-        # Fallback only for older helper/finder mismatches.
-        if not hasattr(helper, "get_behavioral_buyer_control_phase_20pct_30min_entry_family"):
-            return None
-        matched_family = helper.get_behavioral_buyer_control_phase_20pct_30min_entry_family(
-            one_minute_timeframe_stock=stock_wrapper,
-            potential_confirmation_bar=current_bar,
-        )
-        if not matched_family:
-            return None
-
+def _build_context_from_helper_context(
+    current_bar: Any,
+    bars: list[Any],
+    matched_family: str,
+    helper_context: dict[str, Any],
+) -> Optional[BreakoutContext]:
     bars_before_current = get_bars_same_day_until(
         bars=bars,
         current_bar=current_bar,
@@ -614,31 +536,11 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     if len(bars_before_current) < 3:
         return None
 
-    # v22: use the exact resistance/support pair found by the helper.  Previous
-    # versions re-computed these fields generically with max(recent highs) and
-    # min(recent lows), which made the CSV look like invalid HKIT mappings even
-    # when the helper matched a different internal support structure.
-    helper_context = helper_context_from_case_details
-    if helper_context is None and hasattr(helper, "get_last_behavioral_buyer_control_phase_20pct_30min_entry_context"):
-        helper_context = helper.get_last_behavioral_buyer_control_phase_20pct_30min_entry_context()
-
-    if helper_context:
-        resistance_bar = helper_context.get("resistance_bar")
-        support_low_bar = helper_context.get("support_bar")
-        resistance_price = safe_float(helper_context.get("resistance_price"), None)
-        if resistance_price is None and resistance_bar is not None:
-            resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
-    else:
-        # Fallback only for older helper/finder mismatches.
-        recent_bars = bars_before_current[-20:] if len(bars_before_current) >= 20 else bars_before_current
-        resistance_bar = max(
-            recent_bars,
-            key=lambda bar_object: safe_float(getattr(bar_object, "high", None), 0.0),
-        )
-        support_low_bar = min(
-            recent_bars,
-            key=lambda bar_object: safe_float(getattr(bar_object, "low", None), float("inf")),
-        )
+    resistance_bar = helper_context.get("resistance_bar")
+    support_low_bar = helper_context.get("support_bar")
+    breakout_bar = helper_context.get("breakout_bar")
+    resistance_price = safe_float(helper_context.get("resistance_price"), None)
+    if resistance_price is None and resistance_bar is not None:
         resistance_price = safe_float(getattr(resistance_bar, "high", None), None)
 
     support_low = safe_float(getattr(support_low_bar, "low", None), None)
@@ -671,7 +573,8 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
     return BreakoutContext(
         breakout_type="behavioral_buyer_control_phase_20pct_30min_entry",
         reason=matched_family,
-        breakout_bar=current_bar,
+        entry_bar=current_bar,
+        breakout_bar=breakout_bar,
         resistance_bar=resistance_bar,
         resistance_price=resistance_price,
         lowest_low_since_resistance_bar=support_low_bar,
@@ -683,34 +586,95 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_context(
         helper_context=helper_context or {},
     )
 
-def find_breakout_context(
+
+def find_behavioral_buyer_control_phase_20pct_30min_entry_contexts(
     current_bar: Any,
     bars: list[Any],
-    allow_aligned_higher_low_buyer_ignition: bool = True,
-    one_minute_timeframe_stock = common.objects.Stock,
+    one_minute_timeframe_stock: common.objects.Stock,
     helper: Any = None,
-) -> Optional[BreakoutContext]:
-    """
-    Live/export decision for the public 20% momentum-entry experiment.
+) -> list[BreakoutContext]:
+    """Return one BreakoutContext per positive CaseDetails from helper.
 
-    Only the public 20% entry-bar detector is allowed to create an alert here:
-    ORB5, ORB15, or 3+ confluence across VWAP reclaim, bull flag, EMA/MACD,
-    and volume breakout families.
+    New helper contract only:
+        Helper.bar_potential_case_details(...) -> list[common.objects.CaseDetails]
 
-    `allow_aligned_higher_low_buyer_ignition` is kept in the signature for
-    backward compatibility with existing callers, but it is ignored.
+    There is intentionally no fallback to the older helper APIs here.  The
+    finder should export exactly what the helper declares through CaseDetails.
     """
-    public_20pct_context = find_behavioral_buyer_control_phase_20pct_30min_entry_context(
-        current_bar=current_bar,
-        bars=bars,
-        helper=helper,
+    if not _entry_bar_prefilter_passes(current_bar):
+        return []
+
+    if helper is None:
+        helper = buying_confirmator.helper.Helper()
+
+    if not hasattr(helper, "bar_potential_case_details"):
+        raise AttributeError("Helper must define bar_potential_case_details(...)")
+
+    case_details_list = helper.bar_potential_case_details(
         one_minute_timeframe_stock=one_minute_timeframe_stock,
+        potential_confirmation_bar=current_bar,
     )
 
-    if public_20pct_context is not None:
-        return public_20pct_context
+    if case_details_list is None:
+        return []
 
-    return None
+    if not isinstance(case_details_list, list):
+        raise TypeError(
+            "Helper.bar_potential_case_details(...) must return a list of CaseDetails. "
+            f"Got {type(case_details_list).__name__}."
+        )
+
+    contexts: list[BreakoutContext] = []
+    for case_details in case_details_list:
+        if not getattr(case_details, "is_positive", False):
+            continue
+
+        case_resistance_bar = getattr(case_details, "resistance_bar", None)
+        case_support_bar = getattr(case_details, "support_bar", None)
+        case_breakout_bar = getattr(case_details, "breakout_bar", None)
+
+        if case_resistance_bar is None or case_support_bar is None:
+            continue
+
+        matched_family = (
+            getattr(case_details, "reason", None)
+            or getattr(case_details, "family", None)
+            or "bar_potential_case_details"
+        )
+
+        helper_context_from_case_details = {
+            "reason": matched_family,
+            "resistance_bar": case_resistance_bar,
+            "support_bar": case_support_bar,
+            "breakout_bar": case_breakout_bar,
+            "resistance_price": safe_float(getattr(case_resistance_bar, "high", None), None),
+        }
+
+        context = _build_context_from_helper_context(
+            current_bar=current_bar,
+            bars=bars,
+            matched_family=matched_family,
+            helper_context=helper_context_from_case_details,
+        )
+        if context is not None:
+            contexts.append(context)
+
+    return contexts
+
+
+def find_breakout_contexts(
+    current_bar: Any,
+    bars: list[Any],
+    one_minute_timeframe_stock: common.objects.Stock,
+    helper: Any = None,
+) -> list[BreakoutContext]:
+    """Live/export decision for all CaseDetails contexts on this bar."""
+    return find_behavioral_buyer_control_phase_20pct_30min_entry_contexts(
+        current_bar=current_bar,
+        bars=bars,
+        one_minute_timeframe_stock=one_minute_timeframe_stock,
+        helper=helper,
+    )
 
 
 # =========================
@@ -724,13 +688,13 @@ def calculate_future_labels(
     target_gain_pct: float = TARGET_GAIN_PCT,
     invalidation_tolerance_pct: float = SUPPORT_LOW_INVALIDATION_TOLERANCE_PCT,
 ) -> dict[str, Any]:
-    breakout_bar = context.breakout_bar
-    future_bars = get_future_bars(bars, breakout_bar, future_minutes)
-    future_bars_full_session = get_future_bars_until_market_close(bars, breakout_bar)
+    entry_bar = context.entry_bar
+    future_bars = get_future_bars(bars, entry_bar, future_minutes)
+    future_bars_full_session = get_future_bars_until_market_close(bars, entry_bar)
 
-    breakout_close = safe_float(getattr(breakout_bar, "close", None), None)
+    entry_close = safe_float(getattr(entry_bar, "close", None), None)
 
-    if breakout_close is None or breakout_close <= 0:
+    if entry_close is None or entry_close <= 0:
         return {
             "max_gain_after_breakout_next_30_minutes_pct": None,
             "max_gain_after_breakout_next_30_minutes_abs": None,
@@ -827,9 +791,9 @@ def calculate_future_labels(
             support_break_time = future_bar.bar_time
             support_break_price = low
 
-        if not reached_target and high is not None and high >= breakout_close * (1 + target_gain_pct):
+        if not reached_target and high is not None and high >= entry_close * (1 + target_gain_pct):
             reached_target = True
-            minutes_until_target = minutes_between(breakout_bar.bar_time, future_bar.bar_time)
+            minutes_until_target = minutes_between(entry_bar.bar_time, future_bar.bar_time)
             # Stop checking "before target" support breaks after target is reached.
             # Still continue calculating max high / min low across full 30m window.
 
@@ -858,9 +822,9 @@ def calculate_future_labels(
             support_break_price_full_session = low
             break
 
-        if high is not None and high >= breakout_close * (1 + target_gain_pct):
+        if high is not None and high >= entry_close * (1 + target_gain_pct):
             reached_target_before_support_break_full_session = True
-            minutes_until_target_full_session = minutes_between(breakout_bar.bar_time, future_bar.bar_time)
+            minutes_until_target_full_session = minutes_between(entry_bar.bar_time, future_bar.bar_time)
             target_time_full_session = future_bar.bar_time
             break
 
@@ -894,10 +858,10 @@ def calculate_future_labels(
             ema20_value_at_close_break_full_session = ema_20
             break
 
-        if high is not None and high >= breakout_close * (1 + target_gain_pct):
+        if high is not None and high >= entry_close * (1 + target_gain_pct):
             reached_target_before_ema20_close_break_full_session = True
             minutes_until_target_before_ema20_close_break_full_session = minutes_between(
-                breakout_bar.bar_time,
+                entry_bar.bar_time,
                 future_bar.bar_time,
             )
             target_before_ema20_close_break_time_full_session = future_bar.bar_time
@@ -932,10 +896,10 @@ def calculate_future_labels(
             ema9_value_at_close_break_full_session = ema_9
             break
 
-        if high is not None and high >= breakout_close * (1 + target_gain_pct):
+        if high is not None and high >= entry_close * (1 + target_gain_pct):
             reached_target_before_ema9_close_break_full_session = True
             minutes_until_target_before_ema9_close_break_full_session = minutes_between(
-                breakout_bar.bar_time,
+                entry_bar.bar_time,
                 future_bar.bar_time,
             )
             target_before_ema9_close_break_time_full_session = future_bar.bar_time
@@ -976,10 +940,10 @@ def calculate_future_labels(
     minutes_until_max_gain_before_ema9_break = None
 
     if max_gain_before_ema9_break_high is not None:
-        max_gain_before_ema9_break_abs = max_gain_before_ema9_break_high - breakout_close
-        max_gain_before_ema9_break_pct = max_gain_before_ema9_break_abs / breakout_close
+        max_gain_before_ema9_break_abs = max_gain_before_ema9_break_high - entry_close
+        max_gain_before_ema9_break_pct = max_gain_before_ema9_break_abs / entry_close
         minutes_until_max_gain_before_ema9_break = minutes_between(
-            breakout_bar.bar_time,
+            entry_bar.bar_time,
             max_gain_before_ema9_break_high_time,
         )
 
@@ -1017,10 +981,10 @@ def calculate_future_labels(
     minutes_until_max_gain_before_low_break = None
 
     if max_gain_before_low_break_high is not None:
-        max_gain_before_low_break_abs = max_gain_before_low_break_high - breakout_close
-        max_gain_before_low_break_pct = max_gain_before_low_break_abs / breakout_close
+        max_gain_before_low_break_abs = max_gain_before_low_break_high - entry_close
+        max_gain_before_low_break_pct = max_gain_before_low_break_abs / entry_close
         minutes_until_max_gain_before_low_break = minutes_between(
-            breakout_bar.bar_time,
+            entry_bar.bar_time,
             max_gain_before_low_break_high_time,
         )
 
@@ -1028,15 +992,15 @@ def calculate_future_labels(
     max_gain_pct = None
 
     if max_high is not None:
-        max_gain_abs = max_high - breakout_close
-        max_gain_pct = max_gain_abs / breakout_close
+        max_gain_abs = max_high - entry_close
+        max_gain_pct = max_gain_abs / entry_close
 
     max_drawdown_abs = None
     max_drawdown_pct = None
 
     if min_low is not None:
-        max_drawdown_abs = breakout_close - min_low
-        max_drawdown_pct = max_drawdown_abs / breakout_close
+        max_drawdown_abs = entry_close - min_low
+        max_drawdown_pct = max_drawdown_abs / entry_close
 
     return {
         "max_gain_after_breakout_next_30_minutes_pct": max_gain_pct,
@@ -1121,7 +1085,7 @@ def update_tracked_breakouts(
 
         invalidation_price = support_low * (1 - invalidation_tolerance_pct)
 
-        if current_bar.bar_time > tracked.breakout_bar.bar_time and current_low < invalidation_price:
+        if current_bar.bar_time > tracked.entry_bar.bar_time and current_low < invalidation_price:
             tracked.failed_support_low = True
 
 
@@ -1132,7 +1096,7 @@ def get_previous_breakout_history(
     previous_breakouts = [
         tracked
         for tracked in tracked_breakouts
-        if tracked.breakout_bar.bar_time < current_bar.bar_time
+        if tracked.entry_bar.bar_time < current_bar.bar_time
     ]
 
     if not previous_breakouts:
@@ -1146,13 +1110,13 @@ def get_previous_breakout_history(
             "previous_clean_breakout_current_gain_pct": None,
         }
 
-    previous_breakouts = sorted(previous_breakouts, key=lambda x: x.breakout_bar.bar_time)
+    previous_breakouts = sorted(previous_breakouts, key=lambda x: x.entry_bar.bar_time)
     last_breakout = previous_breakouts[-1]
 
     current_high = safe_float(getattr(current_bar, "high", None), None)
     current_close = safe_float(getattr(current_bar, "close", None), None)
 
-    previous_breakout_close = safe_float(getattr(last_breakout.breakout_bar, "close", None), None)
+    previous_breakout_close = safe_float(getattr(last_breakout.entry_bar, "close", None), None)
 
     previous_current_gain_pct = pct_change(previous_breakout_close, current_close)
 
@@ -1165,7 +1129,7 @@ def get_previous_breakout_history(
         "clean_breakout_count_today_before_current": len(previous_breakouts),
         "failed_clean_breakout_count_today_before_current": sum(1 for tracked in previous_breakouts if tracked.failed_support_low),
         "previous_clean_breakout_failed_support_low": last_breakout.failed_support_low,
-        "minutes_since_previous_clean_breakout": minutes_between(last_breakout.breakout_bar.bar_time, current_bar.bar_time),
+        "minutes_since_previous_clean_breakout": minutes_between(last_breakout.entry_bar.bar_time, current_bar.bar_time),
         "previous_clean_breakout_type": last_breakout.breakout_type,
         "previous_clean_breakout_max_gain_until_current_pct": previous_max_gain_until_current_pct,
         "previous_clean_breakout_current_gain_pct": previous_current_gain_pct,
@@ -1182,7 +1146,7 @@ def build_profile_row(
     context: BreakoutContext,
     tracked_breakouts: list[TrackedBreakout],
 ) -> BreakoutProfileRow:
-    bar = context.breakout_bar
+    bar = context.entry_bar
     bars_before_current = get_bars_same_day_until(bars, bar, include_current=False)
 
     previous_bar = bars_before_current[-1] if bars_before_current else None
@@ -1221,18 +1185,16 @@ def build_profile_row(
         trade_date=trade_date,
         is_positive=is_positive,
 
-        breakout_type=context.breakout_type,
-        reason=context.reason,
-        breakout_time=bar.bar_time,
-
         resistance_bar_time=getattr(context.resistance_bar, "bar_time", None),
+        support_bar_time=getattr(context.lowest_low_since_resistance_bar, "bar_time", None),
+        breakout_bar_time=getattr(context.breakout_bar, "bar_time", None),
+        entry_time=bar.bar_time,
         resistance_price=context.resistance_price,
         resistance_bar_close=safe_float(getattr(context.resistance_bar, "close", None), None),
         resistance_bar_volume=safe_float(getattr(context.resistance_bar, "volume", None), None),
         resistance_bar_volume_average=safe_float(getattr(context.resistance_bar, "volume_average", None), None),
         resistance_bar_wick_percentage=safe_float(getattr(context.resistance_bar, "bar_wick_percentage", None), None),
 
-        lowest_low_since_resistance_time=getattr(context.lowest_low_since_resistance_bar, "bar_time", None),
         lowest_low_since_resistance=safe_float(getattr(context.lowest_low_since_resistance_bar, "low", None), None),
         lowest_low_since_resistance_close=safe_float(getattr(context.lowest_low_since_resistance_bar, "close", None), None),
         lowest_low_since_resistance_bar_lower_wick_percentage=safe_float(getattr(context.lowest_low_since_resistance_bar, "bar_lower_wick_percentage", None), None),
@@ -1447,43 +1409,34 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
             current_bar=current_bar,
         )
 
-        # The aligned-higher-low pattern is a broad confirmed-trend pattern.
-        # Latest profiling showed it works best only in the first 1-2 broader
-        # detected setups of the day, so allow it only when there is at most
-        # one previous detected breakout before the current bar. Other detector
-        # families are still allowed after this point.
-        allow_aligned_higher_low_buyer_ignition = (
-            history_before_current["clean_breakout_count_today_before_current"] <= 1
-        )
-
-        context = find_breakout_context(
+        contexts = find_breakout_contexts(
             current_bar=current_bar,
             bars=bars,
-            allow_aligned_higher_low_buyer_ignition=allow_aligned_higher_low_buyer_ignition,
             helper=helper_for_day,
             one_minute_timeframe_stock=stock,
         )
 
-        if context is None:
+        if not contexts:
             continue
 
-        row = build_profile_row(
-            data=data,
-            bars=bars,
-            context=context,
-            tracked_breakouts=tracked_breakouts,
-        )
-
-        rows.append(row)
-
-        tracked_breakouts.append(
-            TrackedBreakout(
-                breakout_bar=current_bar,
-                breakout_type=context.breakout_type,
-                lowest_low_since_resistance_bar=context.lowest_low_since_resistance_bar,
-                failed_support_low=False,
+        for context in contexts:
+            row = build_profile_row(
+                data=data,
+                bars=bars,
+                context=context,
+                tracked_breakouts=tracked_breakouts,
             )
-        )
+
+            rows.append(row)
+
+            tracked_breakouts.append(
+                TrackedBreakout(
+                    entry_bar=current_bar,
+                    breakout_type=context.breakout_type,
+                    lowest_low_since_resistance_bar=context.lowest_low_since_resistance_bar,
+                    failed_support_low=False,
+                )
+            )
 
     return rows
 
@@ -1505,11 +1458,10 @@ def _row_signal_key(row: BreakoutProfileRow) -> tuple:
     return (
         row.symbol,
         row.trade_date,
-        row.breakout_type,
-        row.reason,
-        row.breakout_time,
+        row.entry_time,
         row.resistance_bar_time,
-        row.lowest_low_since_resistance_time,
+        row.support_bar_time,
+        row.breakout_bar_time,
     )
 
 
@@ -1598,8 +1550,6 @@ def write_rows_to_csv(
         "symbol",
         "trade_date",
         "is_positive",
-        "breakout_type",
-        "reason",
     ]
     time_fields = [
         field_name
@@ -1607,7 +1557,7 @@ def write_rows_to_csv(
         if (
             field_name not in leading_fields
             and (
-                field_name == "breakout_time"
+                field_name == "entry_time"
                 or field_name.endswith("_time")
                 or "_time_" in field_name
             )
