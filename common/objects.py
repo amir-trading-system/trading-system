@@ -883,11 +883,11 @@ class CaseDetails:
     def __init__(
         self,
         is_positive: bool,
-        support_bar: BarData,
+        support_bars: list[BarData],
         resistance_bar: BarData,
-        breakout_bar: BarData,
+        breakout_bar: BarData = None,
     ):
         self.is_positive = is_positive
-        self.support_bar = support_bar
+        self.support_bars = support_bars
         self.resistance_bar = resistance_bar
         self.breakout_bar = breakout_bar

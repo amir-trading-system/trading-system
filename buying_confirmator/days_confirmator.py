@@ -214,9 +214,9 @@ class Confirmator:
                     "entry_position_bar_time": potential_confirmation_bar.bar_time,
                     "highest_high_bar_time": highest_high_one_minute_bar.bar_time if highest_high_one_minute_bar is not None else 0,
                     "request_id": stock.request_id,
-                    "support_bar_time": case.support_bar.bar_time if case.is_positive else datetime.datetime.fromisoformat(0),
-                    "resistance_bar_time": case.resistance_bar.bar_time if case.is_positive else datetime.datetime.fromisoformat(0),
-                    "breakout_bar_time": case.breakout_bar.bar_time if case.is_positive else datetime.datetime.fromisoformat(0),
+                    "support_bar_time": case.support_bars[0].bar_time if case.is_positive else datetime.datetime.fromtimestamp(0),
+                    "resistance_bar_time": case.resistance_bar.bar_time if case.is_positive else datetime.datetime.fromtimestamp(0),
+                    "breakout_bar_time": case.breakout_bar.bar_time if case.is_positive and case.breakout_bar is not None else datetime.datetime.fromtimestamp(0),
                 },
             )
 

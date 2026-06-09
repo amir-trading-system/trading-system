@@ -11,6 +11,207 @@ class Helper:
     ) -> None:
         self.unique_keys = {}
 
+    def bar_potential_case_details(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
+    ) -> list[common.objects.CaseDetails]:
+        case_details: list[common.objects.CaseDetails] = []
+
+        if (
+            potential_confirmation_bar.close < potential_confirmation_bar.ema_9
+            or potential_confirmation_bar.ema_9 < potential_confirmation_bar.ema_20
+            or potential_confirmation_bar.ema_9 < potential_confirmation_bar.vwap
+            or not potential_confirmation_bar.is_positive
+            or not potential_confirmation_bar.above_vwap
+            or not potential_confirmation_bar.above_volume_average
+            or not potential_confirmation_bar.body_percentage >= 0.4
+        ):
+            return []
+
+        bars_since_04_am = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if bar_object.bar_time >= datetime.datetime(
+                year=potential_confirmation_bar.bar_time.year,
+                month=potential_confirmation_bar.bar_time.month,
+                day=potential_confirmation_bar.bar_time.day,
+                hour=4,
+            )
+        ]
+
+        relevant_bars = [
+            bar_object
+            for bar_object in one_minute_timeframe_stock.bars
+            if potential_confirmation_bar.bar_time - datetime.timedelta(minutes=20) < bar_object.bar_time < potential_confirmation_bar.bar_time
+        ]
+
+        for bar_object in relevant_bars:
+            if bar_object.bar_time.date() != potential_confirmation_bar.bar_time.date():
+                continue
+
+            self.detect_classic_support_resistance_pattern_cases(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                bars_since_04_am=bars_since_04_am,
+                potential_confirmation_bar=potential_confirmation_bar,
+                bar_object=bar_object,
+                case_details=case_details,
+            )
+            if case_details:
+                continue
+
+            self.detect_consistent_support_to_resistance_cases(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                bars_since_04_am=bars_since_04_am,
+                bar_object=bar_object,
+                case_details=case_details,
+            )
+
+        return case_details
+
+    def detect_classic_support_resistance_pattern_cases(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        bars_since_04_am: list[common.objects.BarData],
+        potential_confirmation_bar: common.objects.BarData,
+        bar_object: common.objects.BarData,
+        case_details: list[common.objects.CaseDetails],
+    ) -> None:
+        if not self.is_support_bar(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            bar_object=bar_object,
+        ):
+            return
+
+        support_bar = bar_object
+        potential_resistance_bars = [
+            bar_obj
+            for bar_obj in bars_since_04_am
+            if bar_obj.bar_time.date() == support_bar.bar_time.date()
+            and bar_obj.bar_time < support_bar.bar_time
+            and not any(
+                bar_obj
+                for bar_obj in bars_since_04_am
+                if support_bar.bar_time < bar_obj.bar_time < potential_confirmation_bar.bar_time
+                and bar_obj.close < bar_object.high
+            )
+            and self.is_resistance_bar(
+                one_minute_timeframe_stock=one_minute_timeframe_stock,
+                bars_since_04_am=bars_since_04_am,
+                bar_object=bar_obj,
+                support_bar=support_bar,
+            )
+        ]
+
+        for resistance_bar in potential_resistance_bars:
+            unique_key = f"{support_bar.symbol}-{support_bar.bar_time}-{resistance_bar.bar_time}"
+            if unique_key in self.unique_keys:
+                continue
+
+            bars_beetween_resistance_to_support = [
+                bar_object
+                for bar_object in bars_since_04_am
+                if resistance_bar.bar_time < bar_object.bar_time < support_bar.bar_time
+                and bar_object.low/resistance_bar.high <= 0.99
+            ]
+
+            resistance_crossed_clean = len(
+                [
+                    bar_obj
+                    for bar_obj in bars_since_04_am
+                    if resistance_bar.bar_time < bar_obj.bar_time < support_bar.bar_time
+                    and bar_obj.low < resistance_bar.high < bar_obj.high
+                    and bar_obj.low/resistance_bar.high <= 0.99
+                ]
+            ) <= 3
+
+            if not resistance_crossed_clean:
+                continue
+
+            for bar_object in bars_beetween_resistance_to_support:
+                if not self.is_breakout_bar(
+                    bar_object=bar_object,
+                    support_bar=support_bar,
+                    resistance_bar=resistance_bar,
+                    bars_since_04_am=bars_since_04_am,
+                ):
+                    continue
+
+                breakout_bar = bar_object
+                case_details.append(
+                    common.objects.CaseDetails(
+                        is_positive=True,
+                        support_bars=[support_bar],
+                        resistance_bar=resistance_bar,
+                        breakout_bar=breakout_bar,
+                    )
+                )
+
+                self.unique_keys[unique_key] = True
+                break
+
+    def detect_consistent_support_to_resistance_cases(
+        self,
+        one_minute_timeframe_stock: common.objects.Stock,
+        bars_since_04_am: list[common.objects.BarData],
+        bar_object: common.objects.BarData,
+        case_details: list[common.objects.CaseDetails],
+    ) -> None:
+        previous_bars_with_same_low = sorted(
+            [
+                bar_obj
+                for bar_obj in bars_since_04_am
+                if bar_obj.bar_time < bar_object.bar_time
+                and 0.99 <= bar_object.low/bar_obj.low <= 1.01
+                and bar_obj.ema_9 > bar_obj.ema_20
+                and bar_obj.ema_9 > bar_obj.vwap
+                and bar_obj.bar_lower_wick_percentage >= 0.15
+                and bar_obj.macd > 0
+                and bar_obj.signal_line > 0
+            ],
+            key=lambda bar_obj: bar_obj.bar_time,
+            reverse=True,
+        )
+        if not previous_bars_with_same_low:
+            return
+
+        first_support_bar = previous_bars_with_same_low[-1]
+        potential_resistance_bars = sorted(
+            [
+                bar_obj
+                for bar_obj in bars_since_04_am
+                if bar_obj.bar_time.date() == first_support_bar.bar_time.date()
+                and bar_obj.bar_time < first_support_bar.bar_time
+                and self.is_resistance_bar(
+                    one_minute_timeframe_stock=one_minute_timeframe_stock,
+                    bars_since_04_am=bars_since_04_am,
+                    bar_object=bar_obj,
+                    support_bar=first_support_bar,
+                )
+            ],
+            key=lambda bar_obj: bar_obj.bar_time,
+            reverse=True,
+        )
+
+        if not potential_resistance_bars:
+            return
+
+        resistance_bar = potential_resistance_bars[-1]
+
+        unique_key = f"{first_support_bar.symbol}-{first_support_bar.bar_time}-{resistance_bar.bar_time}"
+        if unique_key in self.unique_keys:
+            return
+
+        if len(previous_bars_with_same_low) >= 4:
+            case_details.append(
+                common.objects.CaseDetails(
+                    is_positive=True,
+                    support_bars=previous_bars_with_same_low,
+                    resistance_bar=resistance_bar,
+                )
+            )
+            self.unique_keys[unique_key] = True
+
     def is_support_bar(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
@@ -60,7 +261,7 @@ class Helper:
     def is_resistance_bar(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
-        potential_confirmation_bar: common.objects.BarData,
+        bars_since_04_am: list[common.objects.BarData],
         bar_object: common.objects.BarData,
         support_bar: common.objects.BarData,
     ) -> bool:
@@ -83,16 +284,10 @@ class Helper:
             and bar_object.signal_line > 0
             and bar_object.bar_wick_percentage >= 0.2
             and 0.99 <= bar_object.high/support_bar.low <= 1.01
-            and not any(
-                bar_obj
-                for bar_obj in one_minute_timeframe_stock.bars
-                if support_bar.bar_time < bar_obj.bar_time < potential_confirmation_bar.bar_time
-                and bar_obj.close < bar_object.high
-            )
             and len(
                 [
                     bar_obj
-                    for bar_obj in one_minute_timeframe_stock.bars
+                    for bar_obj in bars_since_04_am
                     if bar_object.bar_time < bar_obj.bar_time < support_bar.bar_time
                     and bar_obj.low < bar_object.high < bar_obj.high
                     and bar_obj.low/bar_object.high <= 0.99
@@ -105,7 +300,7 @@ class Helper:
         bar_object: common.objects.BarData,
         support_bar: common.objects.BarData,
         resistance_bar: common.objects.BarData,
-        one_minute_timeframe_stock: common.objects.Stock,
+        bars_since_04_am: list[common.objects.BarData],
     ) -> bool:
         return (
             True
@@ -117,106 +312,8 @@ class Helper:
             and bar_object.bar_wick_percentage < 0.5
             and not any(
                 bar_obj
-                for bar_obj in one_minute_timeframe_stock.bars
+                for bar_obj in bars_since_04_am
                 if bar_object.bar_time < bar_obj.bar_time < support_bar.bar_time
                 and bar_obj.low/resistance_bar.high < 0.99
             )
         )
-
-    def bar_potential_case_details(
-        self,
-        one_minute_timeframe_stock: common.objects.Stock,
-        potential_confirmation_bar: common.objects.BarData,
-    ) -> list[common.objects.CaseDetails]:
-        support_bar: common.objects.BarData = None
-        case_details: list[common.objects.CaseDetails] = []
-
-        if (
-            potential_confirmation_bar.close < potential_confirmation_bar.ema_9
-            or potential_confirmation_bar.ema_9 < potential_confirmation_bar.ema_20
-            or potential_confirmation_bar.ema_9 < potential_confirmation_bar.vwap
-            or not potential_confirmation_bar.is_positive
-            or not potential_confirmation_bar.above_vwap
-            or not potential_confirmation_bar.above_volume_average
-            or not potential_confirmation_bar.body_percentage >= 0.4
-        ):
-            return []
-
-        relevant_bars = [
-            bar_object
-            for bar_object in one_minute_timeframe_stock.bars
-            if potential_confirmation_bar.bar_time - datetime.timedelta(minutes=20) < bar_object.bar_time < potential_confirmation_bar.bar_time
-        ]
-
-        for bar_object in relevant_bars:
-            if bar_object.bar_time.date() != potential_confirmation_bar.bar_time.date():
-                continue
-
-            if not self.is_support_bar(
-                one_minute_timeframe_stock=one_minute_timeframe_stock,
-                bar_object=bar_object,
-            ):
-                continue
-
-            support_bar = bar_object
-            potential_resistance_bars = [
-                bar_obj
-                for bar_obj in one_minute_timeframe_stock.bars
-                if bar_obj.bar_time < support_bar.bar_time
-                and bar_obj.bar_time.date() == support_bar.bar_time.date()
-                and self.is_resistance_bar(
-                    one_minute_timeframe_stock=one_minute_timeframe_stock,
-                    potential_confirmation_bar=potential_confirmation_bar,
-                    bar_object=bar_obj,
-                    support_bar=support_bar,
-                )
-            ]
-
-            for resistance_bar in potential_resistance_bars:
-                unique_key = f"{support_bar.symbol}-{support_bar.bar_time}-{resistance_bar.bar_time}"
-                if unique_key in self.unique_keys:
-                    continue
-
-                bars_beetween_resistance_to_support = [
-                    bar_object
-                    for bar_object in one_minute_timeframe_stock.bars
-                    if resistance_bar.bar_time < bar_object.bar_time < support_bar.bar_time
-                    and bar_object.low/resistance_bar.high <= 0.99
-                ]
-
-                resistance_crossed_clean = len(
-                    [
-                        bar_obj
-                        for bar_obj in one_minute_timeframe_stock.bars
-                        if resistance_bar.bar_time < bar_obj.bar_time < support_bar.bar_time
-                        and bar_obj.low < resistance_bar.high < bar_obj.high
-                        and bar_obj.low/resistance_bar.high <= 0.99
-                    ]
-                ) <= 3
-
-                if not resistance_crossed_clean:
-                    continue
-
-                for bar_object in bars_beetween_resistance_to_support:
-                    if not self.is_breakout_bar(
-                        bar_object=bar_object,
-                        support_bar=support_bar,
-                        resistance_bar=resistance_bar,
-                        one_minute_timeframe_stock=one_minute_timeframe_stock,
-                    ):
-                        continue
-
-                    breakout_bar = bar_object
-                    case_details.append(
-                        common.objects.CaseDetails(
-                            is_positive=True,
-                            support_bar=support_bar,
-                            resistance_bar=resistance_bar,
-                            breakout_bar=breakout_bar,
-                        )
-                    )
-
-                    self.unique_keys[unique_key] = True
-                    break
-
-        return case_details
