@@ -258,7 +258,7 @@ class Helper:
         if not potential_resistance_bars:
             return
 
-        resistance_bar = potential_resistance_bars[-1]
+        resistance_bar = potential_resistance_bars[0]
 
         unique_key = f"{support_bar.symbol}-{support_bar.bar_time}-{resistance_bar.bar_time}"
         if unique_key in self.unique_keys:
