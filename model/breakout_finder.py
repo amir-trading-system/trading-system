@@ -1595,16 +1595,8 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
 # CSV WRITING
 # =========================
 
-def _row_signal_key(row: BreakoutProfileRow) -> tuple:
-    """Stable de-duplication key for one detected signal/context.
-
-    The training folder can contain multiple source files for the same
-    symbol/date. Without this guard, the exporter writes the same detected
-    signal several times, which makes the CSV look like the same resistance /
-    support properties are repeated 5x, 10x, etc.  We de-dupe by the actual
-    signal identity, not by the whole row, because future-label fields can vary
-    slightly across duplicate source files while the signal itself is identical.
-    """
+def _row_exact_signal_key(row: BreakoutProfileRow) -> tuple:
+    """Exact identity for one exported signal row."""
     return (
         row.symbol,
         row.trade_date,
@@ -1616,16 +1608,95 @@ def _row_signal_key(row: BreakoutProfileRow) -> tuple:
     )
 
 
+def _row_pair_structure_key(row: BreakoutProfileRow) -> tuple:
+    """Structural key for collapsing duplicate helper interpretations.
+
+    Keep different entry/support lifecycles even if they share the same
+    resistance. Example: INHD 11:25 and 11:38 can share the 11:08 resistance,
+    but they have different supports and entries, so both must remain.
+
+    Collapse only rows that describe the same resistance/support pair on the
+    same symbol/date. This removes duplicate case-type interpretations of the
+    same structure without deleting later independent setups.
+    """
+    return (
+        row.symbol,
+        row.trade_date,
+        row.resistance_bar_time,
+        row.support_bar_time,
+    )
+
+
+def _case_type_priority(case_type: Optional[str]) -> int:
+    """Lower is better when several rows describe the same structure."""
+    case_type_text = str(case_type or "")
+    if case_type_text == "classic":
+        return 0
+    if case_type_text == "one_supports_many_resistance":
+        return 1
+    if case_type_text == "many_supports_one_resistance":
+        return 2
+    return 9
+
+
+def _row_representative_rank(row: BreakoutProfileRow) -> tuple:
+    """Pick the representative row for one duplicated resistance/support pair.
+
+    Prefer the cleanest case type. If the structure is identical, keep the
+    earliest entry because it is usually the first actionable signal for that
+    exact resistance/support pair.
+    """
+    entry_time = row.entry_time or datetime.datetime.max
+    breakout_time = row.breakout_bar_time or datetime.datetime.max
+
+    return (
+        _case_type_priority(row.case_type),
+        entry_time,
+        breakout_time,
+    )
+
+
 def dedupe_profile_rows(rows: list[BreakoutProfileRow]) -> list[BreakoutProfileRow]:
-    seen: set[tuple] = set()
-    deduped_rows: list[BreakoutProfileRow] = []
+    """De-duplicate exported rows without deleting distinct later setups.
+
+    Rules:
+      1. Remove exact duplicate rows first.
+      2. Collapse only rows with the same symbol/date/resistance/support pair.
+
+    Important: same resistance alone is not enough to merge. A resistance can
+    create multiple valid later supports/entries. Same support alone is also not
+    enough to merge if the resistance explanation differs.
+    """
+    seen_exact: set[tuple] = set()
+    exact_deduped_rows: list[BreakoutProfileRow] = []
+
     for row in rows:
-        key = _row_signal_key(row)
-        if key in seen:
+        exact_key = _row_exact_signal_key(row)
+        if exact_key in seen_exact:
             continue
-        seen.add(key)
-        deduped_rows.append(row)
-    return deduped_rows
+        seen_exact.add(exact_key)
+        exact_deduped_rows.append(row)
+
+    rows_by_pair: dict[tuple, list[BreakoutProfileRow]] = {}
+    for row in exact_deduped_rows:
+        rows_by_pair.setdefault(_row_pair_structure_key(row), []).append(row)
+
+    merged_rows: list[BreakoutProfileRow] = []
+    for pair_key in sorted(rows_by_pair.keys()):
+        pair_rows = rows_by_pair[pair_key]
+        merged_rows.append(sorted(pair_rows, key=_row_representative_rank)[0])
+
+    return sorted(
+        merged_rows,
+        key=lambda row: (
+            row.symbol,
+            row.trade_date,
+            row.entry_time,
+            row.resistance_bar_time or datetime.datetime.min,
+            row.support_bar_time or datetime.datetime.min,
+            str(row.case_type or ""),
+        ),
+    )
 
 
 def _training_file_symbol_date_key(file_path: str) -> tuple[str, str]:

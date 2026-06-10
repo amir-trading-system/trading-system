@@ -52,6 +52,7 @@ class Helper:
 
             self.detect_classic_support_resistance_pattern_cases(
                 one_minute_timeframe_stock=one_minute_timeframe_stock,
+                potential_confirmation_bar=potential_confirmation_bar,
                 bars_since_04_am=bars_since_04_am,
                 bar_object=bar_object,
                 case_details=case_details,
@@ -76,6 +77,7 @@ class Helper:
     def detect_classic_support_resistance_pattern_cases(
         self,
         one_minute_timeframe_stock: common.objects.Stock,
+        potential_confirmation_bar: common.objects.BarData,
         bars_since_04_am: list[common.objects.BarData],
         bar_object: common.objects.BarData,
         case_details: list[common.objects.ClassicCaseDetails],
@@ -87,6 +89,7 @@ class Helper:
             return
 
         support_bar = bar_object
+
         potential_resistance_bars = [
             bar_obj
             for bar_obj in bars_since_04_am
@@ -97,6 +100,17 @@ class Helper:
                 bars_since_04_am=bars_since_04_am,
                 bar_object=bar_obj,
                 support_bar=support_bar,
+            )
+            and any(
+                bar_object
+                for bar_object in bars_since_04_am
+                if bar_obj.bar_time < bar_object.bar_time < support_bar.bar_time
+                and one_minute_timeframe_stock.previous_bar(
+                    bar_object=bar_object,
+                ) is not None
+                and one_minute_timeframe_stock.previous_bar(
+                    bar_object=bar_object,
+                ).low > bar_object.low
             )
         ]
 
@@ -127,6 +141,7 @@ class Helper:
 
             for bar_object in bars_beetween_resistance_to_support:
                 if not self.is_breakout_bar(
+                    potential_confirmation_bar=potential_confirmation_bar,
                     bar_object=bar_object,
                     support_bar=support_bar,
                     resistance_bar=resistance_bar,
@@ -154,6 +169,15 @@ class Helper:
         bar_object: common.objects.BarData,
         case_details: list[common.objects.ManySupportsToOneResistanceCaseDetails],
     ) -> None:
+        if not (
+            bar_object.ema_9 > bar_object.ema_20
+            and bar_object.ema_9 > bar_object.vwap
+            and bar_object.bar_lower_wick_percentage >= 0.15
+            and bar_object.macd > 0
+            and bar_object.signal_line > 0
+        ):
+            return
+
         previous_bars_with_same_low = sorted(
             [
                 bar_obj
@@ -165,6 +189,7 @@ class Helper:
                 and bar_obj.bar_lower_wick_percentage >= 0.15
                 and bar_obj.macd > 0
                 and bar_obj.signal_line > 0
+                and abs(bar_obj.low - bar_object.low) < abs(bar_obj.high - bar_object.low)
             ],
             key=lambda bar_obj: bar_obj.bar_time,
             reverse=True,
@@ -251,6 +276,13 @@ class Helper:
                 )
                 and bar_obj.macd > 0
                 and bar_obj.signal_line > 0
+                and not any(
+                    bar_between
+                    for bar_between in bars_since_04_am
+                    if bar_obj.bar_time < bar_between.bar_time < support_bar.bar_time
+                    and bar_between.macd < 0
+                    and bar_between.signal_line < 0
+                )
             ],
             key=lambda bar_obj: bar_obj.bar_time,
             reverse=True,
@@ -358,6 +390,7 @@ class Helper:
 
     def is_breakout_bar(
         self,
+        potential_confirmation_bar: common.objects.BarData,
         bar_object: common.objects.BarData,
         support_bar: common.objects.BarData,
         resistance_bar: common.objects.BarData,
@@ -376,5 +409,11 @@ class Helper:
                 for bar_obj in bars_since_04_am
                 if bar_object.bar_time < bar_obj.bar_time < support_bar.bar_time
                 and bar_obj.low/resistance_bar.high < 0.99
+            )
+            and not any(
+                bar_obj
+                for bar_obj in bars_since_04_am
+                if bar_object.bar_time < bar_obj.bar_time < potential_confirmation_bar.bar_time
+                and bar_obj.close < resistance_bar.high
             )
         )
