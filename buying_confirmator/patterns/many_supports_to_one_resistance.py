@@ -26,6 +26,7 @@ class PatternDetector(
             and bar_object.bar_lower_wick_percentage >= 0.15
             and bar_object.macd > 0
             and bar_object.signal_line > 0
+            and bar_object.high - bar_object.low < 0.05
         ):
             return []
 
@@ -73,7 +74,7 @@ class PatternDetector(
 
         resistance_bar = potential_resistance_bars[0]
 
-        unique_key = f"{first_support_bar.symbol}-{first_support_bar.bar_time}"
+        unique_key = f"{first_support_bar.symbol}-{resistance_bar.bar_time}"
         if unique_key in unique_keys:
             return []
 

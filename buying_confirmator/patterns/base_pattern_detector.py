@@ -39,6 +39,7 @@ class PatternDetector:
             and bar_object.bar_lower_wick_percentage > bar_object.bar_wick_percentage
             and bar_object.macd > 0
             and bar_object.signal_line > 0
+            and bar_object.high - bar_object.low > 0.05
             and previous_bar is not None
             and next_bar is not None
             and (
@@ -86,6 +87,7 @@ class PatternDetector:
             and bar_object.high > bar_object.vwap
             and bar_object.macd > 0
             and bar_object.signal_line > 0
+            and bar_object.high - bar_object.low > 0.05
             and bar_object.bar_wick_percentage >= 0.1
             and 0.99 <= bar_object.high/support_bar.low <= 1.02
             and len(

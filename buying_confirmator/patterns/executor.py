@@ -37,6 +37,7 @@ class PatternDetectorExecutor:
             or not potential_confirmation_bar.above_vwap
             or not potential_confirmation_bar.above_volume_average
             or not potential_confirmation_bar.body_percentage >= 0.4
+            or potential_confirmation_bar.volume < 10000
         ):
             return []
 

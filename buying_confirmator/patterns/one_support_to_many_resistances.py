@@ -32,6 +32,7 @@ class PatternDetector(
                 bar_obj
                 for bar_obj in bars_since_04_am
                 if bar_obj.bar_time.date() == support_bar.bar_time.date()
+                and bar_object.high - bar_object.low > 0.05
                 and one_minute_timeframe_stock.previous_bar(
                     bar_object=bar_obj,
                 ) is not None
@@ -68,7 +69,9 @@ class PatternDetector(
         if not potential_resistance_bars:
             return []
 
-        unique_key = f"{support_bar.symbol}-{support_bar.bar_time}"
+        resistance_bar = potential_resistance_bars[0]
+
+        unique_key = f"{support_bar.symbol}-{resistance_bar.bar_time}"
         if unique_key in unique_keys:
             return []
 
