@@ -199,5 +199,5 @@ class DataStreamer():
             day=current_session_date.day,
             hour=9,
             minute=30,
-        ):
+        ) or self.is_retro:
             day_timeframe_stock.one_minute_bars_queue.put(enriched_bar)
