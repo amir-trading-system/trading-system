@@ -4,9 +4,8 @@ import queue
 
 import alerter
 import common
-import model
 from tws import client
-from . import helper
+from . import patterns
 
 
 class Confirmator:
@@ -25,8 +24,7 @@ class Confirmator:
         self.alerter_object = alerter_object
         self.results_queue = results_queue
         self.request_id_to_symbol = request_id_to_symbol
-        self.data_extractor = model.data_extractor.DataExtractor()
-        self.helper = helper.Helper()
+        self.pattern_detector_executor = patterns.executor.PatternDetectorExecutor()
 
     def confirm_entry_position(
         self,
@@ -53,9 +51,9 @@ class Confirmator:
                 True
                 and self.is_retro
                 and next_bar.bar_time >= datetime.datetime(
-                    year=next_bar.bar_time.year,
-                    month=next_bar.bar_time.month,
-                    day=next_bar.bar_time.day,
+                    year=original_bar_to_confirm.bar_time.year,
+                    month=original_bar_to_confirm.bar_time.month,
+                    day=original_bar_to_confirm.bar_time.day,
                     hour=19,
                     minute=55,
                 )
@@ -160,7 +158,7 @@ class Confirmator:
             current_one_minute_bar=potential_confirmation_bar,
         )
 
-        bar_potential_case_details: list[common.objects.ClassicCaseDetails | common.objects.OneSupportToManyResistanceCaseDetails | common.objects.ManySupportsToOneResistanceCaseDetails] = self.helper.bar_potential_case_details(
+        bar_potential_case_details = self.pattern_detector_executor.find_support_to_resistance_patterns(
             one_minute_timeframe_stock=one_minute_timeframe_stock,
             potential_confirmation_bar=potential_confirmation_bar,
         )
@@ -178,23 +176,6 @@ class Confirmator:
                     "request_id": stock.request_id,
                 }
             )
-            return False
-
-        potential_confirmation_bar.price_movement_statistics = self.data_extractor.extract_features_from_symbol_data(
-            day_timeframe_stock=stock,
-            one_minute_timeframe_stock=one_minute_timeframe_stock,
-            potential_confirmation_bar=potential_confirmation_bar,
-            highest_high_one_minute_bar=highest_high_one_minute_bar,
-            one_minute_bars=one_minute_bars,
-        )
-
-        total_volume = potential_confirmation_bar.price_movement_statistics.get("total_volume")
-
-        if (
-            total_volume is not None
-            and total_volume < 200000
-            or potential_confirmation_bar.volume < 15000
-        ):
             return False
 
         for case in bar_potential_case_details:

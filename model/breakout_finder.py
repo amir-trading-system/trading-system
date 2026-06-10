@@ -7,12 +7,17 @@ import glob
 import math
 import os
 import pickle
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 from typing import Any, Optional
 
 import common
 
 import buying_confirmator
+
+try:
+    from buying_confirmator.patterns.executor import PatternDetectorExecutor
+except Exception:
+    PatternDetectorExecutor = None
 
 # =========================
 # CONFIG
@@ -617,6 +622,9 @@ def _case_type_from_case_details(case_details: Any) -> str:
         "ClassicCaseDetails": "classic",
         "OneSupportToManyResistanceCaseDetails": "one_supports_many_resistance",
         "ManySupportsToOneResistanceCaseDetails": "many_supports_one_resistance",
+        "ClassicSUpportToResistanceDetection": "classic",
+        "OneSupportToManyResistancesDetection": "one_supports_many_resistance",
+        "ManySupportsToOneResistaceDetection": "many_supports_one_resistance",
     }
     return mapping.get(class_name, class_name)
 
@@ -737,15 +745,26 @@ def find_behavioral_buyer_control_phase_20pct_30min_entry_contexts(
         return []
 
     if helper is None:
-        helper = buying_confirmator.helper.Helper()
+        if PatternDetectorExecutor is not None:
+            helper = PatternDetectorExecutor()
+        else:
+            helper = buying_confirmator.helper.Helper()
 
-    if not hasattr(helper, "bar_potential_case_details"):
-        raise AttributeError("Helper must define bar_potential_case_details(...)")
-
-    case_details_list = helper.bar_potential_case_details(
-        one_minute_timeframe_stock=one_minute_timeframe_stock,
-        potential_confirmation_bar=current_bar,
-    )
+    if hasattr(helper, "find_support_to_resistance_patterns"):
+        case_details_list = helper.find_support_to_resistance_patterns(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=current_bar,
+        )
+    elif hasattr(helper, "bar_potential_case_details"):
+        case_details_list = helper.bar_potential_case_details(
+            one_minute_timeframe_stock=one_minute_timeframe_stock,
+            potential_confirmation_bar=current_bar,
+        )
+    else:
+        raise AttributeError(
+            "Pattern executor must define find_support_to_resistance_patterns(...) "
+            "or legacy Helper must define bar_potential_case_details(...)."
+        )
 
     if case_details_list is None:
         return []
@@ -1525,10 +1544,13 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
     rows: list[BreakoutProfileRow] = []
     tracked_breakouts: list[TrackedBreakout] = []
 
-    # Reuse these for the whole file/day. Creating a Helper and wrapper for
-    # every bar made the hot path much slower and prevented any helper-side
-    # caching from being useful.
-    helper_for_day = buying_confirmator.helper.Helper()
+    # Reuse the pattern executor for the whole file/day. Creating it for every
+    # bar made the hot path slower and prevented detector-side duplicate/caching
+    # state from being useful.
+    if PatternDetectorExecutor is not None:
+        helper_for_day = PatternDetectorExecutor()
+    else:
+        helper_for_day = buying_confirmator.helper.Helper()
 
     for current_bar in bars:
         # We normally profile regular session only, including the 09:30 opening bar.
@@ -1595,6 +1617,52 @@ def process_training_file(file_path: str) -> list[BreakoutProfileRow]:
 # CSV WRITING
 # =========================
 
+def _format_merged_time(value: Optional[datetime.datetime]) -> Optional[str]:
+    """CSV-friendly single time value used inside merged time lists."""
+    if value is None:
+        return None
+    if isinstance(value, datetime.datetime):
+        return value.strftime("%H:%M")
+    return str(value)
+
+
+def _merged_unique_times(rows: list[BreakoutProfileRow], field_name: str) -> Optional[str]:
+    """Return sorted unique HH:MM values from one time column across merged rows."""
+    values: list[datetime.datetime] = []
+    text_values: list[str] = []
+
+    for row in rows:
+        value = getattr(row, field_name, None)
+        if value is None:
+            continue
+        if isinstance(value, datetime.datetime):
+            values.append(value)
+        else:
+            text_values.append(str(value))
+
+    unique_parts: list[str] = []
+    seen_parts: set[str] = set()
+
+    for value in sorted(set(values)):
+        part = _format_merged_time(value)
+        if part is not None and part not in seen_parts:
+            seen_parts.add(part)
+            unique_parts.append(part)
+
+    for part in sorted(set(text_values)):
+        if part and part not in seen_parts:
+            seen_parts.add(part)
+            unique_parts.append(part)
+
+    return " | ".join(unique_parts) if unique_parts else None
+
+
+def _merged_unique_case_types(rows: list[BreakoutProfileRow]) -> Optional[str]:
+    """Keep visibility into all pattern families that produced this entry."""
+    values = sorted({str(row.case_type) for row in rows if row.case_type is not None})
+    return " | ".join(values) if values else None
+
+
 def _row_exact_signal_key(row: BreakoutProfileRow) -> tuple:
     """Exact identity for one exported signal row."""
     return (
@@ -1608,27 +1676,22 @@ def _row_exact_signal_key(row: BreakoutProfileRow) -> tuple:
     )
 
 
-def _row_pair_structure_key(row: BreakoutProfileRow) -> tuple:
-    """Structural key for collapsing duplicate helper interpretations.
+def _row_entry_key(row: BreakoutProfileRow) -> tuple:
+    """Final CSV identity: one row per symbol/date/entry bar.
 
-    Keep different entry/support lifecycles even if they share the same
-    resistance. Example: INHD 11:25 and 11:38 can share the 11:08 resistance,
-    but they have different supports and entries, so both must remain.
-
-    Collapse only rows that describe the same resistance/support pair on the
-    same symbol/date. This removes duplicate case-type interpretations of the
-    same structure without deleting later independent setups.
+    Different resistance/support/breakout structures for the same entry are not
+    exported as separate rows anymore. They are merged into the same row by
+    combining the event-time columns.
     """
     return (
         row.symbol,
         row.trade_date,
-        row.resistance_bar_time,
-        row.support_bar_time,
+        row.entry_time,
     )
 
 
 def _case_type_priority(case_type: Optional[str]) -> int:
-    """Lower is better when several rows describe the same structure."""
+    """Lower is better when several rows describe the same entry."""
     case_type_text = str(case_type or "")
     if case_type_text == "classic":
         return 0
@@ -1640,32 +1703,56 @@ def _case_type_priority(case_type: Optional[str]) -> int:
 
 
 def _row_representative_rank(row: BreakoutProfileRow) -> tuple:
-    """Pick the representative row for one duplicated resistance/support pair.
+    """Pick the representative values for non-merged feature columns.
 
-    Prefer the cleanest case type. If the structure is identical, keep the
-    earliest entry because it is usually the first actionable signal for that
-    exact resistance/support pair.
+    The merged output keeps all resistance/support/breakout times for the entry,
+    but all scalar research/features columns must still come from one concrete
+    row. Prefer the cleanest case type, then the most recent local structure.
     """
-    entry_time = row.entry_time or datetime.datetime.max
-    breakout_time = row.breakout_bar_time or datetime.datetime.max
+    resistance_time = row.resistance_bar_time or datetime.datetime.min
+    support_time = row.support_bar_time or datetime.datetime.min
+    breakout_time = row.breakout_bar_time or datetime.datetime.min
 
     return (
         _case_type_priority(row.case_type),
-        entry_time,
+        -resistance_time.timestamp() if isinstance(resistance_time, datetime.datetime) else 0,
+        -support_time.timestamp() if isinstance(support_time, datetime.datetime) else 0,
         breakout_time,
     )
 
 
+def _merge_same_entry_rows(entry_rows: list[BreakoutProfileRow]) -> BreakoutProfileRow:
+    """Merge all structures that produced the same entry into one CSV row."""
+    representative = sorted(entry_rows, key=_row_representative_rank)[0]
+
+    return replace(
+        representative,
+        case_type=_merged_unique_case_types(entry_rows) or representative.case_type,
+        resistance_bar_time=_merged_unique_times(entry_rows, "resistance_bar_time"),
+        support_bar_time=_merged_unique_times(entry_rows, "support_bar_time"),
+        breakout_bar_time=_merged_unique_times(entry_rows, "breakout_bar_time"),
+    )
+
+
 def dedupe_profile_rows(rows: list[BreakoutProfileRow]) -> list[BreakoutProfileRow]:
-    """De-duplicate exported rows without deleting distinct later setups.
+    """De-duplicate exported rows and merge structures by entry bar.
 
     Rules:
       1. Remove exact duplicate rows first.
-      2. Collapse only rows with the same symbol/date/resistance/support pair.
+      2. For the final CSV, keep only one row per symbol/date/entry_time.
+      3. When several structures share the same entry, combine their
+         resistance_bar_time, support_bar_time, and breakout_bar_time values
+         into pipe-separated sorted lists in that one row.
 
-    Important: same resistance alone is not enough to merge. A resistance can
-    create multiple valid later supports/entries. Same support alone is also not
-    enough to merge if the resistance explanation differs.
+    Example:
+        R 09:12 -> S 10:21 -> B 10:31 -> E 10:31
+        R 09:30 -> S 10:21 -> B 10:31 -> E 10:31
+
+    becomes one row:
+        resistance_bar_time = "09:12 | 09:30"
+        support_bar_time    = "10:21"
+        breakout_bar_time   = "10:31"
+        entry_time          = 10:31
     """
     seen_exact: set[tuple] = set()
     exact_deduped_rows: list[BreakoutProfileRow] = []
@@ -1677,14 +1764,14 @@ def dedupe_profile_rows(rows: list[BreakoutProfileRow]) -> list[BreakoutProfileR
         seen_exact.add(exact_key)
         exact_deduped_rows.append(row)
 
-    rows_by_pair: dict[tuple, list[BreakoutProfileRow]] = {}
+    rows_by_entry: dict[tuple, list[BreakoutProfileRow]] = {}
     for row in exact_deduped_rows:
-        rows_by_pair.setdefault(_row_pair_structure_key(row), []).append(row)
+        rows_by_entry.setdefault(_row_entry_key(row), []).append(row)
 
     merged_rows: list[BreakoutProfileRow] = []
-    for pair_key in sorted(rows_by_pair.keys()):
-        pair_rows = rows_by_pair[pair_key]
-        merged_rows.append(sorted(pair_rows, key=_row_representative_rank)[0])
+    for entry_key in sorted(rows_by_entry.keys()):
+        entry_rows = rows_by_entry[entry_key]
+        merged_rows.append(_merge_same_entry_rows(entry_rows))
 
     return sorted(
         merged_rows,
@@ -1692,8 +1779,6 @@ def dedupe_profile_rows(rows: list[BreakoutProfileRow]) -> list[BreakoutProfileR
             row.symbol,
             row.trade_date,
             row.entry_time,
-            row.resistance_bar_time or datetime.datetime.min,
-            row.support_bar_time or datetime.datetime.min,
             str(row.case_type or ""),
         ),
     )
