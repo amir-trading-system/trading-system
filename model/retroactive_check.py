@@ -199,7 +199,7 @@ def flush_logs():
 def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     symbols: list[common.objects.SymbolTest] = []
     for symbol, dates in stock_finder.get_dynamic_symbols_data_from_period(
-        period="5d",
+        period="3d",
     ).items():
         for date in dates:
             symbols.append(
@@ -212,12 +212,12 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     return symbols
 
 def run_retroactive_check():
-    get_only_statistics = False
+    get_only_statistics = True
     symbols_data = []
     symbols = [
         common.objects.SymbolTest(
-            name="BATL",
-            datetime_str="06.10.26T12:20:00",
+            name="AKAN",
+            datetime_str="04.28.26T10:20:00",
             is_positive=True,
         ),
     ]
