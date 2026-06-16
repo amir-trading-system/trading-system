@@ -1,37 +1,10 @@
-Need to do the following:
-- cases for check:
-  - WOK - 05.11.2026T15:37 - exists
-  - WOK - 05.11.2026T15:45 - exists
-  - WOK - 05.11.2026T15:59 - exists
-  - RKTO - 05.27.2026T11:43 - exists
-  - NEXR - 05.29.2026T10:17 - exists
-  - NEXR - 06.04.2026T09:49 - exists
-  - HKIT - 06.01.2026T10:03 - exists
-  - HKIT - 06.01.2026T10:05 - exists
-  - HKIT - 06.01.2026T10:10 - exists
-  - LASE - 06.02.2026T12:20 - exists
-  - LASE - 06.02.2026T17:24 - exists
-  - LASE - 06.03.2026T09:49 - exists
-  - SDOT - 06.03.2026T10:31 - exists
-  - SDOT - 06.03.2026T10:32 - missing / should stay excluded
-  - EDHL - 06.04.2026T10:29 - exists
-  - EDHL - 06.04.2026T10:32 - exists
-  - EDHL - 06.04.2026T10:33 - missing / should stay excluded
-  - MASK - 05.28.2026T10:34 - exists
-  - MASK - 05.28.2026T09:50 - missing / should stay excluded
-  - MASK - 05.28.2026T10:35 - missing / should stay excluded
-  - LOBO - 06.02.2026T09:39 - missing / should stay excluded
-  - LOBO - 06.02.2026T10:02 - missing / should stay excluded
-  - ZJYL - 06.02.2026T10:28 - missing / should stay excluded
-  - MTVA - 05.20.2026T10:33 - exists
-  - MTVA - 05.20.2026T10:03 - missing / should stay excluded
-  - MTVA - 05.20.2026T10:34 - missing / should stay excluded
-  - MTVA - 05.20.2026T10:35 - missing / should stay excluded
-  - MTVA - 05.20.2026T10:51 - missing / should stay excluded
-  - RMSG - 06.05.2026T08:30 - exists
-  - RMSG - 06.05.2026T08:28 - missing / should stay excluded
-  - RMSG - 06.05.2026T08:31 - missing / should stay excluded
-  - BCDA - 06.05.2026T09:37 - missing / should stay excluded
-  - BCDA - 06.05.2026T09:39 - missing / should stay excluded
-  - BCDA - 06.05.2026T09:59 - missing / should stay excluded
-  - BNAI - 06.05.2026T10:54 - exists
+Get in only if the following happens:
+ - close is above last VAH.
+ - volume is much bigger than previous, and above volume average.
+ - close above previous resistance (by other close, not high).
+ - bar close strongly - wick less than 0.4.
+ - not in the first 10 minutes if its a good one there will be another option later.
+ examples:
+  - CRVO - 06.16.2026T11:01:00 - True.
+  - CRVO - 06.16.2026T12:18:00 - False - volume is not so high while price is wide - meaning not a lot of buyers.
+  - CRVO - 06.16.2026T12:24:00 - True.
