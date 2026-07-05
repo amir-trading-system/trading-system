@@ -1,10 +1,28 @@
-Get in only if the following happens:
- - close is above last VAH.
- - volume is much bigger than previous, and above volume average.
- - close above previous resistance (by other close, not high).
- - bar close strongly - wick less than 0.4.
- - not in the first 10 minutes if its a good one there will be another option later.
- examples:
-  - CRVO - 06.16.2026T11:01:00 - True.
-  - CRVO - 06.16.2026T12:18:00 - False - volume is not so high while price is wide - meaning not a lot of buyers.
-  - CRVO - 06.16.2026T12:24:00 - True.
+Tasks for today:
+ - short video on EHGO - 06.17.2026 - pre market.
+
+Description:
+In this video we will understand why this specific bar or bars are the one that the market reacts to it and buyers comes in. Like and subscribe!
+
+Tags for videos:
+FRVP,TradingView,Fixed Range Volume Profile,Volume,Technical Analysis,Momentum Trading,Volume Confirmation,Support And Resistance, Breakout, Failed Breakout
+
+
+Entry point should answer all the following:
+ - The previous trend should be on the last 2 hours.
+ - Starts the trend in terms of volume.
+ - High volume relatively to its previous bar.
+ - close strongly - upper wick is small if any at all.
+ - cross the previous VAH of the previous trend.
+ - close of current bar is the highest close for the current day.
+ - If the first move is very high, we need to look on this very causion.
+
+
+Theories to test:
+ - pre market early trend, price does not cross the VAL, and crossed later the VAH but doesnt keep the price up as a new trend.
+ - trend, and short time after than price does not cross the VAL, suddenly volume gets high and VAH crossed - trend continues.
+ - early trend on market, price retest the VAL and does not cross it, resistance line above VAH but a clear one - when crossing this line strongly the trend continues.
+
+ - There are 2 valid scenarios:
+  - previous trend is close, price does not crossed down from VAL, and volume comes early to continue the trend.
+  - previous trend is not so close, take the VAH and search for crossing it strongly. if not crossed strongly but crossed, wait for retest.

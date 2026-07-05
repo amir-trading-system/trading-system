@@ -199,7 +199,7 @@ def flush_logs():
 def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
     symbols: list[common.objects.SymbolTest] = []
     for symbol, dates in stock_finder.get_dynamic_symbols_data_from_period(
-        period="3d",
+        period="30d",
     ).items():
         for date in dates:
             symbols.append(
@@ -221,7 +221,11 @@ def run_retroactive_check():
             is_positive=True,
         ),
     ]
-    # symbols = explore_past_potential_symbols()
+    symbols = explore_past_potential_symbols()
+    for symbol in symbols:
+        print(f"{symbol.name}: {symbol.date_time}")
+
+    return
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
