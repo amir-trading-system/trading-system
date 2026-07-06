@@ -1,0 +1,637 @@
+//@version=6
+indicator("Draggable FRVP VAH / VAL / POC", overlay=true, max_lines_count=500, max_labels_count=500, max_bars_back=5000)
+
+// =====================================================
+// DRAGGABLE AREAS
+// =====================================================
+
+// -------------------------
+// Area 1
+// -------------------------
+bool useArea1 = input.bool(true, "► Enable Area 1", group="Area 1")
+
+int start1 = input.time(timestamp("2026-07-01 09:30"), "Start", confirm=true, inline="A1S", group="Area 1")
+float startPrice1 = input.price(1.00, "", confirm=true, inline="A1S", group="Area 1")
+
+int end1 = input.time(timestamp("2026-07-01 16:00"), "End", confirm=true, inline="A1E", group="Area 1")
+float endPrice1 = input.price(1.00, "", confirm=true, inline="A1E", group="Area 1")
+
+color areaColor1 = input.color(color.new(color.blue, 92), "Area 1 Shading", group="Area 1")
+
+// -------------------------
+// Area 2
+// -------------------------
+bool useArea2 = input.bool(false, "► Enable Area 2", group="Area 2")
+
+int start2 = input.time(timestamp("2026-07-02 09:30"), "Start", confirm=true, inline="A2S", group="Area 2")
+float startPrice2 = input.price(1.00, "", confirm=true, inline="A2S", group="Area 2")
+
+int end2 = input.time(timestamp("2026-07-02 16:00"), "End", confirm=true, inline="A2E", group="Area 2")
+float endPrice2 = input.price(1.00, "", confirm=true, inline="A2E", group="Area 2")
+
+color areaColor2 = input.color(color.new(color.purple, 92), "Area 2 Shading", group="Area 2")
+
+// -------------------------
+// Area 3
+// -------------------------
+bool useArea3 = input.bool(false, "► Enable Area 3", group="Area 3")
+
+int start3 = input.time(timestamp("2026-07-03 09:30"), "Start", confirm=true, inline="A3S", group="Area 3")
+float startPrice3 = input.price(1.00, "", confirm=true, inline="A3S", group="Area 3")
+
+int end3 = input.time(timestamp("2026-07-03 16:00"), "End", confirm=true, inline="A3E", group="Area 3")
+float endPrice3 = input.price(1.00, "", confirm=true, inline="A3E", group="Area 3")
+
+color areaColor3 = input.color(color.new(color.orange, 92), "Area 3 Shading", group="Area 3")
+
+// =====================================================
+// PROFILE SETTINGS
+// =====================================================
+int rowCount = input.int(
+     70,
+     "Profile Rows",
+     minval=10,
+     maxval=200,
+     group="Profile Settings",
+     tooltip="Use the same row count as the TradingView built-in FRVP when comparing values."
+)
+
+float valueAreaPercent = input.float(
+     70.0,
+     "Value Area %",
+     minval=50.0,
+     maxval=95.0,
+     step=1.0,
+     group="Profile Settings"
+)
+
+int maxBarsInRange = input.int(
+     5000,
+     "Max Bars In Selected Range",
+     minval=100,
+     maxval=5000,
+     group="Profile Settings",
+     tooltip="This is not a lookback limit. It is only a safety cap for how many bars one selected FRVP range may contain."
+)
+
+// =====================================================
+// DISPLAY SETTINGS
+// =====================================================
+string tablePos = input.string(
+     "Top Right",
+     "Dashboard Position",
+     options=["Top Right", "Top Left", "Bottom Right", "Bottom Left"],
+     group="Display"
+)
+
+bool showVAH = input.bool(true, "Show VAH", group="Display")
+bool showVAL = input.bool(true, "Show VAL", group="Display")
+bool showPOC = input.bool(true, "Show POC", group="Display")
+bool extendLinesRight = input.bool(true, "Extend Lines Right", group="Display")
+bool showAnchorLine = input.bool(true, "Show Draggable Anchor Line", group="Display")
+
+// =====================================================
+// LINE STYLE SETTINGS
+// =====================================================
+color vahColor = input.color(color.blue, "VAH Color", group="Line Style Settings")
+color valColor = input.color(color.green, "VAL Color", group="Line Style Settings")
+color pocColor = input.color(color.yellow, "POC Color", group="Line Style Settings")
+
+int vahWidth = input.int(2, "VAH Width", minval=1, maxval=5, group="Line Style Settings")
+int valWidth = input.int(2, "VAL Width", minval=1, maxval=5, group="Line Style Settings")
+int pocWidth = input.int(2, "POC Width", minval=1, maxval=5, group="Line Style Settings")
+
+string vahStyleInput = input.string("Dashed", "VAH Style", options=["Solid", "Dashed", "Dotted"], group="Line Style Settings")
+string valStyleInput = input.string("Dashed", "VAL Style", options=["Solid", "Dashed", "Dotted"], group="Line Style Settings")
+string pocStyleInput = input.string("Dotted", "POC Style", options=["Solid", "Dashed", "Dotted"], group="Line Style Settings")
+
+f_lineStyle(string styleText) =>
+    switch styleText
+        "Solid" => line.style_solid
+        "Dashed" => line.style_dashed
+        "Dotted" => line.style_dotted
+        => line.style_solid
+
+vahStyle = f_lineStyle(vahStyleInput)
+valStyle = f_lineStyle(valStyleInput)
+pocStyle = f_lineStyle(pocStyleInput)
+
+// =====================================================
+// NORMALIZED TIMES
+// =====================================================
+int s1 = math.min(start1, end1)
+int e1 = math.max(start1, end1)
+
+int s2 = math.min(start2, end2)
+int e2 = math.max(start2, end2)
+
+int s3 = math.min(start3, end3)
+int e3 = math.max(start3, end3)
+
+// =====================================================
+// AREA MEMBERSHIP
+// Use candle-overlap logic.
+// This works better than requiring exact candle open time.
+// =====================================================
+bool insideArea1 = useArea1 and time >= s1 and time <= e1
+bool insideArea2 = useArea2 and time >= s2 and time <= e2
+bool insideArea3 = useArea3 and time >= s3 and time <= e3
+
+bool enterArea1 = insideArea1 and insideArea1[1] != true
+bool enterArea2 = insideArea2 and insideArea2[1] != true
+bool enterArea3 = insideArea3 and insideArea3[1] != true
+
+// =====================================================
+// BACKGROUND SHADING
+// =====================================================
+color bg = na
+bg := insideArea1 ? areaColor1 : bg
+bg := insideArea2 ? areaColor2 : bg
+bg := insideArea3 ? areaColor3 : bg
+bgcolor(bg)
+
+// =====================================================
+// DRAG POINT VISUALS
+// =====================================================
+plot(useArea1 and time == start1 ? startPrice1 : na, "Area 1 Start Point", style=plot.style_circles, linewidth=5, color=color.blue)
+plot(useArea1 and time == end1 ? endPrice1 : na, "Area 1 End Point", style=plot.style_circles, linewidth=5, color=color.blue)
+
+plot(useArea2 and time == start2 ? startPrice2 : na, "Area 2 Start Point", style=plot.style_circles, linewidth=5, color=color.purple)
+plot(useArea2 and time == end2 ? endPrice2 : na, "Area 2 End Point", style=plot.style_circles, linewidth=5, color=color.purple)
+
+plot(useArea3 and time == start3 ? startPrice3 : na, "Area 3 Start Point", style=plot.style_circles, linewidth=5, color=color.orange)
+plot(useArea3 and time == end3 ? endPrice3 : na, "Area 3 End Point", style=plot.style_circles, linewidth=5, color=color.orange)
+
+// =====================================================
+// ARRAYS FOR COLLECTED BARS
+// This is the fix for "No Bars found" after changing date:
+// bars are collected as Pine processes chart history,
+// instead of scanning backward only from the latest candle.
+// =====================================================
+var float[] a1Highs = array.new_float()
+var float[] a1Lows = array.new_float()
+var float[] a1Opens = array.new_float()
+var float[] a1Closes = array.new_float()
+var float[] a1Volumes = array.new_float()
+var bool a1Capped = false
+
+var float[] a2Highs = array.new_float()
+var float[] a2Lows = array.new_float()
+var float[] a2Opens = array.new_float()
+var float[] a2Closes = array.new_float()
+var float[] a2Volumes = array.new_float()
+var bool a2Capped = false
+
+var float[] a3Highs = array.new_float()
+var float[] a3Lows = array.new_float()
+var float[] a3Opens = array.new_float()
+var float[] a3Closes = array.new_float()
+var float[] a3Volumes = array.new_float()
+var bool a3Capped = false
+
+// =====================================================
+// RESET AND COLLECT AREA 1
+// =====================================================
+if enterArea1
+    array.clear(a1Highs)
+    array.clear(a1Lows)
+    array.clear(a1Opens)
+    array.clear(a1Closes)
+    array.clear(a1Volumes)
+    a1Capped := false
+
+if insideArea1
+    if array.size(a1Highs) < maxBarsInRange
+        array.push(a1Highs, high)
+        array.push(a1Lows, low)
+        array.push(a1Opens, open)
+        array.push(a1Closes, close)
+        array.push(a1Volumes, na(volume) ? 0.0 : volume)
+    else
+        a1Capped := true
+
+// =====================================================
+// RESET AND COLLECT AREA 2
+// =====================================================
+if enterArea2
+    array.clear(a2Highs)
+    array.clear(a2Lows)
+    array.clear(a2Opens)
+    array.clear(a2Closes)
+    array.clear(a2Volumes)
+    a2Capped := false
+
+if insideArea2
+    if array.size(a2Highs) < maxBarsInRange
+        array.push(a2Highs, high)
+        array.push(a2Lows, low)
+        array.push(a2Opens, open)
+        array.push(a2Closes, close)
+        array.push(a2Volumes, na(volume) ? 0.0 : volume)
+    else
+        a2Capped := true
+
+// =====================================================
+// RESET AND COLLECT AREA 3
+// =====================================================
+if enterArea3
+    array.clear(a3Highs)
+    array.clear(a3Lows)
+    array.clear(a3Opens)
+    array.clear(a3Closes)
+    array.clear(a3Volumes)
+    a3Capped := false
+
+if insideArea3
+    if array.size(a3Highs) < maxBarsInRange
+        array.push(a3Highs, high)
+        array.push(a3Lows, low)
+        array.push(a3Opens, open)
+        array.push(a3Closes, close)
+        array.push(a3Volumes, na(volume) ? 0.0 : volume)
+    else
+        a3Capped := true
+
+// =====================================================
+// FRVP CALCULATION FROM COLLECTED ARRAYS
+// Volume is distributed across all price rows touched by each candle.
+// This is much closer than placing all volume into the close-price bin.
+// =====================================================
+f_calcFRVPFromArrays(
+     float[] highs,
+     float[] lows,
+     float[] opens,
+     float[] closes,
+     float[] volumes,
+     int rows,
+     float vaPercent,
+     bool capped
+) =>
+    float rangeHigh = na
+    float rangeLow = na
+    float totalVolume = 0.0
+    float positiveVolume = 0.0
+    float negativeVolume = 0.0
+
+    int barsFound = array.size(highs)
+
+    if barsFound > 0
+        for i = 0 to barsFound - 1
+            float h = array.get(highs, i)
+            float l = array.get(lows, i)
+            float o = array.get(opens, i)
+            float c = array.get(closes, i)
+            float v = array.get(volumes, i)
+
+            rangeHigh := na(rangeHigh) ? h : math.max(rangeHigh, h)
+            rangeLow := na(rangeLow) ? l : math.min(rangeLow, l)
+
+            totalVolume += v
+
+            if c >= o
+                positiveVolume += v
+            else
+                negativeVolume += v
+
+    float[] profile = array.new_float(rows, 0.0)
+
+    if barsFound > 0 and totalVolume > 0 and not na(rangeHigh) and not na(rangeLow) and rangeHigh > rangeLow
+        float rowSizeForBuild = (rangeHigh - rangeLow) / rows
+
+        for i = 0 to barsFound - 1
+            float h = array.get(highs, i)
+            float l = array.get(lows, i)
+            float c = array.get(closes, i)
+            float v = array.get(volumes, i)
+
+            if v > 0
+                if h > l
+                    float barRange = h - l
+
+                    for r = 0 to rows - 1
+                        float rowLow = rangeLow + r * rowSizeForBuild
+                        float rowHigh = rowLow + rowSizeForBuild
+
+                        float overlapLow = math.max(l, rowLow)
+                        float overlapHigh = math.min(h, rowHigh)
+                        float overlap = math.max(0.0, overlapHigh - overlapLow)
+
+                        if overlap > 0
+                            float addVol = v * overlap / barRange
+                            array.set(profile, r, array.get(profile, r) + addVol)
+                else
+                    int closeBin = math.floor(((c - rangeLow) / (rangeHigh - rangeLow)) * rows)
+                    closeBin := math.max(0, math.min(rows - 1, closeBin))
+                    array.set(profile, closeBin, array.get(profile, closeBin) + v)
+
+    float pocPrice = na
+    float vahPrice = na
+    float valPrice = na
+
+    if barsFound > 0 and totalVolume > 0 and not na(rangeHigh) and not na(rangeLow) and rangeHigh > rangeLow
+        float rowSize = (rangeHigh - rangeLow) / rows
+
+        float maxVol = 0.0
+        int pocIdx = 0
+
+        for r = 0 to rows - 1
+            float rowVol = array.get(profile, r)
+            if rowVol > maxVol
+                maxVol := rowVol
+                pocIdx := r
+
+        pocPrice := rangeLow + pocIdx * rowSize + rowSize / 2.0
+
+        float targetVolume = totalVolume * vaPercent / 100.0
+        float valueAreaVolume = maxVol
+
+        int lowerIdx = pocIdx
+        int upperIdx = pocIdx
+
+        for step = 0 to rows - 1
+            if valueAreaVolume >= targetVolume or (lowerIdx <= 0 and upperIdx >= rows - 1)
+                break
+
+            float upperVol = upperIdx < rows - 1 ? array.get(profile, upperIdx + 1) : -1.0
+            float lowerVol = lowerIdx > 0 ? array.get(profile, lowerIdx - 1) : -1.0
+
+            if upperVol >= lowerVol and upperIdx < rows - 1
+                upperIdx += 1
+                valueAreaVolume += math.max(upperVol, 0.0)
+            else if lowerIdx > 0
+                lowerIdx -= 1
+                valueAreaVolume += math.max(lowerVol, 0.0)
+
+        vahPrice := rangeLow + upperIdx * rowSize + rowSize / 2.0
+        valPrice := rangeLow + lowerIdx * rowSize + rowSize / 2.0
+
+    float netVolume = positiveVolume - negativeVolume
+    float positivePercent = totalVolume > 0 ? positiveVolume / totalVolume * 100.0 : na
+    float negativePercent = totalVolume > 0 ? negativeVolume / totalVolume * 100.0 : na
+    float barAvgVol = barsFound > 0 ? totalVolume/array.size(highs): na
+
+    [vahPrice, valPrice, pocPrice, totalVolume, barAvgVol, positiveVolume, negativeVolume, netVolume, positivePercent, negativePercent, rangeLow, rangeHigh, barsFound]
+
+// =====================================================
+// LINE VARIABLES
+// =====================================================
+var line vahLine1 = na
+var line valLine1 = na
+var line pocLine1 = na
+var line anchorLine1 = na
+
+var line vahLine2 = na
+var line valLine2 = na
+var line pocLine2 = na
+var line anchorLine2 = na
+
+var line vahLine3 = na
+var line valLine3 = na
+var line pocLine3 = na
+var line anchorLine3 = na
+
+// =====================================================
+// LATEST VALUES FOR TABLE
+// =====================================================
+var float vah1 = na
+var float val1 = na
+var float poc1 = na
+var float total1 = na
+var float barAvgVol1 = na
+var float posVol1 = na
+var float negVol1 = na
+var float netVol1 = na
+var float posPct1 = na
+var float negPct1 = na
+var float low1 = na
+var float high1 = na
+var int bars1 = na
+
+var float vah2 = na
+var float val2 = na
+var float poc2 = na
+var float total2 = na
+var float barAvgVol2 = na
+var float posVol2 = na
+var float negVol2 = na
+var float netVol2 = na
+var float posPct2 = na
+var float negPct2 = na
+var float low2 = na
+var float high2 = na
+var int bars2 = na
+
+var float vah3 = na
+var float val3 = na
+var float poc3 = na
+var float total3 = na
+var float barAvgVol3 = na
+var float posVol3 = na
+var float negVol3 = na
+var float netVol3 = na
+var float posPct3 = na
+var float negPct3 = na
+var float low3 = na
+var float high3 = na
+var int bars3 = na
+
+// =====================================================
+// DRAW / REDRAW ON LAST BAR
+// =====================================================
+if barstate.islast
+    // Delete old lines.
+    if not na(vahLine1)
+        line.delete(vahLine1)
+    if not na(valLine1)
+        line.delete(valLine1)
+    if not na(pocLine1)
+        line.delete(pocLine1)
+    if not na(anchorLine1)
+        line.delete(anchorLine1)
+
+    if not na(vahLine2)
+        line.delete(vahLine2)
+    if not na(valLine2)
+        line.delete(valLine2)
+    if not na(pocLine2)
+        line.delete(pocLine2)
+    if not na(anchorLine2)
+        line.delete(anchorLine2)
+
+    if not na(vahLine3)
+        line.delete(vahLine3)
+    if not na(valLine3)
+        line.delete(valLine3)
+    if not na(pocLine3)
+        line.delete(pocLine3)
+    if not na(anchorLine3)
+        line.delete(anchorLine3)
+
+    vahLine1 := na
+    valLine1 := na
+    pocLine1 := na
+    anchorLine1 := na
+
+    vahLine2 := na
+    valLine2 := na
+    pocLine2 := na
+    anchorLine2 := na
+
+    vahLine3 := na
+    valLine3 := na
+    pocLine3 := na
+    anchorLine3 := na
+
+    extendMode = extendLinesRight ? extend.right : extend.none
+
+    // -------------------------
+    // Area 1
+    // -------------------------
+    if useArea1
+        [aVah1, aVal1, aPoc1, aTotal1, aBarAvgVol1, aPos1, aNeg1, aNet1, aPosPct1, aNegPct1, aLow1, aHigh1, aBars1] = f_calcFRVPFromArrays(a1Highs, a1Lows, a1Opens, a1Closes, a1Volumes, rowCount, valueAreaPercent, a1Capped)
+
+        vah1 := aVah1
+        val1 := aVal1
+        poc1 := aPoc1
+        total1 := aTotal1
+        barAvgVol1 := aBarAvgVol1
+        posVol1 := aPos1
+        negVol1 := aNeg1
+        netVol1 := aNet1
+        posPct1 := aPosPct1
+        negPct1 := aNegPct1
+        low1 := aLow1
+        high1 := aHigh1
+        bars1 := aBars1
+
+        if showAnchorLine
+            anchorLine1 := line.new(start1, startPrice1, end1, endPrice1, xloc=xloc.bar_time, color=color.new(color.blue, 0), width=1, style=line.style_solid)
+
+        if showVAH and not na(vah1)
+            vahLine1 := line.new(s1, vah1, e1, vah1, xloc=xloc.bar_time, color=vahColor, width=vahWidth, style=vahStyle, extend=extendMode)
+        if showVAL and not na(val1)
+            valLine1 := line.new(s1, val1, e1, val1, xloc=xloc.bar_time, color=valColor, width=valWidth, style=valStyle, extend=extendMode)
+        if showPOC and not na(poc1)
+            pocLine1 := line.new(s1, poc1, e1, poc1, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
+
+    // -------------------------
+    // Area 2
+    // -------------------------
+    if useArea2
+        [aVah2, aVal2, aPoc2, aTotal2, aBarAvgVol2, aPos2, aNeg2, aNet2, aPosPct2, aNegPct2, aLow2, aHigh2, aBars2] = f_calcFRVPFromArrays(a2Highs, a2Lows, a2Opens, a2Closes, a2Volumes, rowCount, valueAreaPercent, a2Capped)
+
+        vah2 := aVah2
+        val2 := aVal2
+        poc2 := aPoc2
+        total2 := aTotal2
+        barAvgVol2 := aBarAvgVol2
+        posVol2 := aPos2
+        negVol2 := aNeg2
+        netVol2 := aNet2
+        posPct2 := aPosPct2
+        negPct2 := aNegPct2
+        low2 := aLow2
+        high2 := aHigh2
+        bars2 := aBars2
+
+        if showAnchorLine
+            anchorLine2 := line.new(start2, startPrice2, end2, endPrice2, xloc=xloc.bar_time, color=color.new(color.purple, 0), width=1, style=line.style_solid)
+
+        if showVAH and not na(vah2)
+            vahLine2 := line.new(s2, vah2, e2, vah2, xloc=xloc.bar_time, color=vahColor, width=vahWidth, style=vahStyle, extend=extendMode)
+        if showVAL and not na(val2)
+            valLine2 := line.new(s2, val2, e2, val2, xloc=xloc.bar_time, color=valColor, width=valWidth, style=valStyle, extend=extendMode)
+        if showPOC and not na(poc2)
+            pocLine2 := line.new(s2, poc2, e2, poc2, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
+
+    // -------------------------
+    // Area 3
+    // -------------------------
+    if useArea3
+        [aVah3, aVal3, aPoc3, aTotal3, aBarAvgVol3, aPos3, aNeg3, aNet3, aPosPct3, aNegPct3, aLow3, aHigh3, aBars3] = f_calcFRVPFromArrays(a3Highs, a3Lows, a3Opens, a3Closes, a3Volumes, rowCount, valueAreaPercent, a3Capped)
+
+        vah3 := aVah3
+        val3 := aVal3
+        poc3 := aPoc3
+        total3 := aTotal3
+        barAvgVol3 := aBarAvgVol3
+        posVol3 := aPos3
+        negVol3 := aNeg3
+        netVol3 := aNet3
+        posPct3 := aPosPct3
+        negPct3 := aNegPct3
+        low3 := aLow3
+        high3 := aHigh3
+        bars3 := aBars3
+
+        if showAnchorLine
+            anchorLine3 := line.new(start3, startPrice3, end3, endPrice3, xloc=xloc.bar_time, color=color.new(color.orange, 0), width=1, style=line.style_solid)
+
+        if showVAH and not na(vah3)
+            vahLine3 := line.new(s3, vah3, e3, vah3, xloc=xloc.bar_time, color=vahColor, width=vahWidth, style=vahStyle, extend=extendMode)
+        if showVAL and not na(val3)
+            valLine3 := line.new(s3, val3, e3, val3, xloc=xloc.bar_time, color=valColor, width=valWidth, style=valStyle, extend=extendMode)
+        if showPOC and not na(poc3)
+            pocLine3 := line.new(s3, poc3, e3, poc3, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
+
+// =====================================================
+// DASHBOARD
+// =====================================================
+tablePosition = switch tablePos
+    "Top Right"    => position.top_right
+    "Top Left"     => position.top_left
+    "Bottom Right" => position.bottom_right
+    "Bottom Left"  => position.bottom_left
+    => position.top_right
+
+var table hud = table.new(tablePosition, 4, 11, bgcolor=color.new(color.black, 15), border_color=color.gray, border_width=1)
+color disabledColor = #363A45
+
+if barstate.islast
+    table.cell(hud, 0, 0, "Metric", bgcolor=color.gray, text_color=color.white, text_size=size.small)
+    table.cell(hud, 1, 0, "Area 1", bgcolor=useArea1 ? color.blue : disabledColor, text_color=color.white, text_size=size.small)
+    table.cell(hud, 2, 0, "Area 2", bgcolor=useArea2 ? color.purple : disabledColor, text_color=color.white, text_size=size.small)
+    table.cell(hud, 3, 0, "Area 3", bgcolor=useArea3 ? color.orange : disabledColor, text_color=color.white, text_size=size.small)
+
+    table.cell(hud, 0, 1, "Bars", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 2, "Total Vol", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 3, "Bar Avg Vol", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 4, "VAL", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 5, "POC", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 6, "VAH", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 7, "Positive Vol", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 8, "Negative Vol", text_color=color.white, text_size=size.small)
+    table.cell(hud, 0, 9, "Net Vol", text_color=color.white, text_size=size.small)
+
+    // Area 1 column
+    table.cell(hud, 1, 1, useArea1 and not na(bars1) ? str.tostring(bars1) : "-", text_color=color.white, text_size=size.small)
+    table.cell(hud, 1, 2, useArea1 and not na(total1) ? str.tostring(total1, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 1, 3, useArea1 and not na(barAvgVol1) ? str.tostring(barAvgVol1, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 1, 4, useArea1 and not na(val1) ? str.tostring(val1, "#.####") : "-", text_color=valColor, text_size=size.small)
+    table.cell(hud, 1, 5, useArea1 and not na(poc1) ? str.tostring(poc1, "#.####") : "-", text_color=pocColor, text_size=size.small)
+    table.cell(hud, 1, 6, useArea1 and not na(vah1) ? str.tostring(vah1, "#.####") : "-", text_color=vahColor, text_size=size.small)
+    table.cell(hud, 1, 7, useArea1 and not na(posVol1) ? str.tostring(posVol1, "#,###") + " (" + str.tostring(posPct1, "#.0") + "%)" : "-", text_color=color.green, text_size=size.small)
+    table.cell(hud, 1, 8, useArea1 and not na(negVol1) ? str.tostring(negVol1, "#,###") + " (" + str.tostring(negPct1, "#.0") + "%)" : "-", text_color=color.red, text_size=size.small)
+    table.cell(hud, 1, 9, useArea1 and not na(netVol1) ? (netVol1 >= 0 ? "+" : "") + str.tostring(netVol1, "#,###") : "-", text_color=not na(netVol1) and netVol1 >= 0 ? color.green : color.red, text_size=size.small)
+
+    // Area 2 column
+    table.cell(hud, 2, 1, useArea2 and not na(bars2) ? str.tostring(bars2) : "-", text_color=color.white, text_size=size.small)
+    table.cell(hud, 2, 2, useArea2 and not na(total2) ? str.tostring(total2, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 2, 3, useArea1 and not na(barAvgVol2) ? str.tostring(barAvgVol2, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 2, 4, useArea2 and not na(val2) ? str.tostring(val2, "#.####") : "-", text_color=valColor, text_size=size.small)
+    table.cell(hud, 2, 5, useArea2 and not na(poc2) ? str.tostring(poc2, "#.####") : "-", text_color=pocColor, text_size=size.small)
+    table.cell(hud, 2, 6, useArea2 and not na(vah2) ? str.tostring(vah2, "#.####") : "-", text_color=vahColor, text_size=size.small)
+    table.cell(hud, 2, 7, useArea2 and not na(posVol2) ? str.tostring(posVol2, "#,###") + " (" + str.tostring(posPct2, "#.0") + "%)" : "-", text_color=color.green, text_size=size.small)
+    table.cell(hud, 2, 8, useArea2 and not na(negVol2) ? str.tostring(negVol2, "#,###") + " (" + str.tostring(negPct2, "#.0") + "%)" : "-", text_color=color.red, text_size=size.small)
+    table.cell(hud, 2, 9, useArea2 and not na(netVol2) ? (netVol2 >= 0 ? "+" : "") + str.tostring(netVol2, "#,###") : "-", text_color=not na(netVol2) and netVol2 >= 0 ? color.green : color.red, text_size=size.small)
+
+    // Area 3 column
+    table.cell(hud, 3, 1, useArea3 and not na(bars3) ? str.tostring(bars3) : "-", text_color=color.white, text_size=size.small)
+    table.cell(hud, 3, 2, useArea3 and not na(total3) ? str.tostring(total3, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 3, 3, useArea1 and not na(barAvgVol3) ? str.tostring(barAvgVol3, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 3, 4, useArea3 and not na(val3) ? str.tostring(val3, "#.####") : "-", text_color=valColor, text_size=size.small)
+    table.cell(hud, 3, 5, useArea3 and not na(poc3) ? str.tostring(poc3, "#.####") : "-", text_color=pocColor, text_size=size.small)
+    table.cell(hud, 3, 6, useArea3 and not na(vah3) ? str.tostring(vah3, "#.####") : "-", text_color=vahColor, text_size=size.small)
+    table.cell(hud, 3, 7, useArea3 and not na(posVol3) ? str.tostring(posVol3, "#,###") + " (" + str.tostring(posPct3, "#.0") + "%)" : "-", text_color=color.green, text_size=size.small)
+    table.cell(hud, 3, 8, useArea3 and not na(negVol3) ? str.tostring(negVol3, "#,###") + " (" + str.tostring(negPct3, "#.0") + "%)" : "-", text_color=color.red, text_size=size.small)
+    table.cell(hud, 3, 9, useArea3 and not na(netVol3) ? (netVol3 >= 0 ? "+" : "") + str.tostring(netVol3, "#,###") : "-", text_color=not na(netVol3) and netVol3 >= 0 ? color.green : color.red, text_size=size.small)
