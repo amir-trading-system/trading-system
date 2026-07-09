@@ -1,5 +1,5 @@
 //@version=6
-indicator("Draggable FRVP VAH / VAL / POC", overlay=true, max_lines_count=500, max_labels_count=500, max_bars_back=5000)
+indicator("Draggable FRVP VAH / VAL / POC", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=5000)
 
 // =====================================================
 // DRAGGABLE AREAS
@@ -91,6 +91,55 @@ bool extendLinesRight = input.bool(true, "Extend Lines Right", group="Display")
 bool showAnchorLine = input.bool(true, "Show Draggable Anchor Line", group="Display")
 
 // =====================================================
+// TOTAL VOLUME HISTOGRAM / TEXTBOX SETTINGS
+// =====================================================
+bool showTotalVolumeHistogram = input.bool(
+     false,
+     "Show Total Volume Histogram",
+     group="Total Volume Histogram",
+     tooltip="Draws horizontal boxes showing total volume per price row for each enabled FRVP range. This uses the same row-volume distribution used for VAH/VAL/POC."
+)
+
+string histogramPlacement = input.string(
+     "Left of Range",
+     "Histogram Placement",
+     options=["Left of Range", "Inside Range", "Right of Range"],
+     group="Total Volume Histogram",
+     tooltip="Left of Range draws the histogram from the trend start side, extending left from the selected FRVP start time."
+)
+
+float histogramWidthPercent = input.float(
+     25.0,
+     "Histogram Max Width % of Range",
+     minval=5.0,
+     maxval=100.0,
+     step=5.0,
+     group="Total Volume Histogram"
+)
+
+int histogramMaxRowsPerArea = input.int(
+     80,
+     "Max Histogram Rows Per Area",
+     minval=10,
+     maxval=150,
+     group="Total Volume Histogram",
+     tooltip="Safety cap for boxes. If Profile Rows is higher, rows are grouped visually."
+)
+
+color histogramColor = input.color(
+     color.new(color.gray, 78),
+     "Histogram Color",
+     group="Total Volume Histogram"
+)
+
+bool showVolumeTextBox = input.bool(
+     false,
+     "Show Volume Textbox",
+     group="Total Volume Histogram",
+     tooltip="Optional floating summary label with bars, total volume, average volume per bar, and positive/negative split."
+)
+
+// =====================================================
 // LINE STYLE SETTINGS
 // =====================================================
 color vahColor = input.color(color.blue, "VAH Color", group="Line Style Settings")
@@ -115,6 +164,131 @@ f_lineStyle(string styleText) =>
 vahStyle = f_lineStyle(vahStyleInput)
 valStyle = f_lineStyle(valStyleInput)
 pocStyle = f_lineStyle(pocStyleInput)
+
+// =====================================================
+// TOTAL VOLUME HISTOGRAM HELPERS
+// =====================================================
+f_clearBoxes(box[] boxes) =>
+    int boxCount = array.size(boxes)
+    if boxCount > 0
+        for i = 0 to boxCount - 1
+            box.delete(array.get(boxes, i))
+        array.clear(boxes)
+
+f_fmtVol(float v) =>
+    na(v) ? "-" : str.tostring(v, "#,###")
+
+f_fmtPrice(float v) =>
+    na(v) ? "-" : str.tostring(v, "#.####")
+
+f_summaryText(string areaName, int barsFound, float totalVol, float barAvgVol, float posVol, float negVol, float netVol, float posPct, float negPct) =>
+    areaName + "\n" +
+     "Bars: " + (na(barsFound) ? "-" : str.tostring(barsFound)) + "\n" +
+     "Total Vol: " + f_fmtVol(totalVol) + "\n" +
+     "Avg/Bar: " + f_fmtVol(barAvgVol) + "\n" +
+     "Positive: " + f_fmtVol(posVol) + (na(posPct) ? "" : " (" + str.tostring(posPct, "#.0") + "%)") + "\n" +
+     "Negative: " + f_fmtVol(negVol) + (na(negPct) ? "" : " (" + str.tostring(negPct, "#.0") + "%)") + "\n" +
+     "Net: " + (na(netVol) ? "-" : (netVol >= 0 ? "+" : "") + str.tostring(netVol, "#,###"))
+f_drawTotalVolumeHistogram(
+     float[] highs,
+     float[] lows,
+     float[] closes,
+     float[] volumes,
+     int rows,
+     float rangeLow,
+     float rangeHigh,
+     int rangeStart,
+     int rangeEnd,
+     float maxWidthPercent,
+     int maxRowsToDraw,
+     string placement,
+     color histColor,
+     box[] histBoxes
+) =>
+    int barsFound = array.size(highs)
+
+    if barsFound > 0 and not na(rangeLow) and not na(rangeHigh) and rangeHigh > rangeLow
+        float[] profile = array.new_float(rows, 0.0)
+        float rowSize = (rangeHigh - rangeLow) / rows
+
+        // Build total-volume profile by distributing each candle's volume
+        // across every price row touched by the candle.
+        for i = 0 to barsFound - 1
+            float h = array.get(highs, i)
+            float l = array.get(lows, i)
+            float c = array.get(closes, i)
+            float v = array.get(volumes, i)
+
+            if v > 0
+                if h > l
+                    float barRange = h - l
+
+                    for r = 0 to rows - 1
+                        float rowLow = rangeLow + r * rowSize
+                        float rowHigh = rowLow + rowSize
+
+                        float overlapLow = math.max(l, rowLow)
+                        float overlapHigh = math.min(h, rowHigh)
+                        float overlap = math.max(0.0, overlapHigh - overlapLow)
+
+                        if overlap > 0
+                            array.set(profile, r, array.get(profile, r) + v * overlap / barRange)
+                else
+                    int closeBin = math.floor(((c - rangeLow) / (rangeHigh - rangeLow)) * rows)
+                    closeBin := math.max(0, math.min(rows - 1, closeBin))
+                    array.set(profile, closeBin, array.get(profile, closeBin) + v)
+
+        int safeMaxRowsToDraw = math.max(1, maxRowsToDraw)
+        int rowStep = math.max(1, int(math.ceil(rows * 1.0 / safeMaxRowsToDraw)))
+        float maxGroupedVol = 0.0
+
+        for r = 0 to rows - 1
+            if r % rowStep == 0
+                int endIdx = math.min(rows - 1, r + rowStep - 1)
+                float groupedVol = 0.0
+
+                for j = r to endIdx
+                    groupedVol += array.get(profile, j)
+
+                maxGroupedVol := math.max(maxGroupedVol, groupedVol)
+
+        int rangeMs = math.max(1, rangeEnd - rangeStart)
+        int fullWidthMs = math.max(1, int(rangeMs * maxWidthPercent / 100.0))
+        bool drawLeft = placement == "Left of Range"
+        bool drawInside = placement == "Inside Range"
+        bool drawRight = placement == "Right of Range"
+
+        if maxGroupedVol > 0
+            for r = 0 to rows - 1
+                if r % rowStep == 0
+                    int endIdx = math.min(rows - 1, r + rowStep - 1)
+                    float groupedVol = 0.0
+
+                    for j = r to endIdx
+                        groupedVol += array.get(profile, j)
+
+                    float widthRatio = groupedVol / maxGroupedVol
+                    int rowWidthMs = math.max(1, int(fullWidthMs * widthRatio))
+
+                    // Left of Range: histogram is anchored at the FRVP start/trend start and extends left.
+                    // Inside Range: histogram is anchored at the FRVP end and extends left inside the range.
+                    // Right of Range: histogram is anchored at the FRVP end and extends right.
+                    int leftX = drawLeft ? rangeStart - rowWidthMs : drawInside ? rangeEnd - rowWidthMs : rangeEnd
+                    int rightX = drawLeft ? rangeStart : drawInside ? rangeEnd : rangeEnd + rowWidthMs
+
+                    float rowBottom = rangeLow + r * rowSize
+                    float rowTop = rangeLow + (endIdx + 1) * rowSize
+
+                    box b = box.new(
+                         left=leftX,
+                         top=rowTop,
+                         right=rightX,
+                         bottom=rowBottom,
+                         xloc=xloc.bar_time,
+                         border_color=color.new(histColor, 100),
+                         bgcolor=histColor
+                    )
+                    array.push(histBoxes, b)
 
 // =====================================================
 // NORMALIZED TIMES
@@ -288,10 +462,36 @@ f_calcFRVPFromArrays(
 
             totalVolume += v
 
-            if c >= o
-                positiveVolume += v
-            else
-                negativeVolume += v
+            // Split each candle's volume by where price traded inside the bar range.
+            // Bullish/positive bar:
+            //   low -> close  = positive
+            //   close -> high = negative
+            // Bearish/negative bar:
+            //   high -> open  = positive
+            //   open -> low   = negative
+            //
+            // This avoids classifying the whole candle volume as positive/negative
+            // only because close is above/below open.
+            float barRangeForSide = h - l
+
+            if v > 0
+                if barRangeForSide > 0
+                    float posRangeForSide = na
+                    float negRangeForSide = na
+
+                    if c >= o
+                        posRangeForSide := math.max(0.0, c - l)
+                        negRangeForSide := math.max(0.0, h - c)
+                    else
+                        posRangeForSide := math.max(0.0, h - o)
+                        negRangeForSide := math.max(0.0, o - l)
+
+                    positiveVolume += v * posRangeForSide / barRangeForSide
+                    negativeVolume += v * negRangeForSide / barRangeForSide
+                else
+                    // No high-low range, so there is no reliable directional split.
+                    positiveVolume += v * 0.5
+                    negativeVolume += v * 0.5
 
     float[] profile = array.new_float(rows, 0.0)
 
@@ -368,7 +568,7 @@ f_calcFRVPFromArrays(
     float netVolume = positiveVolume - negativeVolume
     float positivePercent = totalVolume > 0 ? positiveVolume / totalVolume * 100.0 : na
     float negativePercent = totalVolume > 0 ? negativeVolume / totalVolume * 100.0 : na
-    float barAvgVol = barsFound > 0 ? totalVolume/array.size(highs): na
+    float barAvgVol = barsFound > 0 ? totalVolume / barsFound : na
 
     [vahPrice, valPrice, pocPrice, totalVolume, barAvgVol, positiveVolume, negativeVolume, netVolume, positivePercent, negativePercent, rangeLow, rangeHigh, barsFound]
 
@@ -389,6 +589,14 @@ var line vahLine3 = na
 var line valLine3 = na
 var line pocLine3 = na
 var line anchorLine3 = na
+
+var box[] histBoxes1 = array.new_box()
+var box[] histBoxes2 = array.new_box()
+var box[] histBoxes3 = array.new_box()
+
+var label volumeTextLabel1 = na
+var label volumeTextLabel2 = na
+var label volumeTextLabel3 = na
 
 // =====================================================
 // LATEST VALUES FOR TABLE
@@ -467,6 +675,21 @@ if barstate.islast
     if not na(anchorLine3)
         line.delete(anchorLine3)
 
+    f_clearBoxes(histBoxes1)
+    f_clearBoxes(histBoxes2)
+    f_clearBoxes(histBoxes3)
+
+    if not na(volumeTextLabel1)
+        label.delete(volumeTextLabel1)
+    if not na(volumeTextLabel2)
+        label.delete(volumeTextLabel2)
+    if not na(volumeTextLabel3)
+        label.delete(volumeTextLabel3)
+
+    volumeTextLabel1 := na
+    volumeTextLabel2 := na
+    volumeTextLabel3 := na
+
     vahLine1 := na
     valLine1 := na
     pocLine1 := na
@@ -514,6 +737,22 @@ if barstate.islast
         if showPOC and not na(poc1)
             pocLine1 := line.new(s1, poc1, e1, poc1, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
 
+        if showTotalVolumeHistogram
+            f_drawTotalVolumeHistogram(a1Highs, a1Lows, a1Closes, a1Volumes, rowCount, low1, high1, s1, e1, histogramWidthPercent, histogramMaxRowsPerArea, histogramPlacement, histogramColor, histBoxes1)
+
+        if showVolumeTextBox and not na(high1)
+            volumeTextLabel1 := label.new(
+                 x=e1,
+                 y=high1,
+                 text=f_summaryText("Area 1", bars1, total1, barAvgVol1, posVol1, negVol1, netVol1, posPct1, negPct1),
+                 xloc=xloc.bar_time,
+                 yloc=yloc.price,
+                 style=label.style_label_left,
+                 color=color.new(color.black, 15),
+                 textcolor=color.white,
+                 size=size.small
+            )
+
     // -------------------------
     // Area 2
     // -------------------------
@@ -544,6 +783,22 @@ if barstate.islast
         if showPOC and not na(poc2)
             pocLine2 := line.new(s2, poc2, e2, poc2, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
 
+        if showTotalVolumeHistogram
+            f_drawTotalVolumeHistogram(a2Highs, a2Lows, a2Closes, a2Volumes, rowCount, low2, high2, s2, e2, histogramWidthPercent, histogramMaxRowsPerArea, histogramPlacement, histogramColor, histBoxes2)
+
+        if showVolumeTextBox and not na(high2)
+            volumeTextLabel2 := label.new(
+                 x=e2,
+                 y=high2,
+                 text=f_summaryText("Area 2", bars2, total2, barAvgVol2, posVol2, negVol2, netVol2, posPct2, negPct2),
+                 xloc=xloc.bar_time,
+                 yloc=yloc.price,
+                 style=label.style_label_left,
+                 color=color.new(color.black, 15),
+                 textcolor=color.white,
+                 size=size.small
+            )
+
     // -------------------------
     // Area 3
     // -------------------------
@@ -573,6 +828,22 @@ if barstate.islast
             valLine3 := line.new(s3, val3, e3, val3, xloc=xloc.bar_time, color=valColor, width=valWidth, style=valStyle, extend=extendMode)
         if showPOC and not na(poc3)
             pocLine3 := line.new(s3, poc3, e3, poc3, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
+
+        if showTotalVolumeHistogram
+            f_drawTotalVolumeHistogram(a3Highs, a3Lows, a3Closes, a3Volumes, rowCount, low3, high3, s3, e3, histogramWidthPercent, histogramMaxRowsPerArea, histogramPlacement, histogramColor, histBoxes3)
+
+        if showVolumeTextBox and not na(high3)
+            volumeTextLabel3 := label.new(
+                 x=e3,
+                 y=high3,
+                 text=f_summaryText("Area 3", bars3, total3, barAvgVol3, posVol3, negVol3, netVol3, posPct3, negPct3),
+                 xloc=xloc.bar_time,
+                 yloc=yloc.price,
+                 style=label.style_label_left,
+                 color=color.new(color.black, 15),
+                 textcolor=color.white,
+                 size=size.small
+            )
 
 // =====================================================
 // DASHBOARD
@@ -617,7 +888,7 @@ if barstate.islast
     // Area 2 column
     table.cell(hud, 2, 1, useArea2 and not na(bars2) ? str.tostring(bars2) : "-", text_color=color.white, text_size=size.small)
     table.cell(hud, 2, 2, useArea2 and not na(total2) ? str.tostring(total2, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 2, 3, useArea1 and not na(barAvgVol2) ? str.tostring(barAvgVol2, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 2, 3, useArea2 and not na(barAvgVol2) ? str.tostring(barAvgVol2, "#,###") : "-", text_color=color.teal, text_size=size.small)
     table.cell(hud, 2, 4, useArea2 and not na(val2) ? str.tostring(val2, "#.####") : "-", text_color=valColor, text_size=size.small)
     table.cell(hud, 2, 5, useArea2 and not na(poc2) ? str.tostring(poc2, "#.####") : "-", text_color=pocColor, text_size=size.small)
     table.cell(hud, 2, 6, useArea2 and not na(vah2) ? str.tostring(vah2, "#.####") : "-", text_color=vahColor, text_size=size.small)
@@ -628,7 +899,7 @@ if barstate.islast
     // Area 3 column
     table.cell(hud, 3, 1, useArea3 and not na(bars3) ? str.tostring(bars3) : "-", text_color=color.white, text_size=size.small)
     table.cell(hud, 3, 2, useArea3 and not na(total3) ? str.tostring(total3, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 3, 3, useArea1 and not na(barAvgVol3) ? str.tostring(barAvgVol3, "#,###") : "-", text_color=color.teal, text_size=size.small)
+    table.cell(hud, 3, 3, useArea3 and not na(barAvgVol3) ? str.tostring(barAvgVol3, "#,###") : "-", text_color=color.teal, text_size=size.small)
     table.cell(hud, 3, 4, useArea3 and not na(val3) ? str.tostring(val3, "#.####") : "-", text_color=valColor, text_size=size.small)
     table.cell(hud, 3, 5, useArea3 and not na(poc3) ? str.tostring(poc3, "#.####") : "-", text_color=pocColor, text_size=size.small)
     table.cell(hud, 3, 6, useArea3 and not na(vah3) ? str.tostring(vah3, "#.####") : "-", text_color=vahColor, text_size=size.small)
