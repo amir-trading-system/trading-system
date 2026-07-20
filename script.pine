@@ -1,908 +1,638 @@
 //@version=6
-indicator("Draggable FRVP VAH / VAL / POC", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=5000)
+indicator("Bullish Supply→Demand Flip Zones [v6.8 • Multi-Bar Supply Structures]", overlay = true, max_boxes_count = 200, max_labels_count = 100)
 
-// =====================================================
-// DRAGGABLE AREAS
-// =====================================================
+// Invisible output anchor for TradingView editor compatibility.
+plot(na, title = "Output anchor", display = display.none)
 
-// -------------------------
-// Area 1
-// -------------------------
-bool useArea1 = input.bool(true, "► Enable Area 1", group="Area 1")
+// This indicator detects only bullish role-reversal zones:
+//   1. A rejection pivot defines the actionable price band and may expand backward into a multi-bar supply structure.
+//   2. The seller-control structure must terminate at confirmed demand.
+//   3. The upper supply remains hidden until a high-quality bullish break confirms.
+//   4. After confirmation, all drawings stay hidden while retest logic remains active.
+//   5. The full supply/control structure, demand box, and S→D marker appear only on the first valid retest.
+//   6. A later failure ends the active zone without rewriting the successful retest or structure.
 
-int start1 = input.time(timestamp("2026-07-01 09:30"), "Start", confirm=true, inline="A1S", group="Area 1")
-float startPrice1 = input.price(1.00, "", confirm=true, inline="A1S", group="Area 1")
+// ─────────────────────── Inputs ─────────────────────────
+groupSupply = "1. Hidden supply qualification"
+pivotLeft = input.int(3, "Pivot bars left", minval = 1, maxval = 20, group = groupSupply)
+pivotRight = input.int(3, "Pivot bars right", minval = 1, maxval = 20, group = groupSupply)
+allowBearishSupplyCandle = input.bool(true, "Allow bearish rejection supply candle", group = groupSupply,
+     tooltip = "Allows high-volume bearish rejection origins such as SDOT 2026-06-29 10:24. All wick, departure, trend, and volume filters still apply.")
+minBearishOriginBodyAtr = input.float(0.45, "Bearish origin minimum body (ATR)", minval = 0.0, step = 0.05, group = groupSupply,
+     tooltip = "Prevents small ordinary red candles from qualifying as bearish supply origins.")
+minUpperWickAtr = input.float(0.10, "Minimum upper wick (ATR)", minval = 0.0, step = 0.05, group = groupSupply)
+minBearishDepartureAtr = input.float(0.50, "Minimum bearish departure (ATR)", minval = 0.1, step = 0.05, group = groupSupply)
+maxHiddenAge = input.int(750, "Maximum hidden-zone age (bars)", minval = 20, maxval = 5000, group = groupSupply)
+maxHiddenCandidates = input.int(75, "Maximum hidden candidates", minval = 5, maxval = 250, group = groupSupply)
 
-int end1 = input.time(timestamp("2026-07-01 16:00"), "End", confirm=true, inline="A1E", group="Area 1")
-float endPrice1 = input.price(1.00, "", confirm=true, inline="A1E", group="Area 1")
+groupSupplyStructure = "1a. Multi-bar supply structure"
+expandSupplyStructure = input.bool(true, "Expand pivot into multi-bar supply structure", group = groupSupplyStructure,
+     tooltip = "Walks backward through contiguous high-volume rejection bars that touched the pivot's supply band. The price band remains defined by the pivot.")
+minSupplyStructureBars = input.int(3, "Minimum supply-structure bars", minval = 2, maxval = 10, group = groupSupplyStructure,
+     tooltip = "The effective minimum is capped at Pivot bars left + 1 because the structure scan stays inside the confirmed pivot window.")
+structureTouchBufferAtr = input.float(0.05, "Structure touch buffer (ATR)", minval = 0.0, step = 0.05, group = groupSupplyStructure)
+structureCloseBufferAtr = input.float(0.10, "Structure close buffer (ATR)", minval = 0.0, step = 0.05, group = groupSupplyStructure,
+     tooltip = "A participating bar must touch the supply band and then close back at or below its proximal boundary, allowing this buffer.")
 
-color areaColor1 = input.color(color.new(color.blue, 92), "Area 1 Shading", group="Area 1")
+groupSellerLeg = "1b. Seller-control leg and demand termination"
+requireSellerControlLeg = input.bool(true, "Require completed seller-control leg", group = groupSellerLeg,
+     tooltip = "Requires supply to produce a multi-bar decline that ends at confirmed demand before it can flip to demand.")
+demandPivotLeft = input.int(3, "Demand pivot bars left", minval = 1, maxval = 10, group = groupSellerLeg)
+demandPivotRight = input.int(3, "Demand pivot bars right", minval = 1, maxval = 10, group = groupSellerLeg)
+minSellerLegBars = input.int(3, "Minimum seller-leg bars", minval = 1, maxval = 50, group = groupSellerLeg)
+maxSellerLegBars = input.int(30, "Maximum seller-leg bars", minval = 3, maxval = 100, group = groupSellerLeg)
+minSellerLegAtr = input.float(1.50, "Minimum supply-to-demand decline (ATR)", minval = 0.1, step = 0.25, group = groupSellerLeg)
+minDemandLowerWickAtr = input.float(0.10, "Demand minimum lower wick (ATR)", minval = 0.0, step = 0.05, group = groupSellerLeg)
+minDemandReactionAtr = input.float(0.75, "Minimum reaction from demand (ATR)", minval = 0.1, step = 0.25, group = groupSellerLeg)
+minDemandRelativeVolume = input.float(0.80, "Demand/reaction minimum relative volume", minval = 0.1, step = 0.1, group = groupSellerLeg,
+     tooltip = "May qualify on the exact demand pivot or on a reaction candle before that pivot is confirmed.")
+allowCompactSellerLeg = input.bool(true, "Allow compact high-volume seller leg", group = groupSellerLeg,
+     tooltip = "Allows a 1-2 bar seller leg when the supply origin has exceptional volume and demand remains stable for the required right bars.")
+compactMaxSellerLegBars = input.int(2, "Compact seller-leg maximum bars", minval = 1, maxval = 5, group = groupSellerLeg)
+compactDemandRightBars = input.int(2, "Compact demand confirmation bars", minval = 1, maxval = 5, group = groupSellerLeg)
+minCompactSupplyRelativeVolume = input.float(2.00, "Compact-leg supply minimum relative volume", minval = 1.0, step = 0.25, group = groupSellerLeg,
+     tooltip = "Keeps compact pullbacks selective. SDOT 2026-07-17 07:09 measures approximately 3.87x average volume.")
 
-// -------------------------
-// Area 2
-// -------------------------
-bool useArea2 = input.bool(false, "► Enable Area 2", group="Area 2")
+groupTrend = "2. Bullish-trend filters"
+requireBullishTrend = input.bool(true, "Require bullish trend context", group = groupTrend)
+fastEmaLength = input.int(9, "Fast EMA length", minval = 2, maxval = 100, group = groupTrend)
+slowEmaLength = input.int(20, "Slow EMA length", minval = 3, maxval = 250, group = groupTrend)
+trendSlopeBars = input.int(3, "Rising-average lookback", minval = 1, maxval = 20, group = groupTrend)
+requireRisingEmas = input.bool(true, "Require EMA 9 and EMA 20 to be rising", group = groupTrend)
+requireRisingVwap = input.bool(false, "Require VWAP to be rising", group = groupTrend)
+requireSupplyVolume = input.bool(true, "Require supply volume above average", group = groupTrend)
+minSupplyRelativeVolume = input.float(1.00, "Supply minimum relative volume", minval = 0.1, step = 0.1, group = groupTrend)
+requireReactionAboveSlowEma = input.bool(true, "Require supply reaction to hold EMA 20", group = groupTrend,
+     tooltip = "Keeps supply reactions that behave like pullbacks within a bullish trend.")
+maxSupplyExtensionAtr = input.float(2.50, "Maximum supply extension above trend (ATR)", minval = 0.0, step = 0.25, group = groupTrend,
+     tooltip = "Rejects exhaustion highs. Set to 0 to disable. The SDOT 07:09 setup needs approximately 2.35 ATR or more.")
+maxBearishSupplyExtensionAtr = input.float(3.00, "Maximum bearish-origin extension (ATR)", minval = 0.0, step = 0.25, group = groupTrend,
+     tooltip = "Bearish rejection origins may spike farther from trend before closing back down. SDOT 2026-06-29 10:24 measures approximately 2.76 ATR.")
+useExtremeVolumeExtensionOverride = input.bool(true, "Allow extreme-volume extension override", group = groupTrend,
+     tooltip = "Allows unusually active supply origins to exceed the normal extension limit. The seller-leg, breakout, and retest rules still apply.")
+minExtremeSupplyRelativeVolume = input.float(3.00, "Extreme-volume minimum relative volume", minval = 1.0, step = 0.25, group = groupTrend)
+maxExtremeSupplyExtensionAtr = input.float(4.50, "Extreme-volume maximum extension (ATR)", minval = 0.0, step = 0.25, group = groupTrend,
+     tooltip = "SDOT 2026-07-01 09:30 measures approximately 3.79 ATR with approximately 9.7x average volume.")
 
-int start2 = input.time(timestamp("2026-07-02 09:30"), "Start", confirm=true, inline="A2S", group="Area 2")
-float startPrice2 = input.price(1.00, "", confirm=true, inline="A2S", group="Area 2")
+groupFlip = "3. Flip confirmation"
+requiredBreakCloses = input.int(2, "Consecutive closes required above supply", minval = 1, maxval = 5, group = groupFlip,
+     tooltip = "Two closes reject one-bar probes such as SDOT 10:46 and confirm the cleaner 10:49-10:50 break.")
+breakBufferAtr = input.float(0.05, "Close above supply buffer (ATR)", minval = 0.0, step = 0.05, group = groupFlip)
+minBreakBodyAtr = input.float(0.50, "Minimum bullish breakout body (ATR)", minval = 0.0, step = 0.05, group = groupFlip)
+volumeAverageLength = input.int(20, "Volume average length", minval = 2, maxval = 200, group = groupFlip)
+requireBreakVolume = input.bool(true, "Require breakout volume above average", group = groupFlip)
+minBreakRelativeVolume = input.float(1.20, "Breakout minimum relative volume", minval = 0.1, step = 0.1, group = groupFlip)
+confirmedBarsOnly = input.bool(true, "Confirm signals only at bar close", group = groupFlip,
+     tooltip = "Recommended. Prevents realtime signals from appearing and disappearing intrabar.")
 
-int end2 = input.time(timestamp("2026-07-02 16:00"), "End", confirm=true, inline="A2E", group="Area 2")
-float endPrice2 = input.price(1.00, "", confirm=true, inline="A2E", group="Area 2")
+groupManagement = "4. Flipped-demand management"
+invalidationMode = input.string("Close", "Invalidation method", options = ["Close", "Wick"], group = groupManagement)
+invalidationBufferAtr = input.float(0.10, "Invalidation buffer (ATR)", minval = 0.0, step = 0.05, group = groupManagement,
+     tooltip = "Allows a small close/wick penetration beyond the zone before declaring failure.")
+sendDynamicAlerts = input.bool(true, "Send dynamic flip/retest alerts", group = groupManagement,
+     tooltip = "Create a TradingView alert using 'Any alert() function call'. Messages include the zone prices.")
+maxDisplayedZones = input.int(50, "Maximum tracked flip structures", minval = 1, maxval = 75, group = groupManagement)
 
-color areaColor2 = input.color(color.new(color.purple, 92), "Area 2 Shading", group="Area 2")
+groupDisplay = "5. Display"
+activeFill = input.color(color.new(color.lime, 84), "Active demand fill", group = groupDisplay)
+activeBorder = input.color(color.new(color.lime, 15), "Active demand border", group = groupDisplay)
+validTextColor = input.color(color.new(color.lime, 0), "Valid-zone text", group = groupDisplay)
+invalidTextColor = input.color(color.new(color.red, 0), "Invalid-zone text/marker", group = groupDisplay)
+showSellerControlLeg = input.bool(true, "Show full supply/control structure after retest", group = groupDisplay)
+sellerLegFill = input.color(color.new(color.red, 91), "Supply/control structure fill", group = groupDisplay)
+sellerLegBorder = input.color(color.new(color.red, 55), "Supply/control structure border", group = groupDisplay)
+showFlipMarkers = input.bool(true, "Show S→D marker on first retest", group = groupDisplay)
+showRetestMarkers = input.bool(true, "Show first-retest markers", group = groupDisplay)
+showLaterBreakMarkers = input.bool(true, "Show red marker when a retested zone later breaks", group = groupDisplay)
+drawFromSupplyOrigin = input.bool(true, "Draw from original supply candle", group = groupDisplay)
+showTrendAverages = input.bool(false, "Show EMA 9, EMA 20, and VWAP", group = groupDisplay)
 
-// -------------------------
-// Area 3
-// -------------------------
-bool useArea3 = input.bool(false, "► Enable Area 3", group="Area 3")
+// ────────────────────── Core calculations ──────────────────────
+float atr = ta.atr(14)
+float volumeAverage = ta.sma(volume, volumeAverageLength)
+float fastEma = ta.ema(close, fastEmaLength)
+float slowEma = ta.ema(close, slowEmaLength)
+float sessionVwap = ta.vwap(hlc3)
+float confirmedPivotHigh = ta.pivothigh(high, pivotLeft, pivotRight)
+float confirmedPivotLow = ta.pivotlow(low, demandPivotLeft, demandPivotRight)
+float postDemandHigh = ta.highest(high, demandPivotRight)
+float compactPostDemandLow = ta.lowest(low, compactDemandRightBars)
+float compactPostDemandHigh = ta.highest(high, compactDemandRightBars)
+float postPivotLow = ta.lowest(low, pivotRight)
+float postPivotClose = ta.lowest(close, pivotRight)
+bool signalBarReady = not confirmedBarsOnly or barstate.isconfirmed
 
-int start3 = input.time(timestamp("2026-07-03 09:30"), "Start", confirm=true, inline="A3S", group="Area 3")
-float startPrice3 = input.price(1.00, "", confirm=true, inline="A3S", group="Area 3")
+plot(showTrendAverages ? fastEma : na, title = "EMA 9", color = color.new(color.teal, 0), linewidth = 1)
+plot(showTrendAverages ? slowEma : na, title = "EMA 20", color = color.new(color.orange, 0), linewidth = 1)
+plot(showTrendAverages ? sessionVwap : na, title = "Session VWAP", color = color.new(color.purple, 0), linewidth = 1)
 
-int end3 = input.time(timestamp("2026-07-03 16:00"), "End", confirm=true, inline="A3E", group="Area 3")
-float endPrice3 = input.price(1.00, "", confirm=true, inline="A3E", group="Area 3")
+// Hidden supply candidates.
+var array<float> candidateTops = array.new<float>()
+var array<float> candidateBottoms = array.new<float>()
+var array<float> candidateLegReferences = array.new<float>()
+var array<float> candidateOriginRelativeVolumes = array.new<float>()
+var array<int> candidateOriginBars = array.new<int>()
+var array<int> candidateStructureStartBars = array.new<int>()
+var array<float> candidateOriginAtrs = array.new<float>()
+var array<float> candidateTrackedLows = array.new<float>()
+var array<bool> candidateLegConfirmed = array.new<bool>()
+var array<float> candidateDemandLows = array.new<float>()
+var array<int> candidateDemandBars = array.new<int>()
+var array<int> candidateBreakCounts = array.new<int>()
 
-color areaColor3 = input.color(color.new(color.orange, 92), "Area 3 Shading", group="Area 3")
+// Confirmed supply→demand zones.
+var array<box> flipBoxes = array.new<box>()
+var array<box> flipLegBoxes = array.new<box>()
+var array<float> flipTops = array.new<float>()
+var array<float> flipBottoms = array.new<float>()
+var array<float> flipDemandLows = array.new<float>()
+var array<int> flipDemandBars = array.new<int>()
+var array<int> flipConfirmationBars = array.new<int>()
+var array<bool> flipRetested = array.new<bool>()
+var array<bool> flipActive = array.new<bool>()
 
-// =====================================================
-// PROFILE SETTINGS
-// =====================================================
-int rowCount = input.int(
-     70,
-     "Profile Rows",
-     minval=10,
-     maxval=200,
-     group="Profile Settings",
-     tooltip="Use the same row count as the TradingView built-in FRVP when comparing values."
-)
+bool flipDetected = false
+bool firstRetestDetected = false
+bool invalidationDetected = false
+bool laterBreakDetected = false
+color hiddenDrawingColor = color.new(color.black, 100)
 
-float valueAreaPercent = input.float(
-     70.0,
-     "Value Area %",
-     minval=50.0,
-     maxval=95.0,
-     step=1.0,
-     group="Profile Settings"
-)
+// ───────────────── Create hidden supply candidates ────────────────
+if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + trendSlopeBars and not na(atr[pivotRight])
+    float pivotOpen = open[pivotRight]
+    float pivotClose = close[pivotRight]
+    float pivotHigh = high[pivotRight]
+    float bodyHigh = math.max(pivotOpen, pivotClose)
+    float bodyLow = math.min(pivotOpen, pivotClose)
+    float pivotAtr = atr[pivotRight]
+    float pivotFastEma = fastEma[pivotRight]
+    float pivotSlowEma = slowEma[pivotRight]
+    float pivotVwap = sessionVwap[pivotRight]
+    float pivotVolumeAverage = volumeAverage[pivotRight]
+    float nearestTrendReference = math.max(pivotFastEma, math.max(pivotSlowEma, pivotVwap))
 
-int maxBarsInRange = input.int(
-     5000,
-     "Max Bars In Selected Range",
-     minval=100,
-     maxval=5000,
-     group="Profile Settings",
-     tooltip="This is not a lookback limit. It is only a safety cap for how many bars one selected FRVP range may contain."
-)
+    float bearishOriginBody = pivotOpen - pivotClose
+    bool bullishSupplyOrigin = pivotClose >= pivotOpen
+    bool bearishRejectionOrigin = allowBearishSupplyCandle and pivotClose < pivotOpen and
+         bearishOriginBody >= pivotAtr * minBearishOriginBodyAtr
+    bool directionOk = bullishSupplyOrigin or bearishRejectionOrigin
+    // A bearish rejection candle performs part of the departure inside its own body,
+    // so its close/body-low is the more faithful proximal boundary. Bullish origins
+    // retain the original upper-wick/body-high boundary.
+    float actionableZoneBottom = bearishRejectionOrigin ? bodyLow : bodyHigh
+    bool wickOk = pivotHigh - bodyHigh >= pivotAtr * minUpperWickAtr
+    bool departureOk = bodyHigh - postPivotLow >= pivotAtr * minBearishDepartureAtr and postPivotClose < bodyHigh
+    bool validZoneWidth = pivotHigh > bodyHigh
 
-// =====================================================
-// DISPLAY SETTINGS
-// =====================================================
-string tablePos = input.string(
-     "Top Right",
-     "Dashboard Position",
-     options=["Top Right", "Top Left", "Bottom Right", "Bottom Left"],
-     group="Display"
-)
+    bool trendDataReady = not na(pivotFastEma) and not na(pivotSlowEma) and not na(pivotVwap)
+    bool supplyAboveTrend = pivotClose > pivotFastEma and pivotClose > pivotSlowEma and pivotClose > pivotVwap and
+         pivotHigh > pivotFastEma and pivotHigh > pivotSlowEma and pivotHigh > pivotVwap
+    bool bullishStack = pivotFastEma > pivotSlowEma
+    bool slopeDataReady = not na(fastEma[pivotRight + trendSlopeBars]) and not na(slowEma[pivotRight + trendSlopeBars])
+    bool risingEmas = not requireRisingEmas or
+         (slopeDataReady and pivotFastEma > fastEma[pivotRight + trendSlopeBars] and
+         pivotSlowEma > slowEma[pivotRight + trendSlopeBars])
+    bool risingVwap = not requireRisingVwap or
+         (not na(sessionVwap[pivotRight + trendSlopeBars]) and pivotVwap > sessionVwap[pivotRight + trendSlopeBars])
+    float supplyRelativeVolume = not na(volume[pivotRight]) and not na(pivotVolumeAverage) and pivotVolumeAverage > 0.0 ?
+         volume[pivotRight] / pivotVolumeAverage : na
+    bool supplyVolumeOk = not requireSupplyVolume or
+         (not na(supplyRelativeVolume) and supplyRelativeVolume >= minSupplyRelativeVolume)
+    float applicableMaxExtensionAtr = bearishRejectionOrigin ? maxBearishSupplyExtensionAtr : maxSupplyExtensionAtr
+    float supplyExtensionAtr = pivotAtr > 0.0 ? (bodyHigh - nearestTrendReference) / pivotAtr : na
+    bool normalExtensionOk = applicableMaxExtensionAtr <= 0.0 or
+         (not na(supplyExtensionAtr) and supplyExtensionAtr <= applicableMaxExtensionAtr)
+    bool extremeVolumeExtensionOk = useExtremeVolumeExtensionOverride and
+         not na(supplyRelativeVolume) and supplyRelativeVolume >= minExtremeSupplyRelativeVolume and
+         not na(supplyExtensionAtr) and supplyExtensionAtr <= maxExtremeSupplyExtensionAtr
+    bool extensionOk = normalExtensionOk or extremeVolumeExtensionOk
 
-bool showVAH = input.bool(true, "Show VAH", group="Display")
-bool showVAL = input.bool(true, "Show VAL", group="Display")
-bool showPOC = input.bool(true, "Show POC", group="Display")
-bool extendLinesRight = input.bool(true, "Extend Lines Right", group="Display")
-bool showAnchorLine = input.bool(true, "Show Draggable Anchor Line", group="Display")
+    bool reactionHoldsSlowEma = true
+    for reactionOffset = 0 to pivotRight - 1
+        reactionHoldsSlowEma := reactionHoldsSlowEma and not na(slowEma[reactionOffset]) and
+             close[reactionOffset] >= slowEma[reactionOffset]
+    bool reactionLocationOk = not requireReactionAboveSlowEma or reactionHoldsSlowEma
 
-// =====================================================
-// TOTAL VOLUME HISTOGRAM / TEXTBOX SETTINGS
-// =====================================================
-bool showTotalVolumeHistogram = input.bool(
-     false,
-     "Show Total Volume Histogram",
-     group="Total Volume Histogram",
-     tooltip="Draws horizontal boxes showing total volume per price row for each enabled FRVP range. This uses the same row-volume distribution used for VAH/VAL/POC."
-)
+    bool supplyTrendOk = supplyVolumeOk and (not requireBullishTrend or
+         (trendDataReady and supplyAboveTrend and bullishStack and risingEmas and risingVwap and
+         reactionLocationOk and extensionOk))
 
-string histogramPlacement = input.string(
-     "Left of Range",
-     "Histogram Placement",
-     options=["Left of Range", "Inside Range", "Right of Range"],
-     group="Total Volume Histogram",
-     tooltip="Left of Range draws the histogram from the trend start side, extending left from the selected FRVP start time."
-)
+    if directionOk and wickOk and departureOk and validZoneWidth and supplyTrendOk
+        int originBar = bar_index - pivotRight
+        int supplyStructureStartBar = originBar
+        int supplyStructureBars = 1
 
-float histogramWidthPercent = input.float(
-     25.0,
-     "Histogram Max Width % of Range",
-     minval=5.0,
-     maxval=100.0,
-     step=5.0,
-     group="Total Volume Histogram"
-)
+        // The pivot defines the vertical zone. Expand only the temporal origin,
+        // walking backward contiguously through the pivot's left-side confirmation
+        // window. A failed bar ends the expansion; the scan never jumps across gaps.
+        if expandSupplyStructure
+            for backwardStep = 1 to pivotLeft
+                int structureOffset = pivotRight + backwardStep
+                float structureBodyHigh = math.max(open[structureOffset], close[structureOffset])
+                float structureVolumeAverage = volumeAverage[structureOffset]
+                float structureRelativeVolume = not na(volume[structureOffset]) and
+                     not na(structureVolumeAverage) and structureVolumeAverage > 0.0 ?
+                     volume[structureOffset] / structureVolumeAverage : na
+                bool structureDataReady = not na(high[structureOffset]) and not na(close[structureOffset]) and
+                     not na(atr[structureOffset]) and not na(fastEma[structureOffset]) and
+                     not na(slowEma[structureOffset]) and not na(sessionVwap[structureOffset])
+                bool structureTouches = structureDataReady and
+                     high[structureOffset] >= actionableZoneBottom - pivotAtr * structureTouchBufferAtr and
+                     high[structureOffset] <= pivotHigh + syminfo.mintick * 2.0
+                bool structureRejects = structureDataReady and
+                     close[structureOffset] <= actionableZoneBottom + pivotAtr * structureCloseBufferAtr and
+                     high[structureOffset] - structureBodyHigh >= pivotAtr * minUpperWickAtr
+                bool structureVolumeOk = not requireSupplyVolume or
+                     (not na(structureRelativeVolume) and structureRelativeVolume >= minSupplyRelativeVolume)
+                bool structureLocationOk = not requireBullishTrend or
+                     (close[structureOffset] > fastEma[structureOffset] and
+                     close[structureOffset] > slowEma[structureOffset] and
+                     close[structureOffset] > sessionVwap[structureOffset] and
+                     high[structureOffset] > fastEma[structureOffset] and
+                     high[structureOffset] > slowEma[structureOffset] and
+                     high[structureOffset] > sessionVwap[structureOffset])
 
-int histogramMaxRowsPerArea = input.int(
-     80,
-     "Max Histogram Rows Per Area",
-     minval=10,
-     maxval=150,
-     group="Total Volume Histogram",
-     tooltip="Safety cap for boxes. If Profile Rows is higher, rows are grouped visually."
-)
-
-color histogramColor = input.color(
-     color.new(color.gray, 78),
-     "Histogram Color",
-     group="Total Volume Histogram"
-)
-
-bool showVolumeTextBox = input.bool(
-     false,
-     "Show Volume Textbox",
-     group="Total Volume Histogram",
-     tooltip="Optional floating summary label with bars, total volume, average volume per bar, and positive/negative split."
-)
-
-// =====================================================
-// LINE STYLE SETTINGS
-// =====================================================
-color vahColor = input.color(color.blue, "VAH Color", group="Line Style Settings")
-color valColor = input.color(color.green, "VAL Color", group="Line Style Settings")
-color pocColor = input.color(color.yellow, "POC Color", group="Line Style Settings")
-
-int vahWidth = input.int(2, "VAH Width", minval=1, maxval=5, group="Line Style Settings")
-int valWidth = input.int(2, "VAL Width", minval=1, maxval=5, group="Line Style Settings")
-int pocWidth = input.int(2, "POC Width", minval=1, maxval=5, group="Line Style Settings")
-
-string vahStyleInput = input.string("Dashed", "VAH Style", options=["Solid", "Dashed", "Dotted"], group="Line Style Settings")
-string valStyleInput = input.string("Dashed", "VAL Style", options=["Solid", "Dashed", "Dotted"], group="Line Style Settings")
-string pocStyleInput = input.string("Dotted", "POC Style", options=["Solid", "Dashed", "Dotted"], group="Line Style Settings")
-
-f_lineStyle(string styleText) =>
-    switch styleText
-        "Solid" => line.style_solid
-        "Dashed" => line.style_dashed
-        "Dotted" => line.style_dotted
-        => line.style_solid
-
-vahStyle = f_lineStyle(vahStyleInput)
-valStyle = f_lineStyle(valStyleInput)
-pocStyle = f_lineStyle(pocStyleInput)
-
-// =====================================================
-// TOTAL VOLUME HISTOGRAM HELPERS
-// =====================================================
-f_clearBoxes(box[] boxes) =>
-    int boxCount = array.size(boxes)
-    if boxCount > 0
-        for i = 0 to boxCount - 1
-            box.delete(array.get(boxes, i))
-        array.clear(boxes)
-
-f_fmtVol(float v) =>
-    na(v) ? "-" : str.tostring(v, "#,###")
-
-f_fmtPrice(float v) =>
-    na(v) ? "-" : str.tostring(v, "#.####")
-
-f_summaryText(string areaName, int barsFound, float totalVol, float barAvgVol, float posVol, float negVol, float netVol, float posPct, float negPct) =>
-    areaName + "\n" +
-     "Bars: " + (na(barsFound) ? "-" : str.tostring(barsFound)) + "\n" +
-     "Total Vol: " + f_fmtVol(totalVol) + "\n" +
-     "Avg/Bar: " + f_fmtVol(barAvgVol) + "\n" +
-     "Positive: " + f_fmtVol(posVol) + (na(posPct) ? "" : " (" + str.tostring(posPct, "#.0") + "%)") + "\n" +
-     "Negative: " + f_fmtVol(negVol) + (na(negPct) ? "" : " (" + str.tostring(negPct, "#.0") + "%)") + "\n" +
-     "Net: " + (na(netVol) ? "-" : (netVol >= 0 ? "+" : "") + str.tostring(netVol, "#,###"))
-f_drawTotalVolumeHistogram(
-     float[] highs,
-     float[] lows,
-     float[] closes,
-     float[] volumes,
-     int rows,
-     float rangeLow,
-     float rangeHigh,
-     int rangeStart,
-     int rangeEnd,
-     float maxWidthPercent,
-     int maxRowsToDraw,
-     string placement,
-     color histColor,
-     box[] histBoxes
-) =>
-    int barsFound = array.size(highs)
-
-    if barsFound > 0 and not na(rangeLow) and not na(rangeHigh) and rangeHigh > rangeLow
-        float[] profile = array.new_float(rows, 0.0)
-        float rowSize = (rangeHigh - rangeLow) / rows
-
-        // Build total-volume profile by distributing each candle's volume
-        // across every price row touched by the candle.
-        for i = 0 to barsFound - 1
-            float h = array.get(highs, i)
-            float l = array.get(lows, i)
-            float c = array.get(closes, i)
-            float v = array.get(volumes, i)
-
-            if v > 0
-                if h > l
-                    float barRange = h - l
-
-                    for r = 0 to rows - 1
-                        float rowLow = rangeLow + r * rowSize
-                        float rowHigh = rowLow + rowSize
-
-                        float overlapLow = math.max(l, rowLow)
-                        float overlapHigh = math.min(h, rowHigh)
-                        float overlap = math.max(0.0, overlapHigh - overlapLow)
-
-                        if overlap > 0
-                            array.set(profile, r, array.get(profile, r) + v * overlap / barRange)
+                if structureTouches and structureRejects and structureVolumeOk and structureLocationOk
+                    supplyStructureStartBar := originBar - backwardStep
+                    supplyStructureBars += 1
                 else
-                    int closeBin = math.floor(((c - rangeLow) / (rangeHigh - rangeLow)) * rows)
-                    closeBin := math.max(0, math.min(rows - 1, closeBin))
-                    array.set(profile, closeBin, array.get(profile, closeBin) + v)
-
-        int safeMaxRowsToDraw = math.max(1, maxRowsToDraw)
-        int rowStep = math.max(1, int(math.ceil(rows * 1.0 / safeMaxRowsToDraw)))
-        float maxGroupedVol = 0.0
-
-        for r = 0 to rows - 1
-            if r % rowStep == 0
-                int endIdx = math.min(rows - 1, r + rowStep - 1)
-                float groupedVol = 0.0
-
-                for j = r to endIdx
-                    groupedVol += array.get(profile, j)
-
-                maxGroupedVol := math.max(maxGroupedVol, groupedVol)
-
-        int rangeMs = math.max(1, rangeEnd - rangeStart)
-        int fullWidthMs = math.max(1, int(rangeMs * maxWidthPercent / 100.0))
-        bool drawLeft = placement == "Left of Range"
-        bool drawInside = placement == "Inside Range"
-        bool drawRight = placement == "Right of Range"
-
-        if maxGroupedVol > 0
-            for r = 0 to rows - 1
-                if r % rowStep == 0
-                    int endIdx = math.min(rows - 1, r + rowStep - 1)
-                    float groupedVol = 0.0
-
-                    for j = r to endIdx
-                        groupedVol += array.get(profile, j)
-
-                    float widthRatio = groupedVol / maxGroupedVol
-                    int rowWidthMs = math.max(1, int(fullWidthMs * widthRatio))
-
-                    // Left of Range: histogram is anchored at the FRVP start/trend start and extends left.
-                    // Inside Range: histogram is anchored at the FRVP end and extends left inside the range.
-                    // Right of Range: histogram is anchored at the FRVP end and extends right.
-                    int leftX = drawLeft ? rangeStart - rowWidthMs : drawInside ? rangeEnd - rowWidthMs : rangeEnd
-                    int rightX = drawLeft ? rangeStart : drawInside ? rangeEnd : rangeEnd + rowWidthMs
-
-                    float rowBottom = rangeLow + r * rowSize
-                    float rowTop = rangeLow + (endIdx + 1) * rowSize
-
-                    box b = box.new(
-                         left=leftX,
-                         top=rowTop,
-                         right=rightX,
-                         bottom=rowBottom,
-                         xloc=xloc.bar_time,
-                         border_color=color.new(histColor, 100),
-                         bgcolor=histColor
-                    )
-                    array.push(histBoxes, b)
-
-// =====================================================
-// NORMALIZED TIMES
-// =====================================================
-int s1 = math.min(start1, end1)
-int e1 = math.max(start1, end1)
-
-int s2 = math.min(start2, end2)
-int e2 = math.max(start2, end2)
-
-int s3 = math.min(start3, end3)
-int e3 = math.max(start3, end3)
-
-// =====================================================
-// AREA MEMBERSHIP
-// Use candle-overlap logic.
-// This works better than requiring exact candle open time.
-// =====================================================
-bool insideArea1 = useArea1 and time >= s1 and time <= e1
-bool insideArea2 = useArea2 and time >= s2 and time <= e2
-bool insideArea3 = useArea3 and time >= s3 and time <= e3
-
-bool enterArea1 = insideArea1 and insideArea1[1] != true
-bool enterArea2 = insideArea2 and insideArea2[1] != true
-bool enterArea3 = insideArea3 and insideArea3[1] != true
-
-// =====================================================
-// BACKGROUND SHADING
-// =====================================================
-color bg = na
-bg := insideArea1 ? areaColor1 : bg
-bg := insideArea2 ? areaColor2 : bg
-bg := insideArea3 ? areaColor3 : bg
-bgcolor(bg)
-
-// =====================================================
-// DRAG POINT VISUALS
-// =====================================================
-plot(useArea1 and time == start1 ? startPrice1 : na, "Area 1 Start Point", style=plot.style_circles, linewidth=5, color=color.blue)
-plot(useArea1 and time == end1 ? endPrice1 : na, "Area 1 End Point", style=plot.style_circles, linewidth=5, color=color.blue)
-
-plot(useArea2 and time == start2 ? startPrice2 : na, "Area 2 Start Point", style=plot.style_circles, linewidth=5, color=color.purple)
-plot(useArea2 and time == end2 ? endPrice2 : na, "Area 2 End Point", style=plot.style_circles, linewidth=5, color=color.purple)
-
-plot(useArea3 and time == start3 ? startPrice3 : na, "Area 3 Start Point", style=plot.style_circles, linewidth=5, color=color.orange)
-plot(useArea3 and time == end3 ? endPrice3 : na, "Area 3 End Point", style=plot.style_circles, linewidth=5, color=color.orange)
-
-// =====================================================
-// ARRAYS FOR COLLECTED BARS
-// This is the fix for "No Bars found" after changing date:
-// bars are collected as Pine processes chart history,
-// instead of scanning backward only from the latest candle.
-// =====================================================
-var float[] a1Highs = array.new_float()
-var float[] a1Lows = array.new_float()
-var float[] a1Opens = array.new_float()
-var float[] a1Closes = array.new_float()
-var float[] a1Volumes = array.new_float()
-var bool a1Capped = false
-
-var float[] a2Highs = array.new_float()
-var float[] a2Lows = array.new_float()
-var float[] a2Opens = array.new_float()
-var float[] a2Closes = array.new_float()
-var float[] a2Volumes = array.new_float()
-var bool a2Capped = false
-
-var float[] a3Highs = array.new_float()
-var float[] a3Lows = array.new_float()
-var float[] a3Opens = array.new_float()
-var float[] a3Closes = array.new_float()
-var float[] a3Volumes = array.new_float()
-var bool a3Capped = false
-
-// =====================================================
-// RESET AND COLLECT AREA 1
-// =====================================================
-if enterArea1
-    array.clear(a1Highs)
-    array.clear(a1Lows)
-    array.clear(a1Opens)
-    array.clear(a1Closes)
-    array.clear(a1Volumes)
-    a1Capped := false
-
-if insideArea1
-    if array.size(a1Highs) < maxBarsInRange
-        array.push(a1Highs, high)
-        array.push(a1Lows, low)
-        array.push(a1Opens, open)
-        array.push(a1Closes, close)
-        array.push(a1Volumes, na(volume) ? 0.0 : volume)
-    else
-        a1Capped := true
-
-// =====================================================
-// RESET AND COLLECT AREA 2
-// =====================================================
-if enterArea2
-    array.clear(a2Highs)
-    array.clear(a2Lows)
-    array.clear(a2Opens)
-    array.clear(a2Closes)
-    array.clear(a2Volumes)
-    a2Capped := false
-
-if insideArea2
-    if array.size(a2Highs) < maxBarsInRange
-        array.push(a2Highs, high)
-        array.push(a2Lows, low)
-        array.push(a2Opens, open)
-        array.push(a2Closes, close)
-        array.push(a2Volumes, na(volume) ? 0.0 : volume)
-    else
-        a2Capped := true
-
-// =====================================================
-// RESET AND COLLECT AREA 3
-// =====================================================
-if enterArea3
-    array.clear(a3Highs)
-    array.clear(a3Lows)
-    array.clear(a3Opens)
-    array.clear(a3Closes)
-    array.clear(a3Volumes)
-    a3Capped := false
-
-if insideArea3
-    if array.size(a3Highs) < maxBarsInRange
-        array.push(a3Highs, high)
-        array.push(a3Lows, low)
-        array.push(a3Opens, open)
-        array.push(a3Closes, close)
-        array.push(a3Volumes, na(volume) ? 0.0 : volume)
-    else
-        a3Capped := true
-
-// =====================================================
-// FRVP CALCULATION FROM COLLECTED ARRAYS
-// Volume is distributed across all price rows touched by each candle.
-// This is much closer than placing all volume into the close-price bin.
-// =====================================================
-f_calcFRVPFromArrays(
-     float[] highs,
-     float[] lows,
-     float[] opens,
-     float[] closes,
-     float[] volumes,
-     int rows,
-     float vaPercent,
-     bool capped
-) =>
-    float rangeHigh = na
-    float rangeLow = na
-    float totalVolume = 0.0
-    float positiveVolume = 0.0
-    float negativeVolume = 0.0
-
-    int barsFound = array.size(highs)
-
-    if barsFound > 0
-        for i = 0 to barsFound - 1
-            float h = array.get(highs, i)
-            float l = array.get(lows, i)
-            float o = array.get(opens, i)
-            float c = array.get(closes, i)
-            float v = array.get(volumes, i)
-
-            rangeHigh := na(rangeHigh) ? h : math.max(rangeHigh, h)
-            rangeLow := na(rangeLow) ? l : math.min(rangeLow, l)
-
-            totalVolume += v
-
-            // Split each candle's volume by where price traded inside the bar range.
-            // Bullish/positive bar:
-            //   low -> close  = positive
-            //   close -> high = negative
-            // Bearish/negative bar:
-            //   high -> open  = positive
-            //   open -> low   = negative
-            //
-            // This avoids classifying the whole candle volume as positive/negative
-            // only because close is above/below open.
-            float barRangeForSide = h - l
-
-            if v > 0
-                if barRangeForSide > 0
-                    float posRangeForSide = na
-                    float negRangeForSide = na
-
-                    if c >= o
-                        posRangeForSide := math.max(0.0, c - l)
-                        negRangeForSide := math.max(0.0, h - c)
-                    else
-                        posRangeForSide := math.max(0.0, h - o)
-                        negRangeForSide := math.max(0.0, o - l)
-
-                    positiveVolume += v * posRangeForSide / barRangeForSide
-                    negativeVolume += v * negRangeForSide / barRangeForSide
-                else
-                    // No high-low range, so there is no reliable directional split.
-                    positiveVolume += v * 0.5
-                    negativeVolume += v * 0.5
-
-    float[] profile = array.new_float(rows, 0.0)
-
-    if barsFound > 0 and totalVolume > 0 and not na(rangeHigh) and not na(rangeLow) and rangeHigh > rangeLow
-        float rowSizeForBuild = (rangeHigh - rangeLow) / rows
-
-        for i = 0 to barsFound - 1
-            float h = array.get(highs, i)
-            float l = array.get(lows, i)
-            float c = array.get(closes, i)
-            float v = array.get(volumes, i)
-
-            if v > 0
-                if h > l
-                    float barRange = h - l
-
-                    for r = 0 to rows - 1
-                        float rowLow = rangeLow + r * rowSizeForBuild
-                        float rowHigh = rowLow + rowSizeForBuild
-
-                        float overlapLow = math.max(l, rowLow)
-                        float overlapHigh = math.min(h, rowHigh)
-                        float overlap = math.max(0.0, overlapHigh - overlapLow)
-
-                        if overlap > 0
-                            float addVol = v * overlap / barRange
-                            array.set(profile, r, array.get(profile, r) + addVol)
-                else
-                    int closeBin = math.floor(((c - rangeLow) / (rangeHigh - rangeLow)) * rows)
-                    closeBin := math.max(0, math.min(rows - 1, closeBin))
-                    array.set(profile, closeBin, array.get(profile, closeBin) + v)
-
-    float pocPrice = na
-    float vahPrice = na
-    float valPrice = na
-
-    if barsFound > 0 and totalVolume > 0 and not na(rangeHigh) and not na(rangeLow) and rangeHigh > rangeLow
-        float rowSize = (rangeHigh - rangeLow) / rows
-
-        float maxVol = 0.0
-        int pocIdx = 0
-
-        for r = 0 to rows - 1
-            float rowVol = array.get(profile, r)
-            if rowVol > maxVol
-                maxVol := rowVol
-                pocIdx := r
-
-        pocPrice := rangeLow + pocIdx * rowSize + rowSize / 2.0
-
-        float targetVolume = totalVolume * vaPercent / 100.0
-        float valueAreaVolume = maxVol
-
-        int lowerIdx = pocIdx
-        int upperIdx = pocIdx
-
-        for step = 0 to rows - 1
-            if valueAreaVolume >= targetVolume or (lowerIdx <= 0 and upperIdx >= rows - 1)
-                break
-
-            float upperVol = upperIdx < rows - 1 ? array.get(profile, upperIdx + 1) : -1.0
-            float lowerVol = lowerIdx > 0 ? array.get(profile, lowerIdx - 1) : -1.0
-
-            if upperVol >= lowerVol and upperIdx < rows - 1
-                upperIdx += 1
-                valueAreaVolume += math.max(upperVol, 0.0)
-            else if lowerIdx > 0
-                lowerIdx -= 1
-                valueAreaVolume += math.max(lowerVol, 0.0)
-
-        vahPrice := rangeLow + upperIdx * rowSize + rowSize / 2.0
-        valPrice := rangeLow + lowerIdx * rowSize + rowSize / 2.0
-
-    float netVolume = positiveVolume - negativeVolume
-    float positivePercent = totalVolume > 0 ? positiveVolume / totalVolume * 100.0 : na
-    float negativePercent = totalVolume > 0 ? negativeVolume / totalVolume * 100.0 : na
-    float barAvgVol = barsFound > 0 ? totalVolume / barsFound : na
-
-    [vahPrice, valPrice, pocPrice, totalVolume, barAvgVol, positiveVolume, negativeVolume, netVolume, positivePercent, negativePercent, rangeLow, rangeHigh, barsFound]
-
-// =====================================================
-// LINE VARIABLES
-// =====================================================
-var line vahLine1 = na
-var line valLine1 = na
-var line pocLine1 = na
-var line anchorLine1 = na
-
-var line vahLine2 = na
-var line valLine2 = na
-var line pocLine2 = na
-var line anchorLine2 = na
-
-var line vahLine3 = na
-var line valLine3 = na
-var line pocLine3 = na
-var line anchorLine3 = na
-
-var box[] histBoxes1 = array.new_box()
-var box[] histBoxes2 = array.new_box()
-var box[] histBoxes3 = array.new_box()
-
-var label volumeTextLabel1 = na
-var label volumeTextLabel2 = na
-var label volumeTextLabel3 = na
-
-// =====================================================
-// LATEST VALUES FOR TABLE
-// =====================================================
-var float vah1 = na
-var float val1 = na
-var float poc1 = na
-var float total1 = na
-var float barAvgVol1 = na
-var float posVol1 = na
-var float negVol1 = na
-var float netVol1 = na
-var float posPct1 = na
-var float negPct1 = na
-var float low1 = na
-var float high1 = na
-var int bars1 = na
-
-var float vah2 = na
-var float val2 = na
-var float poc2 = na
-var float total2 = na
-var float barAvgVol2 = na
-var float posVol2 = na
-var float negVol2 = na
-var float netVol2 = na
-var float posPct2 = na
-var float negPct2 = na
-var float low2 = na
-var float high2 = na
-var int bars2 = na
-
-var float vah3 = na
-var float val3 = na
-var float poc3 = na
-var float total3 = na
-var float barAvgVol3 = na
-var float posVol3 = na
-var float negVol3 = na
-var float netVol3 = na
-var float posPct3 = na
-var float negPct3 = na
-var float low3 = na
-var float high3 = na
-var int bars3 = na
-
-// =====================================================
-// DRAW / REDRAW ON LAST BAR
-// =====================================================
-if barstate.islast
-    // Delete old lines.
-    if not na(vahLine1)
-        line.delete(vahLine1)
-    if not na(valLine1)
-        line.delete(valLine1)
-    if not na(pocLine1)
-        line.delete(pocLine1)
-    if not na(anchorLine1)
-        line.delete(anchorLine1)
-
-    if not na(vahLine2)
-        line.delete(vahLine2)
-    if not na(valLine2)
-        line.delete(valLine2)
-    if not na(pocLine2)
-        line.delete(pocLine2)
-    if not na(anchorLine2)
-        line.delete(anchorLine2)
-
-    if not na(vahLine3)
-        line.delete(vahLine3)
-    if not na(valLine3)
-        line.delete(valLine3)
-    if not na(pocLine3)
-        line.delete(pocLine3)
-    if not na(anchorLine3)
-        line.delete(anchorLine3)
-
-    f_clearBoxes(histBoxes1)
-    f_clearBoxes(histBoxes2)
-    f_clearBoxes(histBoxes3)
-
-    if not na(volumeTextLabel1)
-        label.delete(volumeTextLabel1)
-    if not na(volumeTextLabel2)
-        label.delete(volumeTextLabel2)
-    if not na(volumeTextLabel3)
-        label.delete(volumeTextLabel3)
-
-    volumeTextLabel1 := na
-    volumeTextLabel2 := na
-    volumeTextLabel3 := na
-
-    vahLine1 := na
-    valLine1 := na
-    pocLine1 := na
-    anchorLine1 := na
-
-    vahLine2 := na
-    valLine2 := na
-    pocLine2 := na
-    anchorLine2 := na
-
-    vahLine3 := na
-    valLine3 := na
-    pocLine3 := na
-    anchorLine3 := na
-
-    extendMode = extendLinesRight ? extend.right : extend.none
-
-    // -------------------------
-    // Area 1
-    // -------------------------
-    if useArea1
-        [aVah1, aVal1, aPoc1, aTotal1, aBarAvgVol1, aPos1, aNeg1, aNet1, aPosPct1, aNegPct1, aLow1, aHigh1, aBars1] = f_calcFRVPFromArrays(a1Highs, a1Lows, a1Opens, a1Closes, a1Volumes, rowCount, valueAreaPercent, a1Capped)
-
-        vah1 := aVah1
-        val1 := aVal1
-        poc1 := aPoc1
-        total1 := aTotal1
-        barAvgVol1 := aBarAvgVol1
-        posVol1 := aPos1
-        negVol1 := aNeg1
-        netVol1 := aNet1
-        posPct1 := aPosPct1
-        negPct1 := aNegPct1
-        low1 := aLow1
-        high1 := aHigh1
-        bars1 := aBars1
-
-        if showAnchorLine
-            anchorLine1 := line.new(start1, startPrice1, end1, endPrice1, xloc=xloc.bar_time, color=color.new(color.blue, 0), width=1, style=line.style_solid)
-
-        if showVAH and not na(vah1)
-            vahLine1 := line.new(s1, vah1, e1, vah1, xloc=xloc.bar_time, color=vahColor, width=vahWidth, style=vahStyle, extend=extendMode)
-        if showVAL and not na(val1)
-            valLine1 := line.new(s1, val1, e1, val1, xloc=xloc.bar_time, color=valColor, width=valWidth, style=valStyle, extend=extendMode)
-        if showPOC and not na(poc1)
-            pocLine1 := line.new(s1, poc1, e1, poc1, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
-
-        if showTotalVolumeHistogram
-            f_drawTotalVolumeHistogram(a1Highs, a1Lows, a1Closes, a1Volumes, rowCount, low1, high1, s1, e1, histogramWidthPercent, histogramMaxRowsPerArea, histogramPlacement, histogramColor, histBoxes1)
-
-        if showVolumeTextBox and not na(high1)
-            volumeTextLabel1 := label.new(
-                 x=e1,
-                 y=high1,
-                 text=f_summaryText("Area 1", bars1, total1, barAvgVol1, posVol1, negVol1, netVol1, posPct1, negPct1),
-                 xloc=xloc.bar_time,
-                 yloc=yloc.price,
-                 style=label.style_label_left,
-                 color=color.new(color.black, 15),
-                 textcolor=color.white,
-                 size=size.small
-            )
-
-    // -------------------------
-    // Area 2
-    // -------------------------
-    if useArea2
-        [aVah2, aVal2, aPoc2, aTotal2, aBarAvgVol2, aPos2, aNeg2, aNet2, aPosPct2, aNegPct2, aLow2, aHigh2, aBars2] = f_calcFRVPFromArrays(a2Highs, a2Lows, a2Opens, a2Closes, a2Volumes, rowCount, valueAreaPercent, a2Capped)
-
-        vah2 := aVah2
-        val2 := aVal2
-        poc2 := aPoc2
-        total2 := aTotal2
-        barAvgVol2 := aBarAvgVol2
-        posVol2 := aPos2
-        negVol2 := aNeg2
-        netVol2 := aNet2
-        posPct2 := aPosPct2
-        negPct2 := aNegPct2
-        low2 := aLow2
-        high2 := aHigh2
-        bars2 := aBars2
-
-        if showAnchorLine
-            anchorLine2 := line.new(start2, startPrice2, end2, endPrice2, xloc=xloc.bar_time, color=color.new(color.purple, 0), width=1, style=line.style_solid)
-
-        if showVAH and not na(vah2)
-            vahLine2 := line.new(s2, vah2, e2, vah2, xloc=xloc.bar_time, color=vahColor, width=vahWidth, style=vahStyle, extend=extendMode)
-        if showVAL and not na(val2)
-            valLine2 := line.new(s2, val2, e2, val2, xloc=xloc.bar_time, color=valColor, width=valWidth, style=valStyle, extend=extendMode)
-        if showPOC and not na(poc2)
-            pocLine2 := line.new(s2, poc2, e2, poc2, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
-
-        if showTotalVolumeHistogram
-            f_drawTotalVolumeHistogram(a2Highs, a2Lows, a2Closes, a2Volumes, rowCount, low2, high2, s2, e2, histogramWidthPercent, histogramMaxRowsPerArea, histogramPlacement, histogramColor, histBoxes2)
-
-        if showVolumeTextBox and not na(high2)
-            volumeTextLabel2 := label.new(
-                 x=e2,
-                 y=high2,
-                 text=f_summaryText("Area 2", bars2, total2, barAvgVol2, posVol2, negVol2, netVol2, posPct2, negPct2),
-                 xloc=xloc.bar_time,
-                 yloc=yloc.price,
-                 style=label.style_label_left,
-                 color=color.new(color.black, 15),
-                 textcolor=color.white,
-                 size=size.small
-            )
-
-    // -------------------------
-    // Area 3
-    // -------------------------
-    if useArea3
-        [aVah3, aVal3, aPoc3, aTotal3, aBarAvgVol3, aPos3, aNeg3, aNet3, aPosPct3, aNegPct3, aLow3, aHigh3, aBars3] = f_calcFRVPFromArrays(a3Highs, a3Lows, a3Opens, a3Closes, a3Volumes, rowCount, valueAreaPercent, a3Capped)
-
-        vah3 := aVah3
-        val3 := aVal3
-        poc3 := aPoc3
-        total3 := aTotal3
-        barAvgVol3 := aBarAvgVol3
-        posVol3 := aPos3
-        negVol3 := aNeg3
-        netVol3 := aNet3
-        posPct3 := aPosPct3
-        negPct3 := aNegPct3
-        low3 := aLow3
-        high3 := aHigh3
-        bars3 := aBars3
-
-        if showAnchorLine
-            anchorLine3 := line.new(start3, startPrice3, end3, endPrice3, xloc=xloc.bar_time, color=color.new(color.orange, 0), width=1, style=line.style_solid)
-
-        if showVAH and not na(vah3)
-            vahLine3 := line.new(s3, vah3, e3, vah3, xloc=xloc.bar_time, color=vahColor, width=vahWidth, style=vahStyle, extend=extendMode)
-        if showVAL and not na(val3)
-            valLine3 := line.new(s3, val3, e3, val3, xloc=xloc.bar_time, color=valColor, width=valWidth, style=valStyle, extend=extendMode)
-        if showPOC and not na(poc3)
-            pocLine3 := line.new(s3, poc3, e3, poc3, xloc=xloc.bar_time, color=pocColor, width=pocWidth, style=pocStyle, extend=extendMode)
-
-        if showTotalVolumeHistogram
-            f_drawTotalVolumeHistogram(a3Highs, a3Lows, a3Closes, a3Volumes, rowCount, low3, high3, s3, e3, histogramWidthPercent, histogramMaxRowsPerArea, histogramPlacement, histogramColor, histBoxes3)
-
-        if showVolumeTextBox and not na(high3)
-            volumeTextLabel3 := label.new(
-                 x=e3,
-                 y=high3,
-                 text=f_summaryText("Area 3", bars3, total3, barAvgVol3, posVol3, negVol3, netVol3, posPct3, negPct3),
-                 xloc=xloc.bar_time,
-                 yloc=yloc.price,
-                 style=label.style_label_left,
-                 color=color.new(color.black, 15),
-                 textcolor=color.white,
-                 size=size.small
-            )
-
-// =====================================================
-// DASHBOARD
-// =====================================================
-tablePosition = switch tablePos
-    "Top Right"    => position.top_right
-    "Top Left"     => position.top_left
-    "Bottom Right" => position.bottom_right
-    "Bottom Left"  => position.bottom_left
-    => position.top_right
-
-var table hud = table.new(tablePosition, 4, 11, bgcolor=color.new(color.black, 15), border_color=color.gray, border_width=1)
-color disabledColor = #363A45
-
-if barstate.islast
-    table.cell(hud, 0, 0, "Metric", bgcolor=color.gray, text_color=color.white, text_size=size.small)
-    table.cell(hud, 1, 0, "Area 1", bgcolor=useArea1 ? color.blue : disabledColor, text_color=color.white, text_size=size.small)
-    table.cell(hud, 2, 0, "Area 2", bgcolor=useArea2 ? color.purple : disabledColor, text_color=color.white, text_size=size.small)
-    table.cell(hud, 3, 0, "Area 3", bgcolor=useArea3 ? color.orange : disabledColor, text_color=color.white, text_size=size.small)
-
-    table.cell(hud, 0, 1, "Bars", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 2, "Total Vol", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 3, "Bar Avg Vol", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 4, "VAL", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 5, "POC", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 6, "VAH", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 7, "Positive Vol", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 8, "Negative Vol", text_color=color.white, text_size=size.small)
-    table.cell(hud, 0, 9, "Net Vol", text_color=color.white, text_size=size.small)
-
-    // Area 1 column
-    table.cell(hud, 1, 1, useArea1 and not na(bars1) ? str.tostring(bars1) : "-", text_color=color.white, text_size=size.small)
-    table.cell(hud, 1, 2, useArea1 and not na(total1) ? str.tostring(total1, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 1, 3, useArea1 and not na(barAvgVol1) ? str.tostring(barAvgVol1, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 1, 4, useArea1 and not na(val1) ? str.tostring(val1, "#.####") : "-", text_color=valColor, text_size=size.small)
-    table.cell(hud, 1, 5, useArea1 and not na(poc1) ? str.tostring(poc1, "#.####") : "-", text_color=pocColor, text_size=size.small)
-    table.cell(hud, 1, 6, useArea1 and not na(vah1) ? str.tostring(vah1, "#.####") : "-", text_color=vahColor, text_size=size.small)
-    table.cell(hud, 1, 7, useArea1 and not na(posVol1) ? str.tostring(posVol1, "#,###") + " (" + str.tostring(posPct1, "#.0") + "%)" : "-", text_color=color.green, text_size=size.small)
-    table.cell(hud, 1, 8, useArea1 and not na(negVol1) ? str.tostring(negVol1, "#,###") + " (" + str.tostring(negPct1, "#.0") + "%)" : "-", text_color=color.red, text_size=size.small)
-    table.cell(hud, 1, 9, useArea1 and not na(netVol1) ? (netVol1 >= 0 ? "+" : "") + str.tostring(netVol1, "#,###") : "-", text_color=not na(netVol1) and netVol1 >= 0 ? color.green : color.red, text_size=size.small)
-
-    // Area 2 column
-    table.cell(hud, 2, 1, useArea2 and not na(bars2) ? str.tostring(bars2) : "-", text_color=color.white, text_size=size.small)
-    table.cell(hud, 2, 2, useArea2 and not na(total2) ? str.tostring(total2, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 2, 3, useArea2 and not na(barAvgVol2) ? str.tostring(barAvgVol2, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 2, 4, useArea2 and not na(val2) ? str.tostring(val2, "#.####") : "-", text_color=valColor, text_size=size.small)
-    table.cell(hud, 2, 5, useArea2 and not na(poc2) ? str.tostring(poc2, "#.####") : "-", text_color=pocColor, text_size=size.small)
-    table.cell(hud, 2, 6, useArea2 and not na(vah2) ? str.tostring(vah2, "#.####") : "-", text_color=vahColor, text_size=size.small)
-    table.cell(hud, 2, 7, useArea2 and not na(posVol2) ? str.tostring(posVol2, "#,###") + " (" + str.tostring(posPct2, "#.0") + "%)" : "-", text_color=color.green, text_size=size.small)
-    table.cell(hud, 2, 8, useArea2 and not na(negVol2) ? str.tostring(negVol2, "#,###") + " (" + str.tostring(negPct2, "#.0") + "%)" : "-", text_color=color.red, text_size=size.small)
-    table.cell(hud, 2, 9, useArea2 and not na(netVol2) ? (netVol2 >= 0 ? "+" : "") + str.tostring(netVol2, "#,###") : "-", text_color=not na(netVol2) and netVol2 >= 0 ? color.green : color.red, text_size=size.small)
-
-    // Area 3 column
-    table.cell(hud, 3, 1, useArea3 and not na(bars3) ? str.tostring(bars3) : "-", text_color=color.white, text_size=size.small)
-    table.cell(hud, 3, 2, useArea3 and not na(total3) ? str.tostring(total3, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 3, 3, useArea3 and not na(barAvgVol3) ? str.tostring(barAvgVol3, "#,###") : "-", text_color=color.teal, text_size=size.small)
-    table.cell(hud, 3, 4, useArea3 and not na(val3) ? str.tostring(val3, "#.####") : "-", text_color=valColor, text_size=size.small)
-    table.cell(hud, 3, 5, useArea3 and not na(poc3) ? str.tostring(poc3, "#.####") : "-", text_color=pocColor, text_size=size.small)
-    table.cell(hud, 3, 6, useArea3 and not na(vah3) ? str.tostring(vah3, "#.####") : "-", text_color=vahColor, text_size=size.small)
-    table.cell(hud, 3, 7, useArea3 and not na(posVol3) ? str.tostring(posVol3, "#,###") + " (" + str.tostring(posPct3, "#.0") + "%)" : "-", text_color=color.green, text_size=size.small)
-    table.cell(hud, 3, 8, useArea3 and not na(negVol3) ? str.tostring(negVol3, "#,###") + " (" + str.tostring(negPct3, "#.0") + "%)" : "-", text_color=color.red, text_size=size.small)
-    table.cell(hud, 3, 9, useArea3 and not na(netVol3) ? (netVol3 >= 0 ? "+" : "") + str.tostring(netVol3, "#,###") : "-", text_color=not na(netVol3) and netVol3 >= 0 ? color.green : color.red, text_size=size.small)
+                    break
+
+        int effectiveMinSupplyStructureBars = math.min(minSupplyStructureBars, pivotLeft + 1)
+        if supplyStructureBars < effectiveMinSupplyStructureBars
+            supplyStructureStartBar := originBar
+
+        bool duplicate = false
+        int duplicateIndex = array.size(candidateTops) - 1
+        while duplicateIndex >= 0
+            float oldTop = array.get(candidateTops, duplicateIndex)
+            float oldBottom = array.get(candidateBottoms, duplicateIndex)
+            int oldOriginBar = array.get(candidateOriginBars, duplicateIndex)
+            bool overlaps = actionableZoneBottom <= oldTop and pivotHigh >= oldBottom
+            bool closeInTime = originBar - oldOriginBar <= pivotLeft + pivotRight + 2
+            if overlaps and closeInTime
+                duplicate := true
+            duplicateIndex -= 1
+
+        if not duplicate
+            array.push(candidateTops, pivotHigh)
+            array.push(candidateBottoms, actionableZoneBottom)
+            // Keep the original body-high for measuring seller-leg decline even when
+            // a bearish origin uses its deeper close as the actionable zone boundary.
+            array.push(candidateLegReferences, bodyHigh)
+            array.push(candidateOriginRelativeVolumes, supplyRelativeVolume)
+            array.push(candidateOriginBars, originBar)
+            array.push(candidateStructureStartBars, supplyStructureStartBar)
+            array.push(candidateOriginAtrs, pivotAtr)
+            array.push(candidateTrackedLows, postPivotLow)
+            array.push(candidateLegConfirmed, false)
+            array.push(candidateDemandLows, na)
+            array.push(candidateDemandBars, na)
+            array.push(candidateBreakCounts, 0)
+
+            if array.size(candidateTops) > maxHiddenCandidates
+                array.shift(candidateTops)
+                array.shift(candidateBottoms)
+                array.shift(candidateLegReferences)
+                array.shift(candidateOriginRelativeVolumes)
+                array.shift(candidateOriginBars)
+                array.shift(candidateStructureStartBars)
+                array.shift(candidateOriginAtrs)
+                array.shift(candidateTrackedLows)
+                array.shift(candidateLegConfirmed)
+                array.shift(candidateDemandLows)
+                array.shift(candidateDemandBars)
+                array.shift(candidateBreakCounts)
+
+// ────────────── Confirm supply→demand flips ──────────────
+int candidateIndex = array.size(candidateTops) - 1
+while candidateIndex >= 0
+    float supplyTop = array.get(candidateTops, candidateIndex)
+    float supplyBottom = array.get(candidateBottoms, candidateIndex)
+    float sellerLegReference = array.get(candidateLegReferences, candidateIndex)
+    float supplyOriginRelativeVolume = array.get(candidateOriginRelativeVolumes, candidateIndex)
+    int supplyOriginBar = array.get(candidateOriginBars, candidateIndex)
+    int supplyStructureStartBar = array.get(candidateStructureStartBars, candidateIndex)
+    float supplyOriginAtr = array.get(candidateOriginAtrs, candidateIndex)
+    float trackedLegLow = array.get(candidateTrackedLows, candidateIndex)
+    bool sellerLegConfirmed = array.get(candidateLegConfirmed, candidateIndex)
+    float demandLow = array.get(candidateDemandLows, candidateIndex)
+    int demandBar = array.get(candidateDemandBars, candidateIndex)
+    int breakCount = array.get(candidateBreakCounts, candidateIndex)
+
+    // A new low after demand confirmation means the seller leg has not truly ended.
+    // Reset it and wait for a later demand pivot, provided the leg is still young enough.
+    if sellerLegConfirmed and not na(demandLow) and low < demandLow - syminfo.mintick
+        sellerLegConfirmed := false
+        demandLow := na
+        demandBar := na
+        trackedLegLow := low
+        array.set(candidateLegConfirmed, candidateIndex, false)
+        array.set(candidateDemandLows, candidateIndex, na)
+        array.set(candidateDemandBars, candidateIndex, na)
+        array.set(candidateTrackedLows, candidateIndex, trackedLegLow)
+
+    if not sellerLegConfirmed
+        trackedLegLow := na(trackedLegLow) ? low : math.min(trackedLegLow, low)
+        array.set(candidateTrackedLows, candidateIndex, trackedLegLow)
+
+        if signalBarReady and not na(confirmedPivotLow) and not na(atr[demandPivotRight])
+            int proposedDemandBar = bar_index - demandPivotRight
+            int proposedLegBars = proposedDemandBar - supplyOriginBar
+            float demandAtr = atr[demandPivotRight]
+            float demandBodyLow = math.min(open[demandPivotRight], close[demandPivotRight])
+            float demandLowerWick = demandBodyLow - confirmedPivotLow
+            bool pivotIsLegLow = math.abs(confirmedPivotLow - trackedLegLow) <= syminfo.mintick * 2.0
+            bool legDurationOk = proposedLegBars >= minSellerLegBars and proposedLegBars <= maxSellerLegBars
+            bool legDeclineOk = sellerLegReference - confirmedPivotLow >= supplyOriginAtr * minSellerLegAtr
+            bool demandWickOk = demandLowerWick >= demandAtr * minDemandLowerWickAtr
+            bool demandReactionOk = postDemandHigh - confirmedPivotLow >= demandAtr * minDemandReactionAtr
+            float maxDemandReactionRelativeVolume = na
+            for demandVolumeOffset = 0 to demandPivotRight
+                float reactionVolumeAverage = volumeAverage[demandVolumeOffset]
+                float reactionRelativeVolume = not na(volume[demandVolumeOffset]) and
+                     not na(reactionVolumeAverage) and reactionVolumeAverage > 0.0 ?
+                     volume[demandVolumeOffset] / reactionVolumeAverage : na
+                if not na(reactionRelativeVolume)
+                    maxDemandReactionRelativeVolume := na(maxDemandReactionRelativeVolume) ?
+                         reactionRelativeVolume : math.max(maxDemandReactionRelativeVolume, reactionRelativeVolume)
+            bool demandVolumeOk = not na(maxDemandReactionRelativeVolume) and
+                 maxDemandReactionRelativeVolume >= minDemandRelativeVolume
+
+            if pivotIsLegLow and legDurationOk and legDeclineOk and demandWickOk and
+                 demandReactionOk and demandVolumeOk
+                sellerLegConfirmed := true
+                demandLow := confirmedPivotLow
+                demandBar := proposedDemandBar
+                array.set(candidateLegConfirmed, candidateIndex, true)
+                array.set(candidateDemandLows, candidateIndex, demandLow)
+                array.set(candidateDemandBars, candidateIndex, demandBar)
+
+        // Compact fallback: some strong supply candles produce a sharp one- or two-bar
+        // seller leg whose low cannot satisfy the normal left-pivot requirement because
+        // an earlier pre-origin candle was lower. Require exceptional origin volume,
+        // a stable post-low reaction, and all normal decline/wick/reaction/volume tests.
+        if not sellerLegConfirmed and allowCompactSellerLeg and bar_index >= compactDemandRightBars
+            int compactDemandBar = bar_index - compactDemandRightBars
+            int compactLegBars = compactDemandBar - supplyOriginBar
+            float compactDemandLow = low[compactDemandRightBars]
+            float compactDemandAtr = atr[compactDemandRightBars]
+            float compactDemandBodyLow = math.min(open[compactDemandRightBars], close[compactDemandRightBars])
+            float compactDemandLowerWick = compactDemandBodyLow - compactDemandLow
+            float compactMaxDemandRelativeVolume = na
+            for compactVolumeOffset = 0 to compactDemandRightBars
+                float compactVolumeAverage = volumeAverage[compactVolumeOffset]
+                float compactRelativeVolume = not na(volume[compactVolumeOffset]) and
+                     not na(compactVolumeAverage) and compactVolumeAverage > 0.0 ?
+                     volume[compactVolumeOffset] / compactVolumeAverage : na
+                if not na(compactRelativeVolume)
+                    compactMaxDemandRelativeVolume := na(compactMaxDemandRelativeVolume) ?
+                         compactRelativeVolume : math.max(compactMaxDemandRelativeVolume, compactRelativeVolume)
+
+            bool compactOriginVolumeOk = not na(supplyOriginRelativeVolume) and
+                 supplyOriginRelativeVolume >= minCompactSupplyRelativeVolume
+            bool compactDurationOk = compactLegBars >= 1 and compactLegBars <= compactMaxSellerLegBars
+            bool compactIsStableLegLow = compactDemandLow < compactPostDemandLow and
+                 math.abs(compactDemandLow - trackedLegLow) <= syminfo.mintick * 2.0
+            bool compactLegDeclineOk = sellerLegReference - compactDemandLow >= supplyOriginAtr * minSellerLegAtr
+            bool compactDemandWickOk = not na(compactDemandAtr) and
+                 compactDemandLowerWick >= compactDemandAtr * minDemandLowerWickAtr
+            bool compactDemandReactionOk = not na(compactDemandAtr) and
+                 compactPostDemandHigh - compactDemandLow >= compactDemandAtr * minDemandReactionAtr
+            bool compactDemandVolumeOk = not na(compactMaxDemandRelativeVolume) and
+                 compactMaxDemandRelativeVolume >= minDemandRelativeVolume
+
+            if compactOriginVolumeOk and compactDurationOk and compactIsStableLegLow and
+                 compactLegDeclineOk and compactDemandWickOk and compactDemandReactionOk and compactDemandVolumeOk
+                sellerLegConfirmed := true
+                demandLow := compactDemandLow
+                demandBar := compactDemandBar
+                array.set(candidateLegConfirmed, candidateIndex, true)
+                array.set(candidateDemandLows, candidateIndex, demandLow)
+                array.set(candidateDemandBars, candidateIndex, demandBar)
+
+    bool legReady = not requireSellerControlLeg or sellerLegConfirmed
+    bool expired = bar_index - supplyOriginBar > maxHiddenAge
+    bool legFormationExpired = requireSellerControlLeg and not sellerLegConfirmed and
+         bar_index - supplyOriginBar > maxSellerLegBars + demandPivotRight
+    bool closesAboveSupply = close > supplyTop + atr * breakBufferAtr
+    if signalBarReady
+        breakCount := legReady and closesAboveSupply ? breakCount + 1 : 0
+        array.set(candidateBreakCounts, candidateIndex, breakCount)
+
+    float bullishBody = close - open
+    bool breakBodyOk = bullishBody >= atr * minBreakBodyAtr
+    bool breakVolumeOk = not requireBreakVolume or
+         (not na(volume) and not na(volumeAverage) and volume >= volumeAverage * minBreakRelativeVolume)
+    bool breakTrendDataReady = not na(fastEma) and not na(slowEma) and not na(sessionVwap)
+    bool breakAboveTrend = close > fastEma and close > slowEma and close > sessionVwap
+    bool breakBullishStack = fastEma > slowEma
+    bool breakRisingEmas = not requireRisingEmas or
+         (not na(fastEma[trendSlopeBars]) and not na(slowEma[trendSlopeBars]) and
+         fastEma > fastEma[trendSlopeBars] and slowEma > slowEma[trendSlopeBars])
+    bool breakRisingVwap = not requireRisingVwap or
+         (not na(sessionVwap[trendSlopeBars]) and sessionVwap > sessionVwap[trendSlopeBars])
+    bool breakTrendOk = not requireBullishTrend or
+         (breakTrendDataReady and breakAboveTrend and breakBullishStack and breakRisingEmas and breakRisingVwap)
+
+    bool qualifiedFlip = signalBarReady and legReady and breakCount >= requiredBreakCloses and
+         breakBodyOk and breakVolumeOk and breakTrendOk
+    bool failedBreakQuality = signalBarReady and legReady and breakCount >= requiredBreakCloses and
+         not (breakBodyOk and breakVolumeOk and breakTrendOk)
+
+    // A weak breakout sequence does not erase proven supply. Reset confirmation and
+    // let the hidden candidate wait for a later, higher-quality break.
+    if failedBreakQuality
+        breakCount := 0
+        array.set(candidateBreakCounts, candidateIndex, breakCount)
+
+    if qualifiedFlip
+        box newFlipBox = box.new(
+             left = drawFromSupplyOrigin ? supplyStructureStartBar : bar_index,
+             top = supplyTop,
+             right = bar_index + 1,
+             bottom = supplyBottom,
+             xloc = xloc.bar_index,
+             border_color = hiddenDrawingColor,
+             border_width = 1,
+             bgcolor = hiddenDrawingColor,
+             text = "",
+             text_color = hiddenDrawingColor,
+             text_size = size.normal,
+             text_halign = text.align_left)
+
+        box newLegBox = na
+        if sellerLegConfirmed and not na(demandLow) and not na(demandBar)
+            newLegBox := box.new(
+                 left = supplyStructureStartBar,
+                 top = supplyTop,
+                 right = demandBar + 1,
+                 bottom = demandLow,
+                 xloc = xloc.bar_index,
+                 border_color = hiddenDrawingColor,
+                 border_width = 1,
+                 bgcolor = hiddenDrawingColor,
+                 text = "",
+                 text_color = hiddenDrawingColor,
+                 text_size = size.normal,
+                 text_halign = text.align_left)
+
+        array.push(flipBoxes, newFlipBox)
+        array.push(flipLegBoxes, newLegBox)
+        array.push(flipTops, supplyTop)
+        array.push(flipBottoms, supplyBottom)
+        array.push(flipDemandLows, demandLow)
+        array.push(flipDemandBars, demandBar)
+        array.push(flipConfirmationBars, bar_index)
+        array.push(flipRetested, false)
+        array.push(flipActive, true)
+        flipDetected := true
+
+        if sendDynamicAlerts
+            string legDetails = sellerLegConfirmed ?
+                 " | Supply structure: " + str.tostring(demandBar - supplyStructureStartBar + 1) + " bars" +
+                 " | Demand low: " + str.tostring(demandLow, format.mintick) : ""
+            alert("Supply→Demand flip confirmed | " + syminfo.ticker + " " + timeframe.period +
+                 " | Zone: " + str.tostring(supplyBottom, format.mintick) + " - " +
+                 str.tostring(supplyTop, format.mintick) + legDetails, alert.freq_once_per_bar_close)
+
+        array.remove(candidateTops, candidateIndex)
+        array.remove(candidateBottoms, candidateIndex)
+        array.remove(candidateLegReferences, candidateIndex)
+        array.remove(candidateOriginRelativeVolumes, candidateIndex)
+        array.remove(candidateOriginBars, candidateIndex)
+        array.remove(candidateStructureStartBars, candidateIndex)
+        array.remove(candidateOriginAtrs, candidateIndex)
+        array.remove(candidateTrackedLows, candidateIndex)
+        array.remove(candidateLegConfirmed, candidateIndex)
+        array.remove(candidateDemandLows, candidateIndex)
+        array.remove(candidateDemandBars, candidateIndex)
+        array.remove(candidateBreakCounts, candidateIndex)
+
+        if array.size(flipBoxes) > maxDisplayedZones
+            box oldestBox = array.shift(flipBoxes)
+            box oldestLegBox = array.shift(flipLegBoxes)
+            box.delete(oldestBox)
+            if not na(oldestLegBox)
+                box.delete(oldestLegBox)
+            array.shift(flipTops)
+            array.shift(flipBottoms)
+            array.shift(flipDemandLows)
+            array.shift(flipDemandBars)
+            array.shift(flipConfirmationBars)
+            array.shift(flipRetested)
+            array.shift(flipActive)
+    else if expired or legFormationExpired
+        array.remove(candidateTops, candidateIndex)
+        array.remove(candidateBottoms, candidateIndex)
+        array.remove(candidateLegReferences, candidateIndex)
+        array.remove(candidateOriginRelativeVolumes, candidateIndex)
+        array.remove(candidateOriginBars, candidateIndex)
+        array.remove(candidateStructureStartBars, candidateIndex)
+        array.remove(candidateOriginAtrs, candidateIndex)
+        array.remove(candidateTrackedLows, candidateIndex)
+        array.remove(candidateLegConfirmed, candidateIndex)
+        array.remove(candidateDemandLows, candidateIndex)
+        array.remove(candidateDemandBars, candidateIndex)
+        array.remove(candidateBreakCounts, candidateIndex)
+
+    candidateIndex -= 1
+
+// ───────── Extend, retest, and close zone lifecycles ─────────
+int zoneIndex = 0
+while zoneIndex < array.size(flipBoxes)
+    box zoneBox = array.get(flipBoxes, zoneIndex)
+    box sellerLegBox = array.get(flipLegBoxes, zoneIndex)
+    float zoneTop = array.get(flipTops, zoneIndex)
+    float zoneBottom = array.get(flipBottoms, zoneIndex)
+    float sellerLegDemandLow = array.get(flipDemandLows, zoneIndex)
+    int sellerLegDemandBar = array.get(flipDemandBars, zoneIndex)
+    int confirmationBar = array.get(flipConfirmationBars, zoneIndex)
+    bool alreadyRetested = array.get(flipRetested, zoneIndex)
+    bool isActive = array.get(flipActive, zoneIndex)
+    bool removed = false
+
+    if isActive
+        box.set_right(zoneBox, bar_index + 1)
+        float invalidationThreshold = zoneBottom - atr * invalidationBufferAtr
+        bool invalidated = invalidationMode == "Close" ? close < invalidationThreshold : low < invalidationThreshold
+
+        if signalBarReady and invalidated and bar_index > confirmationBar
+            invalidationDetected := true
+
+            // A zone that fails before its first retest must never become visible.
+            if not alreadyRetested
+                if sendDynamicAlerts
+                    alert("Supply→Demand zone failed before first retest | " + syminfo.ticker + " " + timeframe.period +
+                         " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
+                         str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
+                box.delete(zoneBox)
+                if not na(sellerLegBox)
+                    box.delete(sellerLegBox)
+                array.remove(flipBoxes, zoneIndex)
+                array.remove(flipLegBoxes, zoneIndex)
+                array.remove(flipTops, zoneIndex)
+                array.remove(flipBottoms, zoneIndex)
+                array.remove(flipDemandLows, zoneIndex)
+                array.remove(flipDemandBars, zoneIndex)
+                array.remove(flipConfirmationBars, zoneIndex)
+                array.remove(flipRetested, zoneIndex)
+                array.remove(flipActive, zoneIndex)
+                removed := true
+            else
+                // The retest was valid when it occurred. Freeze that green history at the
+                // later break and mark the failure separately instead of repainting it gray.
+                array.set(flipActive, zoneIndex, false)
+                laterBreakDetected := true
+                box.set_right(zoneBox, bar_index)
+                box.set_bgcolor(zoneBox, activeFill)
+                box.set_border_color(zoneBox, activeBorder)
+                box.set_text(zoneBox, "S→D • valid retest • later broken")
+                box.set_text_color(zoneBox, invalidTextColor)
+                if sendDynamicAlerts
+                    alert("Retested supply→demand zone later broken | " + syminfo.ticker + " " + timeframe.period +
+                         " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
+                         str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
+        else
+            bool intersectsZone = low <= zoneTop and high >= zoneBottom
+            bool firstRetest = signalBarReady and bar_index > confirmationBar and intersectsZone and not alreadyRetested
+            if firstRetest
+                array.set(flipRetested, zoneIndex, true)
+                firstRetestDetected := true
+                box.set_bgcolor(zoneBox, activeFill)
+                box.set_border_color(zoneBox, activeBorder)
+                box.set_text_color(zoneBox, validTextColor)
+                box.set_text(zoneBox, "S→D • retested")
+                if showSellerControlLeg and not na(sellerLegBox)
+                    box.set_bgcolor(sellerLegBox, sellerLegFill)
+                    box.set_border_color(sellerLegBox, sellerLegBorder)
+                    box.set_text_color(sellerLegBox, sellerLegBorder)
+                    box.set_text(sellerLegBox, "Supply structure | " +
+                         str.tostring(sellerLegDemandBar - box.get_left(sellerLegBox) + 1) + " bars | demand " +
+                         str.tostring(sellerLegDemandLow, format.mintick))
+                if sendDynamicAlerts
+                    alert("Supply→Demand first retest | " + syminfo.ticker + " " + timeframe.period +
+                         " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
+                         str.tostring(zoneTop, format.mintick) +
+                         (not na(sellerLegDemandLow) ? " | Structure demand: " +
+                         str.tostring(sellerLegDemandLow, format.mintick) : ""), alert.freq_once_per_bar_close)
+
+    if not removed
+        zoneIndex += 1
+
+// ───────────────────── Markers and alerts ─────────────────────
+plotshape(showFlipMarkers and firstRetestDetected, title = "Retested supply flipped to demand", style = shape.labelup,
+     location = location.belowbar, color = color.new(color.lime, 0), text = "S→D", textcolor = color.black, size = size.normal)
+plotshape(showRetestMarkers and firstRetestDetected, title = "First flipped-demand retest", style = shape.circle,
+     location = location.belowbar, color = color.new(color.aqua, 0), size = size.normal)
+plotshape(showLaterBreakMarkers and laterBreakDetected, title = "Retested flipped demand later broken", style = shape.xcross,
+     location = location.belowbar, color = invalidTextColor, text = "INVALID", textcolor = invalidTextColor, size = size.normal)
+
+alertcondition(flipDetected, title = "Supply flipped to demand",
+     message = "A supply zone flipped to demand on {{ticker}} {{interval}}.")
+alertcondition(firstRetestDetected, title = "First retest of flipped demand",
+     message = "Price is making its first retest of a supply-to-demand flip zone on {{ticker}} {{interval}}.")
+alertcondition(invalidationDetected, title = "Flipped demand invalidated",
+     message = "A supply-to-demand flip zone was invalidated on {{ticker}} {{interval}}.")
+alertcondition(laterBreakDetected, title = "Retested flipped demand later broken",
+     message = "A successfully retested supply-to-demand zone was later broken on {{ticker}} {{interval}}.")

@@ -85,10 +85,11 @@ def get_dynamic_symbols_data_from_period(
         )
 
         positive_data = historical_data[historical_data["Close"] > historical_data["Open"]] # type: ignore
+        positive_data = historical_data
         for symbol in symbols_to_download:
             low_to_high = {}
             filtered_data_by_price = positive_data.Low[symbol][
-                (positive_data.Low[symbol] > 1)
+                (positive_data.Low[symbol] > 1) & (positive_data.Volume[symbol] > 10000000)
             ]
 
             for date, stock_low_price in filtered_data_by_price.items():
