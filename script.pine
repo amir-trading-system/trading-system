@@ -628,11 +628,5 @@ plotshape(showRetestMarkers and firstRetestDetected, title = "First flipped-dema
 plotshape(showLaterBreakMarkers and laterBreakDetected, title = "Retested flipped demand later broken", style = shape.xcross,
      location = location.belowbar, color = invalidTextColor, text = "INVALID", textcolor = invalidTextColor, size = size.normal)
 
-alertcondition(flipDetected, title = "Supply flipped to demand",
-     message = "A supply zone flipped to demand on {{ticker}} {{interval}}.")
 alertcondition(firstRetestDetected, title = "First retest of flipped demand",
      message = "Price is making its first retest of a supply-to-demand flip zone on {{ticker}} {{interval}}.")
-alertcondition(invalidationDetected, title = "Flipped demand invalidated",
-     message = "A supply-to-demand flip zone was invalidated on {{ticker}} {{interval}}.")
-alertcondition(laterBreakDetected, title = "Retested flipped demand later broken",
-     message = "A successfully retested supply-to-demand zone was later broken on {{ticker}} {{interval}}.")
