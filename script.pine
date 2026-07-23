@@ -1,16 +1,17 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.8 • Multi-Bar Supply Structures]", overlay = true, max_boxes_count = 200, max_labels_count = 100)
+indicator("Bullish Supply→Demand Flip Zones [v6.9 • Supply Flips + Continuation Bases]", overlay = true, max_boxes_count = 200, max_labels_count = 100)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
 
-// This indicator detects only bullish role-reversal zones:
+// This indicator detects bullish demand-retest zones from supply flips and continuation bases:
 //   1. A rejection pivot defines the actionable price band and may expand backward into a multi-bar supply structure.
 //   2. The seller-control structure must terminate at confirmed demand.
 //   3. The upper supply remains hidden until a high-quality bullish break confirms.
 //   4. After confirmation, all drawings stay hidden while retest logic remains active.
 //   5. The full supply/control structure, demand box, and S→D marker appear only on the first valid retest.
-//   6. A later failure ends the active zone without rewriting the successful retest or structure.
+//   6. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
+//   7. A later failure ends the active zone without rewriting the successful retest or structure.
 
 // ─────────────────────── Inputs ─────────────────────────
 groupSupply = "1. Hidden supply qualification"
@@ -52,6 +53,31 @@ compactMaxSellerLegBars = input.int(2, "Compact seller-leg maximum bars", minval
 compactDemandRightBars = input.int(2, "Compact demand confirmation bars", minval = 1, maxval = 5, group = groupSellerLeg)
 minCompactSupplyRelativeVolume = input.float(2.00, "Compact-leg supply minimum relative volume", minval = 1.0, step = 0.25, group = groupSellerLeg,
      tooltip = "Keeps compact pullbacks selective. SDOT 2026-07-17 07:09 measures approximately 3.87x average volume.")
+
+groupContinuation = "1c. Bullish continuation-base zones"
+enableContinuationBases = input.bool(true, "Detect bullish continuation bases", group = groupContinuation,
+     tooltip = "Adds a separate live-safe path for compact, high-volume bullish shelves that immediately launch higher. It does not weaken the supply-flip rules.")
+continuationMinBaseBars = input.int(3, "Minimum base bars", minval = 2, maxval = 8, group = groupContinuation)
+continuationMaxBaseBars = input.int(5, "Maximum base bars", minval = 2, maxval = 10, group = groupContinuation,
+     tooltip = "The detector tests the longest qualifying base first. Keep this at or above Minimum base bars.")
+continuationZoneFloor = input.string("Lowest close", "Continuation-zone lower boundary",
+     options = ["Lowest close", "Highest body low"], group = groupContinuation,
+     tooltip = "Lowest close captures the full accepted shelf. Highest body low creates a narrower, more conservative zone.")
+continuationMinAverageRelativeVolume = input.float(1.50, "Base minimum average relative volume", minval = 0.1, step = 0.25, group = groupContinuation)
+continuationMinBarRelativeVolume = input.float(0.80, "Each base bar minimum relative volume", minval = 0.1, step = 0.10, group = groupContinuation)
+continuationHighVolumeThreshold = input.float(1.50, "High-volume base-bar threshold", minval = 0.1, step = 0.25, group = groupContinuation)
+continuationMinHighVolumeBars = input.int(2, "Minimum high-volume bars in base", minval = 1, maxval = 8, group = groupContinuation)
+continuationMaxZoneWidthAtr = input.float(2.25, "Maximum continuation-zone width (ATR)", minval = 0.25, step = 0.25, group = groupContinuation)
+continuationMaxCloseSpreadAtr = input.float(1.50, "Maximum base close spread (ATR)", minval = 0.10, step = 0.10, group = groupContinuation)
+continuationMaxNetPullbackAtr = input.float(0.25, "Maximum first-to-last close pullback (ATR)", minval = 0.0, step = 0.05, group = groupContinuation,
+     tooltip = "The last base close may sit slightly below the first close, but the shelf cannot materially roll over.")
+continuationPriorImpulseLookback = input.int(5, "Prior impulse lookback bars", minval = 1, maxval = 30, group = groupContinuation)
+continuationMinPriorImpulseAtr = input.float(1.50, "Minimum prior impulse into base (ATR)", minval = 0.0, step = 0.25, group = groupContinuation)
+continuationBreakBufferAtr = input.float(0.05, "Continuation close-above-base buffer (ATR)", minval = 0.0, step = 0.05, group = groupContinuation)
+continuationMinBreakBodyAtr = input.float(0.50, "Continuation breakout minimum body (ATR)", minval = 0.0, step = 0.05, group = groupContinuation)
+continuationMinBreakRelativeVolume = input.float(1.20, "Continuation breakout minimum relative volume", minval = 0.1, step = 0.10, group = groupContinuation)
+continuationMaxBreakUpperWickAtr = input.float(0.50, "Continuation breakout maximum upper wick (ATR)", minval = 0.0, step = 0.10, group = groupContinuation)
+continuationDuplicateWindowBars = input.int(10, "Duplicate suppression window (bars)", minval = 1, maxval = 100, group = groupContinuation)
 
 groupTrend = "2. Bullish-trend filters"
 requireBullishTrend = input.bool(true, "Require bullish trend context", group = groupTrend)
@@ -101,7 +127,10 @@ invalidTextColor = input.color(color.new(color.red, 0), "Invalid-zone text/marke
 showSellerControlLeg = input.bool(true, "Show full supply/control structure after retest", group = groupDisplay)
 sellerLegFill = input.color(color.new(color.red, 91), "Supply/control structure fill", group = groupDisplay)
 sellerLegBorder = input.color(color.new(color.red, 55), "Supply/control structure border", group = groupDisplay)
-showFlipMarkers = input.bool(true, "Show S→D marker on first retest", group = groupDisplay)
+showContinuationBaseStructure = input.bool(true, "Show continuation-base structure after retest", group = groupDisplay)
+continuationBaseFill = input.color(color.new(color.aqua, 90), "Continuation-base structure fill", group = groupDisplay)
+continuationBaseBorder = input.color(color.new(color.aqua, 45), "Continuation-base structure border", group = groupDisplay)
+showFlipMarkers = input.bool(true, "Show zone-type marker on first retest", group = groupDisplay)
 showRetestMarkers = input.bool(true, "Show first-retest markers", group = groupDisplay)
 showLaterBreakMarkers = input.bool(true, "Show red marker when a retested zone later breaks", group = groupDisplay)
 drawFromSupplyOrigin = input.bool(true, "Draw from original supply candle", group = groupDisplay)
@@ -125,6 +154,9 @@ bool signalBarReady = not confirmedBarsOnly or barstate.isconfirmed
 plot(showTrendAverages ? fastEma : na, title = "EMA 9", color = color.new(color.teal, 0), linewidth = 1)
 plot(showTrendAverages ? slowEma : na, title = "EMA 20", color = color.new(color.orange, 0), linewidth = 1)
 plot(showTrendAverages ? sessionVwap : na, title = "Session VWAP", color = color.new(color.purple, 0), linewidth = 1)
+
+int ZONE_KIND_SUPPLY_FLIP = 0
+int ZONE_KIND_CONTINUATION_BASE = 1
 
 // Hidden supply candidates.
 var array<float> candidateTops = array.new<float>()
@@ -150,9 +182,12 @@ var array<int> flipDemandBars = array.new<int>()
 var array<int> flipConfirmationBars = array.new<int>()
 var array<bool> flipRetested = array.new<bool>()
 var array<bool> flipActive = array.new<bool>()
+var array<int> flipZoneKinds = array.new<int>()
 
 bool flipDetected = false
 bool firstRetestDetected = false
+bool supplyFlipRetestDetected = false
+bool continuationBaseRetestDetected = false
 bool invalidationDetected = false
 bool laterBreakDetected = false
 color hiddenDrawingColor = color.new(color.black, 100)
@@ -486,6 +521,7 @@ while candidateIndex >= 0
         array.push(flipConfirmationBars, bar_index)
         array.push(flipRetested, false)
         array.push(flipActive, true)
+        array.push(flipZoneKinds, ZONE_KIND_SUPPLY_FLIP)
         flipDetected := true
 
         if sendDynamicAlerts
@@ -522,6 +558,7 @@ while candidateIndex >= 0
             array.shift(flipConfirmationBars)
             array.shift(flipRetested)
             array.shift(flipActive)
+            array.shift(flipZoneKinds)
     else if expired or legFormationExpired
         array.remove(candidateTops, candidateIndex)
         array.remove(candidateBottoms, candidateIndex)
@@ -538,6 +575,184 @@ while candidateIndex >= 0
 
     candidateIndex -= 1
 
+// ───────────── Confirm bullish continuation-base zones ─────────────
+// This path is intentionally separate from supply qualification. It looks for:
+//   prior bullish impulse → compact high-volume acceptance shelf → decisive close above the shelf.
+// The resulting demand zone remains hidden until its first later retest, matching the supply-flip lifecycle.
+if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= continuationMinBaseBars and
+     bar_index > continuationMaxBaseBars + continuationPriorImpulseLookback + trendSlopeBars and not na(atr)
+    bool continuationBreakTrendDataReady = not na(fastEma) and not na(slowEma) and not na(sessionVwap)
+    bool continuationBreakAboveTrend = close > fastEma and close > slowEma and close > sessionVwap
+    bool continuationBreakBullishStack = fastEma > slowEma
+    bool continuationBreakRisingEmas = not requireRisingEmas or
+         (not na(fastEma[trendSlopeBars]) and not na(slowEma[trendSlopeBars]) and
+         fastEma > fastEma[trendSlopeBars] and slowEma > slowEma[trendSlopeBars])
+    bool continuationBreakRisingVwap = not requireRisingVwap or
+         (not na(sessionVwap[trendSlopeBars]) and sessionVwap > sessionVwap[trendSlopeBars])
+    bool continuationBreakTrendOk = not requireBullishTrend or
+         (continuationBreakTrendDataReady and continuationBreakAboveTrend and continuationBreakBullishStack and
+         continuationBreakRisingEmas and continuationBreakRisingVwap)
+
+    int selectedBaseBars = 0
+    float selectedBaseTop = na
+    float selectedBaseBottom = na
+    int selectedBaseStartBar = na
+    int selectedBaseEndBar = na
+
+    int continuationLengthsToTest = continuationMaxBaseBars - continuationMinBaseBars
+    for continuationLengthIndex = 0 to continuationLengthsToTest
+        int testedBaseBars = continuationMaxBaseBars - continuationLengthIndex
+        if selectedBaseBars == 0 and bar_index > testedBaseBars + continuationPriorImpulseLookback
+            float baseAtr = atr[1]
+            float baseTop = na
+            float baseLowestClose = na
+            float baseHighestClose = na
+            float baseHighestBodyLow = na
+            float relativeVolumeSum = 0.0
+            int relativeVolumeSamples = 0
+            int highVolumeBaseBars = 0
+            bool eachBaseBarVolumeOk = true
+            bool eachBaseBarTrendOk = true
+            bool baseDataReady = not na(baseAtr) and baseAtr > 0.0
+
+            for baseOffset = 1 to testedBaseBars
+                float baseBodyLow = math.min(open[baseOffset], close[baseOffset])
+                float baseVolumeAverage = volumeAverage[baseOffset]
+                float baseRelativeVolume = not na(volume[baseOffset]) and not na(baseVolumeAverage) and
+                     baseVolumeAverage > 0.0 ? volume[baseOffset] / baseVolumeAverage : na
+
+                baseTop := na(baseTop) ? high[baseOffset] : math.max(baseTop, high[baseOffset])
+                baseLowestClose := na(baseLowestClose) ? close[baseOffset] : math.min(baseLowestClose, close[baseOffset])
+                baseHighestClose := na(baseHighestClose) ? close[baseOffset] : math.max(baseHighestClose, close[baseOffset])
+                baseHighestBodyLow := na(baseHighestBodyLow) ? baseBodyLow : math.max(baseHighestBodyLow, baseBodyLow)
+
+                bool baseBarDataReady = not na(high[baseOffset]) and not na(close[baseOffset]) and
+                     not na(fastEma[baseOffset]) and not na(slowEma[baseOffset]) and not na(sessionVwap[baseOffset]) and
+                     not na(baseRelativeVolume)
+                baseDataReady := baseDataReady and baseBarDataReady
+                if not na(baseRelativeVolume)
+                    relativeVolumeSum += baseRelativeVolume
+                    relativeVolumeSamples += 1
+                    highVolumeBaseBars += baseRelativeVolume >= continuationHighVolumeThreshold ? 1 : 0
+                eachBaseBarVolumeOk := eachBaseBarVolumeOk and not na(baseRelativeVolume) and
+                     baseRelativeVolume >= continuationMinBarRelativeVolume
+                eachBaseBarTrendOk := eachBaseBarTrendOk and (not requireBullishTrend or
+                     (close[baseOffset] > slowEma[baseOffset] and close[baseOffset] > sessionVwap[baseOffset] and
+                     fastEma[baseOffset] > slowEma[baseOffset]))
+
+            float baseBottom = continuationZoneFloor == "Lowest close" ? baseLowestClose : baseHighestBodyLow
+            float averageBaseRelativeVolume = relativeVolumeSamples == testedBaseBars ?
+                 relativeVolumeSum / testedBaseBars : na
+            float baseZoneWidth = baseTop - baseBottom
+            float baseCloseSpread = baseHighestClose - baseLowestClose
+            bool validBaseZone = baseDataReady and not na(baseBottom) and baseTop > baseBottom and
+                 baseZoneWidth <= baseAtr * continuationMaxZoneWidthAtr and
+                 baseCloseSpread <= baseAtr * continuationMaxCloseSpreadAtr
+            bool baseVolumeOk = eachBaseBarVolumeOk and not na(averageBaseRelativeVolume) and
+                 averageBaseRelativeVolume >= continuationMinAverageRelativeVolume and
+                 highVolumeBaseBars >= math.min(continuationMinHighVolumeBars, testedBaseBars)
+            bool baseNetProgressOk = close[1] >= close[testedBaseBars] - baseAtr * continuationMaxNetPullbackAtr
+
+            float priorImpulseLow = na
+            for priorOffset = testedBaseBars + 1 to testedBaseBars + continuationPriorImpulseLookback
+                priorImpulseLow := na(priorImpulseLow) ? low[priorOffset] : math.min(priorImpulseLow, low[priorOffset])
+            bool priorImpulseOk = continuationMinPriorImpulseAtr <= 0.0 or
+                 (not na(priorImpulseLow) and baseBottom - priorImpulseLow >= baseAtr * continuationMinPriorImpulseAtr)
+
+            bool baseQualified = validBaseZone and baseVolumeOk and eachBaseBarTrendOk and
+                 baseNetProgressOk and priorImpulseOk
+            if baseQualified
+                selectedBaseBars := testedBaseBars
+                selectedBaseTop := baseTop
+                selectedBaseBottom := baseBottom
+                selectedBaseStartBar := bar_index - testedBaseBars
+                selectedBaseEndBar := bar_index - 1
+
+    if selectedBaseBars > 0
+        float continuationBreakBody = close - open
+        float continuationBreakUpperWick = high - math.max(open, close)
+        bool continuationClosesAboveBase = close > selectedBaseTop + atr * continuationBreakBufferAtr
+        bool continuationBreakBodyOk = continuationBreakBody >= atr * continuationMinBreakBodyAtr
+        bool continuationBreakVolumeOk = not na(volume) and not na(volumeAverage) and volumeAverage > 0.0 and
+             volume / volumeAverage >= continuationMinBreakRelativeVolume
+        bool continuationBreakWickOk = continuationBreakUpperWick <= atr * continuationMaxBreakUpperWickAtr
+        bool continuationBreakQualified = continuationClosesAboveBase and continuationBreakBodyOk and
+             continuationBreakVolumeOk and continuationBreakWickOk and continuationBreakTrendOk
+
+        bool continuationDuplicate = false
+        int continuationDuplicateIndex = array.size(flipTops) - 1
+        while continuationDuplicateIndex >= 0
+            float oldZoneTop = array.get(flipTops, continuationDuplicateIndex)
+            float oldZoneBottom = array.get(flipBottoms, continuationDuplicateIndex)
+            int oldConfirmationBar = array.get(flipConfirmationBars, continuationDuplicateIndex)
+            bool continuationOverlap = selectedBaseBottom <= oldZoneTop and selectedBaseTop >= oldZoneBottom
+            bool continuationCloseInTime = bar_index - oldConfirmationBar <= continuationDuplicateWindowBars
+            if continuationOverlap and continuationCloseInTime
+                continuationDuplicate := true
+            continuationDuplicateIndex -= 1
+
+        if continuationBreakQualified and not continuationDuplicate
+            box newContinuationZoneBox = box.new(
+                 left = drawFromSupplyOrigin ? selectedBaseStartBar : bar_index,
+                 top = selectedBaseTop,
+                 right = bar_index + 1,
+                 bottom = selectedBaseBottom,
+                 xloc = xloc.bar_index,
+                 border_color = hiddenDrawingColor,
+                 border_width = 1,
+                 bgcolor = hiddenDrawingColor,
+                 text = "",
+                 text_color = hiddenDrawingColor,
+                 text_size = size.normal,
+                 text_halign = text.align_left)
+
+            box newContinuationBaseBox = box.new(
+                 left = selectedBaseStartBar,
+                 top = selectedBaseTop,
+                 right = selectedBaseEndBar + 1,
+                 bottom = selectedBaseBottom,
+                 xloc = xloc.bar_index,
+                 border_color = hiddenDrawingColor,
+                 border_width = 1,
+                 bgcolor = hiddenDrawingColor,
+                 text = "",
+                 text_color = hiddenDrawingColor,
+                 text_size = size.normal,
+                 text_halign = text.align_left)
+
+            array.push(flipBoxes, newContinuationZoneBox)
+            array.push(flipLegBoxes, newContinuationBaseBox)
+            array.push(flipTops, selectedBaseTop)
+            array.push(flipBottoms, selectedBaseBottom)
+            array.push(flipDemandLows, selectedBaseBottom)
+            array.push(flipDemandBars, selectedBaseEndBar)
+            array.push(flipConfirmationBars, bar_index)
+            array.push(flipRetested, false)
+            array.push(flipActive, true)
+            array.push(flipZoneKinds, ZONE_KIND_CONTINUATION_BASE)
+            flipDetected := true
+
+            if sendDynamicAlerts
+                alert("Bullish continuation base confirmed | " + syminfo.ticker + " " + timeframe.period +
+                     " | Base bars: " + str.tostring(selectedBaseBars) +
+                     " | Zone: " + str.tostring(selectedBaseBottom, format.mintick) + " - " +
+                     str.tostring(selectedBaseTop, format.mintick), alert.freq_once_per_bar_close)
+
+            if array.size(flipBoxes) > maxDisplayedZones
+                box oldestBox = array.shift(flipBoxes)
+                box oldestLegBox = array.shift(flipLegBoxes)
+                box.delete(oldestBox)
+                if not na(oldestLegBox)
+                    box.delete(oldestLegBox)
+                array.shift(flipTops)
+                array.shift(flipBottoms)
+                array.shift(flipDemandLows)
+                array.shift(flipDemandBars)
+                array.shift(flipConfirmationBars)
+                array.shift(flipRetested)
+                array.shift(flipActive)
+                array.shift(flipZoneKinds)
+
 // ───────── Extend, retest, and close zone lifecycles ─────────
 int zoneIndex = 0
 while zoneIndex < array.size(flipBoxes)
@@ -550,6 +765,8 @@ while zoneIndex < array.size(flipBoxes)
     int confirmationBar = array.get(flipConfirmationBars, zoneIndex)
     bool alreadyRetested = array.get(flipRetested, zoneIndex)
     bool isActive = array.get(flipActive, zoneIndex)
+    int zoneKind = array.get(flipZoneKinds, zoneIndex)
+    bool isContinuationBase = zoneKind == ZONE_KIND_CONTINUATION_BASE
     bool removed = false
 
     if isActive
@@ -563,7 +780,9 @@ while zoneIndex < array.size(flipBoxes)
             // A zone that fails before its first retest must never become visible.
             if not alreadyRetested
                 if sendDynamicAlerts
-                    alert("Supply→Demand zone failed before first retest | " + syminfo.ticker + " " + timeframe.period +
+                    string failedZoneName = isContinuationBase ? "Continuation-base zone failed before first retest" :
+                         "Supply→Demand zone failed before first retest"
+                    alert(failedZoneName + " | " + syminfo.ticker + " " + timeframe.period +
                          " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
                          str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
                 box.delete(zoneBox)
@@ -578,6 +797,7 @@ while zoneIndex < array.size(flipBoxes)
                 array.remove(flipConfirmationBars, zoneIndex)
                 array.remove(flipRetested, zoneIndex)
                 array.remove(flipActive, zoneIndex)
+                array.remove(flipZoneKinds, zoneIndex)
                 removed := true
             else
                 // The retest was valid when it occurred. Freeze that green history at the
@@ -587,10 +807,13 @@ while zoneIndex < array.size(flipBoxes)
                 box.set_right(zoneBox, bar_index)
                 box.set_bgcolor(zoneBox, activeFill)
                 box.set_border_color(zoneBox, activeBorder)
-                box.set_text(zoneBox, "S→D • valid retest • later broken")
+                box.set_text(zoneBox, isContinuationBase ?
+                     "Continuation base • valid retest • later broken" : "S→D • valid retest • later broken")
                 box.set_text_color(zoneBox, invalidTextColor)
                 if sendDynamicAlerts
-                    alert("Retested supply→demand zone later broken | " + syminfo.ticker + " " + timeframe.period +
+                    string laterBreakName = isContinuationBase ? "Retested continuation-base zone later broken" :
+                         "Retested supply→demand zone later broken"
+                    alert(laterBreakName + " | " + syminfo.ticker + " " + timeframe.period +
                          " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
                          str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
         else
@@ -599,34 +822,50 @@ while zoneIndex < array.size(flipBoxes)
             if firstRetest
                 array.set(flipRetested, zoneIndex, true)
                 firstRetestDetected := true
+                supplyFlipRetestDetected := supplyFlipRetestDetected or not isContinuationBase
+                continuationBaseRetestDetected := continuationBaseRetestDetected or isContinuationBase
                 box.set_bgcolor(zoneBox, activeFill)
                 box.set_border_color(zoneBox, activeBorder)
                 box.set_text_color(zoneBox, validTextColor)
-                box.set_text(zoneBox, "S→D • retested")
-                if showSellerControlLeg and not na(sellerLegBox)
-                    box.set_bgcolor(sellerLegBox, sellerLegFill)
-                    box.set_border_color(sellerLegBox, sellerLegBorder)
-                    box.set_text_color(sellerLegBox, sellerLegBorder)
-                    box.set_text(sellerLegBox, "Supply structure | " +
-                         str.tostring(sellerLegDemandBar - box.get_left(sellerLegBox) + 1) + " bars | demand " +
+                box.set_text(zoneBox, isContinuationBase ? "Continuation base • retested" : "S→D • retested")
+                bool showOriginStructure = isContinuationBase ? showContinuationBaseStructure : showSellerControlLeg
+                if showOriginStructure and not na(sellerLegBox)
+                    color originFill = isContinuationBase ? continuationBaseFill : sellerLegFill
+                    color originBorder = isContinuationBase ? continuationBaseBorder : sellerLegBorder
+                    box.set_bgcolor(sellerLegBox, originFill)
+                    box.set_border_color(sellerLegBox, originBorder)
+                    box.set_text_color(sellerLegBox, originBorder)
+                    string originStructureName = isContinuationBase ? "Continuation base" : "Supply structure"
+                    string originLevelName = isContinuationBase ? "floor " : "demand "
+                    box.set_text(sellerLegBox, originStructureName + " | " +
+                         str.tostring(sellerLegDemandBar - box.get_left(sellerLegBox) + 1) + " bars | " + originLevelName +
                          str.tostring(sellerLegDemandLow, format.mintick))
                 if sendDynamicAlerts
-                    alert("Supply→Demand first retest | " + syminfo.ticker + " " + timeframe.period +
+                    string firstRetestName = isContinuationBase ? "Bullish continuation-base first retest" :
+                         "Supply→Demand first retest"
+                    string structureDetailName = isContinuationBase ? " | Base floor: " : " | Structure demand: "
+                    alert(firstRetestName + " | " + syminfo.ticker + " " + timeframe.period +
                          " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
                          str.tostring(zoneTop, format.mintick) +
-                         (not na(sellerLegDemandLow) ? " | Structure demand: " +
+                         (not na(sellerLegDemandLow) ? structureDetailName +
                          str.tostring(sellerLegDemandLow, format.mintick) : ""), alert.freq_once_per_bar_close)
 
     if not removed
         zoneIndex += 1
 
 // ───────────────────── Markers and alerts ─────────────────────
-plotshape(showFlipMarkers and firstRetestDetected, title = "Retested supply flipped to demand", style = shape.labelup,
+plotshape(showFlipMarkers and supplyFlipRetestDetected, title = "Retested supply flipped to demand", style = shape.labelup,
      location = location.belowbar, color = color.new(color.lime, 0), text = "S→D", textcolor = color.black, size = size.normal)
-plotshape(showRetestMarkers and firstRetestDetected, title = "First flipped-demand retest", style = shape.circle,
+plotshape(showFlipMarkers and continuationBaseRetestDetected, title = "Retested bullish continuation base", style = shape.labelup,
+     location = location.belowbar, color = color.new(color.aqua, 0), text = "BASE", textcolor = color.black, size = size.normal)
+plotshape(showRetestMarkers and firstRetestDetected, title = "First demand-zone retest", style = shape.circle,
      location = location.belowbar, color = color.new(color.aqua, 0), size = size.normal)
-plotshape(showLaterBreakMarkers and laterBreakDetected, title = "Retested flipped demand later broken", style = shape.xcross,
+plotshape(showLaterBreakMarkers and laterBreakDetected, title = "Retested demand zone later broken", style = shape.xcross,
      location = location.belowbar, color = invalidTextColor, text = "INVALID", textcolor = invalidTextColor, size = size.normal)
 
-alertcondition(firstRetestDetected, title = "First retest of flipped demand",
+alertcondition(firstRetestDetected, title = "First retest of bullish demand zone",
+     message = "Price is making its first retest of a confirmed bullish demand zone on {{ticker}} {{interval}}.")
+alertcondition(supplyFlipRetestDetected, title = "First retest of flipped supply",
      message = "Price is making its first retest of a supply-to-demand flip zone on {{ticker}} {{interval}}.")
+alertcondition(continuationBaseRetestDetected, title = "First retest of continuation base",
+     message = "Price is making its first retest of a bullish continuation-base zone on {{ticker}} {{interval}}.")
