@@ -1,5 +1,5 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.9 • Supply Flips + Continuation Bases]", overlay = true, max_boxes_count = 200, max_labels_count = 100)
+indicator("Bullish Supply→Demand Flip Zones [v6.16 • Session Labels + All S→D Retests]", overlay = true, max_bars_back = 5000, max_boxes_count = 200, max_labels_count = 250)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
@@ -9,9 +9,10 @@ plot(na, title = "Output anchor", display = display.none)
 //   2. The seller-control structure must terminate at confirmed demand.
 //   3. The upper supply remains hidden until a high-quality bullish break confirms.
 //   4. After confirmation, all drawings stay hidden while retest logic remains active.
-//   5. The full supply/control structure, demand box, and S→D marker appear only on the first valid retest.
-//   6. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
-//   7. A later failure ends the active zone without rewriting the successful retest or structure.
+//   5. The full structure and external label appear on the first valid retest.
+//   6. Every later fresh re-entry into an active S→D zone receives another S→D arrow.
+//   7. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
+//   8. A later failure ends the active zone without rewriting the successful retest or structure.
 
 // ─────────────────────── Inputs ─────────────────────────
 groupSupply = "1. Hidden supply qualification"
@@ -130,11 +131,24 @@ sellerLegBorder = input.color(color.new(color.red, 55), "Supply/control structur
 showContinuationBaseStructure = input.bool(true, "Show continuation-base structure after retest", group = groupDisplay)
 continuationBaseFill = input.color(color.new(color.aqua, 90), "Continuation-base structure fill", group = groupDisplay)
 continuationBaseBorder = input.color(color.new(color.aqua, 45), "Continuation-base structure border", group = groupDisplay)
-showFlipMarkers = input.bool(true, "Show zone-type marker on first retest", group = groupDisplay)
+showFlipMarkers = input.bool(true, "Show zone-type arrows on retests", group = groupDisplay)
+showAdditionalSupplyRetests = input.bool(true, "Mark every fresh S→D retest", group = groupDisplay,
+     tooltip = "After the first valid S→D retest, marks each later re-entry that occurs after price has first left the zone. Continuous bars inside one retest receive only one arrow.")
 showRetestMarkers = input.bool(true, "Show first-retest markers", group = groupDisplay)
 showLaterBreakMarkers = input.bool(true, "Show red marker when a retested zone later breaks", group = groupDisplay)
+zoneLeftPaddingBars = input.int(3, "Start visible area before origin (bars)", minval = 0, maxval = 20, group = groupDisplay,
+     tooltip = "Visual padding only. Moves the box left border before the true origin so it does not cover the origin candle wick. Detection and bar counts remain unchanged.")
+zoneTextLeftOffsetBars = input.int(1, "Text distance left of visible area (bars)", minval = 0, maxval = 20, group = groupDisplay,
+     tooltip = "Places the complete zone callout outside the box on its left side. The arrow tip points toward the visible zone.")
 drawFromSupplyOrigin = input.bool(true, "Draw from original supply candle", group = groupDisplay)
 showTrendAverages = input.bool(false, "Show EMA 9, EMA 20, and VWAP", group = groupDisplay)
+
+// ────────────────────── Helpers ──────────────────────
+f_origin_session_suffix(int originTimestamp) =>
+    int originHour = hour(originTimestamp, syminfo.timezone)
+    int originMinute = minute(originTimestamp, syminfo.timezone)
+    int originMinuteOfDay = originHour * 60 + originMinute
+    originMinuteOfDay < 570 ? " • PREMARKET" : originMinuteOfDay >= 960 ? " • AFTER HOURS" : ""
 
 // ────────────────────── Core calculations ──────────────────────
 float atr = ta.atr(14)
@@ -175,18 +189,22 @@ var array<int> candidateBreakCounts = array.new<int>()
 // Confirmed supply→demand zones.
 var array<box> flipBoxes = array.new<box>()
 var array<box> flipLegBoxes = array.new<box>()
+var array<label> flipTextLabels = array.new<label>()
 var array<float> flipTops = array.new<float>()
 var array<float> flipBottoms = array.new<float>()
 var array<float> flipDemandLows = array.new<float>()
 var array<int> flipDemandBars = array.new<int>()
 var array<int> flipConfirmationBars = array.new<int>()
+var array<int> flipOriginTimes = array.new<int>()
 var array<bool> flipRetested = array.new<bool>()
+var array<bool> flipWasIntersecting = array.new<bool>()
 var array<bool> flipActive = array.new<bool>()
 var array<int> flipZoneKinds = array.new<int>()
 
 bool flipDetected = false
 bool firstRetestDetected = false
 bool supplyFlipRetestDetected = false
+bool additionalSupplyFlipRetestDetected = false
 bool continuationBaseRetestDetected = false
 bool invalidationDetected = false
 bool laterBreakDetected = false
@@ -483,7 +501,7 @@ while candidateIndex >= 0
 
     if qualifiedFlip
         box newFlipBox = box.new(
-             left = drawFromSupplyOrigin ? supplyStructureStartBar : bar_index,
+             left = drawFromSupplyOrigin ? math.max(0, supplyStructureStartBar - zoneLeftPaddingBars) : bar_index,
              top = supplyTop,
              right = bar_index + 1,
              bottom = supplyBottom,
@@ -499,7 +517,7 @@ while candidateIndex >= 0
         box newLegBox = na
         if sellerLegConfirmed and not na(demandLow) and not na(demandBar)
             newLegBox := box.new(
-                 left = supplyStructureStartBar,
+                 left = math.max(0, supplyStructureStartBar - zoneLeftPaddingBars),
                  top = supplyTop,
                  right = demandBar + 1,
                  bottom = demandLow,
@@ -514,12 +532,15 @@ while candidateIndex >= 0
 
         array.push(flipBoxes, newFlipBox)
         array.push(flipLegBoxes, newLegBox)
+        array.push(flipTextLabels, na)
         array.push(flipTops, supplyTop)
         array.push(flipBottoms, supplyBottom)
         array.push(flipDemandLows, demandLow)
         array.push(flipDemandBars, demandBar)
         array.push(flipConfirmationBars, bar_index)
+        array.push(flipOriginTimes, time[bar_index - supplyStructureStartBar])
         array.push(flipRetested, false)
+        array.push(flipWasIntersecting, false)
         array.push(flipActive, true)
         array.push(flipZoneKinds, ZONE_KIND_SUPPLY_FLIP)
         flipDetected := true
@@ -548,15 +569,20 @@ while candidateIndex >= 0
         if array.size(flipBoxes) > maxDisplayedZones
             box oldestBox = array.shift(flipBoxes)
             box oldestLegBox = array.shift(flipLegBoxes)
+            label oldestTextLabel = array.shift(flipTextLabels)
             box.delete(oldestBox)
             if not na(oldestLegBox)
                 box.delete(oldestLegBox)
+            if not na(oldestTextLabel)
+                label.delete(oldestTextLabel)
             array.shift(flipTops)
             array.shift(flipBottoms)
             array.shift(flipDemandLows)
             array.shift(flipDemandBars)
             array.shift(flipConfirmationBars)
+            array.shift(flipOriginTimes)
             array.shift(flipRetested)
+            array.shift(flipWasIntersecting)
             array.shift(flipActive)
             array.shift(flipZoneKinds)
     else if expired or legFormationExpired
@@ -693,7 +719,7 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
 
         if continuationBreakQualified and not continuationDuplicate
             box newContinuationZoneBox = box.new(
-                 left = drawFromSupplyOrigin ? selectedBaseStartBar : bar_index,
+                 left = drawFromSupplyOrigin ? math.max(0, selectedBaseStartBar - zoneLeftPaddingBars) : bar_index,
                  top = selectedBaseTop,
                  right = bar_index + 1,
                  bottom = selectedBaseBottom,
@@ -707,7 +733,7 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
                  text_halign = text.align_left)
 
             box newContinuationBaseBox = box.new(
-                 left = selectedBaseStartBar,
+                 left = math.max(0, selectedBaseStartBar - zoneLeftPaddingBars),
                  top = selectedBaseTop,
                  right = selectedBaseEndBar + 1,
                  bottom = selectedBaseBottom,
@@ -722,12 +748,15 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
 
             array.push(flipBoxes, newContinuationZoneBox)
             array.push(flipLegBoxes, newContinuationBaseBox)
+            array.push(flipTextLabels, na)
             array.push(flipTops, selectedBaseTop)
             array.push(flipBottoms, selectedBaseBottom)
             array.push(flipDemandLows, selectedBaseBottom)
             array.push(flipDemandBars, selectedBaseEndBar)
             array.push(flipConfirmationBars, bar_index)
+            array.push(flipOriginTimes, time[bar_index - selectedBaseStartBar])
             array.push(flipRetested, false)
+            array.push(flipWasIntersecting, false)
             array.push(flipActive, true)
             array.push(flipZoneKinds, ZONE_KIND_CONTINUATION_BASE)
             flipDetected := true
@@ -741,15 +770,20 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
             if array.size(flipBoxes) > maxDisplayedZones
                 box oldestBox = array.shift(flipBoxes)
                 box oldestLegBox = array.shift(flipLegBoxes)
+                label oldestTextLabel = array.shift(flipTextLabels)
                 box.delete(oldestBox)
                 if not na(oldestLegBox)
                     box.delete(oldestLegBox)
+                if not na(oldestTextLabel)
+                    label.delete(oldestTextLabel)
                 array.shift(flipTops)
                 array.shift(flipBottoms)
                 array.shift(flipDemandLows)
                 array.shift(flipDemandBars)
                 array.shift(flipConfirmationBars)
+                array.shift(flipOriginTimes)
                 array.shift(flipRetested)
+                array.shift(flipWasIntersecting)
                 array.shift(flipActive)
                 array.shift(flipZoneKinds)
 
@@ -758,12 +792,17 @@ int zoneIndex = 0
 while zoneIndex < array.size(flipBoxes)
     box zoneBox = array.get(flipBoxes, zoneIndex)
     box sellerLegBox = array.get(flipLegBoxes, zoneIndex)
+    label zoneTextLabel = array.get(flipTextLabels, zoneIndex)
     float zoneTop = array.get(flipTops, zoneIndex)
     float zoneBottom = array.get(flipBottoms, zoneIndex)
     float sellerLegDemandLow = array.get(flipDemandLows, zoneIndex)
     int sellerLegDemandBar = array.get(flipDemandBars, zoneIndex)
     int confirmationBar = array.get(flipConfirmationBars, zoneIndex)
+    int originTime = array.get(flipOriginTimes, zoneIndex)
+    string originStartText = "START " + str.format_time(originTime, "HH:mm", syminfo.timezone) +
+         f_origin_session_suffix(originTime)
     bool alreadyRetested = array.get(flipRetested, zoneIndex)
+    bool wasIntersecting = array.get(flipWasIntersecting, zoneIndex)
     bool isActive = array.get(flipActive, zoneIndex)
     int zoneKind = array.get(flipZoneKinds, zoneIndex)
     bool isContinuationBase = zoneKind == ZONE_KIND_CONTINUATION_BASE
@@ -788,14 +827,19 @@ while zoneIndex < array.size(flipBoxes)
                 box.delete(zoneBox)
                 if not na(sellerLegBox)
                     box.delete(sellerLegBox)
+                if not na(zoneTextLabel)
+                    label.delete(zoneTextLabel)
                 array.remove(flipBoxes, zoneIndex)
                 array.remove(flipLegBoxes, zoneIndex)
+                array.remove(flipTextLabels, zoneIndex)
                 array.remove(flipTops, zoneIndex)
                 array.remove(flipBottoms, zoneIndex)
                 array.remove(flipDemandLows, zoneIndex)
                 array.remove(flipDemandBars, zoneIndex)
                 array.remove(flipConfirmationBars, zoneIndex)
+                array.remove(flipOriginTimes, zoneIndex)
                 array.remove(flipRetested, zoneIndex)
+                array.remove(flipWasIntersecting, zoneIndex)
                 array.remove(flipActive, zoneIndex)
                 array.remove(flipZoneKinds, zoneIndex)
                 removed := true
@@ -807,9 +851,26 @@ while zoneIndex < array.size(flipBoxes)
                 box.set_right(zoneBox, bar_index)
                 box.set_bgcolor(zoneBox, activeFill)
                 box.set_border_color(zoneBox, activeBorder)
-                box.set_text(zoneBox, isContinuationBase ?
-                     "Continuation base • valid retest • later broken" : "S→D • valid retest • later broken")
-                box.set_text_color(zoneBox, invalidTextColor)
+                box.set_text(zoneBox, "")
+
+                bool showOriginStructure = isContinuationBase ? showContinuationBaseStructure : showSellerControlLeg
+                string brokenLifecycleText = isContinuationBase ?
+                     "BASE\nVALID RETEST → LATER BROKEN\n" + originStartText :
+                     "S→D\nVALID RETEST → LATER BROKEN\n" + originStartText
+                string brokenOriginText = ""
+                if showOriginStructure and not na(sellerLegBox)
+                    string brokenOriginStructureName = isContinuationBase ? "BASE ORIGIN" : "SUPPLY ORIGIN"
+                    string brokenOriginLevelName = isContinuationBase ? "floor " : "demand "
+                    int brokenStructureBars = math.max(1,
+                         sellerLegDemandBar - box.get_left(sellerLegBox) + 1 - zoneLeftPaddingBars)
+                    brokenOriginText := "\n\n" + brokenOriginStructureName + "\n" +
+                         str.tostring(brokenStructureBars) + " bars • " + brokenOriginLevelName +
+                         str.tostring(sellerLegDemandLow, format.mintick)
+
+                if not na(zoneTextLabel)
+                    label.set_text(zoneTextLabel, brokenLifecycleText + brokenOriginText)
+                    label.set_textcolor(zoneTextLabel, invalidTextColor)
+                    label.set_color(zoneTextLabel, color.new(color.red, 75))
                 if sendDynamicAlerts
                     string laterBreakName = isContinuationBase ? "Retested continuation-base zone later broken" :
                          "Retested supply→demand zone later broken"
@@ -821,25 +882,47 @@ while zoneIndex < array.size(flipBoxes)
             bool firstRetest = signalBarReady and bar_index > confirmationBar and intersectsZone and not alreadyRetested
             if firstRetest
                 array.set(flipRetested, zoneIndex, true)
+                array.set(flipWasIntersecting, zoneIndex, true)
                 firstRetestDetected := true
                 supplyFlipRetestDetected := supplyFlipRetestDetected or not isContinuationBase
                 continuationBaseRetestDetected := continuationBaseRetestDetected or isContinuationBase
                 box.set_bgcolor(zoneBox, activeFill)
                 box.set_border_color(zoneBox, activeBorder)
-                box.set_text_color(zoneBox, validTextColor)
-                box.set_text(zoneBox, isContinuationBase ? "Continuation base • retested" : "S→D • retested")
+                box.set_text(zoneBox, "")
+
                 bool showOriginStructure = isContinuationBase ? showContinuationBaseStructure : showSellerControlLeg
+                string lifecycleText = isContinuationBase ?
+                     "BASE\nVALID RETEST\n" + originStartText :
+                     "S→D\nVALID RETEST\n" + originStartText
+                string originText = ""
+                color externalLabelColor = color.new(isContinuationBase ? continuationBaseBorder : activeBorder, 72)
                 if showOriginStructure and not na(sellerLegBox)
                     color originFill = isContinuationBase ? continuationBaseFill : sellerLegFill
                     color originBorder = isContinuationBase ? continuationBaseBorder : sellerLegBorder
                     box.set_bgcolor(sellerLegBox, originFill)
                     box.set_border_color(sellerLegBox, originBorder)
-                    box.set_text_color(sellerLegBox, originBorder)
-                    string originStructureName = isContinuationBase ? "Continuation base" : "Supply structure"
+                    box.set_text(sellerLegBox, "")
+                    string originStructureName = isContinuationBase ? "BASE ORIGIN" : "SUPPLY ORIGIN"
                     string originLevelName = isContinuationBase ? "floor " : "demand "
-                    box.set_text(sellerLegBox, originStructureName + " | " +
-                         str.tostring(sellerLegDemandBar - box.get_left(sellerLegBox) + 1) + " bars | " + originLevelName +
-                         str.tostring(sellerLegDemandLow, format.mintick))
+                    int structureBars = math.max(1,
+                         sellerLegDemandBar - box.get_left(sellerLegBox) + 1 - zoneLeftPaddingBars)
+                    originText := "\n\n" + originStructureName + "\n" +
+                         str.tostring(structureBars) + " bars • " + originLevelName +
+                         str.tostring(sellerLegDemandLow, format.mintick)
+
+                int externalTextBar = math.max(0, box.get_left(zoneBox) - zoneTextLeftOffsetBars)
+                zoneTextLabel := label.new(
+                     x = externalTextBar,
+                     y = zoneTop,
+                     text = lifecycleText + originText,
+                     xloc = xloc.bar_index,
+                     yloc = yloc.price,
+                     style = label.style_label_right,
+                     color = externalLabelColor,
+                     textcolor = validTextColor,
+                     size = size.small,
+                     textalign = text.align_right)
+                array.set(flipTextLabels, zoneIndex, zoneTextLabel)
                 if sendDynamicAlerts
                     string firstRetestName = isContinuationBase ? "Bullish continuation-base first retest" :
                          "Supply→Demand first retest"
@@ -849,23 +932,33 @@ while zoneIndex < array.size(flipBoxes)
                          str.tostring(zoneTop, format.mintick) +
                          (not na(sellerLegDemandLow) ? structureDetailName +
                          str.tostring(sellerLegDemandLow, format.mintick) : ""), alert.freq_once_per_bar_close)
+            else if signalBarReady and alreadyRetested
+                // Mark a later S→D retest only when price freshly re-enters after first leaving the zone.
+                // This prevents one multi-bar visit from printing an arrow on every candle.
+                bool freshRetestEntry = intersectsZone and not wasIntersecting
+                if freshRetestEntry and not isContinuationBase and showAdditionalSupplyRetests
+                    additionalSupplyFlipRetestDetected := true
+                    if sendDynamicAlerts
+                        alert("Additional Supply→Demand retest | " + syminfo.ticker + " " + timeframe.period +
+                             " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
+                             str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
+                array.set(flipWasIntersecting, zoneIndex, intersectsZone)
 
     if not removed
         zoneIndex += 1
 
 // ───────────────────── Markers and alerts ─────────────────────
-plotshape(showFlipMarkers and supplyFlipRetestDetected, title = "Retested supply flipped to demand", style = shape.labelup,
+plotshape(showFlipMarkers and (supplyFlipRetestDetected or additionalSupplyFlipRetestDetected), title = "Supply→Demand retest", style = shape.arrowup,
      location = location.belowbar, color = color.new(color.lime, 0), text = "S→D", textcolor = color.black, size = size.normal)
-plotshape(showFlipMarkers and continuationBaseRetestDetected, title = "Retested bullish continuation base", style = shape.labelup,
+plotshape(showFlipMarkers and continuationBaseRetestDetected, title = "Retested bullish continuation base", style = shape.arrowup,
      location = location.belowbar, color = color.new(color.aqua, 0), text = "BASE", textcolor = color.black, size = size.normal)
-plotshape(showRetestMarkers and firstRetestDetected, title = "First demand-zone retest", style = shape.circle,
+// BASE and S→D zones use their own labeled arrows, so do not draw the generic retest circle on those bars.
+plotshape(showRetestMarkers and firstRetestDetected and not continuationBaseRetestDetected and not supplyFlipRetestDetected, title = "First demand-zone retest", style = shape.circle,
      location = location.belowbar, color = color.new(color.aqua, 0), size = size.normal)
 plotshape(showLaterBreakMarkers and laterBreakDetected, title = "Retested demand zone later broken", style = shape.xcross,
      location = location.belowbar, color = invalidTextColor, text = "INVALID", textcolor = invalidTextColor, size = size.normal)
 
-alertcondition(firstRetestDetected, title = "First retest of bullish demand zone",
+alertcondition(firstRetestDetected or supplyFlipRetestDetected or continuationBaseRetestDetected, title = "First retest of bullish demand zone",
      message = "Price is making its first retest of a confirmed bullish demand zone on {{ticker}} {{interval}}.")
-alertcondition(supplyFlipRetestDetected, title = "First retest of flipped supply",
-     message = "Price is making its first retest of a supply-to-demand flip zone on {{ticker}} {{interval}}.")
-alertcondition(continuationBaseRetestDetected, title = "First retest of continuation base",
-     message = "Price is making its first retest of a bullish continuation-base zone on {{ticker}} {{interval}}.")
+alertcondition(additionalSupplyFlipRetestDetected, title = "Additional Supply→Demand retest",
+     message = "Price has freshly re-entered an already retested Supply→Demand zone on {{ticker}} {{interval}}.")
