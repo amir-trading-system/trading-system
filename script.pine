@@ -958,7 +958,5 @@ plotshape(showRetestMarkers and firstRetestDetected and not continuationBaseRete
 plotshape(showLaterBreakMarkers and laterBreakDetected, title = "Retested demand zone later broken", style = shape.xcross,
      location = location.belowbar, color = invalidTextColor, text = "INVALID", textcolor = invalidTextColor, size = size.normal)
 
-alertcondition(firstRetestDetected or supplyFlipRetestDetected or continuationBaseRetestDetected, title = "First retest of bullish demand zone",
+alertcondition(firstRetestDetected or supplyFlipRetestDetected or continuationBaseRetestDetected or additionalSupplyFlipRetestDetected, title = "First retest of bullish demand zone",
      message = "Price is making its first retest of a confirmed bullish demand zone on {{ticker}} {{interval}}.")
-alertcondition(additionalSupplyFlipRetestDetected, title = "Additional Supply→Demand retest",
-     message = "Price has freshly re-entered an already retested Supply→Demand zone on {{ticker}} {{interval}}.")
