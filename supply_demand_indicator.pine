@@ -1,16 +1,17 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.25 • Progressive Supply Takeover]", overlay = true, max_bars_back = 5000, max_boxes_count = 200, max_labels_count = 350)
+indicator("Bullish Supply→Demand Flip Zones [v6.28 • No External Zone Text]", overlay = true, max_bars_back = 5000, max_boxes_count = 200, max_labels_count = 350)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
 
 // This indicator detects bullish demand-retest zones from supply flips and continuation bases:
-//   1. A rejection pivot starts a live-safe supply formation. The formation extends forward until participation collapses.
+//   1. A rejection pivot starts a live-safe supply formation. The formation extends forward until participation collapses
+//      or price clearly disengages beneath the evolving supply band.
 //      Its top is the highest high and its bottom is the highest close before the collapse bar.
 //   2. The seller-control structure must terminate at confirmed demand.
 //   3. Supply may flip through a high-quality final break candle or a strong breakout impulse followed by acceptance.
 //   4. After confirmation, all drawings stay hidden while retest logic remains active.
-//   5. The full original supply structure and external label appear when price first returns to the zone.
+//   5. The full original supply structure appears when price first returns to the zone.
 //   6. A zone touch or fresh re-entry controls visibility/state only; it never draws an S→D arrow by itself.
 //   7. Only a confirmed pivot support inside the flipped original supply zone receives an S→D arrow on the actual support candle.
 //   8. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
@@ -152,7 +153,6 @@ maxDisplayedZones = input.int(50, "Maximum tracked flip structures", minval = 1,
 groupDisplay = "5. Display"
 activeFill = input.color(color.new(color.lime, 84), "Active demand fill", group = groupDisplay, display = display.none)
 activeBorder = input.color(color.new(color.lime, 15), "Active demand border", group = groupDisplay, display = display.none)
-validTextColor = input.color(color.new(color.lime, 0), "Valid-zone text", group = groupDisplay, display = display.none)
 invalidTextColor = input.color(color.new(color.red, 0), "Invalid-zone text/marker", group = groupDisplay, display = display.none)
 showSellerControlLeg = input.bool(true, "Show full supply/control structure after retest", group = groupDisplay, display = display.none)
 sellerLegFill = input.color(color.new(color.red, 91), "Supply/control structure fill", group = groupDisplay, display = display.none)
@@ -169,17 +169,8 @@ showRetestMarkers = input.bool(true, "Show first-retest markers", group = groupD
 showLaterBreakMarkers = input.bool(true, "Show red marker when a retested zone later breaks", group = groupDisplay, display = display.none)
 zoneLeftPaddingBars = input.int(3, "Start visible area before origin (bars)", minval = 0, maxval = 20, group = groupDisplay,
      tooltip = "Visual padding only. Moves the box left border before the true origin so it does not cover the origin candle wick. Detection and bar counts remain unchanged.", display = display.none)
-zoneTextLeftOffsetBars = input.int(1, "Text distance left of visible area (bars)", minval = 0, maxval = 20, group = groupDisplay,
-     tooltip = "Places the complete zone callout outside the box on its left side. The arrow tip points toward the visible zone.", display = display.none)
 drawFromSupplyOrigin = input.bool(true, "Draw from original supply candle", group = groupDisplay, display = display.none)
 showTrendAverages = input.bool(false, "Show EMA 9, EMA 20, and VWAP", group = groupDisplay, display = display.none)
-
-// ────────────────────── Helpers ──────────────────────
-f_origin_session_suffix(int originTimestamp) =>
-    int originHour = hour(originTimestamp, syminfo.timezone)
-    int originMinute = minute(originTimestamp, syminfo.timezone)
-    int originMinuteOfDay = originHour * 60 + originMinute
-    originMinuteOfDay < 570 ? " • PREMARKET" : originMinuteOfDay >= 960 ? " • AFTER HOURS" : ""
 
 // ────────────────────── Core calculations ──────────────────────
 float atr = ta.atr(14)
@@ -391,7 +382,12 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
                 bool formationRatioCollapse = volume[formationOffset] <= formationLastVolume * formationCollapsePreviousRatio or
                      volume[formationOffset] <= formationPeakVolume * formationCollapsePeakRatio
                 bool formationCollapse = formationBelowAverage and formationRatioCollapse
-                if formationCollapse
+                // Stop before the first candle that no longer reaches the evolving
+                // supply band. This prevents a sustained seller leg from being
+                // absorbed into the supply formation when volume remains elevated.
+                bool formationPriceDisengaged = high[formationOffset] <
+                     formationBottom - pivotAtr * structureTouchBufferAtr
+                if formationCollapse or formationPriceDisengaged
                     formationFinalized := true
                     break
                 formationTop := math.max(formationTop, high[formationOffset])
@@ -505,10 +501,14 @@ while candidateIndex >= 0
         bool formationRatioCollapse = volume <= formationLastVolume * formationCollapsePreviousRatio or
              volume <= formationPeakVolume * formationCollapsePeakRatio
         bool formationVolumeCollapsed = formationBelowAverage and formationRatioCollapse
-        bool formationPriceLeft = close > supplyTop + atr * breakBufferAtr
+        bool formationPriceLeftAbove = close > supplyTop + atr * breakBufferAtr
+        // A bar whose high no longer reaches the evolving lower boundary proves
+        // that price has left the supply auction to the downside. Exclude that bar
+        // and freeze the formation immediately before it.
+        bool formationPriceDisengagedBelow = high < supplyBottom - atr * structureTouchBufferAtr
         bool formationReachedCap = formationBarCount >= maxForwardSupplyFormationBars
 
-        if formationVolumeCollapsed or formationPriceLeft or formationReachedCap
+        if formationVolumeCollapsed or formationPriceLeftAbove or formationPriceDisengagedBelow or formationReachedCap
             formationFinalized := true
         else
             supplyTop := math.max(supplyTop, high)
@@ -624,6 +624,9 @@ while candidateIndex >= 0
                 array.set(candidateDemandBars, candidateIndex, demandBar)
 
     bool legReady = formationReady and (not requireSellerControlLeg or sellerLegConfirmed)
+    // Progressive takeover supplies its own lower-edge demand and preservation
+    // evidence, so it must not depend on a separate classic seller-leg pivot.
+    bool progressiveReady = formationReady
 
     // Universal leave-and-return proof. Once the supply formation and seller leg are
     // ready, record the first candle whose entire range is above the zone.
@@ -634,6 +637,9 @@ while candidateIndex >= 0
     bool expired = bar_index - supplyOriginBar > maxHiddenAge
     bool legFormationExpired = requireSellerControlLeg and not sellerLegConfirmed and
          bar_index - supplyOriginBar > maxSellerLegBars + demandPivotRight
+    // Keep a candidate available for the progressive path until maxHiddenAge.
+    // The classic path may no longer use it after its seller-leg window expires.
+    bool classicLegUsable = not legFormationExpired
     bool closesAboveSupply = close > supplyTop + atr * breakBufferAtr
 
     float bullishBody = close - open
@@ -656,7 +662,7 @@ while candidateIndex >= 0
     //   1. A demand candle tests the lower edge and closes back above it.
     //   2. Every later low must preserve that demand low.
     //   3. Consecutive closes above the supply top confirm acceptance on renewed volume.
-    if signalBarReady and enableProgressiveSupplyTakeover and legReady
+    if signalBarReady and enableProgressiveSupplyTakeover and progressiveReady and not expired
         float progressivePreservationTolerance = syminfo.mintick * progressivePreservationToleranceTicks
 
         if progressiveArmed
@@ -700,7 +706,10 @@ while candidateIndex >= 0
     // sequence. A later consecutive close can confirm acceptance even when that
     // acceptance candle is neutral or bearish.
     if signalBarReady
-        if legReady and closesAboveSupply
+        // Classic flips count after their seller leg is ready. Progressive
+        // takeovers begin counting only after lower-edge demand has armed.
+        bool breakSequenceEligible = (legReady and classicLegUsable) or progressiveArmed
+        if not expired and breakSequenceEligible and closesAboveSupply
             breakCount += 1
             breakImpulseQualified := breakImpulseQualified or currentBreakQualityOk
         else
@@ -718,13 +727,13 @@ while candidateIndex >= 0
          not na(progressiveDemandBar) and bar_index > progressiveDemandBar and
          bar_index - progressiveDemandBar <= progressiveMaxBarsToAcceptance and
          low >= progressiveDemandLow - syminfo.mintick * progressivePreservationToleranceTicks
-    bool qualifiedProgressiveTakeover = signalBarReady and enableProgressiveSupplyTakeover and legReady and
-         progressiveDemandStillPreserved and breakCount >= requiredBreakCloses and
-         progressiveAcceptanceVolumeOk and breakTrendOk
-    bool qualifiedFlip = signalBarReady and legReady and breakCount >= requiredBreakCloses and
-         finalBreakQualityOk and not qualifiedProgressiveTakeover
-    bool failedBreakQuality = signalBarReady and legReady and breakCount >= requiredBreakCloses and
-         not finalBreakQualityOk and not qualifiedProgressiveTakeover
+    bool qualifiedProgressiveTakeover = signalBarReady and not expired and
+         enableProgressiveSupplyTakeover and progressiveReady and progressiveDemandStillPreserved and
+         breakCount >= requiredBreakCloses and progressiveAcceptanceVolumeOk and breakTrendOk
+    bool qualifiedFlip = signalBarReady and not expired and classicLegUsable and legReady and
+         breakCount >= requiredBreakCloses and finalBreakQualityOk and not qualifiedProgressiveTakeover
+    bool failedBreakQuality = signalBarReady and not expired and classicLegUsable and legReady and
+         breakCount >= requiredBreakCloses and not finalBreakQualityOk and not qualifiedProgressiveTakeover
 
     // A weak close-above sequence does not erase proven supply. Reset confirmation and
     // let the hidden candidate wait for a later sequence containing a high-quality impulse.
@@ -768,25 +777,10 @@ while candidateIndex >= 0
                  text_halign = text.align_left)
 
         int progressiveOriginTime = time[bar_index - supplyStructureStartBar]
-        string progressiveOriginText = "START " +
-             str.format_time(progressiveOriginTime, "HH:mm", syminfo.timezone) +
-             f_origin_session_suffix(progressiveOriginTime)
         string progressiveDemandTime = str.format_time(time[bar_index - progressiveDemandBar], "HH:mm", syminfo.timezone)
-        string progressiveText = "S→D\nPROGRESSIVE TAKEOVER\n" + progressiveOriginText +
-             "\n\nSUPPLY FORMATION\n" + str.tostring(formationBarCount) +
-             " bars • demand " + str.tostring(progressiveDemandLow, format.mintick)
-        int progressiveTextBar = math.max(0, progressiveVisibleLeft - zoneTextLeftOffsetBars)
-        label newProgressiveTextLabel = label.new(
-             x = progressiveTextBar,
-             y = supplyTop,
-             text = progressiveText,
-             xloc = xloc.bar_index,
-             yloc = yloc.price,
-             style = label.style_label_right,
-             color = color.new(activeBorder, 72),
-             textcolor = validTextColor,
-             size = size.small,
-             textalign = text.align_right)
+        // Keep a synchronized placeholder in the zone lifecycle array. Zone
+        // callout text is intentionally disabled; the S→D arrow remains.
+        label newProgressiveTextLabel = na
 
         float progressiveMarkerY = progressiveDemandLow - progressiveDemandAtr * 0.15
         string progressiveConfirmedTime = str.format_time(time, "HH:mm", syminfo.timezone)
@@ -985,7 +979,7 @@ while candidateIndex >= 0
             array.shift(flipZoneKinds)
             array.shift(flipDemandConfirmed)
             array.shift(flipFirstSeparationBars)
-    else if expired or legFormationExpired
+    else if expired or (legFormationExpired and not enableProgressiveSupplyTakeover)
         array.remove(candidateTops, candidateIndex)
         array.remove(candidateBottoms, candidateIndex)
         array.remove(candidateLegReferences, candidateIndex)
@@ -1215,8 +1209,6 @@ while zoneIndex < array.size(flipBoxes)
     int sellerLegDemandBar = array.get(flipDemandBars, zoneIndex)
     int confirmationBar = array.get(flipConfirmationBars, zoneIndex)
     int originTime = array.get(flipOriginTimes, zoneIndex)
-    string originStartText = "START " + str.format_time(originTime, "HH:mm", syminfo.timezone) +
-         f_origin_session_suffix(originTime)
     bool alreadyRetested = array.get(flipRetested, zoneIndex)
     bool wasIntersecting = array.get(flipWasIntersecting, zoneIndex)
     bool isActive = array.get(flipActive, zoneIndex)
@@ -1266,26 +1258,6 @@ while zoneIndex < array.size(flipBoxes)
         if confirmedSupportQualified and array.indexof(confirmedSupplyFlipSupportBars, confirmedSupportBar) == -1
             array.set(flipDemandConfirmed, zoneIndex, true)
             demandConfirmed := true
-
-            // The zone was revealed on first touch. It becomes a valid S→D retest only now,
-            // when a demand pivot inside the original supply area is confirmed.
-            if not na(zoneTextLabel)
-                string confirmedLifecycleText = isProgressiveTakeover ?
-                     "S→D\nPROGRESSIVE TAKEOVER\n" + originStartText :
-                     "S→D\nVALID RETEST\n" + originStartText
-                string confirmedOriginText = ""
-                if showSellerControlLeg and not na(sellerLegBox)
-                    if isProgressiveTakeover
-                        confirmedOriginText := "\n\nSUPPLY FORMATION\ndemand " +
-                             str.tostring(sellerLegDemandLow, format.mintick)
-                    else
-                        int confirmedStructureBars = math.max(1,
-                             sellerLegDemandBar - box.get_left(sellerLegBox) + 1 - zoneLeftPaddingBars)
-                        confirmedOriginText := "\n\nSUPPLY ORIGIN\n" +
-                             str.tostring(confirmedStructureBars) + " bars • demand " +
-                             str.tostring(sellerLegDemandLow, format.mintick)
-                label.set_text(zoneTextLabel, confirmedLifecycleText + confirmedOriginText)
-                label.set_textcolor(zoneTextLabel, validTextColor)
 
             float confirmedSupportMarkerY = confirmedPivotLow - confirmedSupportAtr * 0.15
             string confirmedSupportTime = str.format_time(time[demandPivotRight], "HH:mm", syminfo.timezone)
@@ -1366,32 +1338,6 @@ while zoneIndex < array.size(flipBoxes)
                 box.set_border_color(zoneBox, activeBorder)
                 box.set_text(zoneBox, "")
 
-                bool showOriginStructure = isContinuationBase ? showContinuationBaseStructure : showSellerControlLeg
-                string brokenLifecycleText = isContinuationBase ?
-                     "BASE\nVALID RETEST → LATER BROKEN\n" + originStartText :
-                     isProgressiveTakeover ?
-                     "S→D\nPROGRESSIVE TAKEOVER → LATER BROKEN\n" + originStartText :
-                     demandConfirmed ?
-                     "S→D\nVALID RETEST → LATER BROKEN\n" + originStartText :
-                     "S→D\nRETEST FAILED\n" + originStartText
-                string brokenOriginText = ""
-                if showOriginStructure and not na(sellerLegBox)
-                    if isProgressiveTakeover
-                        brokenOriginText := "\n\nSUPPLY FORMATION\ndemand " +
-                             str.tostring(sellerLegDemandLow, format.mintick)
-                    else
-                        string brokenOriginStructureName = isContinuationBase ? "BASE ORIGIN" : "SUPPLY ORIGIN"
-                        string brokenOriginLevelName = isContinuationBase ? "floor " : "demand "
-                        int brokenStructureBars = math.max(1,
-                             sellerLegDemandBar - box.get_left(sellerLegBox) + 1 - zoneLeftPaddingBars)
-                        brokenOriginText := "\n\n" + brokenOriginStructureName + "\n" +
-                             str.tostring(brokenStructureBars) + " bars • " + brokenOriginLevelName +
-                             str.tostring(sellerLegDemandLow, format.mintick)
-
-                if not na(zoneTextLabel)
-                    label.set_text(zoneTextLabel, brokenLifecycleText + brokenOriginText)
-                    label.set_textcolor(zoneTextLabel, invalidTextColor)
-                    label.set_color(zoneTextLabel, color.new(color.red, 75))
                 if sendDynamicAlerts
                     string laterBreakName = isContinuationBase ? "Retested continuation-base zone later broken" :
                          "Retested supply→demand zone later broken"
@@ -1413,40 +1359,12 @@ while zoneIndex < array.size(flipBoxes)
                 box.set_text(zoneBox, "")
 
                 bool showOriginStructure = isContinuationBase ? showContinuationBaseStructure : showSellerControlLeg
-                string lifecycleText = isContinuationBase ?
-                     "BASE\nVALID RETEST\n" + originStartText :
-                     demandConfirmed ?
-                     "S→D\nVALID RETEST\n" + originStartText :
-                     "S→D\nRETEST STARTED\n" + originStartText
-                string originText = ""
-                color externalLabelColor = color.new(isContinuationBase ? continuationBaseBorder : activeBorder, 72)
                 if showOriginStructure and not na(sellerLegBox)
                     color originFill = isContinuationBase ? continuationBaseFill : sellerLegFill
                     color originBorder = isContinuationBase ? continuationBaseBorder : sellerLegBorder
                     box.set_bgcolor(sellerLegBox, originFill)
                     box.set_border_color(sellerLegBox, originBorder)
                     box.set_text(sellerLegBox, "")
-                    string originStructureName = isContinuationBase ? "BASE ORIGIN" : "SUPPLY ORIGIN"
-                    string originLevelName = isContinuationBase ? "floor " : "demand "
-                    int structureBars = math.max(1,
-                         sellerLegDemandBar - box.get_left(sellerLegBox) + 1 - zoneLeftPaddingBars)
-                    originText := "\n\n" + originStructureName + "\n" +
-                         str.tostring(structureBars) + " bars • " + originLevelName +
-                         str.tostring(sellerLegDemandLow, format.mintick)
-
-                int externalTextBar = math.max(0, box.get_left(zoneBox) - zoneTextLeftOffsetBars)
-                zoneTextLabel := label.new(
-                     x = externalTextBar,
-                     y = zoneTop,
-                     text = lifecycleText + originText,
-                     xloc = xloc.bar_index,
-                     yloc = yloc.price,
-                     style = label.style_label_right,
-                     color = externalLabelColor,
-                     textcolor = validTextColor,
-                     size = size.small,
-                     textalign = text.align_right)
-                array.set(flipTextLabels, zoneIndex, zoneTextLabel)
                 if sendDynamicAlerts
                     string firstRetestName = isContinuationBase ? "Bullish continuation-base first retest" :
                          "Supply→Demand zone retest started"

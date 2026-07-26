@@ -1,0 +1,1185 @@
+//@version=6
+indicator(
+     "FRVP Value-Area Continuation Detector v1.6",
+     shorttitle = "FRVP Continuation v1.6",
+     overlay = true,
+     max_bars_back = 5000,
+     max_lines_count = 500,
+     max_boxes_count = 100,
+     max_labels_count = 500)
+
+//==============================================================================
+// Purpose
+//------------------------------------------------------------------------------
+// Standalone continuation detector. It intentionally does not share state with
+// the Supply-to-Demand indicator.
+//
+// Sequence:
+//   1. Detect (or manually define) the first bullish movement.
+//   2. Freeze an approximate fixed-range volume profile for that movement.
+//   3. Require the frozen POC to remain at or above session VWAP.
+//   4. Look for a defended VAL and repeated failed attempts around the POC.
+//   5. Confirm continuation when a strong, high-volume candle crosses from
+//      below the POC to above the VAH and then holds above the POC.
+//
+// The profile is approximate. Each candle's volume is spread uniformly over
+// the price rows crossed by that candle. TradingView does not expose the values
+// of its built-in Fixed Range Volume Profile to Pine scripts.
+//==============================================================================
+
+const string GROUP_MOVE     = "1. First-move detection"
+const string GROUP_PROFILE  = "2. Approximate fixed-range volume profile"
+const string GROUP_VAL      = "3. VAL defense"
+const string GROUP_POC      = "4. POC fight"
+const string GROUP_BREAKOUT = "5. Continuation breakout"
+const string GROUP_DISPLAY  = "6. Display"
+
+const int STATE_SEARCHING = 0
+const int STATE_BUILDING  = 1
+const int STATE_PROFILE   = 2
+
+//------------------------------------------------------------------------------
+// Inputs
+//------------------------------------------------------------------------------
+
+string detectionMode = input.string(
+     "Auto",
+     "Movement selection",
+     options = ["Auto", "Manual window"],
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Auto finds the first qualifying bullish movement. Manual window profiles the exact exchange-time window below.")
+
+string analysisSession = input.session(
+     "0930-1600",
+     "Analysis session",
+     group = GROUP_MOVE,
+     display = display.none)
+
+string autoStartWindow = input.session(
+     "0930-1300",
+     "Auto: search for movement start",
+     group = GROUP_MOVE,
+     display = display.none)
+
+string manualMoveWindow = input.session(
+     "1149-1250",
+     "Manual: movement window",
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Session end is exclusive. On a one-minute chart, 1149-1250 includes 11:49 through 12:49. This is the AKAN 2026-04-22 validation window.")
+
+int maximumChartMinutes = input.int(
+     5,
+     "Maximum supported chart timeframe (minutes)",
+     minval = 1,
+     maxval = 30,
+     group = GROUP_MOVE,
+     display = display.none)
+
+int volumeAverageLength = input.int(
+     20,
+     "Volume average length",
+     minval = 5,
+     maxval = 100,
+     group = GROUP_MOVE,
+     display = display.none)
+
+int atrLength = input.int(
+     14,
+     "ATR length",
+     minval = 5,
+     maxval = 100,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float startRelativeVolume = input.float(
+     1.80,
+     "Auto: start relative volume",
+     minval = 1.00,
+     step = 0.05,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float startBodyATR = input.float(
+     0.60,
+     "Auto: start bullish body (ATR)",
+     minval = 0.10,
+     step = 0.05,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float startCloseLocation = input.float(
+     0.70,
+     "Auto: minimum close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "0.70 means the close must be in the upper 30% of the candle range.")
+
+int autoPreTriggerBars = input.int(
+     1,
+     "Auto: include bars before trigger",
+     minval = 0,
+     maxval = 5,
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Includes completed context bars immediately before the qualifying expansion candle. The default captures the true start of AKAN's 11:49 movement when 11:50 is the first bar that satisfies every trigger filter.")
+
+int minimumMoveBars = input.int(
+     8,
+     "Auto: minimum movement bars",
+     minval = 3,
+     maxval = 100,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float minimumMoveRangeATR = input.float(
+     4.00,
+     "Auto: minimum movement range (ATR)",
+     minval = 1.00,
+     step = 0.25,
+     group = GROUP_MOVE,
+     display = display.none)
+
+int contractionBars = input.int(
+     3,
+     "Auto: contraction bars after movement high",
+     minval = 2,
+     maxval = 10,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float contractionVsAverage = input.float(
+     0.85,
+     "Auto: contraction volume / average",
+     minval = 0.10,
+     maxval = 1.50,
+     step = 0.05,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float contractionVsPeak = input.float(
+     0.45,
+     "Auto: contraction volume / movement peak",
+     minval = 0.05,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_MOVE,
+     display = display.none)
+
+int maximumMoveBars = input.int(
+     150,
+     "Auto: maximum movement bars",
+     minval = 10,
+     maxval = 300,
+     group = GROUP_MOVE,
+     display = display.none)
+
+int profileRows = input.int(
+     30,
+     "Profile price rows",
+     minval = 10,
+     maxval = 100,
+     group = GROUP_PROFILE,
+     display = display.none,
+     tooltip = "30 rows reproduces the resolution used for the initial AKAN study.")
+
+float valueAreaPercent = input.float(
+     70.0,
+     "Value area volume (%)",
+     minval = 50.0,
+     maxval = 95.0,
+     step = 1.0,
+     group = GROUP_PROFILE,
+     display = display.none)
+
+int valPivotLeft = input.int(
+     2,
+     "VAL defense pivot bars left",
+     minval = 1,
+     maxval = 10,
+     group = GROUP_VAL,
+     display = display.none)
+
+int valPivotRight = input.int(
+     2,
+     "VAL defense pivot bars right",
+     minval = 1,
+     maxval = 10,
+     group = GROUP_VAL,
+     display = display.none)
+
+float valApproachATR = input.float(
+     0.50,
+     "Maximum distance above VAL (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
+float valWickToleranceATR = input.float(
+     0.15,
+     "Allowed wick below VAL (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
+float valCloseToleranceATR = input.float(
+     0.10,
+     "Allowed close below VAL (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
+int valInvalidationCloses = input.int(
+     2,
+     "Consecutive closes that invalidate VAL",
+     minval = 1,
+     maxval = 5,
+     group = GROUP_VAL,
+     display = display.none)
+
+float pocMinimumPenetrationATR = input.float(
+     0.00,
+     "POC attempt minimum penetration (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none)
+
+float pocFailedCloseBandATR = input.float(
+     0.15,
+     "POC failed-close band (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none)
+
+int pocAttemptSpacingBars = input.int(
+     2,
+     "Minimum bars between POC attempts",
+     minval = 1,
+     maxval = 30,
+     group = GROUP_POC,
+     display = display.none)
+
+int minimumFailedPOCAttempts = input.int(
+     2,
+     "Minimum spaced failed POC attempts",
+     minval = 1,
+     maxval = 10,
+     group = GROUP_POC,
+     display = display.none)
+
+float breakoutStartToleranceATR = input.float(
+     0.15,
+     "Breakout may start above POC by (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float breakoutVAHBufferATR = input.float(
+     0.03,
+     "Close above VAH buffer (ATR)",
+     minval = 0.00,
+     step = 0.01,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float breakoutBodyATR = input.float(
+     0.80,
+     "Minimum bullish body (ATR)",
+     minval = 0.10,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float breakoutCloseLocation = input.float(
+     0.75,
+     "Minimum close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float breakoutRelativeVolume = input.float(
+     1.80,
+     "Minimum breakout relative volume",
+     minval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+int breakoutHoldBars = input.int(
+     2,
+     "Bars required to hold after breakout",
+     minval = 0,
+     maxval = 10,
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "The arrow is placed on the breakout candle after this many later bars avoid a close back below POC.")
+
+float breakoutFailureBelowPOCATR = input.float(
+     0.05,
+     "Hold failure below POC (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+bool showMovementBox = input.bool(
+     true,
+     "Shade frozen movement",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+bool showFrozenProfileLabel = input.bool(
+     true,
+     "Show frozen-profile summary",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+bool showVALDefenseMarkers = input.bool(
+     true,
+     "Mark VAL defense",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+bool showPOCAttemptMarkers = input.bool(
+     true,
+     "Mark failed POC attempts",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+bool showEntryMarkers = input.bool(
+     true,
+     "Mark entry bars",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+bool showVALInvalidation = input.bool(
+     true,
+     "Mark VAL invalidation",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+int maximumHistoricalProfiles = input.int(
+     100,
+     "Maximum historical profiles",
+     minval = 1,
+     maxval = 100,
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+int maximumHistoricalMarkers = input.int(
+     320,
+     "Maximum diagnostic markers",
+     minval = 20,
+     maxval = 340,
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+int maximumHistoricalEntryMarkers = input.int(
+     140,
+     "Maximum protected entry markers",
+     minval = 20,
+     maxval = 150,
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+color valColor = input.color(
+     color.rgb(33, 150, 83),
+     "VAL color",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+color pocColor = input.color(
+     color.rgb(255, 255, 255),
+     "POC color",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+color vahColor = input.color(
+     color.rgb(220, 53, 69),
+     "VAH color",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+color entryCandidateColor = input.color(
+     color.rgb(245, 166, 35),
+     "Pending entry marker color",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+color continuationColor = input.color(
+     color.rgb(0, 181, 120),
+     "Confirmed entry marker color",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+//------------------------------------------------------------------------------
+// Approximate fixed-range volume profile
+//------------------------------------------------------------------------------
+
+f_calculateProfile(
+     array<float> storedLows,
+     array<float> storedHighs,
+     array<float> storedVolumes,
+     float rangeLow,
+     float rangeHigh,
+     int rowCount,
+     float valueAreaFraction) =>
+    array<float> result = array.new_float(3, na)
+    int storedBarCount = array.size(storedLows)
+    float profileRange = rangeHigh - rangeLow
+
+    if storedBarCount > 0 and profileRange > syminfo.mintick
+        float rowHeight = profileRange / rowCount
+        array<float> rowVolumes = array.new_float(rowCount, 0.0)
+
+        for storedBarIndex = 0 to storedBarCount - 1
+            float storedLow = array.get(storedLows, storedBarIndex)
+            float storedHigh = array.get(storedHighs, storedBarIndex)
+            float storedVolume = array.get(storedVolumes, storedBarIndex)
+            float storedRange = storedHigh - storedLow
+
+            if storedRange <= syminfo.mintick
+                int singleRow = int(math.floor((storedLow - rangeLow) / rowHeight))
+                singleRow := math.max(0, math.min(rowCount - 1, singleRow))
+                array.set(rowVolumes, singleRow, array.get(rowVolumes, singleRow) + storedVolume)
+            else
+                for rowIndex = 0 to rowCount - 1
+                    float rowLow = rangeLow + rowIndex * rowHeight
+                    float rowHigh = rowLow + rowHeight
+                    float overlap = math.max(0.0, math.min(storedHigh, rowHigh) - math.max(storedLow, rowLow))
+                    if overlap > 0.0
+                        float allocatedVolume = storedVolume * overlap / storedRange
+                        array.set(rowVolumes, rowIndex, array.get(rowVolumes, rowIndex) + allocatedVolume)
+
+        int pocRow = 0
+        float pocRowVolume = array.get(rowVolumes, 0)
+        for rowIndex = 1 to rowCount - 1
+            float candidateVolume = array.get(rowVolumes, rowIndex)
+            if candidateVolume > pocRowVolume
+                pocRow := rowIndex
+                pocRowVolume := candidateVolume
+
+        float totalProfileVolume = array.sum(rowVolumes)
+        float targetValueAreaVolume = totalProfileVolume * valueAreaFraction
+        int valueAreaLowRow = pocRow
+        int valueAreaHighRow = pocRow
+        float includedVolume = pocRowVolume
+        int expansionCount = 0
+
+        while includedVolume < targetValueAreaVolume and expansionCount < rowCount - 1
+            float lowerCandidateVolume = valueAreaLowRow > 0 ? array.get(rowVolumes, valueAreaLowRow - 1) : -1.0
+            float upperCandidateVolume = valueAreaHighRow < rowCount - 1 ? array.get(rowVolumes, valueAreaHighRow + 1) : -1.0
+
+            if upperCandidateVolume > lowerCandidateVolume
+                valueAreaHighRow += 1
+                includedVolume += math.max(0.0, upperCandidateVolume)
+            else if valueAreaLowRow > 0
+                valueAreaLowRow -= 1
+                includedVolume += math.max(0.0, lowerCandidateVolume)
+            else if valueAreaHighRow < rowCount - 1
+                valueAreaHighRow += 1
+                includedVolume += math.max(0.0, upperCandidateVolume)
+
+            expansionCount += 1
+
+        float calculatedVAL = rangeLow + valueAreaLowRow * rowHeight
+        float calculatedPOC = rangeLow + (pocRow + 0.5) * rowHeight
+        float calculatedVAH = rangeLow + (valueAreaHighRow + 1.0) * rowHeight
+
+        array.set(result, 0, calculatedVAL)
+        array.set(result, 1, calculatedPOC)
+        array.set(result, 2, calculatedVAH)
+
+    result
+
+//------------------------------------------------------------------------------
+// Series calculations
+//------------------------------------------------------------------------------
+
+float atrValue = ta.atr(atrLength)
+float volumeAverage = ta.sma(volume, volumeAverageLength)
+float contractionVolumeAverage = ta.sma(volume, contractionBars)
+float sessionVWAP = ta.vwap(hlc3)
+float candleRange = high - low
+float candleBody = math.abs(close - open)
+float candleCloseLocation = candleRange > 0.0 ? (close - low) / candleRange : 0.5
+float relativeVolume = not na(volumeAverage) and volumeAverage > 0.0 ? volume / volumeAverage : na
+float confirmedVALPivot = ta.pivotlow(low, valPivotLeft, valPivotRight)
+
+bool timeframeSupported = timeframe.isminutes and timeframe.multiplier <= maximumChartMinutes
+bool inAnalysisSession = not na(time(timeframe.period, analysisSession, syminfo.timezone))
+bool inAutoStartWindow = not na(time(timeframe.period, autoStartWindow, syminfo.timezone))
+bool inManualMoveWindow = not na(time(timeframe.period, manualMoveWindow, syminfo.timezone))
+
+int currentDateKey = year * 10000 + month * 100 + dayofmonth
+bool newTradingDate = bar_index > 0 and currentDateKey != currentDateKey[1]
+
+//------------------------------------------------------------------------------
+// Persistent state and drawing retention
+//------------------------------------------------------------------------------
+
+var int lifecycleState = STATE_SEARCHING
+
+var array<float> movementLows = array.new_float()
+var array<float> movementHighs = array.new_float()
+var array<float> movementVolumes = array.new_float()
+
+var float movementLow = na
+var float movementHigh = na
+var float movementPeakVolume = na
+var int movementStartTime = na
+var int movementEndTime = na
+var int movementHighBarIndex = na
+
+var float profileVAL = na
+var float profilePOC = na
+var float profileVAH = na
+var float profileVWAPAtFreeze = na
+var int profileReadyBarIndex = na
+var int profileLastVisibleTime = na
+
+var bool valDefended = false
+var bool valInvalidated = false
+var bool valInvalidationMarked = false
+var int consecutiveClosesBelowVAL = 0
+
+var int failedPOCAttempts = 0
+var int lastPOCAttemptBarIndex = na
+
+var bool breakoutPending = false
+var bool breakoutConfirmed = false
+var int breakoutBarIndex = na
+var int breakoutTime = na
+var float breakoutLow = na
+var float breakoutHigh = na
+var float breakoutATRAtSignal = na
+
+var line activeVALLine = na
+var line activePOCLine = na
+var line activeVAHLine = na
+var box activeMovementBox = na
+var label activeEntryLabel = na
+
+var array<line> retainedProfileLines = array.new_line()
+var array<box> retainedMovementBoxes = array.new_box()
+var array<label> retainedMarkers = array.new_label()
+var array<label> retainedEntryMarkers = array.new_label()
+
+bool entryTriggeredThisBar = false
+
+//------------------------------------------------------------------------------
+// Reset the live lifecycle at the first bar of each exchange date.
+// Historical drawings remain on the chart.
+//------------------------------------------------------------------------------
+
+if newTradingDate
+    lifecycleState := STATE_SEARCHING
+    array.clear(movementLows)
+    array.clear(movementHighs)
+    array.clear(movementVolumes)
+
+    movementLow := na
+    movementHigh := na
+    movementPeakVolume := na
+    movementStartTime := na
+    movementEndTime := na
+    movementHighBarIndex := na
+
+    profileVAL := na
+    profilePOC := na
+    profileVAH := na
+    profileVWAPAtFreeze := na
+    profileReadyBarIndex := na
+    profileLastVisibleTime := na
+
+    valDefended := false
+    valInvalidated := false
+    valInvalidationMarked := false
+    consecutiveClosesBelowVAL := 0
+
+    failedPOCAttempts := 0
+    lastPOCAttemptBarIndex := na
+
+    breakoutPending := false
+    breakoutConfirmed := false
+    breakoutBarIndex := na
+    breakoutTime := na
+    breakoutLow := na
+    breakoutHigh := na
+    breakoutATRAtSignal := na
+
+    activeVALLine := na
+    activePOCLine := na
+    activeVAHLine := na
+    activeMovementBox := na
+    activeEntryLabel := na
+
+//------------------------------------------------------------------------------
+// Detect/build/freeze the first movement.
+// All lifecycle decisions occur on confirmed bars.
+//------------------------------------------------------------------------------
+
+bool freezeMovementNow = false
+bool discardMovementNow = false
+
+if barstate.isconfirmed and timeframeSupported
+    if detectionMode == "Manual window"
+        if lifecycleState == STATE_SEARCHING and inManualMoveWindow
+            array.clear(movementLows)
+            array.clear(movementHighs)
+            array.clear(movementVolumes)
+            array.push(movementLows, low)
+            array.push(movementHighs, high)
+            array.push(movementVolumes, nz(volume))
+
+            movementLow := low
+            movementHigh := high
+            movementPeakVolume := nz(volume)
+            movementStartTime := time
+            movementEndTime := time_close
+            movementHighBarIndex := bar_index
+            lifecycleState := STATE_BUILDING
+
+        else if lifecycleState == STATE_BUILDING
+            if inManualMoveWindow
+                array.push(movementLows, low)
+                array.push(movementHighs, high)
+                array.push(movementVolumes, nz(volume))
+
+                movementLow := math.min(movementLow, low)
+                if high >= movementHigh
+                    movementHigh := high
+                    movementHighBarIndex := bar_index
+                movementPeakVolume := math.max(movementPeakVolume, nz(volume))
+                movementEndTime := time_close
+            else
+                freezeMovementNow := array.size(movementLows) >= 2 and movementHigh > movementLow
+                discardMovementNow := not freezeMovementNow
+
+    else
+        bool bullishMovementStart =
+             lifecycleState == STATE_SEARCHING and
+             inAnalysisSession and
+             inAutoStartWindow and
+             not na(atrValue) and
+             not na(relativeVolume) and
+             close > open and
+             candleBody >= atrValue * startBodyATR and
+             candleCloseLocation >= startCloseLocation and
+             relativeVolume >= startRelativeVolume
+
+        if bullishMovementStart
+            array.clear(movementLows)
+            array.clear(movementHighs)
+            array.clear(movementVolumes)
+
+            movementLow := low
+            movementHigh := high
+            movementPeakVolume := nz(volume)
+            movementStartTime := time
+            movementEndTime := time_close
+            movementHighBarIndex := bar_index
+
+            // The qualifying expansion candle can be the second bar of the
+            // actual movement. Seed a small amount of completed context before
+            // it, while staying inside the same exchange date and session.
+            int contextOffset = autoPreTriggerBars
+            while contextOffset >= 1
+                bool contextBarEligible =
+                     inAnalysisSession[contextOffset] and
+                     currentDateKey[contextOffset] == currentDateKey
+                if contextBarEligible
+                    array.push(movementLows, low[contextOffset])
+                    array.push(movementHighs, high[contextOffset])
+                    array.push(movementVolumes, nz(volume[contextOffset]))
+                    movementLow := math.min(movementLow, low[contextOffset])
+                    if high[contextOffset] > movementHigh
+                        movementHigh := high[contextOffset]
+                        movementHighBarIndex := bar_index - contextOffset
+                    movementPeakVolume := math.max(movementPeakVolume, nz(volume[contextOffset]))
+                    movementStartTime := math.min(movementStartTime, time[contextOffset])
+                contextOffset -= 1
+
+            array.push(movementLows, low)
+            array.push(movementHighs, high)
+            array.push(movementVolumes, nz(volume))
+
+            // Prefer the current bar when it ties or exceeds the seeded high,
+            // matching the normal movement-high tracking behavior.
+            if high >= movementHigh
+                movementHigh := high
+                movementHighBarIndex := bar_index
+            lifecycleState := STATE_BUILDING
+
+        else if lifecycleState == STATE_BUILDING
+            if inAnalysisSession
+                array.push(movementLows, low)
+                array.push(movementHighs, high)
+                array.push(movementVolumes, nz(volume))
+
+                movementLow := math.min(movementLow, low)
+                if high >= movementHigh
+                    movementHigh := high
+                    movementHighBarIndex := bar_index
+                movementPeakVolume := math.max(movementPeakVolume, nz(volume))
+                movementEndTime := time_close
+
+                int movementBarCount = array.size(movementLows)
+                int barsSinceMovementHigh = bar_index - movementHighBarIndex
+                bool movementIsLargeEnough =
+                     movementBarCount >= minimumMoveBars and
+                     not na(atrValue) and
+                     movementHigh - movementLow >= atrValue * minimumMoveRangeATR
+                bool volumeHasContracted =
+                     not na(contractionVolumeAverage) and
+                     not na(volumeAverage) and
+                     contractionVolumeAverage <= volumeAverage * contractionVsAverage and
+                     nz(volume) <= movementPeakVolume * contractionVsPeak
+                bool movementHasStalled =
+                     barsSinceMovementHigh >= contractionBars and
+                     volumeHasContracted
+                bool movementReachedMaximum = movementBarCount >= maximumMoveBars
+
+                freezeMovementNow := movementIsLargeEnough and (movementHasStalled or movementReachedMaximum)
+                discardMovementNow := not movementIsLargeEnough and (movementHasStalled or movementReachedMaximum)
+            else
+                int movementBarCount = array.size(movementLows)
+                bool movementIsLargeEnough =
+                     movementBarCount >= minimumMoveBars and
+                     not na(atrValue[1]) and
+                     movementHigh - movementLow >= atrValue[1] * minimumMoveRangeATR
+                freezeMovementNow := movementIsLargeEnough
+                discardMovementNow := not movementIsLargeEnough
+
+if discardMovementNow
+    lifecycleState := STATE_SEARCHING
+    array.clear(movementLows)
+    array.clear(movementHighs)
+    array.clear(movementVolumes)
+    movementLow := na
+    movementHigh := na
+    movementPeakVolume := na
+    movementStartTime := na
+    movementEndTime := na
+    movementHighBarIndex := na
+
+if freezeMovementNow
+    array<float> calculatedProfile = f_calculateProfile(
+         movementLows,
+         movementHighs,
+         movementVolumes,
+         movementLow,
+         movementHigh,
+         profileRows,
+         valueAreaPercent / 100.0)
+
+    float calculatedVAL = array.get(calculatedProfile, 0)
+    float calculatedPOC = array.get(calculatedProfile, 1)
+    float calculatedVAH = array.get(calculatedProfile, 2)
+
+    bool profileValuesReady =
+         not na(calculatedVAL) and
+         not na(calculatedPOC) and
+         not na(calculatedVAH)
+    bool frozenPOCAtOrAboveVWAP =
+         profileValuesReady and
+         not na(sessionVWAP) and
+         calculatedPOC >= sessionVWAP
+
+    if frozenPOCAtOrAboveVWAP
+        profileVAL := calculatedVAL
+        profilePOC := calculatedPOC
+        profileVAH := calculatedVAH
+        profileVWAPAtFreeze := sessionVWAP
+        profileReadyBarIndex := bar_index
+        profileLastVisibleTime := time_close
+        lifecycleState := STATE_PROFILE
+
+        valDefended := false
+        valInvalidated := false
+        valInvalidationMarked := false
+        consecutiveClosesBelowVAL := 0
+        failedPOCAttempts := 0
+        lastPOCAttemptBarIndex := na
+        breakoutPending := false
+        breakoutConfirmed := false
+        activeEntryLabel := na
+
+        if showMovementBox
+            activeMovementBox := box.new(
+                 left = movementStartTime,
+                 top = movementHigh,
+                 right = movementEndTime,
+                 bottom = movementLow,
+                 xloc = xloc.bar_time,
+                 border_color = color.new(vahColor, 45),
+                 border_width = 1,
+                 bgcolor = color.new(vahColor, 91))
+            array.push(retainedMovementBoxes, activeMovementBox)
+            if array.size(retainedMovementBoxes) > maximumHistoricalProfiles
+                box.delete(array.shift(retainedMovementBoxes))
+
+        activeVALLine := line.new(
+             x1 = movementStartTime,
+             y1 = profileVAL,
+             x2 = profileLastVisibleTime,
+             y2 = profileVAL,
+             xloc = xloc.bar_time,
+             extend = extend.none,
+             color = valColor,
+             width = 2)
+
+        activePOCLine := line.new(
+             x1 = movementStartTime,
+             y1 = profilePOC,
+             x2 = profileLastVisibleTime,
+             y2 = profilePOC,
+             xloc = xloc.bar_time,
+             extend = extend.none,
+             color = pocColor,
+             width = 2,
+             style = line.style_dashed)
+
+        activeVAHLine := line.new(
+             x1 = movementStartTime,
+             y1 = profileVAH,
+             x2 = profileLastVisibleTime,
+             y2 = profileVAH,
+             xloc = xloc.bar_time,
+             extend = extend.none,
+             color = vahColor,
+             width = 2)
+
+        array.push(retainedProfileLines, activeVALLine)
+        array.push(retainedProfileLines, activePOCLine)
+        array.push(retainedProfileLines, activeVAHLine)
+        while array.size(retainedProfileLines) > maximumHistoricalProfiles * 3
+            line.delete(array.shift(retainedProfileLines))
+
+        if showFrozenProfileLabel
+            string profileWindow =
+                 str.format_time(movementStartTime, "HH:mm", syminfo.timezone) +
+                 "–" +
+                 str.format_time(movementEndTime, "HH:mm", syminfo.timezone)
+            string profileSummary =
+                 "FRVP FROZEN\n" +
+                 profileWindow +
+                 "\nVAL " + str.tostring(profileVAL, format.mintick) +
+                 "  •  POC " + str.tostring(profilePOC, format.mintick) +
+                 "  •  VAH " + str.tostring(profileVAH, format.mintick) +
+                 "\nFreeze VWAP " + str.tostring(profileVWAPAtFreeze, format.mintick) +
+                 "  •  POC above VWAP"
+            label profileLabel = label.new(
+                 x = movementEndTime,
+                 y = movementHigh,
+                 text = "FRVP\nFROZEN",
+                 xloc = xloc.bar_time,
+                 yloc = yloc.price,
+                 style = label.style_label_down,
+                 color = color.new(vahColor, 5),
+                 textcolor = color.white,
+                 size = size.tiny,
+                 tooltip = profileSummary)
+            array.push(retainedMarkers, profileLabel)
+
+    else
+        lifecycleState := STATE_SEARCHING
+
+//------------------------------------------------------------------------------
+// Frozen-profile continuation lifecycle
+//------------------------------------------------------------------------------
+
+bool profileCanBeEvaluated =
+     barstate.isconfirmed and
+     timeframeSupported and
+     lifecycleState == STATE_PROFILE and
+     bar_index > profileReadyBarIndex and
+     inAnalysisSession
+
+bool confirmBreakoutNow = false
+
+if profileCanBeEvaluated
+    profileLastVisibleTime := time_close
+    line.set_x2(activeVALLine, profileLastVisibleTime)
+    line.set_x2(activePOCLine, profileLastVisibleTime)
+    line.set_x2(activeVAHLine, profileLastVisibleTime)
+
+    // A value-area defense is invalidated by sustained acceptance below VAL,
+    // not by one isolated wick.
+    bool closeAcceptedBelowVAL = close < profileVAL - atrValue * valCloseToleranceATR
+    consecutiveClosesBelowVAL := closeAcceptedBelowVAL ? consecutiveClosesBelowVAL + 1 : 0
+
+    if consecutiveClosesBelowVAL >= valInvalidationCloses
+        valInvalidated := true
+        breakoutPending := false
+
+        if showVALInvalidation and not valInvalidationMarked
+            label valLostLabel = label.new(
+                 x = time,
+                 y = low,
+                 text = "VAL\nLOST",
+                 xloc = xloc.bar_time,
+                 yloc = yloc.price,
+                 style = label.style_label_up,
+                 color = color.new(color.red, 5),
+                 textcolor = color.white,
+                 size = size.tiny,
+                 tooltip = "Value was accepted below VAL at " + str.format_time(time, "HH:mm", syminfo.timezone))
+            array.push(retainedMarkers, valLostLabel)
+            valInvalidationMarked := true
+
+    // A VAL defense can be established directly when a completed bar approaches
+    // VAL without accepting below it. The existing pivot path remains as a
+    // stricter fallback when the approach is recognized a few bars later.
+    if not valDefended and not valInvalidated
+        bool directDefenseApproachedVAL = low <= profileVAL + atrValue * valApproachATR
+        bool directDefenseHeldVAL = low >= profileVAL - atrValue * valWickToleranceATR
+        bool directDefenseClosedAcceptably = close >= profileVAL - atrValue * valCloseToleranceATR
+        bool directVALDefense =
+             directDefenseApproachedVAL and
+             directDefenseHeldVAL and
+             directDefenseClosedAcceptably
+
+        float pivotATR = atrValue[valPivotRight]
+        float pivotClose = close[valPivotRight]
+        int pivotTime = time[valPivotRight]
+        bool pivotOccurredAfterProfile = pivotTime > movementEndTime
+        bool pivotApproachedVAL =
+             not na(confirmedVALPivot) and
+             confirmedVALPivot <= profileVAL + pivotATR * valApproachATR
+        bool pivotDidNotUndercutTooFar =
+             not na(confirmedVALPivot) and
+             confirmedVALPivot >= profileVAL - pivotATR * valWickToleranceATR
+        bool pivotClosedAcceptably =
+             not na(confirmedVALPivot) and
+             pivotClose >= profileVAL - pivotATR * valCloseToleranceATR
+        bool pivotVALDefense =
+             pivotOccurredAfterProfile and
+             pivotApproachedVAL and
+             pivotDidNotUndercutTooFar and
+             pivotClosedAcceptably
+
+        if directVALDefense or pivotVALDefense
+            int defenseTime = directVALDefense ? time : pivotTime
+            float defenseLow = directVALDefense ? low : confirmedVALPivot
+            string defenseMethod = directVALDefense ? "Observed at bar close" : "Confirmed pivot"
+            valDefended := true
+            line.set_color(activeVALLine, color.new(valColor, 0))
+            line.set_width(activeVALLine, 3)
+
+            if showVALDefenseMarkers
+                string defenseTooltip =
+                     "VAL DEFENDED\n" +
+                     "Defense: " + str.format_time(defenseTime, "HH:mm", syminfo.timezone) +
+                     "\nMethod: " + defenseMethod +
+                     "\nVAL: " + str.tostring(profileVAL, format.mintick) +
+                     "\nDefense low: " + str.tostring(defenseLow, format.mintick)
+                label defenseLabel = label.new(
+                     x = defenseTime,
+                     y = defenseLow,
+                     text = "VAL\nDEFENDED",
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_up,
+                     color = color.new(valColor, 0),
+                     textcolor = color.white,
+                     size = size.tiny,
+                     tooltip = defenseTooltip)
+                array.push(retainedMarkers, defenseLabel)
+
+    // A pending breakout is confirmed only after later bars avoid a close back
+    // below POC. The visible arrow remains on the original breakout candle.
+    if breakoutPending
+        bool holdFailed = close < profilePOC - atrValue * breakoutFailureBelowPOCATR
+        int elapsedHoldBars = bar_index - breakoutBarIndex
+
+        if holdFailed
+            breakoutPending := false
+
+            if showEntryMarkers and not na(activeEntryLabel)
+                string failedEntryTooltip =
+                     "FRVP ENTRY FAILED\n" +
+                     "Entry: " + str.format_time(breakoutTime, "HH:mm", syminfo.timezone) +
+                     "\nFailed: " + str.format_time(time, "HH:mm", syminfo.timezone) +
+                     "\nReason: price closed back below POC"
+                label.set_text(activeEntryLabel, "FRVP ENTRY\nFAILED")
+                label.set_color(activeEntryLabel, color.new(color.red, 15))
+                label.set_tooltip(activeEntryLabel, failedEntryTooltip)
+
+            activeEntryLabel := na
+        else if elapsedHoldBars >= breakoutHoldBars
+            confirmBreakoutNow := true
+
+    // Count failed POC rejection bars when they are sufficiently separated in
+    // time. This captures an extended fight around POC without requiring price
+    // to leave an ATR-wide band between every rejection.
+    bool startsAbovePOCEnough =
+         high >= profilePOC + atrValue * pocMinimumPenetrationATR
+    bool failsPOCAcceptance =
+         close <= profilePOC + atrValue * pocFailedCloseBandATR
+    bool enoughBarsSinceLastPOCAttempt =
+         na(lastPOCAttemptBarIndex) or
+         bar_index - lastPOCAttemptBarIndex >= pocAttemptSpacingBars
+    bool failedPOCAttemptNow =
+         not breakoutPending and
+         not breakoutConfirmed and
+         startsAbovePOCEnough and
+         failsPOCAcceptance and
+         enoughBarsSinceLastPOCAttempt
+
+    if failedPOCAttemptNow
+        failedPOCAttempts += 1
+        lastPOCAttemptBarIndex := bar_index
+
+        if showPOCAttemptMarkers
+            string attemptTooltip =
+                 "FAILED POC ATTEMPT #" + str.tostring(failedPOCAttempts) +
+                 "\nTime: " + str.format_time(time, "HH:mm", syminfo.timezone) +
+                 "\nPOC: " + str.tostring(profilePOC, format.mintick) +
+                 "\nHigh: " + str.tostring(high, format.mintick) +
+                 "\nClose: " + str.tostring(close, format.mintick)
+            label attemptLabel = label.new(
+                 x = time,
+                 y = high,
+                 text = "POC\nFAIL " + str.tostring(failedPOCAttempts),
+                 xloc = xloc.bar_time,
+                 yloc = yloc.price,
+                 style = label.style_label_down,
+                 color = color.new(pocColor, 5),
+                 textcolor = color.rgb(30, 30, 30),
+                 size = size.tiny,
+                 tooltip = attemptTooltip)
+            array.push(retainedMarkers, attemptLabel)
+
+    // The continuation candle must travel from the POC region to beyond VAH
+    // with strong price structure and participation.
+    bool breakoutStartsNearOrBelowPOC =
+         open <= profilePOC + atrValue * breakoutStartToleranceATR or
+         close[1] <= profilePOC + atrValue * breakoutStartToleranceATR
+    bool breakoutClosesAboveVAH =
+         close > profileVAH + atrValue * breakoutVAHBufferATR
+    bool breakoutPriceQuality =
+         close > open and
+         candleBody >= atrValue * breakoutBodyATR and
+         candleCloseLocation >= breakoutCloseLocation
+    bool breakoutVolumeQuality =
+         not na(relativeVolume) and
+         relativeVolume >= breakoutRelativeVolume
+    bool pocAtOrAboveEntryVWAP =
+         not na(sessionVWAP) and
+         profilePOC >= sessionVWAP
+    bool strongContinuationBreakout =
+         not breakoutPending and
+         not breakoutConfirmed and
+         valDefended and
+         not valInvalidated and
+         pocAtOrAboveEntryVWAP and
+         failedPOCAttempts >= minimumFailedPOCAttempts and
+         breakoutStartsNearOrBelowPOC and
+         breakoutClosesAboveVAH and
+         breakoutPriceQuality and
+         breakoutVolumeQuality
+
+    if strongContinuationBreakout
+        breakoutBarIndex := bar_index
+        breakoutTime := time
+        breakoutLow := low
+        breakoutHigh := high
+        breakoutATRAtSignal := atrValue
+        entryTriggeredThisBar := true
+
+        if showEntryMarkers
+            string pendingEntryStatus = breakoutHoldBars > 0 ? "PENDING " + str.tostring(breakoutHoldBars) + "-BAR HOLD" : "CONFIRMS AT THIS CLOSE"
+            string entryTooltip =
+                 "FRVP ENTRY\n" +
+                 "Time: " + str.format_time(breakoutTime, "HH:mm", syminfo.timezone) +
+                 "\nStatus: " + pendingEntryStatus +
+                 "\nVAL: " + str.tostring(profileVAL, format.mintick) +
+                 "\nPOC: " + str.tostring(profilePOC, format.mintick) +
+                 "\nVAH: " + str.tostring(profileVAH, format.mintick) +
+                 "\nVWAP: " + str.tostring(sessionVWAP, format.mintick) +
+                 "\nFailed POC attempts: " + str.tostring(failedPOCAttempts) +
+                 "\nRelative volume: " + str.tostring(relativeVolume, "#.##") + "×"
+            activeEntryLabel := label.new(
+                 x = breakoutTime,
+                 y = breakoutLow - breakoutATRAtSignal * 0.15,
+                 text = "FRVP\nENTRY",
+                 xloc = xloc.bar_time,
+                 yloc = yloc.price,
+                 style = label.style_label_up,
+                 color = entryCandidateColor,
+                 textcolor = color.white,
+                 size = size.small,
+                 tooltip = entryTooltip)
+            array.push(retainedEntryMarkers, activeEntryLabel)
+
+        if breakoutHoldBars == 0
+            confirmBreakoutNow := true
+        else
+            breakoutPending := true
+
+    if confirmBreakoutNow
+        breakoutPending := false
+        breakoutConfirmed := true
+
+        string continuationTooltip =
+             "FRVP ENTRY CONFIRMED\n" +
+             "Entry: " + str.format_time(breakoutTime, "HH:mm", syminfo.timezone) +
+             "\nConfirmed: " + str.format_time(time, "HH:mm", syminfo.timezone) +
+             "\nVAL: " + str.tostring(profileVAL, format.mintick) +
+             "\nPOC: " + str.tostring(profilePOC, format.mintick) +
+             "\nVAH: " + str.tostring(profileVAH, format.mintick) +
+             "\nFailed POC attempts: " + str.tostring(failedPOCAttempts)
+
+        if showEntryMarkers
+            if not na(activeEntryLabel)
+                label.set_text(activeEntryLabel, "FRVP ENTRY\nCONFIRMED")
+                label.set_color(activeEntryLabel, continuationColor)
+                label.set_tooltip(activeEntryLabel, continuationTooltip)
+            else
+                activeEntryLabel := label.new(
+                     x = breakoutTime,
+                     y = breakoutLow - breakoutATRAtSignal * 0.15,
+                     text = "FRVP ENTRY\nCONFIRMED",
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_up,
+                     color = continuationColor,
+                     textcolor = color.white,
+                     size = size.small,
+                     tooltip = continuationTooltip)
+                array.push(retainedEntryMarkers, activeEntryLabel)
+
+        line.set_color(activeVALLine, color.new(valColor, 20))
+        line.set_color(activePOCLine, pocColor)
+        line.set_color(activeVAHLine, vahColor)
+        line.set_width(activePOCLine, 3)
+        line.set_width(activeVAHLine, 3)
+
+// Keep drawings within the declared object limits.
+while array.size(retainedMarkers) > maximumHistoricalMarkers
+    label.delete(array.shift(retainedMarkers))
+
+// Entry labels use their own protected pool, so a historical entry cannot be
+// displaced by later POC-failure and VAL diagnostic labels.
+while array.size(retainedEntryMarkers) > maximumHistoricalEntryMarkers
+    label.delete(array.shift(retainedEntryMarkers))
+
+// The script exposes one alert only. It fires when the qualifying entry candle
+// closes, not when the later hold confirmation succeeds or fails.
+alertcondition(
+     entryTriggeredThisBar,
+     title = "FRVP Entry Bar",
+     message = "FRVP Entry Bar: price crossed from the POC region through VAH with qualifying price structure and relative volume.")
