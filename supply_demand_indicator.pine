@@ -1,5 +1,5 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.28 • No External Zone Text]", overlay = true, max_bars_back = 5000, max_boxes_count = 200, max_labels_count = 350)
+indicator("Bullish Supply→Demand Flip Zones [v6.30.1 • Historical Retention Fix]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
@@ -8,17 +8,19 @@ plot(na, title = "Output anchor", display = display.none)
 //   1. A rejection pivot starts a live-safe supply formation. The formation extends forward until participation collapses
 //      or price clearly disengages beneath the evolving supply band.
 //      Its top is the highest high and its bottom is the highest close before the collapse bar.
-//   2. The seller-control structure must terminate at confirmed demand.
-//   3. Supply may flip through a high-quality final break candle or a strong breakout impulse followed by acceptance.
-//   4. After confirmation, all drawings stay hidden while retest logic remains active.
-//   5. The full original supply structure appears when price first returns to the zone.
-//   6. A zone touch or fresh re-entry controls visibility/state only; it never draws an S→D arrow by itself.
-//   7. Only a confirmed pivot support inside the flipped original supply zone receives an S→D arrow on the actual support candle.
-//   8. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
-//   9. Classic retests require a completed candle whose low is above the zone top before the return.
-//  10. A separate progressive-takeover path allows demand to defend the lower edge, preserve its low,
+//   2. A compact multi-bar rejection shelf may qualify collectively when no
+//      single bar carries all of the body, volume, and trend evidence.
+//   3. The seller-control structure must terminate at confirmed demand.
+//   4. Supply may flip through a high-quality final break candle or a strong breakout impulse followed by acceptance.
+//   5. After confirmation, all drawings stay hidden while retest logic remains active.
+//   6. The full original supply structure appears when price first returns to the zone.
+//   7. A zone touch or fresh re-entry controls visibility/state only; it never draws an S→D arrow by itself.
+//   8. Only a confirmed pivot support inside or immediately above the flipped original supply zone receives an S→D arrow.
+//   9. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
+//  10. Classic retests require a completed candle whose low is above the zone top before the return.
+//  11. A separate progressive-takeover path allows demand to defend the lower edge, preserve its low,
 //      and then confirm acceptance above the upper edge on renewed volume.
-//  11. A later failure ends the active zone without rewriting the successful retest or structure.
+//  12. A later failure ends the active zone without rewriting the successful retest or structure.
 
 // ─────────────────────── Inputs ─────────────────────────
 groupSupply = "1. Hidden supply qualification"
@@ -51,6 +53,20 @@ formationCollapsePeakRatio = input.float(0.35, "Volume collapse vs formation pea
      tooltip = "Also detects gradual fading by comparing the current bar with the highest volume already included in the formation.", display = display.none)
 formationCollapseRequiresBelowAverage = input.bool(true, "Collapse bar must be below volume average", group = groupSupplyStructure,
      tooltip = "Recommended. Prevents one merely quieter but still highly active bar from ending the supply formation.", display = display.none)
+enableCollectiveSupplyShelves = input.bool(true, "Allow compact multi-bar supply shelves", group = groupSupplyStructure,
+     tooltip = "Allows several compact rejection bars to qualify together when the final pivot bar narrowly misses the single-candle body, volume, or trend-location rules.", display = display.none)
+collectiveSupplyBars = input.int(3, "Collective supply-shelf bars", minval = 3, maxval = 5, group = groupSupplyStructure,
+     tooltip = "The compact shelf must end on the confirmed pivot high. Three bars captures SDOT 2026-06-03 07:10–07:12.", display = display.none)
+collectiveMaxHighSpreadAtr = input.float(0.50, "Collective shelf maximum high spread (ATR)", minval = 0.05, step = 0.05, group = groupSupplyStructure,
+     tooltip = "Keeps the bars clustered near one rejected price ceiling instead of treating an accelerating rally as supply.", display = display.none)
+collectiveMaxCloseSpreadAtr = input.float(0.50, "Collective shelf maximum close spread (ATR)", minval = 0.05, step = 0.05, group = groupSupplyStructure,
+     tooltip = "Requires closing prices to remain compact while supply is forming.", display = display.none)
+collectiveMinAggregateRelativeVolume = input.float(1.00, "Collective shelf minimum aggregate relative volume", minval = 0.10, step = 0.10, group = groupSupplyStructure,
+     tooltip = "Compares the shelf's total volume with the sum of its per-bar volume averages.", display = display.none)
+collectiveMinClosesAboveTrend = input.int(2, "Collective shelf closes above EMA/VWAP", minval = 1, maxval = 5, group = groupSupplyStructure,
+     tooltip = "Minimum shelf bars that must close above EMA 9, EMA 20, and session VWAP.", display = display.none)
+collectiveMinPriorAdvanceAtr = input.float(0.50, "Collective shelf minimum prior advance (ATR)", minval = 0.0, step = 0.05, group = groupSupplyStructure,
+     tooltip = "Requires price to advance into the shelf before the rejection develops.", display = display.none)
 
 groupSellerLeg = "1b. Seller-control leg and demand termination"
 requireSellerControlLeg = input.bool(true, "Require completed seller-control leg", group = groupSellerLeg,
@@ -59,6 +75,8 @@ demandPivotLeft = input.int(3, "Demand pivot bars left", minval = 1, maxval = 10
 demandPivotRight = input.int(3, "Demand pivot bars right", minval = 1, maxval = 10, group = groupSellerLeg, display = display.none)
 minSellerLegBars = input.int(3, "Minimum seller-leg bars", minval = 1, maxval = 50, group = groupSellerLeg, display = display.none)
 maxSellerLegBars = input.int(30, "Maximum seller-leg bars", minval = 3, maxval = 100, group = groupSellerLeg, display = display.none)
+collectiveMaxSellerLegBars = input.int(40, "Multi-bar supply maximum seller-leg bars", minval = 3, maxval = 100, group = groupSellerLeg,
+     tooltip = "Applies only when the supply origin spans multiple bars. It lets an extended seller-controlled decline reach its final confirmed demand without changing the 30-bar limit for single-bar supply.", display = display.none)
 minSellerLegAtr = input.float(1.50, "Minimum supply-to-demand decline (ATR)", minval = 0.1, step = 0.25, group = groupSellerLeg, display = display.none)
 minDemandLowerWickAtr = input.float(0.10, "Demand minimum lower wick (ATR)", minval = 0.0, step = 0.05, group = groupSellerLeg, display = display.none)
 minDemandReactionAtr = input.float(0.75, "Minimum reaction from demand (ATR)", minval = 0.1, step = 0.25, group = groupSellerLeg, display = display.none)
@@ -146,9 +164,14 @@ groupManagement = "4. Flipped-demand management"
 invalidationMode = input.string("Close", "Invalidation method", options = ["Close", "Wick"], group = groupManagement, display = display.none)
 invalidationBufferAtr = input.float(0.10, "Invalidation buffer (ATR)", minval = 0.0, step = 0.05, group = groupManagement,
      tooltip = "Allows a small close/wick penetration beyond the zone before declaring failure.", display = display.none)
+supplyRetestProximityAtr = input.float(0.10, "Supply retest proximity above zone (ATR)", minval = 0.0, step = 0.05, group = groupManagement,
+     tooltip = "Allows buyers to front-run a flipped supply top by a small ATR distance. SDOT 2026-06-03 10:05 stopped at 6.32, only about 0.07 ATR above the 6.29 zone top.", display = display.none)
 sendDynamicAlerts = input.bool(true, "Send dynamic flip/retest alerts", group = groupManagement,
      tooltip = "Create a TradingView alert using 'Any alert() function call'. Messages include the zone prices.", display = display.none)
-maxDisplayedZones = input.int(50, "Maximum tracked flip structures", minval = 1, maxval = 75, group = groupManagement, display = display.none)
+maxHistoricalFlipStructures = input.int(200, "Maximum retained flip structures (history)", minval = 1, maxval = 200, group = groupManagement,
+     tooltip = "Retains older confirmed zones on long historical datasets. The distinct input name prevents a previously saved 50-zone setting from carrying into this version.", display = display.none)
+maxHistoricalSupportMarkers = input.int(400, "Maximum retained S→D markers (history)", minval = 1, maxval = 400, group = groupManagement,
+     tooltip = "Retains confirmed support arrows for older zones while staying within TradingView's label-object limit.", display = display.none)
 
 groupDisplay = "5. Display"
 activeFill = input.color(color.new(color.lime, 84), "Active demand fill", group = groupDisplay, display = display.none)
@@ -164,7 +187,7 @@ showFlipMarkers = input.bool(true, "Show zone-type arrows on retests", group = g
 showAdditionalSupplyRetests = input.bool(true, "Track every fresh S→D zone re-entry", group = groupDisplay,
      tooltip = "Tracks each later re-entry after price leaves the zone. Re-entry alone does not draw an arrow; only a confirmed demand pivot inside the zone does.", display = display.none)
 showConfirmedSupplyFlipSupports = input.bool(true, "Mark confirmed support pivots inside S→D zones", group = groupDisplay,
-     tooltip = "Marks a confirmed pivot low on its actual candle when it forms inside an already flipped original supply zone and passes the existing wick, reaction, and volume tests.", display = display.none)
+     tooltip = "Marks a confirmed pivot low on its actual candle when it forms inside or within the configured proximity above an already flipped supply zone and passes the wick, reaction, and volume tests.", display = display.none)
 showRetestMarkers = input.bool(true, "Show first-retest markers", group = groupDisplay, display = display.none)
 showLaterBreakMarkers = input.bool(true, "Show red marker when a retested zone later breaks", group = groupDisplay, display = display.none)
 zoneLeftPaddingBars = input.int(3, "Start visible area before origin (bars)", minval = 0, maxval = 20, group = groupDisplay,
@@ -316,15 +339,97 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
          (trendDataReady and supplyAboveTrend and bullishStack and risingEmas and risingVwap and
          reactionLocationOk and extensionOk))
 
-    if directionOk and wickOk and departureOk and validZoneWidth and supplyTrendOk
+    bool standardSupplyQualified = directionOk and wickOk and departureOk and validZoneWidth and supplyTrendOk
+
+    // Collective shelf fallback. A compact sequence may carry valid supply
+    // evidence across several bars even when the final pivot narrowly misses a
+    // single-candle threshold. Its top is the highest high and its bottom is the
+    // highest accepted close across the shelf.
+    bool collectiveDataReady = enableCollectiveSupplyShelves and
+         bar_index > pivotRight + collectiveSupplyBars
+    float collectiveTop = na
+    float collectiveBottom = na
+    float collectiveMinimumHigh = na
+    float collectiveMinimumClose = na
+    float collectiveMaximumBodyHigh = na
+    float collectiveVolumeSum = 0.0
+    float collectiveVolumeAverageSum = 0.0
+    float collectivePeakVolume = 0.0
+    int collectiveHighVolumeBars = 0
+    int collectiveTrendCloses = 0
+    bool collectiveAllClosesAboveVwap = true
+
+    for collectiveStep = 0 to collectiveSupplyBars - 1
+        int collectiveOffset = pivotRight + collectiveStep
+        float collectiveBarBodyHigh = math.max(open[collectiveOffset], close[collectiveOffset])
+        float collectiveBarVolumeAverage = volumeAverage[collectiveOffset]
+        float collectiveBarRelativeVolume = not na(volume[collectiveOffset]) and
+             not na(collectiveBarVolumeAverage) and collectiveBarVolumeAverage > 0.0 ?
+             volume[collectiveOffset] / collectiveBarVolumeAverage : na
+        bool collectiveBarDataReady = not na(high[collectiveOffset]) and
+             not na(close[collectiveOffset]) and not na(fastEma[collectiveOffset]) and
+             not na(slowEma[collectiveOffset]) and not na(sessionVwap[collectiveOffset]) and
+             not na(collectiveBarRelativeVolume)
+
+        collectiveDataReady := collectiveDataReady and collectiveBarDataReady
+        collectiveTop := na(collectiveTop) ? high[collectiveOffset] : math.max(collectiveTop, high[collectiveOffset])
+        collectiveBottom := na(collectiveBottom) ? close[collectiveOffset] : math.max(collectiveBottom, close[collectiveOffset])
+        collectiveMinimumHigh := na(collectiveMinimumHigh) ? high[collectiveOffset] : math.min(collectiveMinimumHigh, high[collectiveOffset])
+        collectiveMinimumClose := na(collectiveMinimumClose) ? close[collectiveOffset] : math.min(collectiveMinimumClose, close[collectiveOffset])
+        collectiveMaximumBodyHigh := na(collectiveMaximumBodyHigh) ?
+             collectiveBarBodyHigh : math.max(collectiveMaximumBodyHigh, collectiveBarBodyHigh)
+        collectiveVolumeSum += nz(volume[collectiveOffset])
+        collectiveVolumeAverageSum += nz(collectiveBarVolumeAverage)
+        collectivePeakVolume := math.max(collectivePeakVolume, nz(volume[collectiveOffset]))
+        collectiveHighVolumeBars += not na(collectiveBarRelativeVolume) and
+             collectiveBarRelativeVolume >= minSupplyRelativeVolume ? 1 : 0
+        collectiveTrendCloses += collectiveBarDataReady and
+             close[collectiveOffset] > fastEma[collectiveOffset] and
+             close[collectiveOffset] > slowEma[collectiveOffset] and
+             close[collectiveOffset] > sessionVwap[collectiveOffset] ? 1 : 0
+        collectiveAllClosesAboveVwap := collectiveAllClosesAboveVwap and
+             collectiveBarDataReady and close[collectiveOffset] > sessionVwap[collectiveOffset]
+
+    float collectiveAggregateRelativeVolume = collectiveVolumeAverageSum > 0.0 ?
+         collectiveVolumeSum / collectiveVolumeAverageSum : na
+    float collectivePriorClose = close[pivotRight + collectiveSupplyBars]
+    bool collectiveHighSpreadOk = collectiveDataReady and
+         collectiveTop - collectiveMinimumHigh <= pivotAtr * collectiveMaxHighSpreadAtr
+    bool collectiveCloseSpreadOk = collectiveDataReady and
+         collectiveBottom - collectiveMinimumClose <= pivotAtr * collectiveMaxCloseSpreadAtr
+    bool collectiveVolumeOk = not requireSupplyVolume or
+         (not na(collectiveAggregateRelativeVolume) and
+         collectiveAggregateRelativeVolume >= collectiveMinAggregateRelativeVolume and
+         collectiveHighVolumeBars >= 1)
+    bool collectiveTrendOk = not requireBullishTrend or
+         (trendDataReady and bullishStack and risingEmas and risingVwap and extensionOk and
+         collectiveAllClosesAboveVwap and
+         collectiveTrendCloses >= math.min(collectiveMinClosesAboveTrend, collectiveSupplyBars))
+    bool collectivePriorAdvanceOk = collectiveMinPriorAdvanceAtr <= 0.0 or
+         (not na(collectivePriorClose) and
+         collectiveBottom - collectivePriorClose >= pivotAtr * collectiveMinPriorAdvanceAtr)
+    bool collectiveRejectionOk = collectiveDataReady and
+         collectiveTop - collectiveMaximumBodyHigh >= pivotAtr * minUpperWickAtr
+    bool collectiveDepartureOk = collectiveDataReady and
+         collectiveBottom - postPivotLow >= pivotAtr * minBearishDepartureAtr and
+         postPivotClose < collectiveBottom
+    bool collectiveZoneValid = collectiveDataReady and collectiveTop > collectiveBottom
+    bool collectiveSupplyQualified = enableCollectiveSupplyShelves and
+         collectiveHighSpreadOk and collectiveCloseSpreadOk and collectiveVolumeOk and
+         collectiveTrendOk and collectivePriorAdvanceOk and collectiveRejectionOk and
+         collectiveDepartureOk and collectiveZoneValid
+    bool useCollectiveSupplyOrigin = not standardSupplyQualified and collectiveSupplyQualified
+
+    if standardSupplyQualified or useCollectiveSupplyOrigin
         int originBar = bar_index - pivotRight
-        int supplyStructureStartBar = originBar
-        int supplyStructureBars = 1
+        int supplyStructureStartBar = useCollectiveSupplyOrigin ?
+             originBar - collectiveSupplyBars + 1 : originBar
+        int supplyStructureBars = useCollectiveSupplyOrigin ? collectiveSupplyBars : 1
 
         // The pivot defines the vertical zone. Expand only the temporal origin,
         // walking backward contiguously through the pivot's left-side confirmation
         // window. A failed bar ends the expansion; the scan never jumps across gaps.
-        if expandSupplyStructure
+        if expandSupplyStructure and not useCollectiveSupplyOrigin
             for backwardStep = 1 to pivotLeft
                 int structureOffset = pivotRight + backwardStep
                 float structureBodyHigh = math.max(open[structureOffset], close[structureOffset])
@@ -357,20 +462,21 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
                 else
                     break
 
-        int effectiveMinSupplyStructureBars = math.min(minSupplyStructureBars, pivotLeft + 1)
-        if supplyStructureBars < effectiveMinSupplyStructureBars
-            supplyStructureStartBar := originBar
+        if not useCollectiveSupplyOrigin
+            int effectiveMinSupplyStructureBars = math.min(minSupplyStructureBars, pivotLeft + 1)
+            if supplyStructureBars < effectiveMinSupplyStructureBars
+                supplyStructureStartBar := originBar
 
         // Build the initial forward formation from the pivot through the bars already
         // required to confirm it. Scan chronologically and stop before the first
         // dramatic volume-collapse bar. This is live-safe because all inspected bars
         // are already closed when the pivot becomes confirmed.
-        float formationTop = pivotHigh
-        float formationBottom = pivotClose
-        float formationPeakVolume = volume[pivotRight]
+        float formationTop = useCollectiveSupplyOrigin ? collectiveTop : pivotHigh
+        float formationBottom = useCollectiveSupplyOrigin ? collectiveBottom : pivotClose
+        float formationPeakVolume = useCollectiveSupplyOrigin ? collectivePeakVolume : volume[pivotRight]
         float formationLastVolume = volume[pivotRight]
         int formationEndBar = originBar
-        int formationBarCount = 1
+        int formationBarCount = useCollectiveSupplyOrigin ? collectiveSupplyBars : 1
         bool formationFinalized = not useForwardVolumeSupplyFormation
 
         if useForwardVolumeSupplyFormation and pivotRight > 0
@@ -417,8 +523,13 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
             array.push(candidateBottoms, formationBottom)
             // Keep the original body-high for measuring seller-leg decline even when
             // a bearish origin uses its deeper close as the actionable zone boundary.
-            array.push(candidateLegReferences, math.max(bodyHigh, formationBottom))
-            array.push(candidateOriginRelativeVolumes, supplyRelativeVolume)
+            float candidateLegReference = useCollectiveSupplyOrigin ?
+                 math.max(collectiveMaximumBodyHigh, formationBottom) :
+                 math.max(bodyHigh, formationBottom)
+            float candidateRelativeVolume = useCollectiveSupplyOrigin ?
+                 collectiveAggregateRelativeVolume : supplyRelativeVolume
+            array.push(candidateLegReferences, candidateLegReference)
+            array.push(candidateOriginRelativeVolumes, candidateRelativeVolume)
             array.push(candidateOriginBars, originBar)
             array.push(candidateStructureStartBars, supplyStructureStartBar)
             array.push(candidateOriginAtrs, pivotAtr)
@@ -473,6 +584,9 @@ while candidateIndex >= 0
     float supplyOriginRelativeVolume = array.get(candidateOriginRelativeVolumes, candidateIndex)
     int supplyOriginBar = array.get(candidateOriginBars, candidateIndex)
     int supplyStructureStartBar = array.get(candidateStructureStartBars, candidateIndex)
+    bool isMultiBarSupplyStructure = supplyStructureStartBar < supplyOriginBar
+    int effectiveMaxSellerLegBars = isMultiBarSupplyStructure ?
+         math.max(maxSellerLegBars, collectiveMaxSellerLegBars) : maxSellerLegBars
     float supplyOriginAtr = array.get(candidateOriginAtrs, candidateIndex)
     float trackedLegLow = array.get(candidateTrackedLows, candidateIndex)
     bool sellerLegConfirmed = array.get(candidateLegConfirmed, candidateIndex)
@@ -555,7 +669,7 @@ while candidateIndex >= 0
             float demandBodyLow = math.min(open[demandPivotRight], close[demandPivotRight])
             float demandLowerWick = demandBodyLow - confirmedPivotLow
             bool pivotIsLegLow = math.abs(confirmedPivotLow - trackedLegLow) <= syminfo.mintick * 2.0
-            bool legDurationOk = proposedLegBars >= minSellerLegBars and proposedLegBars <= maxSellerLegBars
+            bool legDurationOk = proposedLegBars >= minSellerLegBars and proposedLegBars <= effectiveMaxSellerLegBars
             bool legDeclineOk = sellerLegReference - confirmedPivotLow >= supplyOriginAtr * minSellerLegAtr
             bool demandWickOk = demandLowerWick >= demandAtr * minDemandLowerWickAtr
             bool demandReactionOk = postDemandHigh - confirmedPivotLow >= demandAtr * minDemandReactionAtr
@@ -636,7 +750,7 @@ while candidateIndex >= 0
 
     bool expired = bar_index - supplyOriginBar > maxHiddenAge
     bool legFormationExpired = requireSellerControlLeg and not sellerLegConfirmed and
-         bar_index - supplyOriginBar > maxSellerLegBars + demandPivotRight
+         bar_index - supplyOriginBar > effectiveMaxSellerLegBars + demandPivotRight
     // Keep a candidate available for the progressive path until maxHiddenAge.
     // The classic path may no longer use it after its seller-leg window expires.
     bool classicLegUsable = not legFormationExpired
@@ -801,7 +915,7 @@ while candidateIndex >= 0
                   "–" + str.tostring(supplyTop, format.mintick))
         array.push(confirmedSupplyFlipSupportBars, progressiveDemandBar)
         array.push(confirmedSupplyFlipSupportLabels, progressiveDemandLabel)
-        if array.size(confirmedSupplyFlipSupportBars) > 100
+        if array.size(confirmedSupplyFlipSupportBars) > maxHistoricalSupportMarkers
             array.shift(confirmedSupplyFlipSupportBars)
             label oldestProgressiveSupportLabel = array.shift(confirmedSupplyFlipSupportLabels)
             if not na(oldestProgressiveSupportLabel)
@@ -857,7 +971,7 @@ while candidateIndex >= 0
         array.remove(candidateProgressiveDemandBars, candidateIndex)
         array.remove(candidateProgressiveDemandAtrs, candidateIndex)
 
-        if array.size(flipBoxes) > maxDisplayedZones
+        if array.size(flipBoxes) > maxHistoricalFlipStructures
             box oldestBox = array.shift(flipBoxes)
             box oldestLegBox = array.shift(flipLegBoxes)
             label oldestTextLabel = array.shift(flipTextLabels)
@@ -958,7 +1072,7 @@ while candidateIndex >= 0
         array.remove(candidateProgressiveDemandBars, candidateIndex)
         array.remove(candidateProgressiveDemandAtrs, candidateIndex)
 
-        if array.size(flipBoxes) > maxDisplayedZones
+        if array.size(flipBoxes) > maxHistoricalFlipStructures
             box oldestBox = array.shift(flipBoxes)
             box oldestLegBox = array.shift(flipLegBoxes)
             label oldestTextLabel = array.shift(flipTextLabels)
@@ -1175,7 +1289,7 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
                      " | Zone: " + str.tostring(selectedBaseBottom, format.mintick) + " - " +
                      str.tostring(selectedBaseTop, format.mintick), alert.freq_once_per_bar_close)
 
-            if array.size(flipBoxes) > maxDisplayedZones
+            if array.size(flipBoxes) > maxHistoricalFlipStructures
                 box oldestBox = array.shift(flipBoxes)
                 box oldestLegBox = array.shift(flipLegBoxes)
                 label oldestTextLabel = array.shift(flipTextLabels)
@@ -1238,7 +1352,9 @@ while zoneIndex < array.size(flipBoxes)
         float confirmedSupportLowerWick = confirmedSupportBodyLow - confirmedPivotLow
         bool confirmedSupportAfterFlip = confirmedSupportBar > confirmationBar
         bool confirmedSupportAfterSeparation = hasFullSeparation and confirmedSupportBar > firstSeparationBar
-        bool confirmedSupportInsideZone = confirmedPivotLow <= zoneTop and confirmedSupportHigh >= zoneBottom
+        float confirmedSupportProximityTop = zoneTop + confirmedSupportAtr * supplyRetestProximityAtr
+        bool confirmedSupportInsideZone = confirmedPivotLow <= confirmedSupportProximityTop and
+             confirmedSupportHigh >= zoneBottom
         bool confirmedSupportWickOk = confirmedSupportLowerWick >= confirmedSupportAtr * minDemandLowerWickAtr
         bool confirmedSupportReactionOk = postDemandHigh - confirmedPivotLow >= confirmedSupportAtr * minDemandReactionAtr
         float confirmedSupportMaxRelativeVolume = na
@@ -1280,7 +1396,7 @@ while zoneIndex < array.size(flipBoxes)
             array.push(confirmedSupplyFlipSupportBars, confirmedSupportBar)
             array.push(confirmedSupplyFlipSupportLabels, confirmedSupportLabel)
             confirmedSupplyFlipSupportDetected := true
-            if array.size(confirmedSupplyFlipSupportBars) > 100
+            if array.size(confirmedSupplyFlipSupportBars) > maxHistoricalSupportMarkers
                 array.shift(confirmedSupplyFlipSupportBars)
                 label oldestConfirmedSupportLabel = array.shift(confirmedSupplyFlipSupportLabels)
                 if not na(oldestConfirmedSupportLabel)
@@ -1345,7 +1461,11 @@ while zoneIndex < array.size(flipBoxes)
                          " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
                          str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
         else
-            bool intersectsZone = low <= zoneTop and high >= zoneBottom
+            // Supply retests may be front-run by a small ATR distance. Continuation
+            // bases retain exact intersection behavior.
+            float retestProximityTop = isContinuationBase ?
+                 zoneTop : zoneTop + atr * supplyRetestProximityAtr
+            bool intersectsZone = low <= retestProximityTop and high >= zoneBottom
             bool firstRetest = signalBarReady and hasFullSeparation and bar_index > firstSeparationBar and intersectsZone and not alreadyRetested
             if firstRetest
                 array.set(flipRetested, zoneIndex, true)

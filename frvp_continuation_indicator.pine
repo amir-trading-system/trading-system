@@ -1,7 +1,7 @@
 //@version=6
 indicator(
-     "FRVP Value-Area Continuation Detector v1.6",
-     shorttitle = "FRVP Continuation v1.6",
+     "FRVP Value-Area Continuation Detector v1.12",
+     shorttitle = "FRVP Continuation v1.12",
      overlay = true,
      max_bars_back = 5000,
      max_lines_count = 500,
@@ -15,9 +15,11 @@ indicator(
 // the Supply-to-Demand indicator.
 //
 // Sequence:
-//   1. Detect (or manually define) the first bullish movement.
+//   1. Detect (or manually define) the first bullish movement in each enabled
+//      market session: premarket, regular hours, and after-hours.
 //   2. Freeze an approximate fixed-range volume profile for that movement.
-//   3. Require the frozen POC to remain at or above session VWAP.
+//   3. Preserve session VWAP as informational context without using it to
+//      reject an otherwise valid first-move profile.
 //   4. Look for a defended VAL and repeated failed attempts around the POC.
 //   5. Confirm continuation when a strong, high-volume candle crosses from
 //      below the POC to above the VAH and then holds above the POC.
@@ -50,17 +52,51 @@ string detectionMode = input.string(
      display = display.none,
      tooltip = "Auto finds the first qualifying bullish movement. Manual window profiles the exact exchange-time window below.")
 
-string analysisSession = input.session(
+bool includePremarket = input.bool(
+     true,
+     "Include premarket",
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Enables an independent first-move search during 04:00–09:30 exchange time.")
+
+bool includeRegularSession = input.bool(
+     true,
+     "Include regular market",
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Enables an independent first-move search during 09:30–16:00 exchange time.")
+
+bool includeAfterHours = input.bool(
+     true,
+     "Include after-hours",
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Enables an independent first-move search during 16:00–20:00 exchange time.")
+
+string premarketSession = input.session(
+     "0400-0930",
+     "Premarket session",
+     group = GROUP_MOVE,
+     display = display.none)
+
+string regularMarketSession = input.session(
      "0930-1600",
-     "Analysis session",
+     "Regular market session",
+     group = GROUP_MOVE,
+     display = display.none)
+
+string afterHoursSession = input.session(
+     "1600-2000",
+     "After-hours session",
      group = GROUP_MOVE,
      display = display.none)
 
 string autoStartWindow = input.session(
-     "0930-1300",
+     "0400-2000",
      "Auto: search for movement start",
      group = GROUP_MOVE,
-     display = display.none)
+     display = display.none,
+     tooltip = "Additional search-window filter applied inside every enabled market session.")
 
 string manualMoveWindow = input.session(
      "1149-1250",
@@ -143,6 +179,15 @@ float minimumMoveRangeATR = input.float(
      step = 0.25,
      group = GROUP_MOVE,
      display = display.none)
+
+float minimumMoveCumulativeVolume = input.float(
+     50000.0,
+     "Minimum first-move cumulative volume",
+     minval = 0.0,
+     step = 5000.0,
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "The complete detected movement must contain at least this much total volume before its profile can be frozen and drawn. Set to 0 to disable.")
 
 int contractionBars = input.int(
      3,
@@ -254,11 +299,21 @@ float pocMinimumPenetrationATR = input.float(
 
 float pocFailedCloseBandATR = input.float(
      0.15,
-     "POC failed-close band (ATR)",
+     "POC rejection maximum close above POC (ATR)",
      minval = 0.00,
      step = 0.05,
      group = GROUP_POC,
-     display = display.none)
+     display = display.none,
+     tooltip = "Allows a rejection candle to finish slightly above POC when it clearly moved downward from its high.")
+
+float pocMinimumDownwardRejectionATR = input.float(
+     0.10,
+     "Minimum downward rejection from high (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none,
+     tooltip = "Measures the drop from the candle high to its close after reaching POC. This distinguishes a real downward rejection from a candle that simply closes near POC.")
 
 int pocAttemptSpacingBars = input.int(
      2,
@@ -267,6 +322,16 @@ int pocAttemptSpacingBars = input.int(
      maxval = 30,
      group = GROUP_POC,
      display = display.none)
+
+float pocAttemptLabelDistanceATR = input.float(
+     0.50,
+     "POC fail label distance above bar (ATR)",
+     minval = 0.00,
+     maxval = 5.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none,
+     tooltip = "Moves each POC FAIL label above its signal candle. Increase this value if labels still cover nearby price bars.")
 
 int minimumFailedPOCAttempts = input.int(
      2,
@@ -519,12 +584,25 @@ float relativeVolume = not na(volumeAverage) and volumeAverage > 0.0 ? volume / 
 float confirmedVALPivot = ta.pivotlow(low, valPivotLeft, valPivotRight)
 
 bool timeframeSupported = timeframe.isminutes and timeframe.multiplier <= maximumChartMinutes
-bool inAnalysisSession = not na(time(timeframe.period, analysisSession, syminfo.timezone))
+bool inPremarketSession = includePremarket and
+     not na(time(timeframe.period, premarketSession, syminfo.timezone))
+bool inRegularMarketSession = includeRegularSession and
+     not na(time(timeframe.period, regularMarketSession, syminfo.timezone))
+bool inAfterHoursSession = includeAfterHours and
+     not na(time(timeframe.period, afterHoursSession, syminfo.timezone))
+int activeMarketSession = inPremarketSession ? 1 :
+     inRegularMarketSession ? 2 :
+     inAfterHoursSession ? 3 : 0
+bool inAnalysisSession = activeMarketSession != 0
 bool inAutoStartWindow = not na(time(timeframe.period, autoStartWindow, syminfo.timezone))
 bool inManualMoveWindow = not na(time(timeframe.period, manualMoveWindow, syminfo.timezone))
 
 int currentDateKey = year * 10000 + month * 100 + dayofmonth
 bool newTradingDate = bar_index > 0 and currentDateKey != currentDateKey[1]
+bool newEnabledMarketSession =
+     activeMarketSession != 0 and
+     (bar_index == 0 or activeMarketSession != activeMarketSession[1])
+bool resetLifecycleNow = newTradingDate or newEnabledMarketSession
 
 //------------------------------------------------------------------------------
 // Persistent state and drawing retention
@@ -580,11 +658,11 @@ var array<label> retainedEntryMarkers = array.new_label()
 bool entryTriggeredThisBar = false
 
 //------------------------------------------------------------------------------
-// Reset the live lifecycle at the first bar of each exchange date.
-// Historical drawings remain on the chart.
+// Reset the live lifecycle at the first bar of each enabled market session.
+// Historical drawings from earlier sessions remain on the chart.
 //------------------------------------------------------------------------------
 
-if newTradingDate
+if resetLifecycleNow
     lifecycleState := STATE_SEARCHING
     array.clear(movementLows)
     array.clear(movementHighs)
@@ -636,7 +714,7 @@ bool discardMovementNow = false
 
 if barstate.isconfirmed and timeframeSupported
     if detectionMode == "Manual window"
-        if lifecycleState == STATE_SEARCHING and inManualMoveWindow
+        if lifecycleState == STATE_SEARCHING and inAnalysisSession and inManualMoveWindow
             array.clear(movementLows)
             array.clear(movementHighs)
             array.clear(movementVolumes)
@@ -653,7 +731,7 @@ if barstate.isconfirmed and timeframeSupported
             lifecycleState := STATE_BUILDING
 
         else if lifecycleState == STATE_BUILDING
-            if inManualMoveWindow
+            if inAnalysisSession and inManualMoveWindow
                 array.push(movementLows, low)
                 array.push(movementHighs, high)
                 array.push(movementVolumes, nz(volume))
@@ -699,6 +777,7 @@ if barstate.isconfirmed and timeframeSupported
             while contextOffset >= 1
                 bool contextBarEligible =
                      inAnalysisSession[contextOffset] and
+                     activeMarketSession[contextOffset] == activeMarketSession and
                      currentDateKey[contextOffset] == currentDateKey
                 if contextBarEligible
                     array.push(movementLows, low[contextOffset])
@@ -776,6 +855,9 @@ if discardMovementNow
     movementHighBarIndex := na
 
 if freezeMovementNow
+    float movementCumulativeVolume = array.sum(movementVolumes)
+    bool movementVolumeQualified = movementCumulativeVolume >= minimumMoveCumulativeVolume
+
     array<float> calculatedProfile = f_calculateProfile(
          movementLows,
          movementHighs,
@@ -790,15 +872,11 @@ if freezeMovementNow
     float calculatedVAH = array.get(calculatedProfile, 2)
 
     bool profileValuesReady =
+         movementVolumeQualified and
          not na(calculatedVAL) and
          not na(calculatedPOC) and
          not na(calculatedVAH)
-    bool frozenPOCAtOrAboveVWAP =
-         profileValuesReady and
-         not na(sessionVWAP) and
-         calculatedPOC >= sessionVWAP
-
-    if frozenPOCAtOrAboveVWAP
+    if profileValuesReady
         profileVAL := calculatedVAL
         profilePOC := calculatedPOC
         profileVAH := calculatedVAH
@@ -879,8 +957,8 @@ if freezeMovementNow
                  "\nVAL " + str.tostring(profileVAL, format.mintick) +
                  "  •  POC " + str.tostring(profilePOC, format.mintick) +
                  "  •  VAH " + str.tostring(profileVAH, format.mintick) +
-                 "\nFreeze VWAP " + str.tostring(profileVWAPAtFreeze, format.mintick) +
-                 "  •  POC above VWAP"
+                 "\nCumulative volume " + str.tostring(math.round(movementCumulativeVolume)) +
+                 "\nFreeze VWAP " + str.tostring(profileVWAPAtFreeze, format.mintick)
             label profileLabel = label.new(
                  x = movementEndTime,
                  y = movementHigh,
@@ -1027,8 +1105,10 @@ if profileCanBeEvaluated
     // to leave an ATR-wide band between every rejection.
     bool startsAbovePOCEnough =
          high >= profilePOC + atrValue * pocMinimumPenetrationATR
-    bool failsPOCAcceptance =
+    bool closesNearOrBelowPOC =
          close <= profilePOC + atrValue * pocFailedCloseBandATR
+    bool rejectsDownFromReachedPrice =
+         high - close >= atrValue * pocMinimumDownwardRejectionATR
     bool enoughBarsSinceLastPOCAttempt =
          na(lastPOCAttemptBarIndex) or
          bar_index - lastPOCAttemptBarIndex >= pocAttemptSpacingBars
@@ -1036,7 +1116,8 @@ if profileCanBeEvaluated
          not breakoutPending and
          not breakoutConfirmed and
          startsAbovePOCEnough and
-         failsPOCAcceptance and
+         closesNearOrBelowPOC and
+         rejectsDownFromReachedPrice and
          enoughBarsSinceLastPOCAttempt
 
     if failedPOCAttemptNow
@@ -1049,10 +1130,12 @@ if profileCanBeEvaluated
                  "\nTime: " + str.format_time(time, "HH:mm", syminfo.timezone) +
                  "\nPOC: " + str.tostring(profilePOC, format.mintick) +
                  "\nHigh: " + str.tostring(high, format.mintick) +
-                 "\nClose: " + str.tostring(close, format.mintick)
+                 "\nClose: " + str.tostring(close, format.mintick) +
+                 "\nDownward rejection: " + str.tostring(high - close, format.mintick)
+            float attemptLabelY = high + atrValue * pocAttemptLabelDistanceATR
             label attemptLabel = label.new(
                  x = time,
-                 y = high,
+                 y = attemptLabelY,
                  text = "POC\nFAIL " + str.tostring(failedPOCAttempts),
                  xloc = xloc.bar_time,
                  yloc = yloc.price,
@@ -1077,15 +1160,11 @@ if profileCanBeEvaluated
     bool breakoutVolumeQuality =
          not na(relativeVolume) and
          relativeVolume >= breakoutRelativeVolume
-    bool pocAtOrAboveEntryVWAP =
-         not na(sessionVWAP) and
-         profilePOC >= sessionVWAP
     bool strongContinuationBreakout =
          not breakoutPending and
          not breakoutConfirmed and
          valDefended and
          not valInvalidated and
-         pocAtOrAboveEntryVWAP and
          failedPOCAttempts >= minimumFailedPOCAttempts and
          breakoutStartsNearOrBelowPOC and
          breakoutClosesAboveVAH and
