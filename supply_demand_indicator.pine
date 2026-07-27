@@ -1,5 +1,5 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.30.1 • Historical Retention Fix]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
+indicator("Bullish Supply→Demand Flip Zones [v6.30.9 • Three-Bar Evidence Survival]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
@@ -15,12 +15,27 @@ plot(na, title = "Output anchor", display = display.none)
 //   5. After confirmation, all drawings stay hidden while retest logic remains active.
 //   6. The full original supply structure appears when price first returns to the zone.
 //   7. A zone touch or fresh re-entry controls visibility/state only; it never draws an S→D arrow by itself.
-//   8. Only a confirmed pivot support inside or immediately above the flipped original supply zone receives an S→D arrow.
+//   8. An S→D arrow requires either confirmed pivot support at the flipped zone or
+//      a confirmed immediate post-breakout front-run defense.
 //   9. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
 //  10. Classic retests require a completed candle whose low is above the zone top before the return.
 //  11. A separate progressive-takeover path allows demand to defend the lower edge, preserve its low,
 //      and then confirm acceptance above the upper edge on renewed volume.
-//  12. A later failure ends the active zone without rewriting the successful retest or structure.
+//  12. A separate immediate front-run path recognizes the first full-separation candle when it
+//      approaches the old supply top after an exceptional breakout, rejects lower prices, and
+//      preserves its low for the configured confirmation bars.
+//  13. When multiple visible zones substantially overlap, an optional display
+//      filter keeps only the broadest price area visible.
+//  14. Timestamp-based candle-edge coordinates let zones begin on the true
+//      origin bar without drawing the left border through its wick.
+//  15. A supply retest that fails before confirmed S→D demand is removed entirely.
+//      Only zones with confirmed demand preserve their successful history after a later break.
+//  16. When drawing history reaches its limit, hidden and unconfirmed zones are
+//      retired before confirmed S→D/BASE areas, preventing orphan arrows.
+//  17. Broad-zone suppression requires the shaded rectangles to overlap in both
+//      price and time; an unrelated zone from another session cannot hide one.
+//  18. Every BASE/S→D area must survive three later bars after its evidence
+//      becomes knowable live. An earlier breakdown removes the entire area.
 
 // ─────────────────────── Inputs ─────────────────────────
 groupSupply = "1. Hidden supply qualification"
@@ -160,16 +175,28 @@ progressivePreservationToleranceTicks = input.int(1, "Demand-low preservation to
 progressiveMinAcceptanceRelativeVolume = input.float(1.20, "Upper-edge acceptance minimum relative volume", minval = 0.1, step = 0.1, group = groupProgressive,
      tooltip = "The candle completing the consecutive closes above supply must reach this volume multiple. No bullish-body minimum is required for this path.", display = display.none)
 
+groupImmediateFrontRun = "3b. Immediate front-run demand"
+enableImmediateFrontRunDemand = input.bool(true, "Allow immediate front-run demand", group = groupImmediateFrontRun,
+     tooltip = "Recognizes the first full-separation candle immediately after a strong breakout when buyers defend just above the old supply top. The demand marker appears only after later bars preserve its low and confirm the reaction.", display = display.none)
+immediateFrontRunProximityAtr = input.float(0.25, "Maximum distance above supply top (ATR)", minval = 0.0, step = 0.05, group = groupImmediateFrontRun,
+     tooltip = "Applies only to this immediate post-breakout path. SDOT 2026-06-04 13:23 stopped approximately 0.215 ATR above the 8.2499 supply top.", display = display.none)
+immediateFrontRunConfirmationBars = input.int(3, "Low-preservation confirmation bars", minval = 1, maxval = 10, group = groupImmediateFrontRun,
+     tooltip = "The front-run candle's low must remain preserved for this many completed bars before the historical S→D marker is drawn.", display = display.none)
+immediateFrontRunPreservationTicks = input.int(1, "Low-preservation tolerance (ticks)", minval = 0, maxval = 20, group = groupImmediateFrontRun,
+     tooltip = "Allows this many minimum ticks beneath the front-run low during confirmation.", display = display.none)
+
 groupManagement = "4. Flipped-demand management"
 invalidationMode = input.string("Close", "Invalidation method", options = ["Close", "Wick"], group = groupManagement, display = display.none)
 invalidationBufferAtr = input.float(0.10, "Invalidation buffer (ATR)", minval = 0.0, step = 0.05, group = groupManagement,
      tooltip = "Allows a small close/wick penetration beyond the zone before declaring failure.", display = display.none)
+minimumEvidenceSurvivalBars = input.int(3, "Minimum bars zone must survive after evidence", minval = 0, maxval = 20, group = groupManagement,
+     tooltip = "Counts from the live confirmation bar of BASE, S→D, progressive takeover, or immediate front-run evidence. If the zone invalidates before this many later bars complete, its entire area is removed.", display = display.none)
 supplyRetestProximityAtr = input.float(0.10, "Supply retest proximity above zone (ATR)", minval = 0.0, step = 0.05, group = groupManagement,
      tooltip = "Allows buyers to front-run a flipped supply top by a small ATR distance. SDOT 2026-06-03 10:05 stopped at 6.32, only about 0.07 ATR above the 6.29 zone top.", display = display.none)
 sendDynamicAlerts = input.bool(true, "Send dynamic flip/retest alerts", group = groupManagement,
      tooltip = "Create a TradingView alert using 'Any alert() function call'. Messages include the zone prices.", display = display.none)
 maxHistoricalFlipStructures = input.int(200, "Maximum retained flip structures (history)", minval = 1, maxval = 200, group = groupManagement,
-     tooltip = "Retains older confirmed zones on long historical datasets. The distinct input name prevents a previously saved 50-zone setting from carrying into this version.", display = display.none)
+     tooltip = "Retains older confirmed zones on long historical datasets. When full, hidden and unconfirmed zones are retired before confirmed S→D/BASE areas.", display = display.none)
 maxHistoricalSupportMarkers = input.int(400, "Maximum retained S→D markers (history)", minval = 1, maxval = 400, group = groupManagement,
      tooltip = "Retains confirmed support arrows for older zones while staying within TradingView's label-object limit.", display = display.none)
 
@@ -186,12 +213,16 @@ continuationBaseBorder = input.color(color.new(color.aqua, 45), "Continuation-ba
 showFlipMarkers = input.bool(true, "Show zone-type arrows on retests", group = groupDisplay, display = display.none)
 showAdditionalSupplyRetests = input.bool(true, "Track every fresh S→D zone re-entry", group = groupDisplay,
      tooltip = "Tracks each later re-entry after price leaves the zone. Re-entry alone does not draw an arrow; only a confirmed demand pivot inside the zone does.", display = display.none)
-showConfirmedSupplyFlipSupports = input.bool(true, "Mark confirmed support pivots inside S→D zones", group = groupDisplay,
-     tooltip = "Marks a confirmed pivot low on its actual candle when it forms inside or within the configured proximity above an already flipped supply zone and passes the wick, reaction, and volume tests.", display = display.none)
+showConfirmedSupplyFlipSupports = input.bool(true, "Mark confirmed S→D support arrows", group = groupDisplay,
+     tooltip = "Marks qualified pivot supports and confirmed immediate front-run demand on their actual candles. Both paths retain their own wick, reaction, volume, and location requirements.", display = display.none)
 showRetestMarkers = input.bool(true, "Show first-retest markers", group = groupDisplay, display = display.none)
 showLaterBreakMarkers = input.bool(true, "Show red marker when a retested zone later breaks", group = groupDisplay, display = display.none)
-zoneLeftPaddingBars = input.int(3, "Start visible area before origin (bars)", minval = 0, maxval = 20, group = groupDisplay,
-     tooltip = "Visual padding only. Moves the box left border before the true origin so it does not cover the origin candle wick. Detection and bar counts remain unchanged.", display = display.none)
+showOnlyBroadestOverlappingZone = input.bool(true, "Show only broadest overlapping zone", group = groupDisplay,
+     tooltip = "When visible S→D, progressive, immediate front-run, or BASE zones substantially overlap, hides the narrower price areas while preserving all detection, lifecycle, marker, and alert logic.", display = display.none)
+broadZoneMinimumOverlap = input.float(0.75, "Minimum overlap of narrower zone", minval = 0.10, maxval = 1.00, step = 0.05, group = groupDisplay,
+     tooltip = "The broader zone must cover at least this fraction of the narrower zone before the narrower area is hidden. The default 0.75 ignores small edge overlaps.", display = display.none)
+zoneLeftPaddingBars = input.int(0, "Start visible area before origin (bars)", minval = 0, maxval = 20, group = groupDisplay,
+     tooltip = "Zero starts at the left edge of the true origin candle, keeping the border away from its wick. Higher values add whole-bar visual padding without changing detection.", display = display.none)
 drawFromSupplyOrigin = input.bool(true, "Draw from original supply candle", group = groupDisplay, display = display.none)
 showTrendAverages = input.bool(false, "Show EMA 9, EMA 20, and VWAP", group = groupDisplay, display = display.none)
 
@@ -210,6 +241,24 @@ float postPivotLow = ta.lowest(low, pivotRight)
 float postPivotClose = ta.lowest(close, pivotRight)
 bool signalBarReady = not confirmedBarsOnly or barstate.isconfirmed
 
+// TradingView places bar-index drawings on the candle's center. Use timestamps
+// shifted by half of the chart interval to address the candle's visual edges.
+// This lets the zone include the true origin candle without placing its left
+// vertical border through the candle's wick.
+float chartTimeframeSeconds = timeframe.in_seconds()
+int visualHalfBarMs = not na(chartTimeframeSeconds) ?
+     math.max(1, int(chartTimeframeSeconds * 500.0)) : 1
+
+f_bar_left_edge_time(int absoluteBarIndex, int paddingBars) =>
+    int paddedBarIndex = math.max(0, math.min(bar_index, absoluteBarIndex - paddingBars))
+    int barsBack = bar_index - paddedBarIndex
+    time[barsBack] - visualHalfBarMs
+
+f_bar_right_edge_time(int absoluteBarIndex) =>
+    int safeBarIndex = math.max(0, math.min(bar_index, absoluteBarIndex))
+    int barsBack = bar_index - safeBarIndex
+    time[barsBack] + visualHalfBarMs
+
 plot(showTrendAverages ? fastEma : na, title = "EMA 9", color = color.new(color.teal, 0), linewidth = 1, display = display.all - display.status_line)
 plot(showTrendAverages ? slowEma : na, title = "EMA 20", color = color.new(color.orange, 0), linewidth = 1, display = display.all - display.status_line)
 plot(showTrendAverages ? sessionVwap : na, title = "Session VWAP", color = color.new(color.purple, 0), linewidth = 1, display = display.all - display.status_line)
@@ -217,6 +266,7 @@ plot(showTrendAverages ? sessionVwap : na, title = "Session VWAP", color = color
 int ZONE_KIND_SUPPLY_FLIP = 0
 int ZONE_KIND_CONTINUATION_BASE = 1
 int ZONE_KIND_PROGRESSIVE_TAKEOVER = 2
+int ZONE_KIND_IMMEDIATE_FRONT_RUN = 3
 
 // Hidden supply candidates.
 var array<float> candidateTops = array.new<float>()
@@ -260,8 +310,36 @@ var array<bool> flipWasIntersecting = array.new<bool>()
 var array<bool> flipActive = array.new<bool>()
 var array<int> flipZoneKinds = array.new<int>()
 var array<bool> flipDemandConfirmed = array.new<bool>()
+// Bar where BASE/S→D evidence first became knowable live. This is deliberately
+// different from a marker bar that may be plotted retrospectively.
+var array<int> flipEvidenceConfirmationBars = array.new<int>()
 // First completed candle whose entire range traded above the zone.
 var array<int> flipFirstSeparationBars = array.new<int>()
+
+// Prefer retiring drawings that never produced a visible, confirmed result.
+// This keeps old confirmed zones synchronized with their longer marker history.
+f_flip_retention_eviction_index() =>
+    int firstHiddenIndex = na
+    int firstUnconfirmedIndex = na
+    int retainedZoneCount = array.size(flipBoxes)
+
+    if retainedZoneCount > 0
+        for retentionIndex = 0 to retainedZoneCount - 1
+            bool retentionRetested = array.get(flipRetested, retentionIndex)
+            bool retentionDemandConfirmed = array.get(flipDemandConfirmed, retentionIndex)
+            int retentionZoneKind = array.get(flipZoneKinds, retentionIndex)
+            bool retentionBaseConfirmed =
+                 retentionZoneKind == ZONE_KIND_CONTINUATION_BASE and retentionRetested
+            bool retentionLifecycleConfirmed =
+                 retentionDemandConfirmed or retentionBaseConfirmed
+
+            if na(firstHiddenIndex) and not retentionRetested
+                firstHiddenIndex := retentionIndex
+            if na(firstUnconfirmedIndex) and not retentionLifecycleConfirmed
+                firstUnconfirmedIndex := retentionIndex
+
+    not na(firstHiddenIndex) ? firstHiddenIndex :
+         not na(firstUnconfirmedIndex) ? firstUnconfirmedIndex : 0
 
 // Confirmed support pivots inside already flipped original supply zones.
 // These are arrows only; they never create a separate demand box.
@@ -751,8 +829,9 @@ while candidateIndex >= 0
     bool expired = bar_index - supplyOriginBar > maxHiddenAge
     bool legFormationExpired = requireSellerControlLeg and not sellerLegConfirmed and
          bar_index - supplyOriginBar > effectiveMaxSellerLegBars + demandPivotRight
-    // Keep a candidate available for the progressive path until maxHiddenAge.
-    // The classic path may no longer use it after its seller-leg window expires.
+    // Keep a candidate available for the progressive or immediate front-run path
+    // until maxHiddenAge. The classic path may no longer use it after its
+    // seller-leg window expires.
     bool classicLegUsable = not legFormationExpired
     bool closesAboveSupply = close > supplyTop + atr * breakBufferAtr
 
@@ -771,6 +850,64 @@ while candidateIndex >= 0
     bool breakTrendOk = not requireBullishTrend or
          (breakTrendDataReady and breakAboveTrend and breakBullishStack and breakRisingEmas and breakRisingVwap)
     bool currentBreakQualityOk = breakBodyOk and breakVolumeOk and breakTrendOk
+
+    // Immediate front-run demand is intentionally independent of the classic
+    // seller-leg age window. The original supply must still have produced the
+    // required decline, and the preceding candle must be a complete high-quality
+    // breakout from at/below the old supply top. The current candle then becomes
+    // a hidden demand candidate only when its entire range is above supply, its
+    // low remains very close to the top, and its lower wick shows rejection.
+    bool immediateHistoryReady = bar_index > trendSlopeBars + 2 and
+         not na(atr) and atr > 0.0 and not na(atr[1]) and atr[1] > 0.0 and
+         not na(fastEma[1]) and not na(slowEma[1]) and not na(sessionVwap[1])
+    float immediateImpulseBody = immediateHistoryReady ? close[1] - open[1] : na
+    float immediateImpulseRelativeVolume = immediateHistoryReady and
+         not na(volumeAverage[1]) and volumeAverage[1] > 0.0 ?
+         volume[1] / volumeAverage[1] : na
+    bool immediateImpulseClosesAbove = immediateHistoryReady and
+         close[1] > supplyTop + atr[1] * breakBufferAtr
+    bool immediateImpulseCrossesFromBelow = immediateHistoryReady and
+         (open[1] <= supplyTop or close[2] <= supplyTop + atr[2] * breakBufferAtr)
+    bool immediateImpulseBodyOk = immediateHistoryReady and
+         immediateImpulseBody >= atr[1] * minBreakBodyAtr
+    bool immediateImpulseVolumeOk = immediateHistoryReady and
+         (not requireBreakVolume or
+         (not na(immediateImpulseRelativeVolume) and
+         immediateImpulseRelativeVolume >= minBreakRelativeVolume))
+    bool immediateImpulseAboveTrend = immediateHistoryReady and
+         close[1] > fastEma[1] and close[1] > slowEma[1] and close[1] > sessionVwap[1]
+    bool immediateImpulseBullishStack = immediateHistoryReady and fastEma[1] > slowEma[1]
+    bool immediateImpulseRisingEmas = not requireRisingEmas or
+         (immediateHistoryReady and not na(fastEma[1 + trendSlopeBars]) and
+         not na(slowEma[1 + trendSlopeBars]) and
+         fastEma[1] > fastEma[1 + trendSlopeBars] and
+         slowEma[1] > slowEma[1 + trendSlopeBars])
+    bool immediateImpulseRisingVwap = not requireRisingVwap or
+         (immediateHistoryReady and not na(sessionVwap[1 + trendSlopeBars]) and
+         sessionVwap[1] > sessionVwap[1 + trendSlopeBars])
+    bool immediateImpulseTrendOk = not requireBullishTrend or
+         (immediateImpulseAboveTrend and immediateImpulseBullishStack and
+         immediateImpulseRisingEmas and immediateImpulseRisingVwap)
+    bool immediateStrongBreakout = immediateImpulseClosesAbove and
+         immediateImpulseCrossesFromBelow and immediateImpulseBodyOk and
+         immediateImpulseVolumeOk and immediateImpulseTrendOk
+
+    float immediateFrontRunBodyLow = math.min(open, close)
+    float immediateFrontRunLowerWick = immediateFrontRunBodyLow - low
+    float immediateFrontRunRelativeVolume = not na(volumeAverage) and volumeAverage > 0.0 ?
+         volume / volumeAverage : na
+    bool immediateSellerMoveOk = not na(trackedLegLow) and
+         sellerLegReference - trackedLegLow >= supplyOriginAtr * minSellerLegAtr
+    bool immediateFrontRunAboveSupply = low > supplyTop and
+         low <= supplyTop + atr * immediateFrontRunProximityAtr and
+         close > supplyTop + atr * breakBufferAtr
+    bool immediateFrontRunWickOk = immediateFrontRunLowerWick >= atr * minDemandLowerWickAtr
+    bool immediateFrontRunVolumeOk = not na(immediateFrontRunRelativeVolume) and
+         immediateFrontRunRelativeVolume >= minDemandRelativeVolume
+    bool qualifiedImmediateFrontRunCandidate = signalBarReady and
+         enableImmediateFrontRunDemand and formationReady and not expired and
+         bar_index > formationEndBar and immediateSellerMoveOk and immediateStrongBreakout and
+         immediateFrontRunAboveSupply and immediateFrontRunWickOk and immediateFrontRunVolumeOk
 
     // Progressive supply takeover path:
     //   1. A demand candle tests the lower edge and closes back above it.
@@ -858,14 +995,15 @@ while candidateIndex >= 0
         array.set(candidateBreakImpulseQualified, candidateIndex, breakImpulseQualified)
 
     if qualifiedProgressiveTakeover
-        int progressiveVisibleLeft = drawFromSupplyOrigin ?
-             math.max(0, supplyStructureStartBar - zoneLeftPaddingBars) : progressiveDemandBar
+        int progressiveVisibleStartBar = drawFromSupplyOrigin ?
+             supplyStructureStartBar : progressiveDemandBar
+        int progressiveVisiblePadding = drawFromSupplyOrigin ? zoneLeftPaddingBars : 0
         box newProgressiveFlipBox = box.new(
-             left = progressiveVisibleLeft,
+             left = f_bar_left_edge_time(progressiveVisibleStartBar, progressiveVisiblePadding),
              top = supplyTop,
-             right = bar_index + 1,
+             right = f_bar_right_edge_time(bar_index),
              bottom = supplyBottom,
-             xloc = xloc.bar_index,
+             xloc = xloc.bar_time,
              border_color = activeBorder,
              border_width = 1,
              bgcolor = activeFill,
@@ -877,11 +1015,11 @@ while candidateIndex >= 0
         box newProgressiveFormationBox = na
         if showSellerControlLeg
             newProgressiveFormationBox := box.new(
-                 left = math.max(0, supplyStructureStartBar - zoneLeftPaddingBars),
+                 left = f_bar_left_edge_time(supplyStructureStartBar, zoneLeftPaddingBars),
                  top = supplyTop,
-                 right = formationEndBar + 1,
+                 right = f_bar_right_edge_time(formationEndBar),
                  bottom = supplyBottom,
-                 xloc = xloc.bar_index,
+                 xloc = xloc.bar_time,
                  border_color = sellerLegBorder,
                  border_width = 1,
                  bgcolor = sellerLegFill,
@@ -936,6 +1074,7 @@ while candidateIndex >= 0
         array.push(flipActive, true)
         array.push(flipZoneKinds, ZONE_KIND_PROGRESSIVE_TAKEOVER)
         array.push(flipDemandConfirmed, true)
+        array.push(flipEvidenceConfirmationBars, bar_index)
         array.push(flipFirstSeparationBars, progressiveFirstSeparationBar)
         flipDetected := true
         progressiveTakeoverDetected := true
@@ -972,33 +1111,137 @@ while candidateIndex >= 0
         array.remove(candidateProgressiveDemandAtrs, candidateIndex)
 
         if array.size(flipBoxes) > maxHistoricalFlipStructures
-            box oldestBox = array.shift(flipBoxes)
-            box oldestLegBox = array.shift(flipLegBoxes)
-            label oldestTextLabel = array.shift(flipTextLabels)
-            box.delete(oldestBox)
-            if not na(oldestLegBox)
-                box.delete(oldestLegBox)
-            if not na(oldestTextLabel)
-                label.delete(oldestTextLabel)
-            array.shift(flipTops)
-            array.shift(flipBottoms)
-            array.shift(flipDemandLows)
-            array.shift(flipDemandBars)
-            array.shift(flipConfirmationBars)
-            array.shift(flipOriginTimes)
-            array.shift(flipRetested)
-            array.shift(flipWasIntersecting)
-            array.shift(flipActive)
-            array.shift(flipZoneKinds)
-            array.shift(flipDemandConfirmed)
-            array.shift(flipFirstSeparationBars)
+            int evictionIndex = f_flip_retention_eviction_index()
+            box evictedBox = array.remove(flipBoxes, evictionIndex)
+            box evictedLegBox = array.remove(flipLegBoxes, evictionIndex)
+            label evictedTextLabel = array.remove(flipTextLabels, evictionIndex)
+            box.delete(evictedBox)
+            if not na(evictedLegBox)
+                box.delete(evictedLegBox)
+            if not na(evictedTextLabel)
+                label.delete(evictedTextLabel)
+            array.remove(flipTops, evictionIndex)
+            array.remove(flipBottoms, evictionIndex)
+            array.remove(flipDemandLows, evictionIndex)
+            array.remove(flipDemandBars, evictionIndex)
+            array.remove(flipConfirmationBars, evictionIndex)
+            array.remove(flipOriginTimes, evictionIndex)
+            array.remove(flipRetested, evictionIndex)
+            array.remove(flipWasIntersecting, evictionIndex)
+            array.remove(flipActive, evictionIndex)
+            array.remove(flipZoneKinds, evictionIndex)
+            array.remove(flipDemandConfirmed, evictionIndex)
+            array.remove(flipEvidenceConfirmationBars, evictionIndex)
+            array.remove(flipFirstSeparationBars, evictionIndex)
+    else if qualifiedImmediateFrontRunCandidate
+        // Store the original supply zone invisibly while the next bars confirm
+        // that the immediate front-run low was genuinely defended. This path
+        // does not reveal the zone or draw an arrow before confirmation.
+        box newImmediateFlipBox = box.new(
+             left = drawFromSupplyOrigin ?
+                  f_bar_left_edge_time(supplyStructureStartBar, zoneLeftPaddingBars) :
+                  f_bar_left_edge_time(bar_index, 0),
+             top = supplyTop,
+             right = f_bar_right_edge_time(bar_index),
+             bottom = supplyBottom,
+             xloc = xloc.bar_time,
+             border_color = hiddenDrawingColor,
+             border_width = 1,
+             bgcolor = hiddenDrawingColor,
+             text = "",
+             text_color = hiddenDrawingColor,
+             text_size = size.normal,
+             text_halign = text.align_left)
+
+        box newImmediateFormationBox = na
+        if showSellerControlLeg
+            newImmediateFormationBox := box.new(
+                 left = f_bar_left_edge_time(supplyStructureStartBar, zoneLeftPaddingBars),
+                 top = supplyTop,
+                 right = f_bar_right_edge_time(formationEndBar),
+                 bottom = supplyBottom,
+                 xloc = xloc.bar_time,
+                 border_color = hiddenDrawingColor,
+                 border_width = 1,
+                 bgcolor = hiddenDrawingColor,
+                 text = "",
+                 text_color = hiddenDrawingColor,
+                 text_size = size.normal,
+                 text_halign = text.align_left)
+
+        array.push(flipBoxes, newImmediateFlipBox)
+        array.push(flipLegBoxes, newImmediateFormationBox)
+        array.push(flipTextLabels, na)
+        array.push(flipTops, supplyTop)
+        array.push(flipBottoms, supplyBottom)
+        array.push(flipDemandLows, low)
+        array.push(flipDemandBars, bar_index)
+        array.push(flipConfirmationBars, bar_index)
+        array.push(flipOriginTimes, time[bar_index - supplyStructureStartBar])
+        array.push(flipRetested, false)
+        array.push(flipWasIntersecting, false)
+        array.push(flipActive, true)
+        array.push(flipZoneKinds, ZONE_KIND_IMMEDIATE_FRONT_RUN)
+        array.push(flipDemandConfirmed, false)
+        array.push(flipEvidenceConfirmationBars, na)
+        array.push(flipFirstSeparationBars, bar_index)
+
+        array.remove(candidateTops, candidateIndex)
+        array.remove(candidateBottoms, candidateIndex)
+        array.remove(candidateLegReferences, candidateIndex)
+        array.remove(candidateOriginRelativeVolumes, candidateIndex)
+        array.remove(candidateOriginBars, candidateIndex)
+        array.remove(candidateStructureStartBars, candidateIndex)
+        array.remove(candidateOriginAtrs, candidateIndex)
+        array.remove(candidateTrackedLows, candidateIndex)
+        array.remove(candidateLegConfirmed, candidateIndex)
+        array.remove(candidateDemandLows, candidateIndex)
+        array.remove(candidateDemandBars, candidateIndex)
+        array.remove(candidateBreakCounts, candidateIndex)
+        array.remove(candidateBreakImpulseQualified, candidateIndex)
+        array.remove(candidateFormationFinalized, candidateIndex)
+        array.remove(candidateFormationEndBars, candidateIndex)
+        array.remove(candidateFormationBarCounts, candidateIndex)
+        array.remove(candidateFormationPeakVolumes, candidateIndex)
+        array.remove(candidateFormationLastVolumes, candidateIndex)
+        array.remove(candidateFirstSeparationBars, candidateIndex)
+        array.remove(candidateProgressiveArmed, candidateIndex)
+        array.remove(candidateProgressiveDemandLows, candidateIndex)
+        array.remove(candidateProgressiveDemandBars, candidateIndex)
+        array.remove(candidateProgressiveDemandAtrs, candidateIndex)
+
+        if array.size(flipBoxes) > maxHistoricalFlipStructures
+            int evictionIndex = f_flip_retention_eviction_index()
+            box evictedBox = array.remove(flipBoxes, evictionIndex)
+            box evictedLegBox = array.remove(flipLegBoxes, evictionIndex)
+            label evictedTextLabel = array.remove(flipTextLabels, evictionIndex)
+            box.delete(evictedBox)
+            if not na(evictedLegBox)
+                box.delete(evictedLegBox)
+            if not na(evictedTextLabel)
+                label.delete(evictedTextLabel)
+            array.remove(flipTops, evictionIndex)
+            array.remove(flipBottoms, evictionIndex)
+            array.remove(flipDemandLows, evictionIndex)
+            array.remove(flipDemandBars, evictionIndex)
+            array.remove(flipConfirmationBars, evictionIndex)
+            array.remove(flipOriginTimes, evictionIndex)
+            array.remove(flipRetested, evictionIndex)
+            array.remove(flipWasIntersecting, evictionIndex)
+            array.remove(flipActive, evictionIndex)
+            array.remove(flipZoneKinds, evictionIndex)
+            array.remove(flipDemandConfirmed, evictionIndex)
+            array.remove(flipEvidenceConfirmationBars, evictionIndex)
+            array.remove(flipFirstSeparationBars, evictionIndex)
     else if qualifiedFlip
         box newFlipBox = box.new(
-             left = drawFromSupplyOrigin ? math.max(0, supplyStructureStartBar - zoneLeftPaddingBars) : bar_index,
+             left = drawFromSupplyOrigin ?
+                  f_bar_left_edge_time(supplyStructureStartBar, zoneLeftPaddingBars) :
+                  f_bar_left_edge_time(bar_index, 0),
              top = supplyTop,
-             right = bar_index + 1,
+             right = f_bar_right_edge_time(bar_index),
              bottom = supplyBottom,
-             xloc = xloc.bar_index,
+             xloc = xloc.bar_time,
              border_color = hiddenDrawingColor,
              border_width = 1,
              bgcolor = hiddenDrawingColor,
@@ -1010,11 +1253,11 @@ while candidateIndex >= 0
         box newLegBox = na
         if sellerLegConfirmed and not na(demandLow) and not na(demandBar)
             newLegBox := box.new(
-                 left = math.max(0, supplyStructureStartBar - zoneLeftPaddingBars),
+                 left = f_bar_left_edge_time(supplyStructureStartBar, zoneLeftPaddingBars),
                  top = supplyTop,
-                 right = demandBar + 1,
+                 right = f_bar_right_edge_time(demandBar),
                  bottom = demandLow,
-                 xloc = xloc.bar_index,
+                 xloc = xloc.bar_time,
                  border_color = hiddenDrawingColor,
                  border_width = 1,
                  bgcolor = hiddenDrawingColor,
@@ -1037,6 +1280,7 @@ while candidateIndex >= 0
         array.push(flipActive, true)
         array.push(flipZoneKinds, ZONE_KIND_SUPPLY_FLIP)
         array.push(flipDemandConfirmed, false)
+        array.push(flipEvidenceConfirmationBars, na)
         array.push(flipFirstSeparationBars, firstSeparationBar)
         flipDetected := true
 
@@ -1073,27 +1317,30 @@ while candidateIndex >= 0
         array.remove(candidateProgressiveDemandAtrs, candidateIndex)
 
         if array.size(flipBoxes) > maxHistoricalFlipStructures
-            box oldestBox = array.shift(flipBoxes)
-            box oldestLegBox = array.shift(flipLegBoxes)
-            label oldestTextLabel = array.shift(flipTextLabels)
-            box.delete(oldestBox)
-            if not na(oldestLegBox)
-                box.delete(oldestLegBox)
-            if not na(oldestTextLabel)
-                label.delete(oldestTextLabel)
-            array.shift(flipTops)
-            array.shift(flipBottoms)
-            array.shift(flipDemandLows)
-            array.shift(flipDemandBars)
-            array.shift(flipConfirmationBars)
-            array.shift(flipOriginTimes)
-            array.shift(flipRetested)
-            array.shift(flipWasIntersecting)
-            array.shift(flipActive)
-            array.shift(flipZoneKinds)
-            array.shift(flipDemandConfirmed)
-            array.shift(flipFirstSeparationBars)
-    else if expired or (legFormationExpired and not enableProgressiveSupplyTakeover)
+            int evictionIndex = f_flip_retention_eviction_index()
+            box evictedBox = array.remove(flipBoxes, evictionIndex)
+            box evictedLegBox = array.remove(flipLegBoxes, evictionIndex)
+            label evictedTextLabel = array.remove(flipTextLabels, evictionIndex)
+            box.delete(evictedBox)
+            if not na(evictedLegBox)
+                box.delete(evictedLegBox)
+            if not na(evictedTextLabel)
+                label.delete(evictedTextLabel)
+            array.remove(flipTops, evictionIndex)
+            array.remove(flipBottoms, evictionIndex)
+            array.remove(flipDemandLows, evictionIndex)
+            array.remove(flipDemandBars, evictionIndex)
+            array.remove(flipConfirmationBars, evictionIndex)
+            array.remove(flipOriginTimes, evictionIndex)
+            array.remove(flipRetested, evictionIndex)
+            array.remove(flipWasIntersecting, evictionIndex)
+            array.remove(flipActive, evictionIndex)
+            array.remove(flipZoneKinds, evictionIndex)
+            array.remove(flipDemandConfirmed, evictionIndex)
+            array.remove(flipEvidenceConfirmationBars, evictionIndex)
+            array.remove(flipFirstSeparationBars, evictionIndex)
+    else if expired or (legFormationExpired and
+         not enableProgressiveSupplyTakeover and not enableImmediateFrontRunDemand)
         array.remove(candidateTops, candidateIndex)
         array.remove(candidateBottoms, candidateIndex)
         array.remove(candidateLegReferences, candidateIndex)
@@ -1238,11 +1485,13 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
 
         if continuationBreakQualified and not continuationDuplicate
             box newContinuationZoneBox = box.new(
-                 left = drawFromSupplyOrigin ? math.max(0, selectedBaseStartBar - zoneLeftPaddingBars) : bar_index,
+                 left = drawFromSupplyOrigin ?
+                      f_bar_left_edge_time(selectedBaseStartBar, zoneLeftPaddingBars) :
+                      f_bar_left_edge_time(bar_index, 0),
                  top = selectedBaseTop,
-                 right = bar_index + 1,
+                 right = f_bar_right_edge_time(bar_index),
                  bottom = selectedBaseBottom,
-                 xloc = xloc.bar_index,
+                 xloc = xloc.bar_time,
                  border_color = hiddenDrawingColor,
                  border_width = 1,
                  bgcolor = hiddenDrawingColor,
@@ -1252,11 +1501,11 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
                  text_halign = text.align_left)
 
             box newContinuationBaseBox = box.new(
-                 left = math.max(0, selectedBaseStartBar - zoneLeftPaddingBars),
+                 left = f_bar_left_edge_time(selectedBaseStartBar, zoneLeftPaddingBars),
                  top = selectedBaseTop,
-                 right = selectedBaseEndBar + 1,
+                 right = f_bar_right_edge_time(selectedBaseEndBar),
                  bottom = selectedBaseBottom,
-                 xloc = xloc.bar_index,
+                 xloc = xloc.bar_time,
                  border_color = hiddenDrawingColor,
                  border_width = 1,
                  bgcolor = hiddenDrawingColor,
@@ -1279,6 +1528,7 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
             array.push(flipActive, true)
             array.push(flipZoneKinds, ZONE_KIND_CONTINUATION_BASE)
             array.push(flipDemandConfirmed, true)
+            array.push(flipEvidenceConfirmationBars, na)
             int continuationFirstSeparationBar = low > selectedBaseTop ? bar_index : na
             array.push(flipFirstSeparationBars, continuationFirstSeparationBar)
             flipDetected := true
@@ -1290,26 +1540,28 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
                      str.tostring(selectedBaseTop, format.mintick), alert.freq_once_per_bar_close)
 
             if array.size(flipBoxes) > maxHistoricalFlipStructures
-                box oldestBox = array.shift(flipBoxes)
-                box oldestLegBox = array.shift(flipLegBoxes)
-                label oldestTextLabel = array.shift(flipTextLabels)
-                box.delete(oldestBox)
-                if not na(oldestLegBox)
-                    box.delete(oldestLegBox)
-                if not na(oldestTextLabel)
-                    label.delete(oldestTextLabel)
-                array.shift(flipTops)
-                array.shift(flipBottoms)
-                array.shift(flipDemandLows)
-                array.shift(flipDemandBars)
-                array.shift(flipConfirmationBars)
-                array.shift(flipOriginTimes)
-                array.shift(flipRetested)
-                array.shift(flipWasIntersecting)
-                array.shift(flipActive)
-                array.shift(flipZoneKinds)
-                array.shift(flipDemandConfirmed)
-                array.shift(flipFirstSeparationBars)
+                int evictionIndex = f_flip_retention_eviction_index()
+                box evictedBox = array.remove(flipBoxes, evictionIndex)
+                box evictedLegBox = array.remove(flipLegBoxes, evictionIndex)
+                label evictedTextLabel = array.remove(flipTextLabels, evictionIndex)
+                box.delete(evictedBox)
+                if not na(evictedLegBox)
+                    box.delete(evictedLegBox)
+                if not na(evictedTextLabel)
+                    label.delete(evictedTextLabel)
+                array.remove(flipTops, evictionIndex)
+                array.remove(flipBottoms, evictionIndex)
+                array.remove(flipDemandLows, evictionIndex)
+                array.remove(flipDemandBars, evictionIndex)
+                array.remove(flipConfirmationBars, evictionIndex)
+                array.remove(flipOriginTimes, evictionIndex)
+                array.remove(flipRetested, evictionIndex)
+                array.remove(flipWasIntersecting, evictionIndex)
+                array.remove(flipActive, evictionIndex)
+                array.remove(flipZoneKinds, evictionIndex)
+                array.remove(flipDemandConfirmed, evictionIndex)
+                array.remove(flipEvidenceConfirmationBars, evictionIndex)
+                array.remove(flipFirstSeparationBars, evictionIndex)
 
 // ───────── Extend, retest, and close zone lifecycles ─────────
 int zoneIndex = 0
@@ -1328,14 +1580,162 @@ while zoneIndex < array.size(flipBoxes)
     bool isActive = array.get(flipActive, zoneIndex)
     int zoneKind = array.get(flipZoneKinds, zoneIndex)
     bool demandConfirmed = array.get(flipDemandConfirmed, zoneIndex)
+    int evidenceConfirmationBar = array.get(flipEvidenceConfirmationBars, zoneIndex)
     int firstSeparationBar = array.get(flipFirstSeparationBars, zoneIndex)
     bool isContinuationBase = zoneKind == ZONE_KIND_CONTINUATION_BASE
     bool isProgressiveTakeover = zoneKind == ZONE_KIND_PROGRESSIVE_TAKEOVER
+    bool isImmediateFrontRun = zoneKind == ZONE_KIND_IMMEDIATE_FRONT_RUN
+    bool immediateFrontRunPending = isImmediateFrontRun and not demandConfirmed
     bool removed = false
+
+    // An immediate front-run setup is stored invisibly on the first complete
+    // separation candle after the breakout. Confirm it only after the configured
+    // number of actual bars preserve that low and produce the normal demand
+    // reaction/volume evidence. If preservation or confirmation fails, discard
+    // the hidden setup without leaving any historical drawing.
+    if signalBarReady and isActive and immediateFrontRunPending
+        box.set_right(zoneBox, f_bar_right_edge_time(bar_index))
+        int immediateBarsSinceDemand = bar_index - sellerLegDemandBar
+        float immediatePreservationTolerance = syminfo.mintick * immediateFrontRunPreservationTicks
+        bool immediateLowBroken = immediateBarsSinceDemand > 0 and
+             low < sellerLegDemandLow - immediatePreservationTolerance
+        bool immediateConfirmationReached = immediateBarsSinceDemand >= immediateFrontRunConfirmationBars
+
+        if immediateLowBroken or immediateConfirmationReached
+            bool immediateDemandQualified = false
+            float immediateDemandAtr = na
+            float immediatePostDemandHigh = na
+            float immediateMaxRelativeVolume = na
+
+            if not immediateLowBroken and
+                 immediateBarsSinceDemand == immediateFrontRunConfirmationBars and
+                 not na(atr[immediateFrontRunConfirmationBars])
+                immediateDemandAtr := atr[immediateFrontRunConfirmationBars]
+                float immediateStoredLow = low[immediateFrontRunConfirmationBars]
+                float immediateDemandBodyLow = math.min(
+                     open[immediateFrontRunConfirmationBars],
+                     close[immediateFrontRunConfirmationBars])
+                float immediateDemandLowerWick = immediateDemandBodyLow - immediateStoredLow
+                float immediateRightLowest = na
+
+                for immediateRightOffset = 0 to immediateFrontRunConfirmationBars - 1
+                    immediateRightLowest := na(immediateRightLowest) ?
+                         low[immediateRightOffset] :
+                         math.min(immediateRightLowest, low[immediateRightOffset])
+                    immediatePostDemandHigh := na(immediatePostDemandHigh) ?
+                         high[immediateRightOffset] :
+                         math.max(immediatePostDemandHigh, high[immediateRightOffset])
+
+                for immediateVolumeOffset = 0 to immediateFrontRunConfirmationBars
+                    float immediateVolumeAverage = volumeAverage[immediateVolumeOffset]
+                    float immediateRelativeVolume = not na(volume[immediateVolumeOffset]) and
+                         not na(immediateVolumeAverage) and immediateVolumeAverage > 0.0 ?
+                         volume[immediateVolumeOffset] / immediateVolumeAverage : na
+                    if not na(immediateRelativeVolume)
+                        immediateMaxRelativeVolume := na(immediateMaxRelativeVolume) ?
+                             immediateRelativeVolume :
+                             math.max(immediateMaxRelativeVolume, immediateRelativeVolume)
+
+                bool immediateStoredBarMatches = sellerLegDemandBar ==
+                     bar_index - immediateFrontRunConfirmationBars and
+                     math.abs(immediateStoredLow - sellerLegDemandLow) <= syminfo.mintick * 2.0
+                bool immediateLowPreserved = not na(immediateRightLowest) and
+                     immediateRightLowest >= sellerLegDemandLow - immediatePreservationTolerance
+                bool immediateWickConfirmed = immediateDemandLowerWick >=
+                     immediateDemandAtr * minDemandLowerWickAtr
+                bool immediateReactionConfirmed = not na(immediatePostDemandHigh) and
+                     immediatePostDemandHigh - sellerLegDemandLow >=
+                     immediateDemandAtr * minDemandReactionAtr
+                bool immediateVolumeConfirmed = not na(immediateMaxRelativeVolume) and
+                     immediateMaxRelativeVolume >= minDemandRelativeVolume
+                immediateDemandQualified := immediateStoredBarMatches and immediateLowPreserved and
+                     immediateWickConfirmed and immediateReactionConfirmed and immediateVolumeConfirmed
+
+            if immediateDemandQualified
+                array.set(flipRetested, zoneIndex, true)
+                array.set(flipDemandConfirmed, zoneIndex, true)
+                array.set(flipEvidenceConfirmationBars, zoneIndex, bar_index)
+                alreadyRetested := true
+                demandConfirmed := true
+                evidenceConfirmationBar := bar_index
+                immediateFrontRunPending := false
+                box.set_bgcolor(zoneBox, activeFill)
+                box.set_border_color(zoneBox, activeBorder)
+                box.set_text(zoneBox, "")
+
+                if showSellerControlLeg and not na(sellerLegBox)
+                    box.set_bgcolor(sellerLegBox, sellerLegFill)
+                    box.set_border_color(sellerLegBox, sellerLegBorder)
+                    box.set_text(sellerLegBox, "")
+
+                string immediateDemandTime = str.format_time(
+                     time[immediateFrontRunConfirmationBars], "HH:mm", syminfo.timezone)
+                string immediateConfirmedTime = str.format_time(time, "HH:mm", syminfo.timezone)
+                bool immediateSupportIsNew = array.indexof(
+                     confirmedSupplyFlipSupportBars, sellerLegDemandBar) == -1
+                if immediateSupportIsNew
+                    label immediateDemandLabel = na
+                    if showConfirmedSupplyFlipSupports
+                        float immediateMarkerY = sellerLegDemandLow - immediateDemandAtr * 0.15
+                        immediateDemandLabel := label.new(
+                             x = sellerLegDemandBar,
+                             y = immediateMarkerY,
+                             text = "S→D",
+                             xloc = xloc.bar_index,
+                             yloc = yloc.price,
+                             style = label.style_label_up,
+                             color = color.new(color.lime, 0),
+                             textcolor = color.black,
+                             size = size.normal,
+                             textalign = text.align_center,
+                             tooltip = "Immediate front-run demand " + immediateDemandTime +
+                                  " • confirmed " + immediateConfirmedTime +
+                                  " • original supply " + str.tostring(zoneBottom, format.mintick) +
+                                  "–" + str.tostring(zoneTop, format.mintick))
+
+                    array.push(confirmedSupplyFlipSupportBars, sellerLegDemandBar)
+                    array.push(confirmedSupplyFlipSupportLabels, immediateDemandLabel)
+                    confirmedSupplyFlipSupportDetected := true
+                    if array.size(confirmedSupplyFlipSupportBars) > maxHistoricalSupportMarkers
+                        array.shift(confirmedSupplyFlipSupportBars)
+                        label oldestImmediateSupportLabel = array.shift(confirmedSupplyFlipSupportLabels)
+                        if not na(oldestImmediateSupportLabel)
+                            label.delete(oldestImmediateSupportLabel)
+
+                    if sendDynamicAlerts
+                        alert("Immediate front-run S→D demand confirmed | " + syminfo.ticker + " " + timeframe.period +
+                             " | Demand: " + immediateDemandTime +
+                             " | Confirmed: " + immediateConfirmedTime +
+                             " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
+                             str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
+            else
+                box.delete(zoneBox)
+                if not na(sellerLegBox)
+                    box.delete(sellerLegBox)
+                if not na(zoneTextLabel)
+                    label.delete(zoneTextLabel)
+                array.remove(flipBoxes, zoneIndex)
+                array.remove(flipLegBoxes, zoneIndex)
+                array.remove(flipTextLabels, zoneIndex)
+                array.remove(flipTops, zoneIndex)
+                array.remove(flipBottoms, zoneIndex)
+                array.remove(flipDemandLows, zoneIndex)
+                array.remove(flipDemandBars, zoneIndex)
+                array.remove(flipConfirmationBars, zoneIndex)
+                array.remove(flipOriginTimes, zoneIndex)
+                array.remove(flipRetested, zoneIndex)
+                array.remove(flipWasIntersecting, zoneIndex)
+                array.remove(flipActive, zoneIndex)
+                array.remove(flipZoneKinds, zoneIndex)
+                array.remove(flipDemandConfirmed, zoneIndex)
+                array.remove(flipEvidenceConfirmationBars, zoneIndex)
+                array.remove(flipFirstSeparationBars, zoneIndex)
+                removed := true
 
     // Keep checking every active zone until one complete candle trades entirely
     // above it. A later return is not a valid retest without this separation proof.
-    if signalBarReady and isActive and na(firstSeparationBar) and bar_index > confirmationBar and low > zoneTop
+    if not removed and signalBarReady and isActive and not immediateFrontRunPending and
+         na(firstSeparationBar) and bar_index > confirmationBar and low > zoneTop
         firstSeparationBar := bar_index
         array.set(flipFirstSeparationBars, zoneIndex, firstSeparationBar)
     bool hasFullSeparation = not na(firstSeparationBar)
@@ -1343,7 +1743,8 @@ while zoneIndex < array.size(flipBoxes)
     // A confirmed pivot low inside an already flipped original supply zone is a
     // confirmed S→D support point. Place only an arrow on the actual support candle;
     // the price area remains the original supply zone.
-    if signalBarReady and isActive and not isContinuationBase and showConfirmedSupplyFlipSupports and
+    if not removed and signalBarReady and isActive and not immediateFrontRunPending and
+         not isContinuationBase and
          not na(confirmedPivotLow) and not na(atr[demandPivotRight])
         int confirmedSupportBar = bar_index - demandPivotRight
         float confirmedSupportHigh = high[demandPivotRight]
@@ -1371,55 +1772,85 @@ while zoneIndex < array.size(flipBoxes)
         bool confirmedSupportQualified = confirmedSupportAfterFlip and confirmedSupportAfterSeparation and
              confirmedSupportInsideZone and confirmedSupportWickOk and confirmedSupportReactionOk and confirmedSupportVolumeOk
 
-        if confirmedSupportQualified and array.indexof(confirmedSupplyFlipSupportBars, confirmedSupportBar) == -1
+        if confirmedSupportQualified
             array.set(flipDemandConfirmed, zoneIndex, true)
             demandConfirmed := true
+            if na(evidenceConfirmationBar)
+                evidenceConfirmationBar := bar_index
+                array.set(flipEvidenceConfirmationBars, zoneIndex, evidenceConfirmationBar)
 
-            float confirmedSupportMarkerY = confirmedPivotLow - confirmedSupportAtr * 0.15
-            string confirmedSupportTime = str.format_time(time[demandPivotRight], "HH:mm", syminfo.timezone)
-            string confirmedSupportConfirmedTime = str.format_time(time, "HH:mm", syminfo.timezone)
-            label confirmedSupportLabel = label.new(
-                 x = confirmedSupportBar,
-                 y = confirmedSupportMarkerY,
-                 text = "S→D",
-                 xloc = xloc.bar_index,
-                 yloc = yloc.price,
-                 style = label.style_label_up,
-                 color = color.new(color.lime, 0),
-                 textcolor = color.black,
-                 size = size.normal,
-                 textalign = text.align_center,
-                 tooltip = "Confirmed S→D support " + confirmedSupportTime +
-                      " • confirmed " + confirmedSupportConfirmedTime +
-                      " • original supply " + str.tostring(zoneBottom, format.mintick) +
-                      "–" + str.tostring(zoneTop, format.mintick))
-            array.push(confirmedSupplyFlipSupportBars, confirmedSupportBar)
-            array.push(confirmedSupplyFlipSupportLabels, confirmedSupportLabel)
-            confirmedSupplyFlipSupportDetected := true
-            if array.size(confirmedSupplyFlipSupportBars) > maxHistoricalSupportMarkers
-                array.shift(confirmedSupplyFlipSupportBars)
-                label oldestConfirmedSupportLabel = array.shift(confirmedSupplyFlipSupportLabels)
-                if not na(oldestConfirmedSupportLabel)
-                    label.delete(oldestConfirmedSupportLabel)
-            if sendDynamicAlerts
-                alert("Confirmed S→D support inside original supply zone | " + syminfo.ticker + " " + timeframe.period +
-                     " | Support: " + confirmedSupportTime +
-                     " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
-                     str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
+            bool confirmedSupportIsNew = array.indexof(
+                 confirmedSupplyFlipSupportBars, confirmedSupportBar) == -1
+            if confirmedSupportIsNew
+                float confirmedSupportMarkerY = confirmedPivotLow - confirmedSupportAtr * 0.15
+                string confirmedSupportTime = str.format_time(time[demandPivotRight], "HH:mm", syminfo.timezone)
+                string confirmedSupportConfirmedTime = str.format_time(time, "HH:mm", syminfo.timezone)
+                label confirmedSupportLabel = na
+                if showConfirmedSupplyFlipSupports
+                    confirmedSupportLabel := label.new(
+                         x = confirmedSupportBar,
+                         y = confirmedSupportMarkerY,
+                         text = "S→D",
+                         xloc = xloc.bar_index,
+                         yloc = yloc.price,
+                         style = label.style_label_up,
+                         color = color.new(color.lime, 0),
+                         textcolor = color.black,
+                         size = size.normal,
+                         textalign = text.align_center,
+                         tooltip = "Confirmed S→D support " + confirmedSupportTime +
+                              " • confirmed " + confirmedSupportConfirmedTime +
+                              " • original supply " + str.tostring(zoneBottom, format.mintick) +
+                              "–" + str.tostring(zoneTop, format.mintick))
+                array.push(confirmedSupplyFlipSupportBars, confirmedSupportBar)
+                array.push(confirmedSupplyFlipSupportLabels, confirmedSupportLabel)
+                confirmedSupplyFlipSupportDetected := true
+                if array.size(confirmedSupplyFlipSupportBars) > maxHistoricalSupportMarkers
+                    array.shift(confirmedSupplyFlipSupportBars)
+                    label oldestConfirmedSupportLabel = array.shift(confirmedSupplyFlipSupportLabels)
+                    if not na(oldestConfirmedSupportLabel)
+                        label.delete(oldestConfirmedSupportLabel)
+                if sendDynamicAlerts
+                    alert("Confirmed S→D support inside original supply zone | " + syminfo.ticker + " " + timeframe.period +
+                         " | Support: " + confirmedSupportTime +
+                         " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
+                         str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
 
-    if isActive
-        box.set_right(zoneBox, bar_index + 1)
+    if not removed and isActive and not immediateFrontRunPending
+        box.set_right(zoneBox, f_bar_right_edge_time(bar_index))
         float invalidationThreshold = zoneBottom - atr * invalidationBufferAtr
         bool invalidated = invalidationMode == "Close" ? close < invalidationThreshold : low < invalidationThreshold
 
         if signalBarReady and invalidated and bar_index > confirmationBar
             invalidationDetected := true
 
-            // A zone that fails before its first retest must never become visible.
-            if not alreadyRetested
+            // A hidden zone that fails before its first retest, or a visible
+            // supply-flip retest that fails before confirmed S→D demand, must
+            // leave no historical price area. BASE zones already carry their
+            // own confirmed BASE retest, while progressive and immediate paths
+            // set demandConfirmed when their S→D arrow is created.
+            bool failedBeforeConfirmedSupplyDemand =
+                 not isContinuationBase and not demandConfirmed
+            int barsSurvivedAfterEvidence = na(evidenceConfirmationBar) ?
+                 na : bar_index - evidenceConfirmationBar
+            bool failedBeforeMinimumEvidenceSurvival =
+                 not na(barsSurvivedAfterEvidence) and
+                 barsSurvivedAfterEvidence < minimumEvidenceSurvivalBars
+            bool discardInvalidatedZone =
+                 not alreadyRetested or failedBeforeConfirmedSupplyDemand or
+                 failedBeforeMinimumEvidenceSurvival
+
+            if discardInvalidatedZone
                 if sendDynamicAlerts
-                    string failedZoneName = isContinuationBase ? "Continuation-base zone failed before first retest" :
-                         "Supply→Demand zone failed before first retest"
+                    string failedZoneName = failedBeforeMinimumEvidenceSurvival ?
+                         (isContinuationBase ?
+                         "Continuation-base evidence failed before minimum survival" :
+                         "Supply→Demand evidence failed before minimum survival") :
+                         not alreadyRetested ?
+                         (isContinuationBase ?
+                         "Continuation-base zone failed before first retest" :
+                         "Supply→Demand zone failed before first retest") :
+                         "Supply→Demand retest failed before confirmed demand"
                     alert(failedZoneName + " | " + syminfo.ticker + " " + timeframe.period +
                          " | Zone: " + str.tostring(zoneBottom, format.mintick) + " - " +
                          str.tostring(zoneTop, format.mintick), alert.freq_once_per_bar_close)
@@ -1442,14 +1873,15 @@ while zoneIndex < array.size(flipBoxes)
                 array.remove(flipActive, zoneIndex)
                 array.remove(flipZoneKinds, zoneIndex)
                 array.remove(flipDemandConfirmed, zoneIndex)
+                array.remove(flipEvidenceConfirmationBars, zoneIndex)
                 array.remove(flipFirstSeparationBars, zoneIndex)
                 removed := true
             else
-                // The retest was valid when it occurred. Freeze that green history at the
-                // later break and mark the failure separately instead of repainting it gray.
+                // Confirmed demand existed before this later break. Freeze that
+                // successful green history and mark the later failure separately.
                 array.set(flipActive, zoneIndex, false)
                 laterBreakDetected := true
-                box.set_right(zoneBox, bar_index)
+                box.set_right(zoneBox, time)
                 box.set_bgcolor(zoneBox, activeFill)
                 box.set_border_color(zoneBox, activeBorder)
                 box.set_text(zoneBox, "")
@@ -1470,6 +1902,9 @@ while zoneIndex < array.size(flipBoxes)
             if firstRetest
                 array.set(flipRetested, zoneIndex, true)
                 array.set(flipWasIntersecting, zoneIndex, true)
+                if isContinuationBase and na(evidenceConfirmationBar)
+                    evidenceConfirmationBar := bar_index
+                    array.set(flipEvidenceConfirmationBars, zoneIndex, evidenceConfirmationBar)
                 firstRetestDetected := true
                 // A supply-zone touch reveals the zone but is not evidence of demand.
                 // Only the confirmed pivot-support block above may draw an S→D arrow.
@@ -1510,9 +1945,104 @@ while zoneIndex < array.size(flipBoxes)
     if not removed
         zoneIndex += 1
 
+// ───────────── Broadest overlapping zone display ─────────────
+// Recalculate visual dominance after all lifecycle changes on the bar. A
+// narrower zone is hidden only when a wider visible zone of any supported type
+// covers the configured fraction of its price range while both rectangles also
+// overlap in time. No zone state, marker, alert, or invalidation logic is removed
+// by this display filter.
+int displayZoneCount = array.size(flipBoxes)
+// One final pass is sufficient because box properties persist. Avoid an
+// all-pairs comparison on every historical bar.
+if displayZoneCount > 0 and barstate.islast and (barstate.ishistory or barstate.isconfirmed)
+    for displayZoneIndex = 0 to displayZoneCount - 1
+        box displayZoneBox = array.get(flipBoxes, displayZoneIndex)
+        box displayStructureBox = array.get(flipLegBoxes, displayZoneIndex)
+        float displayZoneTop = array.get(flipTops, displayZoneIndex)
+        float displayZoneBottom = array.get(flipBottoms, displayZoneIndex)
+        int displayZoneLeft = box.get_left(displayZoneBox)
+        int displayZoneRight = box.get_right(displayZoneBox)
+        bool displayZoneVisible = array.get(flipRetested, displayZoneIndex)
+        int displayZoneKind = array.get(flipZoneKinds, displayZoneIndex)
+        bool displayIsContinuationBase = displayZoneKind == ZONE_KIND_CONTINUATION_BASE
+        bool displayDemandConfirmed = array.get(flipDemandConfirmed, displayZoneIndex)
+        bool displayLifecycleConfirmed = displayDemandConfirmed or
+             (displayIsContinuationBase and displayZoneVisible)
+        bool displaySuppressed = false
+
+        if showOnlyBroadestOverlappingZone and displayZoneVisible
+            float displayZoneWidth = displayZoneTop - displayZoneBottom
+
+            for comparisonIndex = 0 to displayZoneCount - 1
+                if comparisonIndex != displayZoneIndex and not displaySuppressed
+                    bool comparisonVisible = array.get(flipRetested, comparisonIndex)
+
+                    if comparisonVisible
+                        int comparisonZoneKind = array.get(flipZoneKinds, comparisonIndex)
+                        bool comparisonIsContinuationBase =
+                             comparisonZoneKind == ZONE_KIND_CONTINUATION_BASE
+                        bool comparisonDemandConfirmed =
+                             array.get(flipDemandConfirmed, comparisonIndex)
+                        bool comparisonLifecycleConfirmed = comparisonDemandConfirmed or
+                             comparisonIsContinuationBase
+                        box comparisonZoneBox = array.get(flipBoxes, comparisonIndex)
+                        int comparisonZoneLeft = box.get_left(comparisonZoneBox)
+                        int comparisonZoneRight = box.get_right(comparisonZoneBox)
+                        bool comparisonOverlapsInTime =
+                             displayZoneLeft <= comparisonZoneRight and
+                             displayZoneRight >= comparisonZoneLeft
+                        float comparisonTop = array.get(flipTops, comparisonIndex)
+                        float comparisonBottom = array.get(flipBottoms, comparisonIndex)
+                        float comparisonWidth = comparisonTop - comparisonBottom
+                        float overlapHeight = math.max(
+                             0.0,
+                             math.min(displayZoneTop, comparisonTop) -
+                             math.max(displayZoneBottom, comparisonBottom))
+                        float narrowerWidth = math.min(displayZoneWidth, comparisonWidth)
+                        float overlapFraction = narrowerWidth > 0.0 ?
+                             overlapHeight / narrowerWidth : 0.0
+                        bool comparisonIsBroader = comparisonWidth >
+                             displayZoneWidth + syminfo.mintick * 2.0
+                        bool comparisonSubstantiallyOverlaps =
+                             overlapFraction >= broadZoneMinimumOverlap
+                        bool comparisonHasEnoughConfirmation =
+                             comparisonLifecycleConfirmed or not displayLifecycleConfirmed
+
+                        if comparisonOverlapsInTime and comparisonIsBroader and
+                             comparisonSubstantiallyOverlaps and
+                             comparisonHasEnoughConfirmation
+                            displaySuppressed := true
+
+        bool drawDisplayZone = displayZoneVisible and not displaySuppressed
+        if drawDisplayZone
+            box.set_bgcolor(displayZoneBox, activeFill)
+            box.set_border_color(displayZoneBox, activeBorder)
+            box.set_text(displayZoneBox, "")
+        else
+            box.set_bgcolor(displayZoneBox, hiddenDrawingColor)
+            box.set_border_color(displayZoneBox, hiddenDrawingColor)
+            box.set_text(displayZoneBox, "")
+
+        if not na(displayStructureBox)
+            bool showDisplayStructure = displayIsContinuationBase ?
+                 showContinuationBaseStructure : showSellerControlLeg
+            if drawDisplayZone and showDisplayStructure
+                color displayStructureFill = displayIsContinuationBase ?
+                     continuationBaseFill : sellerLegFill
+                color displayStructureBorder = displayIsContinuationBase ?
+                     continuationBaseBorder : sellerLegBorder
+                box.set_bgcolor(displayStructureBox, displayStructureFill)
+                box.set_border_color(displayStructureBox, displayStructureBorder)
+                box.set_text(displayStructureBox, "")
+            else
+                box.set_bgcolor(displayStructureBox, hiddenDrawingColor)
+                box.set_border_color(displayStructureBox, hiddenDrawingColor)
+                box.set_text(displayStructureBox, "")
+
 // ───────────────────── Markers and alerts ─────────────────────
-// S→D arrows are created only by label.new() in the confirmed pivot-support block,
-// so a bearish first touch such as OMH 09:40 cannot be mislabeled as demand.
+// S→D arrows are created only after confirmed pivot support or confirmed immediate
+// front-run demand, so a bearish first touch such as OMH 09:40 cannot be
+// mislabeled as demand.
 plotshape(showFlipMarkers and continuationBaseRetestDetected, title = "Retested bullish continuation base", style = shape.arrowup,
      location = location.belowbar, color = color.new(color.aqua, 0), text = "BASE", textcolor = color.black, size = size.normal, display = display.all - display.status_line)
 plotshape(showLaterBreakMarkers and laterBreakDetected, title = "Retested demand zone later broken", style = shape.xcross,

@@ -1,7 +1,7 @@
 //@version=6
 indicator(
-     "FRVP Value-Area Continuation Detector v1.12",
-     shorttitle = "FRVP Continuation v1.12",
+     "FRVP Value-Area Continuation Detector v1.13",
+     shorttitle = "FRVP Continuation v1.13",
      overlay = true,
      max_bars_back = 5000,
      max_lines_count = 500,
@@ -1100,10 +1100,13 @@ if profileCanBeEvaluated
         else if elapsedHoldBars >= breakoutHoldBars
             confirmBreakoutNow := true
 
-    // Count failed POC rejection bars when they are sufficiently separated in
-    // time. This captures an extended fight around POC without requiring price
-    // to leave an ATR-wide band between every rejection.
-    bool startsAbovePOCEnough =
+    // Count only upward breakout attempts that begin below POC. The candle must
+    // open below POC, trade up into/through it, and then reject downward from
+    // the reached price. This excludes candles that were already accepted above
+    // POC before their rejection began.
+    bool opensBelowPOC =
+         open < profilePOC
+    bool reachesPOCFromBelow =
          high >= profilePOC + atrValue * pocMinimumPenetrationATR
     bool closesNearOrBelowPOC =
          close <= profilePOC + atrValue * pocFailedCloseBandATR
@@ -1115,7 +1118,8 @@ if profileCanBeEvaluated
     bool failedPOCAttemptNow =
          not breakoutPending and
          not breakoutConfirmed and
-         startsAbovePOCEnough and
+         opensBelowPOC and
+         reachesPOCFromBelow and
          closesNearOrBelowPOC and
          rejectsDownFromReachedPrice and
          enoughBarsSinceLastPOCAttempt
@@ -1129,6 +1133,7 @@ if profileCanBeEvaluated
                  "FAILED POC ATTEMPT #" + str.tostring(failedPOCAttempts) +
                  "\nTime: " + str.format_time(time, "HH:mm", syminfo.timezone) +
                  "\nPOC: " + str.tostring(profilePOC, format.mintick) +
+                 "\nOpen: " + str.tostring(open, format.mintick) +
                  "\nHigh: " + str.tostring(high, format.mintick) +
                  "\nClose: " + str.tostring(close, format.mintick) +
                  "\nDownward rejection: " + str.tostring(high - close, format.mintick)
