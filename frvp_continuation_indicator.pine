@@ -1,7 +1,7 @@
 //@version=6
 indicator(
-     "FRVP Value-Area Continuation Detector v1.13",
-     shorttitle = "FRVP Continuation v1.13",
+     "FRVP Value-Area Continuation Detector v1.24",
+     shorttitle = "FRVP Continuation v1.24",
      overlay = true,
      max_bars_back = 5000,
      max_lines_count = 500,
@@ -20,9 +20,24 @@ indicator(
 //   2. Freeze an approximate fixed-range volume profile for that movement.
 //   3. Preserve session VWAP as informational context without using it to
 //      reject an otherwise valid first-move profile.
-//   4. Look for a defended VAL and repeated failed attempts around the POC.
+//   4. Mark defended VAL/POC support and repeated failed attempts below the POC.
 //   5. Confirm continuation when a strong, high-volume candle crosses from
 //      below the POC to above the VAH and then holds above the POC.
+//   6. Keep a frozen premarket profile active after the regular market opens;
+//      unfinished profiles may also continue through later session changes.
+//   7. Rearm POC defense after price leaves its vicinity, allowing every fresh
+//      support test—including a new regular-session defense—to be marked.
+//   8. Require every POC defense candle to touch/undercut POC, trade above
+//      average volume, and form a lower wick at least 25% of its full range.
+//      No ATR-based maximum undercut is imposed when the candle recovers POC.
+//   9. Require the POC defense candle to make a lower low than the prior bar.
+//  10. Require its open to be strictly below the prior bar's high.
+//  11. Mark every candle that trades below VAL, closes above VAL, and forms a
+//      lower wick at least 25% as large as its candle body. Its open may be on
+//      either side of VAL.
+//  12. Invalidate the profile only after sustained closes below the first
+//      movement's absolute low; acceptance below VAL alone does not invalidate.
+//  13. Require at least 100,000 shares of cumulative first-move volume by default.
 //
 // The profile is approximate. Each candle's volume is spread uniformly over
 // the price rows crossed by that candle. TradingView does not expose the values
@@ -72,6 +87,13 @@ bool includeAfterHours = input.bool(
      group = GROUP_MOVE,
      display = display.none,
      tooltip = "Enables an independent first-move search during 16:00–20:00 exchange time.")
+
+bool carryActiveProfileAcrossSessions = input.bool(
+     true,
+     "Carry active frozen profile into the next session",
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Always carries a frozen premarket profile through 09:30 so its levels remain actionable during regular hours. At later session changes, an unfinished profile is carried while a completed one may reset.")
 
 string premarketSession = input.session(
      "0400-0930",
@@ -181,7 +203,7 @@ float minimumMoveRangeATR = input.float(
      display = display.none)
 
 float minimumMoveCumulativeVolume = input.float(
-     50000.0,
+     100000.0,
      "Minimum first-move cumulative volume",
      minval = 0.0,
      step = 5000.0,
@@ -241,49 +263,19 @@ float valueAreaPercent = input.float(
      group = GROUP_PROFILE,
      display = display.none)
 
-int valPivotLeft = input.int(
-     2,
-     "VAL defense pivot bars left",
-     minval = 1,
-     maxval = 10,
-     group = GROUP_VAL,
-     display = display.none)
-
-int valPivotRight = input.int(
-     2,
-     "VAL defense pivot bars right",
-     minval = 1,
-     maxval = 10,
-     group = GROUP_VAL,
-     display = display.none)
-
-float valApproachATR = input.float(
-     0.50,
-     "Maximum distance above VAL (ATR)",
+float valMinimumLowerWickToBody = input.float(
+     0.25,
+     "VAL defense minimum lower wick / body",
      minval = 0.00,
+     maxval = 10.00,
      step = 0.05,
      group = GROUP_VAL,
-     display = display.none)
-
-float valWickToleranceATR = input.float(
-     0.15,
-     "Allowed wick below VAL (ATR)",
-     minval = 0.00,
-     step = 0.05,
-     group = GROUP_VAL,
-     display = display.none)
-
-float valCloseToleranceATR = input.float(
-     0.10,
-     "Allowed close below VAL (ATR)",
-     minval = 0.00,
-     step = 0.05,
-     group = GROUP_VAL,
-     display = display.none)
+     display = display.none,
+     tooltip = "0.25 means the lower wick must be at least 25% as large as the candle body.")
 
 int valInvalidationCloses = input.int(
      2,
-     "Consecutive closes that invalidate VAL",
+     "Consecutive closes below FRVP low that invalidate",
      minval = 1,
      maxval = 5,
      group = GROUP_VAL,
@@ -314,6 +306,42 @@ float pocMinimumDownwardRejectionATR = input.float(
      group = GROUP_POC,
      display = display.none,
      tooltip = "Measures the drop from the candle high to its close after reaching POC. This distinguishes a real downward rejection from a candle that simply closes near POC.")
+
+float pocDefenseApproachATR = input.float(
+     0.15,
+     "POC defense maximum distance above POC (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none,
+     tooltip = "A support test may stop slightly above POC and still qualify as buyers front-running the level.")
+
+float pocDefenseMinimumLowerWickFraction = input.float(
+     0.25,
+     "POC defense minimum lower wick / range",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none,
+     tooltip = "0.25 requires the lower wick to occupy at least 25% of the candle's high-low range. Wick is open-low on positive candles and close-low on negative candles.")
+
+float pocDefenseCloseBufferATR = input.float(
+     0.00,
+     "POC defense close-above buffer (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none)
+
+int pocDefenseSpacingBars = input.int(
+     2,
+     "Minimum bars between POC defenses",
+     minval = 1,
+     maxval = 30,
+     group = GROUP_POC,
+     display = display.none,
+     tooltip = "A new label requires price to leave the POC approach band, return, and respect this minimum bar spacing.")
 
 int pocAttemptSpacingBars = input.int(
      2,
@@ -414,6 +442,12 @@ bool showFrozenProfileLabel = input.bool(
 bool showVALDefenseMarkers = input.bool(
      true,
      "Mark VAL defense",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+bool showPOCDefenseMarkers = input.bool(
+     true,
+     "Mark POC defense",
      group = GROUP_DISPLAY,
      display = display.none)
 
@@ -581,8 +615,6 @@ float candleRange = high - low
 float candleBody = math.abs(close - open)
 float candleCloseLocation = candleRange > 0.0 ? (close - low) / candleRange : 0.5
 float relativeVolume = not na(volumeAverage) and volumeAverage > 0.0 ? volume / volumeAverage : na
-float confirmedVALPivot = ta.pivotlow(low, valPivotLeft, valPivotRight)
-
 bool timeframeSupported = timeframe.isminutes and timeframe.multiplier <= maximumChartMinutes
 bool inPremarketSession = includePremarket and
      not na(time(timeframe.period, premarketSession, syminfo.timezone))
@@ -602,7 +634,6 @@ bool newTradingDate = bar_index > 0 and currentDateKey != currentDateKey[1]
 bool newEnabledMarketSession =
      activeMarketSession != 0 and
      (bar_index == 0 or activeMarketSession != activeMarketSession[1])
-bool resetLifecycleNow = newTradingDate or newEnabledMarketSession
 
 //------------------------------------------------------------------------------
 // Persistent state and drawing retention
@@ -631,8 +662,10 @@ var int profileLastVisibleTime = na
 var bool valDefended = false
 var bool valInvalidated = false
 var bool valInvalidationMarked = false
-var int consecutiveClosesBelowVAL = 0
+var int consecutiveClosesBelowProfileLow = 0
 
+var bool pocDefenseArmed = true
+var int lastPOCDefenseBarIndex = na
 var int failedPOCAttempts = 0
 var int lastPOCAttemptBarIndex = na
 
@@ -656,10 +689,34 @@ var array<label> retainedMarkers = array.new_label()
 var array<label> retainedEntryMarkers = array.new_label()
 
 bool entryTriggeredThisBar = false
+bool pocDefendedThisBar = false
+
+// A frozen premarket profile always survives the 09:30 boundary, even if its
+// earlier entry lifecycle completed. Other session changes carry only an
+// unfinished profile.
+bool frozenProfileExists =
+     lifecycleState == STATE_PROFILE
+bool frozenProfileStillActionable =
+     frozenProfileExists and
+     not valInvalidated and
+     not breakoutConfirmed
+bool enteringRegularFromPremarket =
+     newEnabledMarketSession and
+     bar_index > 0 and
+     activeMarketSession == 2 and
+     activeMarketSession[1] == 1
+bool preserveProfileAtSessionBoundary =
+     carryActiveProfileAcrossSessions and
+     newEnabledMarketSession and
+     frozenProfileExists and
+     (enteringRegularFromPremarket or frozenProfileStillActionable)
+bool resetLifecycleNow =
+     newTradingDate or
+     (newEnabledMarketSession and not preserveProfileAtSessionBoundary)
 
 //------------------------------------------------------------------------------
-// Reset the live lifecycle at the first bar of each enabled market session.
-// Historical drawings from earlier sessions remain on the chart.
+// Reset at a new date or at an enabled session boundary where no frozen profile
+// qualifies for carry-forward. Historical drawings remain on the chart.
 //------------------------------------------------------------------------------
 
 if resetLifecycleNow
@@ -685,8 +742,10 @@ if resetLifecycleNow
     valDefended := false
     valInvalidated := false
     valInvalidationMarked := false
-    consecutiveClosesBelowVAL := 0
+    consecutiveClosesBelowProfileLow := 0
 
+    pocDefenseArmed := true
+    lastPOCDefenseBarIndex := na
     failedPOCAttempts := 0
     lastPOCAttemptBarIndex := na
 
@@ -888,7 +947,9 @@ if freezeMovementNow
         valDefended := false
         valInvalidated := false
         valInvalidationMarked := false
-        consecutiveClosesBelowVAL := 0
+        consecutiveClosesBelowProfileLow := 0
+        pocDefenseArmed := true
+        lastPOCDefenseBarIndex := na
         failedPOCAttempts := 0
         lastPOCAttemptBarIndex := na
         breakoutPending := false
@@ -994,12 +1055,14 @@ if profileCanBeEvaluated
     line.set_x2(activePOCLine, profileLastVisibleTime)
     line.set_x2(activeVAHLine, profileLastVisibleTime)
 
-    // A value-area defense is invalidated by sustained acceptance below VAL,
-    // not by one isolated wick.
-    bool closeAcceptedBelowVAL = close < profileVAL - atrValue * valCloseToleranceATR
-    consecutiveClosesBelowVAL := closeAcceptedBelowVAL ? consecutiveClosesBelowVAL + 1 : 0
+    // Trading below VAL does not invalidate the profile while price remains
+    // inside its original range. Only sustained closes beneath the first
+    // movement's absolute low invalidate the profile.
+    bool closeAcceptedBelowProfileLow = close < movementLow
+    consecutiveClosesBelowProfileLow :=
+         closeAcceptedBelowProfileLow ? consecutiveClosesBelowProfileLow + 1 : 0
 
-    if consecutiveClosesBelowVAL >= valInvalidationCloses
+    if consecutiveClosesBelowProfileLow >= valInvalidationCloses
         valInvalidated := true
         breakoutPending := false
 
@@ -1007,52 +1070,38 @@ if profileCanBeEvaluated
             label valLostLabel = label.new(
                  x = time,
                  y = low,
-                 text = "VAL\nLOST",
+                 text = "FRVP\nLOST",
                  xloc = xloc.bar_time,
                  yloc = yloc.price,
                  style = label.style_label_up,
                  color = color.new(color.red, 5),
                  textcolor = color.white,
                  size = size.tiny,
-                 tooltip = "Value was accepted below VAL at " + str.format_time(time, "HH:mm", syminfo.timezone))
+                 tooltip =
+                      "Price was accepted below the FRVP low " +
+                      str.tostring(movementLow, format.mintick) +
+                      " at " +
+                      str.format_time(time, "HH:mm", syminfo.timezone))
             array.push(retainedMarkers, valLostLabel)
             valInvalidationMarked := true
 
-    // A VAL defense can be established directly when a completed bar approaches
-    // VAL without accepting below it. The existing pivot path remains as a
-    // stricter fallback when the approach is recognized a few bars later.
-    if not valDefended and not valInvalidated
-        bool directDefenseApproachedVAL = low <= profileVAL + atrValue * valApproachATR
-        bool directDefenseHeldVAL = low >= profileVAL - atrValue * valWickToleranceATR
-        bool directDefenseClosedAcceptably = close >= profileVAL - atrValue * valCloseToleranceATR
+    // Every completed candle is evaluated independently. A valid VAL defense
+    // trades below VAL, recovers to close above it, and shows a lower wick that
+    // is at least the configured fraction of its body. Its open is unrestricted.
+    if not valInvalidated
+        float valDefenseLowerWick = math.min(open, close) - low
+        bool valDefenseClosesAbove = close > profileVAL
+        bool valDefenseTradesBelow = low < profileVAL
+        bool valDefenseHasBody = candleBody > 0.0
+        bool valDefenseLowerWickOk =
+             valDefenseHasBody and
+             valDefenseLowerWick >= candleBody * valMinimumLowerWickToBody
         bool directVALDefense =
-             directDefenseApproachedVAL and
-             directDefenseHeldVAL and
-             directDefenseClosedAcceptably
+             valDefenseClosesAbove and
+             valDefenseTradesBelow and
+             valDefenseLowerWickOk
 
-        float pivotATR = atrValue[valPivotRight]
-        float pivotClose = close[valPivotRight]
-        int pivotTime = time[valPivotRight]
-        bool pivotOccurredAfterProfile = pivotTime > movementEndTime
-        bool pivotApproachedVAL =
-             not na(confirmedVALPivot) and
-             confirmedVALPivot <= profileVAL + pivotATR * valApproachATR
-        bool pivotDidNotUndercutTooFar =
-             not na(confirmedVALPivot) and
-             confirmedVALPivot >= profileVAL - pivotATR * valWickToleranceATR
-        bool pivotClosedAcceptably =
-             not na(confirmedVALPivot) and
-             pivotClose >= profileVAL - pivotATR * valCloseToleranceATR
-        bool pivotVALDefense =
-             pivotOccurredAfterProfile and
-             pivotApproachedVAL and
-             pivotDidNotUndercutTooFar and
-             pivotClosedAcceptably
-
-        if directVALDefense or pivotVALDefense
-            int defenseTime = directVALDefense ? time : pivotTime
-            float defenseLow = directVALDefense ? low : confirmedVALPivot
-            string defenseMethod = directVALDefense ? "Observed at bar close" : "Confirmed pivot"
+        if directVALDefense
             valDefended := true
             line.set_color(activeVALLine, color.new(valColor, 0))
             line.set_width(activeVALLine, 3)
@@ -1060,13 +1109,18 @@ if profileCanBeEvaluated
             if showVALDefenseMarkers
                 string defenseTooltip =
                      "VAL DEFENDED\n" +
-                     "Defense: " + str.format_time(defenseTime, "HH:mm", syminfo.timezone) +
-                     "\nMethod: " + defenseMethod +
+                     "Defense: " + str.format_time(time, "HH:mm", syminfo.timezone) +
                      "\nVAL: " + str.tostring(profileVAL, format.mintick) +
-                     "\nDefense low: " + str.tostring(defenseLow, format.mintick)
+                     "\nOpen: " + str.tostring(open, format.mintick) +
+                     "\nLow: " + str.tostring(low, format.mintick) +
+                     "\nClose: " + str.tostring(close, format.mintick) +
+                     "\nLower wick: " + str.tostring(valDefenseLowerWick, format.mintick) +
+                     "\nBody: " + str.tostring(candleBody, format.mintick) +
+                     "\nWick / body: " +
+                     str.tostring(valDefenseLowerWick / candleBody * 100.0, "#.##") + "%"
                 label defenseLabel = label.new(
-                     x = defenseTime,
-                     y = defenseLow,
+                     x = time,
+                     y = low,
                      text = "VAL\nDEFENDED",
                      xloc = xloc.bar_time,
                      yloc = yloc.price,
@@ -1076,6 +1130,89 @@ if profileCanBeEvaluated
                      size = size.tiny,
                      tooltip = defenseTooltip)
                 array.push(retainedMarkers, defenseLabel)
+
+    // A POC defense is the opposite of a POC FAIL. After each defense, price
+    // must first leave the approach band above POC before another return can
+    // produce a fresh label and alert.
+    bool pocDefenseBandCleared =
+         low > profilePOC + atrValue * pocDefenseApproachATR
+    if not pocDefenseArmed and pocDefenseBandCleared
+        pocDefenseArmed := true
+
+    if pocDefenseArmed
+        bool pocWasPreviouslyAcceptedAbove = close[1] > profilePOC
+        bool pocDefenseOpensAbove = open > profilePOC
+        bool pocDefenseTouchesOrUndercutsPOC =
+             low <= profilePOC
+        bool pocDefenseMakesLowerLow =
+             low < low[1]
+        bool pocDefenseOpensBelowPreviousHigh =
+             open < high[1]
+        bool pocDefenseClosesAbove =
+             close > profilePOC + atrValue * pocDefenseCloseBufferATR
+        bool pocDefensePositiveBar = close >= open
+        float pocDefenseLowerWick =
+             (pocDefensePositiveBar ? open : close) - low
+        bool pocDefenseHasLowerWick =
+             pocDefenseLowerWick > 0.0
+        bool pocDefenseLowerWickShareOk =
+             candleRange > 0.0 and
+             pocDefenseLowerWick >=
+             candleRange * pocDefenseMinimumLowerWickFraction
+        bool pocDefenseVolumeAboveAverage =
+             not na(volume) and
+             not na(volumeAverage) and
+             volumeAverage > 0.0 and
+             volume > volumeAverage
+        bool enoughBarsSinceLastPOCDefense =
+             na(lastPOCDefenseBarIndex) or
+             bar_index - lastPOCDefenseBarIndex >= pocDefenseSpacingBars
+        bool directPOCDefense =
+             pocWasPreviouslyAcceptedAbove and
+             pocDefenseOpensAbove and
+             pocDefenseTouchesOrUndercutsPOC and
+             pocDefenseMakesLowerLow and
+             pocDefenseOpensBelowPreviousHigh and
+             pocDefenseClosesAbove and
+             pocDefenseHasLowerWick and
+             pocDefenseLowerWickShareOk and
+             pocDefenseVolumeAboveAverage and
+             enoughBarsSinceLastPOCDefense
+
+        if directPOCDefense
+            pocDefenseArmed := false
+            lastPOCDefenseBarIndex := bar_index
+            pocDefendedThisBar := true
+            line.set_color(activePOCLine, pocColor)
+            line.set_width(activePOCLine, 3)
+
+            if showPOCDefenseMarkers
+                string pocDefenseTooltip =
+                     "POC DEFENDED\n" +
+                     "Time: " + str.format_time(time, "HH:mm", syminfo.timezone) +
+                     "\nPOC: " + str.tostring(profilePOC, format.mintick) +
+                     "\nOpen: " + str.tostring(open, format.mintick) +
+                     "\nPrevious high: " + str.tostring(high[1], format.mintick) +
+                     "\nPrevious low: " + str.tostring(low[1], format.mintick) +
+                     "\nLow: " + str.tostring(low, format.mintick) +
+                     "\nClose: " + str.tostring(close, format.mintick) +
+                     "\nLower wick: " + str.tostring(pocDefenseLowerWick, format.mintick) +
+                     "\nWick / range: " +
+                     str.tostring(pocDefenseLowerWick / candleRange * 100.0, "#.##") + "%" +
+                     "\nVolume / average: " +
+                     str.tostring(volume / volumeAverage, "#.##") + "×"
+                label pocDefenseLabel = label.new(
+                     x = time,
+                     y = low,
+                     text = "POC\nDEFENDED",
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_up,
+                     color = pocColor,
+                     textcolor = color.rgb(30, 30, 30),
+                     size = size.tiny,
+                     tooltip = pocDefenseTooltip)
+                array.push(retainedMarkers, pocDefenseLabel)
 
     // A pending breakout is confirmed only after later bars avoid a close back
     // below POC. The visible arrow remains on the original breakout candle.
@@ -1261,9 +1398,14 @@ while array.size(retainedMarkers) > maximumHistoricalMarkers
 while array.size(retainedEntryMarkers) > maximumHistoricalEntryMarkers
     label.delete(array.shift(retainedEntryMarkers))
 
-// The script exposes one alert only. It fires when the qualifying entry candle
-// closes, not when the later hold confirmation succeeds or fails.
+// Dedicated alert choices. Both events use confirmed bars because the frozen
+// profile lifecycle is intentionally evaluated only after candle close.
 alertcondition(
      entryTriggeredThisBar,
      title = "FRVP Entry Bar",
      message = "FRVP Entry Bar: price crossed from the POC region through VAH with qualifying price structure and relative volume.")
+
+alertcondition(
+     pocDefendedThisBar,
+     title = "FRVP POC Defended",
+     message = "FRVP POC Defended: {{ticker}} {{interval}} tested the frozen POC from above and closed back above it. Close: {{close}}.")
