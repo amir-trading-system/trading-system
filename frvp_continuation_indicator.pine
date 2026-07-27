@@ -1,7 +1,7 @@
 //@version=6
 indicator(
-     "FRVP Value-Area Continuation Detector v1.24",
-     shorttitle = "FRVP Continuation v1.24",
+     "FRVP Value-Area Continuation Detector v1.28",
+     shorttitle = "FRVP Continuation v1.28",
      overlay = true,
      max_bars_back = 5000,
      max_lines_count = 500,
@@ -38,6 +38,16 @@ indicator(
 //  12. Invalidate the profile only after sustained closes below the first
 //      movement's absolute low; acceptance below VAL alone does not invalidate.
 //  13. Require at least 100,000 shares of cumulative first-move volume by default.
+//  14. Add an exceptional VAH-expansion path for a full-bodied bullish candle
+//      whose volume surges versus both its recent bars and normal average. This
+//      path keeps VAL defense and hold confirmation but does not require the
+//      candle to begin near POC or follow two failed POC attempts.
+//  15. Mark every fresh VAH defense with the same price, wick, volume, and
+//      rearm discipline used for POC defense. A defense may front-run VAH by
+//      the configured ATR distance. The first post-breakout retest may use the
+//      breakout identity instead of requiring a lower low than that bar.
+//  16. Expose one combined VAL/POC/VAH defense alert while preserving the
+//      separate chart labels that identify which frozen level was defended.
 //
 // The profile is approximate. Each candle's volume is spread uniformly over
 // the price rows crossed by that candle. TradingView does not expose the values
@@ -48,8 +58,9 @@ const string GROUP_MOVE     = "1. First-move detection"
 const string GROUP_PROFILE  = "2. Approximate fixed-range volume profile"
 const string GROUP_VAL      = "3. VAL defense"
 const string GROUP_POC      = "4. POC fight"
-const string GROUP_BREAKOUT = "5. Continuation breakout"
-const string GROUP_DISPLAY  = "6. Display"
+const string GROUP_VAH      = "5. VAH defense"
+const string GROUP_BREAKOUT = "6. Continuation breakout"
+const string GROUP_DISPLAY  = "7. Display"
 
 const int STATE_SEARCHING = 0
 const int STATE_BUILDING  = 1
@@ -369,6 +380,42 @@ int minimumFailedPOCAttempts = input.int(
      group = GROUP_POC,
      display = display.none)
 
+float vahDefenseApproachATR = input.float(
+     0.15,
+     "VAH defense maximum distance above VAH (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_VAH,
+     display = display.none,
+     tooltip = "A defense may stop this far above VAH. After a defense, price must leave the same approach band before another fresh defense can be marked.")
+
+float vahDefenseMinimumLowerWickFraction = input.float(
+     0.25,
+     "VAH defense minimum lower wick / range",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_VAH,
+     display = display.none,
+     tooltip = "Uses open-low on positive candles and close-low on negative candles, matching POC defense.")
+
+float vahDefenseCloseToleranceATR = input.float(
+     0.25,
+     "VAH defense close tolerance below VAH (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_VAH,
+     display = display.none,
+     tooltip = "Allows a small close beneath VAH when a strong lower wick and above-average volume demonstrate recovery.")
+
+int vahDefenseSpacingBars = input.int(
+     2,
+     "Minimum bars between VAH defenses",
+     minval = 1,
+     maxval = 30,
+     group = GROUP_VAH,
+     display = display.none)
+
 float breakoutStartToleranceATR = input.float(
      0.15,
      "Breakout may start above POC by (ATR)",
@@ -410,6 +457,65 @@ float breakoutRelativeVolume = input.float(
      group = GROUP_BREAKOUT,
      display = display.none)
 
+bool enableExceptionalVAHExpansion = input.bool(
+     true,
+     "Allow exceptional-volume VAH expansion",
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "Allows an unusually strong, full-bodied volume expansion through VAH to confirm continuation even when the candle begins above POC or fewer than two POC failures occurred.")
+
+float exceptionalVAHClearanceATR = input.float(
+     0.50,
+     "Exceptional: minimum close above VAH (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float exceptionalBodyRangeFraction = input.float(
+     0.75,
+     "Exceptional: minimum body / range",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "0.75 means at least 75% of the candle's complete high-low range must be filled by its real body.")
+
+float exceptionalCloseLocation = input.float(
+     0.85,
+     "Exceptional: minimum close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float exceptionalBodyATR = input.float(
+     1.00,
+     "Exceptional: minimum bullish body (ATR)",
+     minval = 0.10,
+     step = 0.10,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+int exceptionalVolumeLookback = input.int(
+     5,
+     "Exceptional: previous-volume lookback",
+     minval = 2,
+     maxval = 30,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float exceptionalRecentVolumeMultiplier = input.float(
+     3.00,
+     "Exceptional: volume / previous-bar average",
+     minval = 1.00,
+     step = 0.25,
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "Compares the breakout candle with the average volume of the completed bars immediately before it. The current candle is excluded.")
+
 int breakoutHoldBars = input.int(
      2,
      "Bars required to hold after breakout",
@@ -448,6 +554,12 @@ bool showVALDefenseMarkers = input.bool(
 bool showPOCDefenseMarkers = input.bool(
      true,
      "Mark POC defense",
+     group = GROUP_DISPLAY,
+     display = display.none)
+
+bool showVAHDefenseMarkers = input.bool(
+     true,
+     "Mark VAH defense",
      group = GROUP_DISPLAY,
      display = display.none)
 
@@ -615,6 +727,8 @@ float candleRange = high - low
 float candleBody = math.abs(close - open)
 float candleCloseLocation = candleRange > 0.0 ? (close - low) / candleRange : 0.5
 float relativeVolume = not na(volumeAverage) and volumeAverage > 0.0 ? volume / volumeAverage : na
+float exceptionalPreviousVolumeAverage =
+     ta.sma(volume, exceptionalVolumeLookback)[1]
 bool timeframeSupported = timeframe.isminutes and timeframe.multiplier <= maximumChartMinutes
 bool inPremarketSession = includePremarket and
      not na(time(timeframe.period, premarketSession, syminfo.timezone))
@@ -668,6 +782,8 @@ var bool pocDefenseArmed = true
 var int lastPOCDefenseBarIndex = na
 var int failedPOCAttempts = 0
 var int lastPOCAttemptBarIndex = na
+var bool vahDefenseArmed = true
+var int lastVAHDefenseBarIndex = na
 
 var bool breakoutPending = false
 var bool breakoutConfirmed = false
@@ -676,6 +792,7 @@ var int breakoutTime = na
 var float breakoutLow = na
 var float breakoutHigh = na
 var float breakoutATRAtSignal = na
+var string breakoutPath = ""
 
 var line activeVALLine = na
 var line activePOCLine = na
@@ -689,7 +806,9 @@ var array<label> retainedMarkers = array.new_label()
 var array<label> retainedEntryMarkers = array.new_label()
 
 bool entryTriggeredThisBar = false
+bool valDefendedThisBar = false
 bool pocDefendedThisBar = false
+bool vahDefendedThisBar = false
 
 // A frozen premarket profile always survives the 09:30 boundary, even if its
 // earlier entry lifecycle completed. Other session changes carry only an
@@ -748,6 +867,8 @@ if resetLifecycleNow
     lastPOCDefenseBarIndex := na
     failedPOCAttempts := 0
     lastPOCAttemptBarIndex := na
+    vahDefenseArmed := true
+    lastVAHDefenseBarIndex := na
 
     breakoutPending := false
     breakoutConfirmed := false
@@ -756,6 +877,7 @@ if resetLifecycleNow
     breakoutLow := na
     breakoutHigh := na
     breakoutATRAtSignal := na
+    breakoutPath := ""
 
     activeVALLine := na
     activePOCLine := na
@@ -952,8 +1074,11 @@ if freezeMovementNow
         lastPOCDefenseBarIndex := na
         failedPOCAttempts := 0
         lastPOCAttemptBarIndex := na
+        vahDefenseArmed := true
+        lastVAHDefenseBarIndex := na
         breakoutPending := false
         breakoutConfirmed := false
+        breakoutPath := ""
         activeEntryLabel := na
 
         if showMovementBox
@@ -1103,6 +1228,7 @@ if profileCanBeEvaluated
 
         if directVALDefense
             valDefended := true
+            valDefendedThisBar := true
             line.set_color(activeVALLine, color.new(valColor, 0))
             line.set_width(activeVALLine, 3)
 
@@ -1214,6 +1340,94 @@ if profileCanBeEvaluated
                      tooltip = pocDefenseTooltip)
                 array.push(retainedMarkers, pocDefenseLabel)
 
+    // VAH defense mirrors POC defense, but permits a small close beneath VAH.
+    // The first bar after a recognized breakout may qualify without making a
+    // lower low than the breakout candle, whose range often began below VAH.
+    bool vahDefenseBandCleared =
+         low > profileVAH + atrValue * vahDefenseApproachATR
+    if not vahDefenseArmed and vahDefenseBandCleared
+        vahDefenseArmed := true
+
+    if vahDefenseArmed
+        bool vahWasPreviouslyAcceptedAbove = close[1] > profileVAH
+        bool vahDefenseOpensAbove = open > profileVAH
+        bool vahDefenseTouchesOrApproachesVAH =
+             low <= profileVAH + atrValue * vahDefenseApproachATR
+        bool immediatePostBreakoutVAHRetest =
+             not na(breakoutBarIndex) and
+             bar_index == breakoutBarIndex + 1 and
+             (breakoutPending or breakoutConfirmed)
+        bool vahDefenseMakesLowerLow =
+             low < low[1] or immediatePostBreakoutVAHRetest
+        bool vahDefenseOpensBelowPreviousHigh = open < high[1]
+        bool vahDefenseClosesNearOrAbove =
+             close >= profileVAH - atrValue * vahDefenseCloseToleranceATR
+        bool vahDefensePositiveBar = close >= open
+        float vahDefenseLowerWick =
+             (vahDefensePositiveBar ? open : close) - low
+        bool vahDefenseHasLowerWick = vahDefenseLowerWick > 0.0
+        bool vahDefenseLowerWickShareOk =
+             candleRange > 0.0 and
+             vahDefenseLowerWick >=
+             candleRange * vahDefenseMinimumLowerWickFraction
+        bool vahDefenseVolumeAboveAverage =
+             not na(volume) and
+             not na(volumeAverage) and
+             volumeAverage > 0.0 and
+             volume > volumeAverage
+        bool enoughBarsSinceLastVAHDefense =
+             na(lastVAHDefenseBarIndex) or
+             bar_index - lastVAHDefenseBarIndex >= vahDefenseSpacingBars
+        bool directVAHDefense =
+             not valInvalidated and
+             vahWasPreviouslyAcceptedAbove and
+             vahDefenseOpensAbove and
+             vahDefenseTouchesOrApproachesVAH and
+             vahDefenseMakesLowerLow and
+             vahDefenseOpensBelowPreviousHigh and
+             vahDefenseClosesNearOrAbove and
+             vahDefenseHasLowerWick and
+             vahDefenseLowerWickShareOk and
+             vahDefenseVolumeAboveAverage and
+             enoughBarsSinceLastVAHDefense
+
+        if directVAHDefense
+            vahDefenseArmed := false
+            lastVAHDefenseBarIndex := bar_index
+            vahDefendedThisBar := true
+            line.set_color(activeVAHLine, vahColor)
+            line.set_width(activeVAHLine, 3)
+
+            if showVAHDefenseMarkers
+                string vahDefenseTooltip =
+                     "VAH DEFENDED\n" +
+                     "Time: " + str.format_time(time, "HH:mm", syminfo.timezone) +
+                     "\nVAH: " + str.tostring(profileVAH, format.mintick) +
+                     "\nOpen: " + str.tostring(open, format.mintick) +
+                     "\nPrevious high: " + str.tostring(high[1], format.mintick) +
+                     "\nPrevious low: " + str.tostring(low[1], format.mintick) +
+                     "\nLow: " + str.tostring(low, format.mintick) +
+                     "\nClose: " + str.tostring(close, format.mintick) +
+                     "\nLower wick: " + str.tostring(vahDefenseLowerWick, format.mintick) +
+                     "\nWick / range: " +
+                     str.tostring(vahDefenseLowerWick / candleRange * 100.0, "#.##") + "%" +
+                     "\nVolume / average: " +
+                     str.tostring(volume / volumeAverage, "#.##") + "×" +
+                     "\nImmediate post-breakout: " +
+                     str.tostring(immediatePostBreakoutVAHRetest)
+                label vahDefenseLabel = label.new(
+                     x = time,
+                     y = low,
+                     text = "VAH\nDEFENDED",
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_up,
+                     color = vahColor,
+                     textcolor = color.white,
+                     size = size.tiny,
+                     tooltip = vahDefenseTooltip)
+                array.push(retainedMarkers, vahDefenseLabel)
+
     // A pending breakout is confirmed only after later bars avoid a close back
     // below POC. The visible arrow remains on the original breakout candle.
     if breakoutPending
@@ -1302,7 +1516,7 @@ if profileCanBeEvaluated
     bool breakoutVolumeQuality =
          not na(relativeVolume) and
          relativeVolume >= breakoutRelativeVolume
-    bool strongContinuationBreakout =
+    bool classicPOCContinuationBreakout =
          not breakoutPending and
          not breakoutConfirmed and
          valDefended and
@@ -1313,12 +1527,49 @@ if profileCanBeEvaluated
          breakoutPriceQuality and
          breakoutVolumeQuality
 
+    // Exceptional initiative expansion:
+    // A decisive, full-bodied candle may prove continuation directly through
+    // VAH even when price was already accepted above POC or the chart contains
+    // fewer than the normal number of failed POC attempts. The previous close
+    // must still be at/below VAH so this is a genuine value-area breakout.
+    float exceptionalBodyToRange =
+         candleRange > 0.0 ? candleBody / candleRange : 0.0
+    bool exceptionalCrossesVAHFromBelow =
+         close[1] <= profileVAH and
+         close > profileVAH + atrValue * exceptionalVAHClearanceATR
+    bool exceptionalPriceQuality =
+         close > open and
+         candleBody >= atrValue * exceptionalBodyATR and
+         exceptionalBodyToRange >= exceptionalBodyRangeFraction and
+         candleCloseLocation >= exceptionalCloseLocation
+    bool exceptionalRecentVolumeQuality =
+         not na(exceptionalPreviousVolumeAverage) and
+         exceptionalPreviousVolumeAverage > 0.0 and
+         volume >= exceptionalPreviousVolumeAverage *
+              exceptionalRecentVolumeMultiplier
+    bool exceptionalVAHExpansionBreakout =
+         not breakoutPending and
+         not breakoutConfirmed and
+         enableExceptionalVAHExpansion and
+         valDefended and
+         not valInvalidated and
+         exceptionalCrossesVAHFromBelow and
+         exceptionalPriceQuality and
+         breakoutVolumeQuality and
+         exceptionalRecentVolumeQuality
+    bool strongContinuationBreakout =
+         classicPOCContinuationBreakout or
+         exceptionalVAHExpansionBreakout
+
     if strongContinuationBreakout
         breakoutBarIndex := bar_index
         breakoutTime := time
         breakoutLow := low
         breakoutHigh := high
         breakoutATRAtSignal := atrValue
+        breakoutPath := exceptionalVAHExpansionBreakout ?
+             "EXCEPTIONAL VAH EXPANSION" :
+             "POC-TO-VAH CONTINUATION"
         entryTriggeredThisBar := true
 
         if showEntryMarkers
@@ -1326,6 +1577,7 @@ if profileCanBeEvaluated
             string entryTooltip =
                  "FRVP ENTRY\n" +
                  "Time: " + str.format_time(breakoutTime, "HH:mm", syminfo.timezone) +
+                 "\nType: " + breakoutPath +
                  "\nStatus: " + pendingEntryStatus +
                  "\nVAL: " + str.tostring(profileVAL, format.mintick) +
                  "\nPOC: " + str.tostring(profilePOC, format.mintick) +
@@ -1358,6 +1610,7 @@ if profileCanBeEvaluated
         string continuationTooltip =
              "FRVP ENTRY CONFIRMED\n" +
              "Entry: " + str.format_time(breakoutTime, "HH:mm", syminfo.timezone) +
+             "\nType: " + breakoutPath +
              "\nConfirmed: " + str.format_time(time, "HH:mm", syminfo.timezone) +
              "\nVAL: " + str.tostring(profileVAL, format.mintick) +
              "\nPOC: " + str.tostring(profilePOC, format.mintick) +
@@ -1398,14 +1651,19 @@ while array.size(retainedMarkers) > maximumHistoricalMarkers
 while array.size(retainedEntryMarkers) > maximumHistoricalEntryMarkers
     label.delete(array.shift(retainedEntryMarkers))
 
-// Dedicated alert choices. Both events use confirmed bars because the frozen
+// Dedicated alert choices. All events use confirmed bars because the frozen
 // profile lifecycle is intentionally evaluated only after candle close.
 alertcondition(
      entryTriggeredThisBar,
      title = "FRVP Entry Bar",
-     message = "FRVP Entry Bar: price crossed from the POC region through VAH with qualifying price structure and relative volume.")
+     message = "FRVP Entry Bar: qualifying POC-to-VAH continuation or exceptional-volume VAH expansion.")
+
+bool defendedLevelTriggeredThisBar =
+     valDefendedThisBar or
+     pocDefendedThisBar or
+     vahDefendedThisBar
 
 alertcondition(
-     pocDefendedThisBar,
-     title = "FRVP POC Defended",
-     message = "FRVP POC Defended: {{ticker}} {{interval}} tested the frozen POC from above and closed back above it. Close: {{close}}.")
+     defendedLevelTriggeredThisBar,
+     title = "FRVP VAL / POC / VAH Defended",
+     message = "FRVP Defended: {{ticker}} {{interval}} defended a frozen VAL, POC, or VAH level. Check the chart label for the defended level. Close: {{close}}.")

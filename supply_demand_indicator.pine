@@ -1,5 +1,5 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.35 • Record-High Low Tolerance]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
+indicator("Bullish Supply→Demand Flip Zones [v6.42 • Record-High Ownership Fix]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
@@ -18,12 +18,14 @@ plot(na, title = "Output anchor", display = display.none)
 //   8. An S→D arrow requires either confirmed pivot support at the flipped zone or
 //      a confirmed immediate post-breakout front-run defense.
 //   9. A separate continuation-base path recognizes compact high-volume bullish shelves that launch higher.
-//  10. Classic retests require a completed candle whose low is above the zone top before the return.
-//  11. A separate progressive-takeover path allows demand to defend the lower edge, preserve its low,
-//      and then confirm acceptance above the upper edge on renewed volume.
-//  12. A separate immediate front-run path recognizes the first full-separation candle when it
-//      approaches the old supply top after an exceptional breakout, rejects lower prices, and
-//      preserves its low for the configured confirmation bars.
+//  10. Classic retests require two completed candles whose lows are above the
+//      zone top before the later return.
+//  11. A progressive-takeover path may use an earlier lower-edge defense
+//      internally to validate a later breakout. It becomes a visible demand
+//      indication only when that defense itself occurred after a prior cross.
+//  12. A separate front-run path may recognize a near-zone rejection only after
+//      the universal two-bar separation proof has already completed, and then
+//      requires its low to remain preserved for the confirmation bars.
 //  13. When multiple visible zones substantially overlap, an optional display
 //      filter keeps only the broadest price area visible.
 //  14. Timestamp-based candle-edge coordinates let zones begin on the true
@@ -51,6 +53,17 @@ plot(na, title = "Output anchor", display = display.none)
 //  23. After a record-high breakout, intervening completed bars may undercut
 //      the old high by no more than the configured percentage. A deeper low
 //      cancels the pending HH→D setup.
+//  24. Every demand indication must occur only after at least two earlier
+//      completed candles traded fully above the zone with low > zone top.
+//      The demand candle itself never counts toward this separation proof.
+//  25. Supply-derived candidates are retired when a deep drawdown develops as
+//      one-way hard selling: dominant lower closes, dominant bearish volume,
+//      and no meaningful retracement of that decline. Continuation BASE zones
+//      are unaffected.
+//  26. A supply origin must own at least 60% of its actionable price zone:
+//      no earlier comparison candle may overlap more than 40% of that zone.
+//      Collective shelves compare only with bars before the complete shelf.
+//      Record-high origins use the same upper-wick boundary that is plotted.
 
 // ─────────────────────── Inputs ─────────────────────────
 groupSupply = "1. Hidden supply qualification"
@@ -64,6 +77,8 @@ minUpperWickAtr = input.float(0.10, "Minimum upper wick (ATR)", minval = 0.0, st
 minBearishDepartureAtr = input.float(0.50, "Minimum bearish departure (ATR)", minval = 0.1, step = 0.05, group = groupSupply, display = display.none)
 maxHiddenAge = input.int(750, "Maximum hidden-zone age (bars)", minval = 20, maxval = 5000, group = groupSupply, display = display.none)
 maxHiddenCandidates = input.int(75, "Maximum hidden candidates", minval = 5, maxval = 250, group = groupSupply, display = display.none)
+maximumPriorSupplyZoneOverlap = input.float(0.40, "Maximum prior overlap of supply zone", minval = 0.0, maxval = 1.0, step = 0.05, group = groupSupply,
+     tooltip = "Each earlier comparison bar may cover at most this fraction of the origin's actionable supply zone. 0.40 requires the origin to own at least 60% of its zone. Collective shelves compare against bars before the shelf, not against their own member bars.", display = display.none)
 
 groupSupplyStructure = "1a. Multi-bar supply structure"
 expandSupplyStructure = input.bool(true, "Expand pivot into multi-bar supply structure", group = groupSupplyStructure,
@@ -144,6 +159,20 @@ continuationMinBreakRelativeVolume = input.float(1.20, "Continuation breakout mi
 continuationMaxBreakUpperWickAtr = input.float(0.50, "Continuation breakout maximum upper wick (ATR)", minval = 0.0, step = 0.10, group = groupContinuation, display = display.none)
 continuationDuplicateWindowBars = input.int(10, "Duplicate suppression window (bars)", minval = 1, maxval = 100, group = groupContinuation, display = display.none)
 
+groupHardSelling = "1d. Hard-selling exclusion"
+enableHardSellingExclusion = input.bool(true, "Exclude one-way hard-selling origins", group = groupHardSelling,
+     tooltip = "Retires a supply-derived candidate when a deep decline is dominated by lower closes and bearish volume without a meaningful recovery. BASE continuation zones are not affected.", display = display.none)
+hardSellingMinimumBars = input.int(8, "Minimum observed bars", minval = 3, maxval = 100, group = groupHardSelling,
+     tooltip = "Prevents a candidate from being classified as hard selling from only a few candles.", display = display.none)
+hardSellingMinimumDrawdownPercent = input.float(25.0, "Minimum drawdown from supply top (%)", minval = 1.0, maxval = 90.0, step = 1.0, group = groupHardSelling,
+     tooltip = "Measures the running low beneath the supply-zone top.", display = display.none)
+hardSellingMinimumLowerCloseFraction = input.float(0.65, "Minimum lower-close bar fraction", minval = 0.0, maxval = 1.0, step = 0.05, group = groupHardSelling,
+     tooltip = "A lower-close bar closes beneath the preceding candle's close.", display = display.none)
+hardSellingMinimumBearishVolumeShare = input.float(0.65, "Minimum bearish-volume share", minval = 0.0, maxval = 1.0, step = 0.05, group = groupHardSelling,
+     tooltip = "Compares volume on bearish candles with volume on all directional candles.", display = display.none)
+hardSellingMaximumRetracementPercent = input.float(30.0, "Maximum recovery of decline (%)", minval = 0.0, maxval = 100.0, step = 1.0, group = groupHardSelling,
+     tooltip = "Compares the largest closing recovery achieved during the decline with the full distance from the supply top to the current running low. A recovery reaching this threshold proves enough buyer participation to preserve the candidate.", display = display.none)
+
 groupTrend = "2. Bullish-trend filters"
 requireBullishTrend = input.bool(true, "Require bullish trend context", group = groupTrend, display = display.none)
 fastEmaLength = input.int(9, "Fast EMA length", minval = 2, maxval = 100, group = groupTrend, display = display.none)
@@ -175,12 +204,14 @@ minBreakBodyAtr = input.float(0.50, "Minimum bullish breakout body (ATR)", minva
 volumeAverageLength = input.int(20, "Volume average length", minval = 2, maxval = 200, group = groupFlip, display = display.none)
 requireBreakVolume = input.bool(true, "Require breakout volume above average", group = groupFlip, display = display.none)
 minBreakRelativeVolume = input.float(1.20, "Breakout minimum relative volume", minval = 0.1, step = 0.1, group = groupFlip, display = display.none)
+requiredFullSeparationBars = input.int(2, "Fully-above bars required before demand", minval = 2, maxval = 10, group = groupFlip,
+     tooltip = "Every demand indication requires at least this many earlier completed candles whose lows remained above the zone top. The demand candle itself is excluded.", display = display.none)
 evaluateEvidenceIntrabar = input.bool(true, "Evaluate evidence before bar close", group = groupFlip,
      tooltip = "Required for the early alert. Signals are evaluated during the live candle and may disappear before it closes.", display = display.none)
 
 groupProgressive = "3a. Progressive supply takeover"
 enableProgressiveSupplyTakeover = input.bool(true, "Allow progressive supply takeover", group = groupProgressive,
-     tooltip = "Allows demand to defend the lower edge of supply, preserve that low, and later confirm acceptance above the supply top on renewed volume.", display = display.none)
+     tooltip = "Uses a preserved lower-edge defense to validate later acceptance above supply. An S→D arrow is allowed only when the defense occurred after an earlier completed candle traded fully above the zone.", display = display.none)
 progressiveBottomTestToleranceAtr = input.float(0.20, "Lower-edge test tolerance (ATR)", minval = 0.0, step = 0.05, group = groupProgressive,
      tooltip = "The demand candle may undercut the supply bottom by this ATR amount and must close back above the bottom.", display = display.none)
 progressiveMaxBarsToAcceptance = input.int(20, "Maximum bars from demand to acceptance", minval = 2, maxval = 100, group = groupProgressive,
@@ -192,7 +223,7 @@ progressiveMinAcceptanceRelativeVolume = input.float(1.20, "Upper-edge acceptanc
 
 groupImmediateFrontRun = "3b. Immediate front-run demand"
 enableImmediateFrontRunDemand = input.bool(true, "Allow immediate front-run demand", group = groupImmediateFrontRun,
-     tooltip = "Recognizes the first full-separation candle immediately after a strong breakout when buyers defend just above the old supply top. The demand marker appears only after later bars preserve its low and confirm the reaction.", display = display.none)
+     tooltip = "After at least two earlier candles traded fully above supply, recognizes a near-zone defense whose low remains preserved during confirmation.", display = display.none)
 immediateFrontRunProximityAtr = input.float(0.25, "Maximum distance above supply top (ATR)", minval = 0.0, step = 0.05, group = groupImmediateFrontRun,
      tooltip = "Applies only to this immediate post-breakout path. SDOT 2026-06-04 13:23 stopped approximately 0.215 ATR above the 8.2499 supply top.", display = display.none)
 immediateFrontRunConfirmationBars = input.int(3, "Low-preservation confirmation bars", minval = 1, maxval = 10, group = groupImmediateFrontRun,
@@ -294,6 +325,50 @@ f_bar_right_edge_time(int absoluteBarIndex) =>
     int barsBack = bar_index - safeBarIndex
     time[barsBack] + visualHalfBarMs
 
+// Update the live-safe evidence used to distinguish a normal seller-controlled
+// pullback from persistent one-way liquidation. Only completed bars call this
+// helper, so a candidate cannot disappear because of a temporary intrabar low.
+f_update_hard_selling_metrics(
+     int observedBars,
+     int lowerCloseBars,
+     float bearishVolume,
+     float directionalVolume,
+     float runningLow,
+     float maximumRecoveryAmount,
+     float referenceTop) =>
+    int updatedObservedBars = observedBars + 1
+    int updatedLowerCloseBars = lowerCloseBars +
+         (not na(close[1]) and close < close[1] ? 1 : 0)
+    bool bearishCandle = close < open
+    bool bullishCandle = close > open
+    float updatedBearishVolume = bearishVolume +
+         (bearishCandle ? nz(volume) : 0.0)
+    float updatedDirectionalVolume = directionalVolume +
+         (bearishCandle or bullishCandle ? nz(volume) : 0.0)
+    float updatedRunningLow = na(runningLow) ? low : math.min(runningLow, low)
+    float currentRecoveryAmount = math.max(0.0, close - updatedRunningLow)
+    float updatedMaximumRecoveryAmount =
+         math.max(maximumRecoveryAmount, currentRecoveryAmount)
+    float activeDecline = math.max(0.0, referenceTop - updatedRunningLow)
+    float maximumRetracementPercent = activeDecline > 0.0 ?
+         updatedMaximumRecoveryAmount / activeDecline * 100.0 : 0.0
+    float drawdownPercent = referenceTop > 0.0 ?
+         math.max(0.0, (referenceTop - updatedRunningLow) / referenceTop * 100.0) : 0.0
+    float lowerCloseFraction = updatedObservedBars > 0 ?
+         float(updatedLowerCloseBars) / float(updatedObservedBars) : 0.0
+    float bearishVolumeShare = updatedDirectionalVolume > 0.0 ?
+         updatedBearishVolume / updatedDirectionalVolume : 0.0
+    bool invalidated =
+         enableHardSellingExclusion and
+         updatedObservedBars >= hardSellingMinimumBars and
+         drawdownPercent >= hardSellingMinimumDrawdownPercent and
+         lowerCloseFraction >= hardSellingMinimumLowerCloseFraction and
+         bearishVolumeShare >= hardSellingMinimumBearishVolumeShare and
+         maximumRetracementPercent < hardSellingMaximumRetracementPercent
+    [updatedObservedBars, updatedLowerCloseBars, updatedBearishVolume,
+         updatedDirectionalVolume, updatedRunningLow,
+         updatedMaximumRecoveryAmount, invalidated]
+
 plot(showTrendAverages ? fastEma : na, title = "EMA 9", color = color.new(color.teal, 0), linewidth = 1, display = display.all - display.status_line)
 plot(showTrendAverages ? slowEma : na, title = "EMA 20", color = color.new(color.orange, 0), linewidth = 1, display = display.all - display.status_line)
 plot(showTrendAverages ? sessionVwap : na, title = "Session VWAP", color = color.new(color.purple, 0), linewidth = 1, display = display.all - display.status_line)
@@ -313,6 +388,12 @@ var float recordHighCandidateTop = na
 var float recordHighCandidateBottom = na
 var int recordHighCandidateBar = na
 var int recordHighCandidateTime = na
+var int recordHardSellingObservedBars = 0
+var int recordHardSellingLowerCloseBars = 0
+var float recordHardSellingBearishVolume = 0.0
+var float recordHardSellingDirectionalVolume = 0.0
+var float recordHardSellingRunningLow = na
+var float recordHardSellingMaximumRecoveryAmount = 0.0
 
 // Hidden supply candidates.
 var array<float> candidateTops = array.new<float>()
@@ -333,9 +414,19 @@ var array<int> candidateFormationEndBars = array.new<int>()
 var array<int> candidateFormationBarCounts = array.new<int>()
 var array<float> candidateFormationPeakVolumes = array.new<float>()
 var array<float> candidateFormationLastVolumes = array.new<float>()
+var array<int> candidateFullSeparationCounts = array.new<int>()
+// Bar that completes the required number of fully-above candles.
 var array<int> candidateFirstSeparationBars = array.new<int>()
-// Progressive takeover state: a lower-edge demand candle is armed, its low must
-// remain preserved, and later volume-backed closes must accept above supply.
+var array<int> candidateFirstCrossBars = array.new<int>()
+var array<int> candidateHardSellingObservedBars = array.new<int>()
+var array<int> candidateHardSellingLowerCloseBars = array.new<int>()
+var array<float> candidateHardSellingBearishVolumes = array.new<float>()
+var array<float> candidateHardSellingDirectionalVolumes = array.new<float>()
+var array<float> candidateHardSellingRunningLows = array.new<float>()
+var array<float> candidateHardSellingMaximumRecoveryAmounts = array.new<float>()
+// Progressive takeover state: a lower-edge defense may be tracked internally,
+// but it can become a displayed demand point only when its bar occurred after
+// the candidate completed the required fully-above candle count.
 var array<bool> candidateProgressiveArmed = array.new<bool>()
 var array<float> candidateProgressiveDemandLows = array.new<float>()
 var array<int> candidateProgressiveDemandBars = array.new<int>()
@@ -365,7 +456,8 @@ var array<bool> flipDemandConfirmed = array.new<bool>()
 // Bar where BASE/S→D evidence first became knowable live. This is deliberately
 // different from a marker bar that may be plotted retrospectively.
 var array<int> flipEvidenceConfirmationBars = array.new<int>()
-// First completed candle whose entire range traded above the zone.
+var array<int> flipFullSeparationCounts = array.new<int>()
+// Bar that completes the required number of fully-above candles.
 var array<int> flipFirstSeparationBars = array.new<int>()
 
 // Prefer retiring drawings that never produced a visible, confirmed result.
@@ -473,7 +565,40 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
          (trendDataReady and supplyAboveTrend and bullishStack and risingEmas and risingVwap and
          reactionLocationOk and extensionOk))
 
-    bool standardSupplyQualified = directionOk and wickOk and departureOk and validZoneWidth and supplyTrendOk
+    // The origin must contribute its own price area. Compare the actionable
+    // zone with the earlier same-day bars in the pivot-left window. A candle
+    // covering more than the configured fraction means the zone was already
+    // heavily traded before this supposed origin.
+    int pivotDateKey =
+         year[pivotRight] * 10000 +
+         month[pivotRight] * 100 +
+         dayofmonth[pivotRight]
+    float standardSupplyZoneHeight = pivotHigh - actionableZoneBottom
+    bool standardSupplyOwnershipOk = standardSupplyZoneHeight > syminfo.mintick
+    for ownershipStep = 1 to pivotLeft
+        int ownershipOffset = pivotRight + ownershipStep
+        int ownershipDateKey =
+             year[ownershipOffset] * 10000 +
+             month[ownershipOffset] * 100 +
+             dayofmonth[ownershipOffset]
+        bool ownershipBarComparable =
+             not na(high[ownershipOffset]) and
+             not na(low[ownershipOffset]) and
+             ownershipDateKey == pivotDateKey
+        if ownershipBarComparable
+            float ownershipOverlap =
+                 math.max(
+                      0.0,
+                      math.min(high[ownershipOffset], pivotHigh) -
+                      math.max(low[ownershipOffset], actionableZoneBottom))
+            float ownershipOverlapFraction =
+                 ownershipOverlap / standardSupplyZoneHeight
+            standardSupplyOwnershipOk :=
+                 standardSupplyOwnershipOk and
+                 ownershipOverlapFraction <= maximumPriorSupplyZoneOverlap
+
+    bool standardSupplyQualified = directionOk and wickOk and departureOk and
+         validZoneWidth and supplyTrendOk and standardSupplyOwnershipOk
 
     // Collective shelf fallback. A compact sequence may carry valid supply
     // evidence across several bars even when the final pivot narrowly misses a
@@ -548,10 +673,45 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
          collectiveBottom - postPivotLow >= pivotAtr * minBearishDepartureAtr and
          postPivotClose < collectiveBottom
     bool collectiveZoneValid = collectiveDataReady and collectiveTop > collectiveBottom
+    // Member bars intentionally overlap one another. Test ownership only
+    // against candles preceding the oldest bar in the complete shelf.
+    int collectiveStructureStartOffset =
+         pivotRight + collectiveSupplyBars - 1
+    int collectiveStructureDateKey =
+         year[collectiveStructureStartOffset] * 10000 +
+         month[collectiveStructureStartOffset] * 100 +
+         dayofmonth[collectiveStructureStartOffset]
+    float collectiveSupplyZoneHeight = collectiveTop - collectiveBottom
+    bool collectiveSupplyOwnershipOk =
+         collectiveZoneValid and
+         collectiveSupplyZoneHeight > syminfo.mintick
+    for collectiveOwnershipStep = 1 to pivotLeft
+        int collectiveOwnershipOffset =
+             collectiveStructureStartOffset + collectiveOwnershipStep
+        int collectiveOwnershipDateKey =
+             year[collectiveOwnershipOffset] * 10000 +
+             month[collectiveOwnershipOffset] * 100 +
+             dayofmonth[collectiveOwnershipOffset]
+        bool collectiveOwnershipBarComparable =
+             not na(high[collectiveOwnershipOffset]) and
+             not na(low[collectiveOwnershipOffset]) and
+             collectiveOwnershipDateKey == collectiveStructureDateKey
+        if collectiveOwnershipBarComparable
+            float collectiveOwnershipOverlap =
+                 math.max(
+                      0.0,
+                      math.min(high[collectiveOwnershipOffset], collectiveTop) -
+                      math.max(low[collectiveOwnershipOffset], collectiveBottom))
+            float collectiveOwnershipOverlapFraction =
+                 collectiveOwnershipOverlap / collectiveSupplyZoneHeight
+            collectiveSupplyOwnershipOk :=
+                 collectiveSupplyOwnershipOk and
+                 collectiveOwnershipOverlapFraction <=
+                      maximumPriorSupplyZoneOverlap
     bool collectiveSupplyQualified = enableCollectiveSupplyShelves and
          collectiveHighSpreadOk and collectiveCloseSpreadOk and collectiveVolumeOk and
          collectiveTrendOk and collectivePriorAdvanceOk and collectiveRejectionOk and
-         collectiveDepartureOk and collectiveZoneValid
+         collectiveDepartureOk and collectiveZoneValid and collectiveSupplyOwnershipOk
     bool useCollectiveSupplyOrigin = not standardSupplyQualified and collectiveSupplyQualified
 
     if standardSupplyQualified or useCollectiveSupplyOrigin
@@ -678,7 +838,15 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
             array.push(candidateFormationBarCounts, formationBarCount)
             array.push(candidateFormationPeakVolumes, formationPeakVolume)
             array.push(candidateFormationLastVolumes, formationLastVolume)
+            array.push(candidateFullSeparationCounts, 0)
             array.push(candidateFirstSeparationBars, na)
+            array.push(candidateFirstCrossBars, na)
+            array.push(candidateHardSellingObservedBars, 0)
+            array.push(candidateHardSellingLowerCloseBars, 0)
+            array.push(candidateHardSellingBearishVolumes, 0.0)
+            array.push(candidateHardSellingDirectionalVolumes, 0.0)
+            array.push(candidateHardSellingRunningLows, na)
+            array.push(candidateHardSellingMaximumRecoveryAmounts, 0.0)
             array.push(candidateProgressiveArmed, false)
             array.push(candidateProgressiveDemandLows, na)
             array.push(candidateProgressiveDemandBars, na)
@@ -704,7 +872,15 @@ if signalBarReady and not na(confirmedPivotHigh) and bar_index > pivotRight + tr
                 array.shift(candidateFormationBarCounts)
                 array.shift(candidateFormationPeakVolumes)
                 array.shift(candidateFormationLastVolumes)
+                array.shift(candidateFullSeparationCounts)
                 array.shift(candidateFirstSeparationBars)
+                array.shift(candidateFirstCrossBars)
+                array.shift(candidateHardSellingObservedBars)
+                array.shift(candidateHardSellingLowerCloseBars)
+                array.shift(candidateHardSellingBearishVolumes)
+                array.shift(candidateHardSellingDirectionalVolumes)
+                array.shift(candidateHardSellingRunningLows)
+                array.shift(candidateHardSellingMaximumRecoveryAmounts)
                 array.shift(candidateProgressiveArmed)
                 array.shift(candidateProgressiveDemandLows)
                 array.shift(candidateProgressiveDemandBars)
@@ -737,7 +913,15 @@ while candidateIndex >= 0
     int formationBarCount = array.get(candidateFormationBarCounts, candidateIndex)
     float formationPeakVolume = array.get(candidateFormationPeakVolumes, candidateIndex)
     float formationLastVolume = array.get(candidateFormationLastVolumes, candidateIndex)
+    int fullSeparationCount = array.get(candidateFullSeparationCounts, candidateIndex)
     int firstSeparationBar = array.get(candidateFirstSeparationBars, candidateIndex)
+    int firstCrossBar = array.get(candidateFirstCrossBars, candidateIndex)
+    int hardSellingObservedBars = array.get(candidateHardSellingObservedBars, candidateIndex)
+    int hardSellingLowerCloseBars = array.get(candidateHardSellingLowerCloseBars, candidateIndex)
+    float hardSellingBearishVolume = array.get(candidateHardSellingBearishVolumes, candidateIndex)
+    float hardSellingDirectionalVolume = array.get(candidateHardSellingDirectionalVolumes, candidateIndex)
+    float hardSellingRunningLow = array.get(candidateHardSellingRunningLows, candidateIndex)
+    float hardSellingMaximumRecoveryAmount = array.get(candidateHardSellingMaximumRecoveryAmounts, candidateIndex)
     bool progressiveArmed = array.get(candidateProgressiveArmed, candidateIndex)
     float progressiveDemandLow = array.get(candidateProgressiveDemandLows, candidateIndex)
     int progressiveDemandBar = array.get(candidateProgressiveDemandBars, candidateIndex)
@@ -784,6 +968,40 @@ while candidateIndex >= 0
         array.set(candidateFormationLastVolumes, candidateIndex, formationLastVolume)
 
     bool formationReady = formationFinalized
+
+    // Track every completed post-formation bar. A deep decline alone is not
+    // enough: retirement also requires lower-close dominance, bearish-volume
+    // dominance, and no recovery large enough relative to the complete decline.
+    bool hardSellingInvalidated = false
+    if barstate.isconfirmed and formationReady and bar_index > formationEndBar
+        [updatedHardSellingObservedBars,
+             updatedHardSellingLowerCloseBars,
+             updatedHardSellingBearishVolume,
+             updatedHardSellingDirectionalVolume,
+             updatedHardSellingRunningLow,
+             updatedHardSellingMaximumRecoveryAmount,
+             hardSellingInvalidatedNow] =
+             f_update_hard_selling_metrics(
+                  hardSellingObservedBars,
+                  hardSellingLowerCloseBars,
+                  hardSellingBearishVolume,
+                  hardSellingDirectionalVolume,
+                  hardSellingRunningLow,
+                  hardSellingMaximumRecoveryAmount,
+                  supplyTop)
+        hardSellingObservedBars := updatedHardSellingObservedBars
+        hardSellingLowerCloseBars := updatedHardSellingLowerCloseBars
+        hardSellingBearishVolume := updatedHardSellingBearishVolume
+        hardSellingDirectionalVolume := updatedHardSellingDirectionalVolume
+        hardSellingRunningLow := updatedHardSellingRunningLow
+        hardSellingMaximumRecoveryAmount := updatedHardSellingMaximumRecoveryAmount
+        hardSellingInvalidated := hardSellingInvalidatedNow
+        array.set(candidateHardSellingObservedBars, candidateIndex, hardSellingObservedBars)
+        array.set(candidateHardSellingLowerCloseBars, candidateIndex, hardSellingLowerCloseBars)
+        array.set(candidateHardSellingBearishVolumes, candidateIndex, hardSellingBearishVolume)
+        array.set(candidateHardSellingDirectionalVolumes, candidateIndex, hardSellingDirectionalVolume)
+        array.set(candidateHardSellingRunningLows, candidateIndex, hardSellingRunningLow)
+        array.set(candidateHardSellingMaximumRecoveryAmounts, candidateIndex, hardSellingMaximumRecoveryAmount)
 
     // A new low after demand confirmation means the seller leg has not truly ended.
     // Reset it and wait for a later demand pivot, provided the leg is still young enough.
@@ -881,11 +1099,16 @@ while candidateIndex >= 0
     // evidence, so it must not depend on a separate classic seller-leg pivot.
     bool progressiveReady = formationReady
 
-    // Universal leave-and-return proof. Once the supply formation and seller leg are
-    // ready, record the first candle whose entire range is above the zone.
-    if signalBarReady and legReady and na(firstSeparationBar) and bar_index > formationEndBar and low > supplyTop
-        firstSeparationBar := bar_index
-        array.set(candidateFirstSeparationBars, candidateIndex, firstSeparationBar)
+    // Count completed fully-above candles for every supply formation, including
+    // progressive candidates whose classic seller leg is unavailable. Store the
+    // bar that completes the required count; demand must occur later.
+    if barstate.isconfirmed and formationReady and
+         bar_index > formationEndBar and low > supplyTop
+        fullSeparationCount += 1
+        array.set(candidateFullSeparationCounts, candidateIndex, fullSeparationCount)
+        if na(firstSeparationBar) and fullSeparationCount >= requiredFullSeparationBars
+            firstSeparationBar := bar_index
+            array.set(candidateFirstSeparationBars, candidateIndex, firstSeparationBar)
 
     bool expired = bar_index - supplyOriginBar > maxHiddenAge
     bool legFormationExpired = requireSellerControlLeg and not sellerLegConfirmed and
@@ -919,9 +1142,12 @@ while candidateIndex >= 0
     if not na(candidateBreakPreviewBox)
         box.set_right(candidateBreakPreviewBox, f_bar_right_edge_time(bar_index))
 
-    bool firstLiveCrossAboveSupply = signalBarReady and formationReady and not expired and
+    bool firstLiveCrossAboveSupply = signalBarReady and formationReady and
+         not hardSellingInvalidated and not expired and
          bar_index > formationEndBar and high > supplyTop and na(candidateBreakPreviewBox)
     if firstLiveCrossAboveSupply
+        firstCrossBar := bar_index
+        array.set(candidateFirstCrossBars, candidateIndex, firstCrossBar)
         candidateBreakPreviewBox := box.new(
              left = drawFromSupplyOrigin ?
                   f_bar_left_edge_time(supplyStructureStartBar, zoneLeftPaddingBars) :
@@ -941,12 +1167,10 @@ while candidateIndex >= 0
         earlyZoneBreakoutDetected := true
         earlyZoneBreakoutType := "SUPPLY ZONE"
 
-    // Immediate front-run demand is intentionally independent of the classic
-    // seller-leg age window. The original supply must still have produced the
-    // required decline, and the preceding candle must be a complete high-quality
-    // breakout from at/below the old supply top. The current candle then becomes
-    // a hidden demand candidate only when its entire range is above supply, its
-    // low remains very close to the top, and its lower wick shows rejection.
+    // Post-separation front-run demand is independent of the classic seller-leg
+    // age window. The original supply must still have produced the required move,
+    // at least two earlier candles must have traded fully above the zone, and the
+    // current candle must defend just above the top with rejection and volume.
     bool immediateHistoryReady = bar_index > trendSlopeBars + 2 and
          not na(atr) and atr > 0.0 and not na(atr[1]) and atr[1] > 0.0 and
          not na(fastEma[1]) and not na(slowEma[1]) and not na(sessionVwap[1])
@@ -995,15 +1219,20 @@ while candidateIndex >= 0
     bool immediateFrontRunVolumeOk = not na(immediateFrontRunRelativeVolume) and
          immediateFrontRunRelativeVolume >= minDemandRelativeVolume
     bool qualifiedImmediateFrontRunCandidate = signalBarReady and
-         enableImmediateFrontRunDemand and formationReady and not expired and
-         bar_index > formationEndBar and immediateSellerMoveOk and immediateStrongBreakout and
-         immediateFrontRunAboveSupply and immediateFrontRunWickOk and immediateFrontRunVolumeOk
+         enableImmediateFrontRunDemand and formationReady and
+         not hardSellingInvalidated and not expired and
+         bar_index > formationEndBar and immediateSellerMoveOk and
+         immediateFrontRunAboveSupply and immediateFrontRunWickOk and immediateFrontRunVolumeOk and
+         not na(firstSeparationBar) and bar_index > firstSeparationBar
 
     // Progressive supply takeover path:
-    //   1. A demand candle tests the lower edge and closes back above it.
-    //   2. Every later low must preserve that demand low.
-    //   3. Consecutive closes above the supply top confirm acceptance on renewed volume.
-    if signalBarReady and enableProgressiveSupplyTakeover and progressiveReady and not expired
+    //   1. A lower-edge defense may be tracked as internal breakout evidence.
+    //   2. Every later low must preserve that defense.
+    //   3. Consecutive closes above the supply top confirm acceptance on volume.
+    //   4. The defense receives an S→D arrow only if a still-earlier candle
+    //      traded fully above supply with its low above the zone top.
+    if signalBarReady and enableProgressiveSupplyTakeover and progressiveReady and
+         not hardSellingInvalidated and not expired
         float progressivePreservationTolerance = syminfo.mintick * progressivePreservationToleranceTicks
 
         if progressiveArmed
@@ -1050,7 +1279,8 @@ while candidateIndex >= 0
         // Classic flips count after their seller leg is ready. Progressive
         // takeovers begin counting only after lower-edge demand has armed.
         bool breakSequenceEligible = (legReady and classicLegUsable) or progressiveArmed
-        if not expired and breakSequenceEligible and closesAboveSupply
+        if not hardSellingInvalidated and not expired and
+             breakSequenceEligible and closesAboveSupply
             breakCount += 1
             breakImpulseQualified := breakImpulseQualified or currentBreakQualityOk
         else
@@ -1068,12 +1298,22 @@ while candidateIndex >= 0
          not na(progressiveDemandBar) and bar_index > progressiveDemandBar and
          bar_index - progressiveDemandBar <= progressiveMaxBarsToAcceptance and
          low >= progressiveDemandLow - syminfo.mintick * progressivePreservationToleranceTicks
-    bool qualifiedProgressiveTakeover = signalBarReady and not expired and
+    bool progressiveDemandAfterFullSeparation =
+         progressiveArmed and
+         not na(firstCrossBar) and
+         not na(firstSeparationBar) and
+         not na(progressiveDemandBar) and
+         progressiveDemandBar > firstCrossBar and
+         progressiveDemandBar > firstSeparationBar
+    bool qualifiedProgressiveTakeover = signalBarReady and
+         not hardSellingInvalidated and not expired and
          enableProgressiveSupplyTakeover and progressiveReady and progressiveDemandStillPreserved and
          breakCount >= requiredBreakCloses and progressiveAcceptanceVolumeOk and breakTrendOk
-    bool qualifiedFlip = signalBarReady and not expired and classicLegUsable and legReady and
+    bool qualifiedFlip = signalBarReady and
+         not hardSellingInvalidated and not expired and classicLegUsable and legReady and
          breakCount >= requiredBreakCloses and finalBreakQualityOk and not qualifiedProgressiveTakeover
-    bool failedBreakQuality = signalBarReady and not expired and classicLegUsable and legReady and
+    bool failedBreakQuality = signalBarReady and
+         not hardSellingInvalidated and not expired and classicLegUsable and legReady and
          breakCount >= requiredBreakCloses and not finalBreakQualityOk and not qualifiedProgressiveTakeover
 
     // A weak close-above sequence does not erase proven supply. Reset confirmation and
@@ -1130,51 +1370,52 @@ while candidateIndex >= 0
         // callout text is intentionally disabled; the S→D arrow remains.
         label newProgressiveTextLabel = na
 
-        float progressiveMarkerY = progressiveDemandLow - progressiveDemandAtr * 0.15
-        string progressiveConfirmedTime = str.format_time(time, "HH:mm", syminfo.timezone)
-        label progressiveDemandLabel = label.new(
-             x = progressiveDemandBar,
-             y = progressiveMarkerY,
-             text = "S→D",
-             xloc = xloc.bar_index,
-             yloc = yloc.price,
-             style = label.style_label_up,
-             color = color.new(color.lime, 0),
-             textcolor = color.black,
-             size = size.normal,
-             textalign = text.align_center,
-             tooltip = "Progressive takeover demand " + progressiveDemandTime +
-                  " • confirmed " + progressiveConfirmedTime +
-                  " • original supply " + str.tostring(supplyBottom, format.mintick) +
-                  "–" + str.tostring(supplyTop, format.mintick))
-        array.push(confirmedSupplyFlipSupportBars, progressiveDemandBar)
-        array.push(confirmedSupplyFlipSupportLabels, progressiveDemandLabel)
-        if array.size(confirmedSupplyFlipSupportBars) > maxHistoricalSupportMarkers
-            array.shift(confirmedSupplyFlipSupportBars)
-            label oldestProgressiveSupportLabel = array.shift(confirmedSupplyFlipSupportLabels)
-            if not na(oldestProgressiveSupportLabel)
-                label.delete(oldestProgressiveSupportLabel)
+        if progressiveDemandAfterFullSeparation
+            float progressiveMarkerY = progressiveDemandLow - progressiveDemandAtr * 0.15
+            string progressiveConfirmedTime = str.format_time(time, "HH:mm", syminfo.timezone)
+            label progressiveDemandLabel = label.new(
+                 x = progressiveDemandBar,
+                 y = progressiveMarkerY,
+                 text = "S→D",
+                 xloc = xloc.bar_index,
+                 yloc = yloc.price,
+                 style = label.style_label_up,
+                 color = color.new(color.lime, 0),
+                 textcolor = color.black,
+                 size = size.normal,
+                 textalign = text.align_center,
+                 tooltip = "Progressive takeover demand " + progressiveDemandTime +
+                      " • confirmed " + progressiveConfirmedTime +
+                      " • original supply " + str.tostring(supplyBottom, format.mintick) +
+                      "–" + str.tostring(supplyTop, format.mintick))
+            array.push(confirmedSupplyFlipSupportBars, progressiveDemandBar)
+            array.push(confirmedSupplyFlipSupportLabels, progressiveDemandLabel)
+            if array.size(confirmedSupplyFlipSupportBars) > maxHistoricalSupportMarkers
+                array.shift(confirmedSupplyFlipSupportBars)
+                label oldestProgressiveSupportLabel = array.shift(confirmedSupplyFlipSupportLabels)
+                if not na(oldestProgressiveSupportLabel)
+                    label.delete(oldestProgressiveSupportLabel)
 
-        int progressiveFirstSeparationBar = low > supplyTop ? bar_index : na
         array.push(flipBoxes, newProgressiveFlipBox)
         array.push(flipLegBoxes, newProgressiveFormationBox)
         array.push(flipTextLabels, newProgressiveTextLabel)
         array.push(flipTops, supplyTop)
         array.push(flipBottoms, supplyBottom)
-        array.push(flipDemandLows, progressiveDemandLow)
-        array.push(flipDemandBars, progressiveDemandBar)
+        array.push(flipDemandLows, progressiveDemandAfterFullSeparation ? progressiveDemandLow : na)
+        array.push(flipDemandBars, progressiveDemandAfterFullSeparation ? progressiveDemandBar : na)
         array.push(flipConfirmationBars, bar_index)
         array.push(flipOriginTimes, progressiveOriginTime)
-        array.push(flipRetested, true)
+        array.push(flipRetested, progressiveDemandAfterFullSeparation)
         array.push(flipBreakoutVisible, true)
         array.push(flipWasIntersecting, false)
         array.push(flipActive, true)
         array.push(flipZoneKinds, ZONE_KIND_PROGRESSIVE_TAKEOVER)
-        array.push(flipDemandConfirmed, true)
-        array.push(flipEvidenceConfirmationBars, bar_index)
-        array.push(flipFirstSeparationBars, progressiveFirstSeparationBar)
+        array.push(flipDemandConfirmed, progressiveDemandAfterFullSeparation)
+        array.push(flipEvidenceConfirmationBars, progressiveDemandAfterFullSeparation ? bar_index : na)
+        array.push(flipFullSeparationCounts, fullSeparationCount)
+        array.push(flipFirstSeparationBars, firstSeparationBar)
         flipDetected := true
-        progressiveTakeoverDetected := true
+        progressiveTakeoverDetected := progressiveDemandAfterFullSeparation
 
         array.remove(candidateTops, candidateIndex)
         array.remove(candidateBottoms, candidateIndex)
@@ -1194,7 +1435,15 @@ while candidateIndex >= 0
         array.remove(candidateFormationBarCounts, candidateIndex)
         array.remove(candidateFormationPeakVolumes, candidateIndex)
         array.remove(candidateFormationLastVolumes, candidateIndex)
+        array.remove(candidateFullSeparationCounts, candidateIndex)
         array.remove(candidateFirstSeparationBars, candidateIndex)
+        array.remove(candidateFirstCrossBars, candidateIndex)
+        array.remove(candidateHardSellingObservedBars, candidateIndex)
+        array.remove(candidateHardSellingLowerCloseBars, candidateIndex)
+        array.remove(candidateHardSellingBearishVolumes, candidateIndex)
+        array.remove(candidateHardSellingDirectionalVolumes, candidateIndex)
+        array.remove(candidateHardSellingRunningLows, candidateIndex)
+        array.remove(candidateHardSellingMaximumRecoveryAmounts, candidateIndex)
         array.remove(candidateProgressiveArmed, candidateIndex)
         array.remove(candidateProgressiveDemandLows, candidateIndex)
         array.remove(candidateProgressiveDemandBars, candidateIndex)
@@ -1224,6 +1473,7 @@ while candidateIndex >= 0
             array.remove(flipZoneKinds, evictionIndex)
             array.remove(flipDemandConfirmed, evictionIndex)
             array.remove(flipEvidenceConfirmationBars, evictionIndex)
+            array.remove(flipFullSeparationCounts, evictionIndex)
             array.remove(flipFirstSeparationBars, evictionIndex)
     else if qualifiedImmediateFrontRunCandidate
         // Reuse the zone revealed on the breakout. Demand confirmation remains
@@ -1282,7 +1532,8 @@ while candidateIndex >= 0
         array.push(flipZoneKinds, ZONE_KIND_IMMEDIATE_FRONT_RUN)
         array.push(flipDemandConfirmed, false)
         array.push(flipEvidenceConfirmationBars, na)
-        array.push(flipFirstSeparationBars, bar_index)
+        array.push(flipFullSeparationCounts, fullSeparationCount)
+        array.push(flipFirstSeparationBars, firstSeparationBar)
 
         array.remove(candidateTops, candidateIndex)
         array.remove(candidateBottoms, candidateIndex)
@@ -1302,7 +1553,15 @@ while candidateIndex >= 0
         array.remove(candidateFormationBarCounts, candidateIndex)
         array.remove(candidateFormationPeakVolumes, candidateIndex)
         array.remove(candidateFormationLastVolumes, candidateIndex)
+        array.remove(candidateFullSeparationCounts, candidateIndex)
         array.remove(candidateFirstSeparationBars, candidateIndex)
+        array.remove(candidateFirstCrossBars, candidateIndex)
+        array.remove(candidateHardSellingObservedBars, candidateIndex)
+        array.remove(candidateHardSellingLowerCloseBars, candidateIndex)
+        array.remove(candidateHardSellingBearishVolumes, candidateIndex)
+        array.remove(candidateHardSellingDirectionalVolumes, candidateIndex)
+        array.remove(candidateHardSellingRunningLows, candidateIndex)
+        array.remove(candidateHardSellingMaximumRecoveryAmounts, candidateIndex)
         array.remove(candidateProgressiveArmed, candidateIndex)
         array.remove(candidateProgressiveDemandLows, candidateIndex)
         array.remove(candidateProgressiveDemandBars, candidateIndex)
@@ -1332,6 +1591,7 @@ while candidateIndex >= 0
             array.remove(flipZoneKinds, evictionIndex)
             array.remove(flipDemandConfirmed, evictionIndex)
             array.remove(flipEvidenceConfirmationBars, evictionIndex)
+            array.remove(flipFullSeparationCounts, evictionIndex)
             array.remove(flipFirstSeparationBars, evictionIndex)
     else if qualifiedFlip
         box newFlipBox = candidateBreakPreviewBox
@@ -1388,6 +1648,7 @@ while candidateIndex >= 0
         array.push(flipZoneKinds, ZONE_KIND_SUPPLY_FLIP)
         array.push(flipDemandConfirmed, false)
         array.push(flipEvidenceConfirmationBars, na)
+        array.push(flipFullSeparationCounts, fullSeparationCount)
         array.push(flipFirstSeparationBars, firstSeparationBar)
         flipDetected := true
 
@@ -1409,7 +1670,15 @@ while candidateIndex >= 0
         array.remove(candidateFormationBarCounts, candidateIndex)
         array.remove(candidateFormationPeakVolumes, candidateIndex)
         array.remove(candidateFormationLastVolumes, candidateIndex)
+        array.remove(candidateFullSeparationCounts, candidateIndex)
         array.remove(candidateFirstSeparationBars, candidateIndex)
+        array.remove(candidateFirstCrossBars, candidateIndex)
+        array.remove(candidateHardSellingObservedBars, candidateIndex)
+        array.remove(candidateHardSellingLowerCloseBars, candidateIndex)
+        array.remove(candidateHardSellingBearishVolumes, candidateIndex)
+        array.remove(candidateHardSellingDirectionalVolumes, candidateIndex)
+        array.remove(candidateHardSellingRunningLows, candidateIndex)
+        array.remove(candidateHardSellingMaximumRecoveryAmounts, candidateIndex)
         array.remove(candidateProgressiveArmed, candidateIndex)
         array.remove(candidateProgressiveDemandLows, candidateIndex)
         array.remove(candidateProgressiveDemandBars, candidateIndex)
@@ -1439,8 +1708,9 @@ while candidateIndex >= 0
             array.remove(flipZoneKinds, evictionIndex)
             array.remove(flipDemandConfirmed, evictionIndex)
             array.remove(flipEvidenceConfirmationBars, evictionIndex)
+            array.remove(flipFullSeparationCounts, evictionIndex)
             array.remove(flipFirstSeparationBars, evictionIndex)
-    else if expired or (legFormationExpired and
+    else if hardSellingInvalidated or expired or (legFormationExpired and
          not enableProgressiveSupplyTakeover and not enableImmediateFrontRunDemand)
         array.remove(candidateTops, candidateIndex)
         array.remove(candidateBottoms, candidateIndex)
@@ -1460,7 +1730,15 @@ while candidateIndex >= 0
         array.remove(candidateFormationBarCounts, candidateIndex)
         array.remove(candidateFormationPeakVolumes, candidateIndex)
         array.remove(candidateFormationLastVolumes, candidateIndex)
+        array.remove(candidateFullSeparationCounts, candidateIndex)
         array.remove(candidateFirstSeparationBars, candidateIndex)
+        array.remove(candidateFirstCrossBars, candidateIndex)
+        array.remove(candidateHardSellingObservedBars, candidateIndex)
+        array.remove(candidateHardSellingLowerCloseBars, candidateIndex)
+        array.remove(candidateHardSellingBearishVolumes, candidateIndex)
+        array.remove(candidateHardSellingDirectionalVolumes, candidateIndex)
+        array.remove(candidateHardSellingRunningLows, candidateIndex)
+        array.remove(candidateHardSellingMaximumRecoveryAmounts, candidateIndex)
         array.remove(candidateProgressiveArmed, candidateIndex)
         array.remove(candidateProgressiveDemandLows, candidateIndex)
         array.remove(candidateProgressiveDemandBars, candidateIndex)
@@ -1634,7 +1912,12 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
             array.push(flipZoneKinds, ZONE_KIND_CONTINUATION_BASE)
             array.push(flipDemandConfirmed, true)
             array.push(flipEvidenceConfirmationBars, na)
-            int continuationFirstSeparationBar = low > selectedBaseTop ? bar_index : na
+            int continuationInitialSeparationCount =
+                 barstate.isconfirmed and low > selectedBaseTop ? 1 : 0
+            int continuationFirstSeparationBar =
+                 continuationInitialSeparationCount >= requiredFullSeparationBars ?
+                 bar_index : na
+            array.push(flipFullSeparationCounts, continuationInitialSeparationCount)
             array.push(flipFirstSeparationBars, continuationFirstSeparationBar)
             flipDetected := true
             earlyZoneBreakoutDetected := true
@@ -1663,6 +1946,7 @@ if enableContinuationBases and signalBarReady and continuationMaxBaseBars >= con
                 array.remove(flipZoneKinds, evictionIndex)
                 array.remove(flipDemandConfirmed, evictionIndex)
                 array.remove(flipEvidenceConfirmationBars, evictionIndex)
+                array.remove(flipFullSeparationCounts, evictionIndex)
                 array.remove(flipFirstSeparationBars, evictionIndex)
 
 // ───────────── Record-high trend continuation zones ─────────────
@@ -1681,6 +1965,54 @@ if newExchangeDate
     recordHighCandidateBottom := na
     recordHighCandidateBar := na
     recordHighCandidateTime := na
+    recordHardSellingObservedBars := 0
+    recordHardSellingLowerCloseBars := 0
+    recordHardSellingBearishVolume := 0.0
+    recordHardSellingDirectionalVolume := 0.0
+    recordHardSellingRunningLow := na
+    recordHardSellingMaximumRecoveryAmount := 0.0
+
+// Apply the same hard-selling exclusion to the standalone record-high path.
+// This retires the old-high candidate before a much later recovery can turn a
+// one-way liquidation origin into an HH→D area. Begin after the pivot-right
+// formation window so bars still resolving the original supply auction do not
+// count as a later recovery.
+if barstate.isconfirmed and recordHighCandidateActive and
+     bar_index - recordHighCandidateBar >= pivotRight
+    [updatedRecordHardSellingObservedBars,
+         updatedRecordHardSellingLowerCloseBars,
+         updatedRecordHardSellingBearishVolume,
+         updatedRecordHardSellingDirectionalVolume,
+         updatedRecordHardSellingRunningLow,
+         updatedRecordHardSellingMaximumRecoveryAmount,
+         recordHardSellingInvalidatedNow] =
+         f_update_hard_selling_metrics(
+              recordHardSellingObservedBars,
+              recordHardSellingLowerCloseBars,
+              recordHardSellingBearishVolume,
+              recordHardSellingDirectionalVolume,
+              recordHardSellingRunningLow,
+              recordHardSellingMaximumRecoveryAmount,
+              recordHighCandidateTop)
+    recordHardSellingObservedBars := updatedRecordHardSellingObservedBars
+    recordHardSellingLowerCloseBars := updatedRecordHardSellingLowerCloseBars
+    recordHardSellingBearishVolume := updatedRecordHardSellingBearishVolume
+    recordHardSellingDirectionalVolume := updatedRecordHardSellingDirectionalVolume
+    recordHardSellingRunningLow := updatedRecordHardSellingRunningLow
+    recordHardSellingMaximumRecoveryAmount := updatedRecordHardSellingMaximumRecoveryAmount
+
+    if recordHardSellingInvalidatedNow
+        recordHighCandidateActive := false
+        recordHighCandidateTop := na
+        recordHighCandidateBottom := na
+        recordHighCandidateBar := na
+        recordHighCandidateTime := na
+        recordHardSellingObservedBars := 0
+        recordHardSellingLowerCloseBars := 0
+        recordHardSellingBearishVolume := 0.0
+        recordHardSellingDirectionalVolume := 0.0
+        recordHardSellingRunningLow := na
+        recordHardSellingMaximumRecoveryAmount := 0.0
 
 bool recordHighCrossedNow =
      signalBarReady and
@@ -1736,7 +2068,15 @@ if recordHighCrossedNow
     array.push(flipZoneKinds, ZONE_KIND_RECORD_HIGH_TREND)
     array.push(flipDemandConfirmed, false)
     array.push(flipEvidenceConfirmationBars, na)
-    array.push(flipFirstSeparationBars, bar_index)
+    // A breakout that still overlaps the old-high zone is not full separation.
+    // Store the breakout bar only when its entire range is already above supply.
+    int recordHighInitialSeparationCount =
+         barstate.isconfirmed and low > recordHighCandidateTop ? 1 : 0
+    int recordHighInitialSeparationBar =
+         recordHighInitialSeparationCount >= requiredFullSeparationBars ?
+         bar_index : na
+    array.push(flipFullSeparationCounts, recordHighInitialSeparationCount)
+    array.push(flipFirstSeparationBars, recordHighInitialSeparationBar)
     flipDetected := true
     earlyZoneBreakoutDetected := true
     earlyZoneBreakoutType := "RECORD HIGH"
@@ -1746,6 +2086,12 @@ if recordHighCrossedNow
     recordHighCandidateBottom := na
     recordHighCandidateBar := na
     recordHighCandidateTime := na
+    recordHardSellingObservedBars := 0
+    recordHardSellingLowerCloseBars := 0
+    recordHardSellingBearishVolume := 0.0
+    recordHardSellingDirectionalVolume := 0.0
+    recordHardSellingRunningLow := na
+    recordHardSellingMaximumRecoveryAmount := 0.0
 
     if array.size(flipBoxes) > maxHistoricalFlipStructures
         int evictionIndex = f_flip_retention_eviction_index()
@@ -1770,6 +2116,7 @@ if recordHighCrossedNow
         array.remove(flipZoneKinds, evictionIndex)
         array.remove(flipDemandConfirmed, evictionIndex)
         array.remove(flipEvidenceConfirmationBars, evictionIndex)
+        array.remove(flipFullSeparationCounts, evictionIndex)
         array.remove(flipFirstSeparationBars, evictionIndex)
 
 if barstate.isconfirmed
@@ -1789,12 +2136,41 @@ if barstate.isconfirmed
          recordOriginRange > 0.0 and
          recordOriginUpperWick >=
          recordOriginRange * recordHighMinimumUpperWickFraction
+    // Measure ownership against the exact record-high zone that will be stored
+    // and plotted: the upper wick from body high to candle high.
+    float recordOwnershipBottom = math.max(open, close)
+    float recordOwnershipZoneHeight = high - recordOwnershipBottom
+    int recordOriginDateKey = year * 10000 + month * 100 + dayofmonth
+    bool recordOriginOwnershipOk =
+         recordOwnershipZoneHeight > syminfo.mintick
+    for recordOwnershipStep = 1 to pivotLeft
+        int recordOwnershipDateKey =
+             year[recordOwnershipStep] * 10000 +
+             month[recordOwnershipStep] * 100 +
+             dayofmonth[recordOwnershipStep]
+        bool recordOwnershipBarComparable =
+             not na(high[recordOwnershipStep]) and
+             not na(low[recordOwnershipStep]) and
+             recordOwnershipDateKey == recordOriginDateKey
+        if recordOwnershipBarComparable
+            float recordOwnershipOverlap =
+                 math.max(
+                      0.0,
+                      math.min(high[recordOwnershipStep], high) -
+                      math.max(low[recordOwnershipStep], recordOwnershipBottom))
+            float recordOwnershipOverlapFraction =
+                 recordOwnershipOverlap / recordOwnershipZoneHeight
+            recordOriginOwnershipOk :=
+                 recordOriginOwnershipOk and
+                 recordOwnershipOverlapFraction <=
+                      maximumPriorSupplyZoneOverlap
     bool recordOriginQualified =
          enableRecordHighTrendRetest and
          recordOriginMakesNewHigh and
          recordOriginMakesNewVolumeHigh and
          recordOriginAbsoluteVolumeOk and
-         recordOriginUpperWickOk
+         recordOriginUpperWickOk and
+         recordOriginOwnershipOk
 
     if recordOriginQualified
         recordHighCandidateActive := true
@@ -1802,6 +2178,12 @@ if barstate.isconfirmed
         recordHighCandidateBottom := math.max(open, close)
         recordHighCandidateBar := bar_index
         recordHighCandidateTime := time
+        recordHardSellingObservedBars := 0
+        recordHardSellingLowerCloseBars := 0
+        recordHardSellingBearishVolume := 0.0
+        recordHardSellingDirectionalVolume := 0.0
+        recordHardSellingRunningLow := na
+        recordHardSellingMaximumRecoveryAmount := 0.0
 
     recordDayHighestHigh := na(recordDayHighestHigh) ?
          high : math.max(recordDayHighestHigh, high)
@@ -1831,6 +2213,7 @@ while zoneIndex < array.size(flipBoxes)
     int zoneKind = array.get(flipZoneKinds, zoneIndex)
     bool demandConfirmed = array.get(flipDemandConfirmed, zoneIndex)
     int evidenceConfirmationBar = array.get(flipEvidenceConfirmationBars, zoneIndex)
+    int fullSeparationCount = array.get(flipFullSeparationCounts, zoneIndex)
     int firstSeparationBar = array.get(flipFirstSeparationBars, zoneIndex)
     bool isContinuationBase = zoneKind == ZONE_KIND_CONTINUATION_BASE
     bool isProgressiveTakeover = zoneKind == ZONE_KIND_PROGRESSIVE_TAKEOVER
@@ -1974,17 +2357,20 @@ while zoneIndex < array.size(flipBoxes)
                 array.remove(flipZoneKinds, zoneIndex)
                 array.remove(flipDemandConfirmed, zoneIndex)
                 array.remove(flipEvidenceConfirmationBars, zoneIndex)
+                array.remove(flipFullSeparationCounts, zoneIndex)
                 array.remove(flipFirstSeparationBars, zoneIndex)
                 removed := true
 
-    // A record-high trend zone uses the breakout bar as its separation proof.
-    // Demand is confirmed only on a later completed convergence candle:
+    // A record-high trend zone requires the configured fully-above candle count
+    // after the breakout. Demand is confirmed only on a still-later convergence:
     //   • low remains within ±1% of the old high by default,
     //   • current high is below the preceding bar's high,
     //   • and buyers appear at the EMA band, near EMA 9, or through a lower
     //     wick at least 50% as large as the candle body.
     if not removed and barstate.isconfirmed and isActive and
-         recordHighTrendPending and bar_index > confirmationBar
+         recordHighTrendPending and
+         not na(firstSeparationBar) and
+         bar_index > firstSeparationBar
         float recordRetestRatio = zoneTop > 0.0 ? low / zoneTop : na
         bool recordRetestNearOldHigh =
              not na(recordRetestRatio) and
@@ -2052,12 +2438,15 @@ while zoneIndex < array.size(flipBoxes)
                 box.set_border_color(sellerLegBox, sellerLegBorder)
                 box.set_text(sellerLegBox, "")
 
-    // Keep checking every active zone until one complete candle trades entirely
-    // above it. A later return is not a valid retest without this separation proof.
-    if not removed and signalBarReady and isActive and not immediateFrontRunPending and
-         na(firstSeparationBar) and bar_index > confirmationBar and low > zoneTop
-        firstSeparationBar := bar_index
-        array.set(flipFirstSeparationBars, zoneIndex, firstSeparationBar)
+    // Count completed candles trading entirely above the zone. The stored proof
+    // bar is the candle that completes the required count, not the first one.
+    if not removed and barstate.isconfirmed and isActive and not immediateFrontRunPending and
+         bar_index > confirmationBar and low > zoneTop
+        fullSeparationCount += 1
+        array.set(flipFullSeparationCounts, zoneIndex, fullSeparationCount)
+        if na(firstSeparationBar) and fullSeparationCount >= requiredFullSeparationBars
+            firstSeparationBar := bar_index
+            array.set(flipFirstSeparationBars, zoneIndex, firstSeparationBar)
     bool hasFullSeparation = not na(firstSeparationBar)
 
     // A confirmed pivot low inside an already flipped original supply zone is a
@@ -2189,6 +2578,7 @@ while zoneIndex < array.size(flipBoxes)
                 array.remove(flipZoneKinds, zoneIndex)
                 array.remove(flipDemandConfirmed, zoneIndex)
                 array.remove(flipEvidenceConfirmationBars, zoneIndex)
+                array.remove(flipFullSeparationCounts, zoneIndex)
                 array.remove(flipFirstSeparationBars, zoneIndex)
                 removed := true
             else
