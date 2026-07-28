@@ -1,5 +1,5 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.42 • Record-High Ownership Fix]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
+indicator("Bullish Supply→Demand Flip Zones [v6.45 • Daily EMA Defended/Failed]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
@@ -64,6 +64,15 @@ plot(na, title = "Output anchor", display = display.none)
 //      no earlier comparison candle may overlap more than 40% of that zone.
 //      Collective shelves compare only with bars before the complete shelf.
 //      Record-high origins use the same upper-wick boundary that is plotted.
+//  27. Daily EMA 20 and EMA 200 are plotted as overhead context. The first
+//      approach from below that still closes below the EMA receives a visual
+//      sale-warning label; the existing single early alert is unchanged.
+//  28. Each daily EMA is drawn only while price is within the configured
+//      percentage above or below it, preventing distant levels from compressing
+//      the chart.
+//  29. Daily EMA support defenses require a meaningful lower wick and recovery
+//      above the EMA. The first confirmed close that loses accepted EMA support
+//      is labeled as EMA FAILED.
 
 // ─────────────────────── Inputs ─────────────────────────
 groupSupply = "1. Hidden supply qualification"
@@ -290,12 +299,33 @@ zoneLeftPaddingBars = input.int(0, "Start visible area before origin (bars)", mi
 drawFromSupplyOrigin = input.bool(true, "Draw from original supply candle", group = groupDisplay, display = display.none)
 showTrendAverages = input.bool(false, "Show EMA 9, EMA 20, and VWAP", group = groupDisplay, display = display.none)
 
+groupDailyEma = "6. Daily EMA levels and signals"
+showDailyEmaLevels = input.bool(true, "Show daily EMA 20 and EMA 200", group = groupDailyEma, display = display.none)
+dailyEmaMaximumDisplayDistancePercent = input.float(50.00, "Maximum EMA display distance from price (%)", minval = 1.00, maxval = 500.00, step = 1.00, group = groupDailyEma,
+     tooltip = "Each daily EMA is hidden whenever the current bar's close is this percentage or more above or below that EMA.", display = display.none)
+showDailyEmaSellWarnings = input.bool(true, "Show overhead daily-EMA sale warnings", group = groupDailyEma,
+     tooltip = "Marks the first completed candle in each approach from below. A candle that closes above the EMA is treated as a breakout rather than a sale warning.", display = display.none)
+showDailyEmaDefenseAndFailure = input.bool(true, "Show daily EMA defended and failed labels", group = groupDailyEma,
+     tooltip = "DEFENDED requires prior acceptance above the EMA, a pullback into its proximity band, a meaningful lower wick, and a close back above. FAILED marks the first close below an EMA that was accepted above on the previous bar.", display = display.none)
+dailyEmaDefenseMinimumLowerWickFraction = input.float(0.25, "EMA defense minimum lower wick / range", minval = 0.00, maxval = 1.00, step = 0.05, group = groupDailyEma, display = display.none)
+dailyEmaWarningDistancePercent = input.float(1.00, "Warning distance below daily EMA (%)", minval = 0.05, maxval = 10.00, step = 0.05, group = groupDailyEma, display = display.none)
+dailyEmaWarningRearmPercent = input.float(2.00, "Rearm distance below daily EMA (%)", minval = 0.10, maxval = 20.00, step = 0.10, group = groupDailyEma,
+     tooltip = "After a warning, price must move this far below the EMA or close above it before another warning can appear.", display = display.none)
+dailyEmaLabelDistanceAtr = input.float(0.35, "Warning label distance above bar (ATR)", minval = 0.00, maxval = 5.00, step = 0.05, group = groupDailyEma, display = display.none)
+dailyEma20Color = input.color(color.rgb(255, 167, 38), "Daily EMA 20 color", group = groupDailyEma, display = display.none)
+dailyEma200Color = input.color(color.rgb(229, 57, 53), "Daily EMA 200 color", group = groupDailyEma, display = display.none)
+maximumDailyEmaWarningMarkers = input.int(30, "Maximum daily-EMA signal markers", minval = 1, maxval = 40, group = groupDailyEma, display = display.none)
+
 // ────────────────────── Core calculations ──────────────────────
 float atr = ta.atr(14)
 float volumeAverage = ta.sma(volume, volumeAverageLength)
 float fastEma = ta.ema(close, fastEmaLength)
 float slowEma = ta.ema(close, slowEmaLength)
 float sessionVwap = ta.vwap(hlc3)
+float dailyEma20 = request.security(syminfo.tickerid, "D", ta.ema(close, 20),
+     gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_off)
+float dailyEma200 = request.security(syminfo.tickerid, "D", ta.ema(close, 200),
+     gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_off)
 float confirmedPivotHigh = ta.pivothigh(high, pivotLeft, pivotRight)
 float confirmedPivotLow = ta.pivotlow(low, demandPivotLeft, demandPivotRight)
 float postDemandHigh = ta.highest(high, demandPivotRight)
@@ -314,6 +344,10 @@ bool newExchangeDate = bar_index == 0 or exchangeDateKey != exchangeDateKey[1]
 float chartTimeframeSeconds = timeframe.in_seconds()
 int visualHalfBarMs = not na(chartTimeframeSeconds) ?
      math.max(1, int(chartTimeframeSeconds * 500.0)) : 1
+bool dailyEma20NearCurrentPrice = not na(dailyEma20) and dailyEma20 > 0.0 and
+     math.abs(close - dailyEma20) / dailyEma20 * 100.0 < dailyEmaMaximumDisplayDistancePercent
+bool dailyEma200NearCurrentPrice = not na(dailyEma200) and dailyEma200 > 0.0 and
+     math.abs(close - dailyEma200) / dailyEma200 * 100.0 < dailyEmaMaximumDisplayDistancePercent
 
 f_bar_left_edge_time(int absoluteBarIndex, int paddingBars) =>
     int paddedBarIndex = math.max(0, math.min(bar_index, absoluteBarIndex - paddingBars))
@@ -372,6 +406,8 @@ f_update_hard_selling_metrics(
 plot(showTrendAverages ? fastEma : na, title = "EMA 9", color = color.new(color.teal, 0), linewidth = 1, display = display.all - display.status_line)
 plot(showTrendAverages ? slowEma : na, title = "EMA 20", color = color.new(color.orange, 0), linewidth = 1, display = display.all - display.status_line)
 plot(showTrendAverages ? sessionVwap : na, title = "Session VWAP", color = color.new(color.purple, 0), linewidth = 1, display = display.all - display.status_line)
+plot(showDailyEmaLevels and dailyEma20NearCurrentPrice ? dailyEma20 : na, title = "Daily EMA 20", color = dailyEma20Color, linewidth = 2, display = display.all - display.status_line)
+plot(showDailyEmaLevels and dailyEma200NearCurrentPrice ? dailyEma200 : na, title = "Daily EMA 200", color = dailyEma200Color, linewidth = 2, display = display.all - display.status_line)
 
 int ZONE_KIND_SUPPLY_FLIP = 0
 int ZONE_KIND_CONTINUATION_BASE = 1
@@ -2726,6 +2762,250 @@ if displayZoneCount > 0 and barstate.islast and (barstate.ishistory or barstate.
                 box.set_bgcolor(displayStructureBox, hiddenDrawingColor)
                 box.set_border_color(displayStructureBox, hiddenDrawingColor)
                 box.set_text(displayStructureBox, "")
+
+// ───────────── Daily EMA overhead sale warning ─────────────
+// This module is visual only so the indicator retains its single early
+// zone-breakout alert. It marks the first completed approach from below that
+// remains beneath the daily EMA, then waits for price to move away or break
+// above the EMA before it can warn again.
+var bool dailyEma20WarningArmed = true
+var bool dailyEma200WarningArmed = true
+var bool dailyEma20DefenseArmed = true
+var bool dailyEma200DefenseArmed = true
+var array<label> dailyEmaWarningLabels = array.new_label()
+
+if newExchangeDate
+    dailyEma20WarningArmed := true
+    dailyEma200WarningArmed := true
+    dailyEma20DefenseArmed := true
+    dailyEma200DefenseArmed := true
+
+float dailyEmaWarningFraction =
+     dailyEmaWarningDistancePercent / 100.0
+float dailyEmaRearmFraction =
+     dailyEmaWarningRearmPercent / 100.0
+
+if not dailyEma20WarningArmed and not na(dailyEma20)
+    bool dailyEma20MovedAway =
+         high < dailyEma20 * (1.0 - dailyEmaRearmFraction)
+    bool dailyEma20BrokenAbove = close > dailyEma20
+    if dailyEma20MovedAway or dailyEma20BrokenAbove
+        dailyEma20WarningArmed := true
+
+if not dailyEma200WarningArmed and not na(dailyEma200)
+    bool dailyEma200MovedAway =
+         high < dailyEma200 * (1.0 - dailyEmaRearmFraction)
+    bool dailyEma200BrokenAbove = close > dailyEma200
+    if dailyEma200MovedAway or dailyEma200BrokenAbove
+        dailyEma200WarningArmed := true
+
+if not dailyEma20DefenseArmed and not na(dailyEma20)
+    bool dailyEma20LeftSupportBand =
+         low > dailyEma20 * (1.0 + dailyEmaRearmFraction)
+    bool dailyEma20LostSupport = close < dailyEma20
+    if dailyEma20LeftSupportBand or dailyEma20LostSupport
+        dailyEma20DefenseArmed := true
+
+if not dailyEma200DefenseArmed and not na(dailyEma200)
+    bool dailyEma200LeftSupportBand =
+         low > dailyEma200 * (1.0 + dailyEmaRearmFraction)
+    bool dailyEma200LostSupport = close < dailyEma200
+    if dailyEma200LeftSupportBand or dailyEma200LostSupport
+        dailyEma200DefenseArmed := true
+
+bool dailyEma20SellWarning =
+     barstate.isconfirmed and
+     showDailyEmaSellWarnings and
+     dailyEma20WarningArmed and
+     not na(dailyEma20) and
+     close[1] < dailyEma20[1] and
+     open < dailyEma20 and
+     high >= dailyEma20 * (1.0 - dailyEmaWarningFraction) and
+     close < dailyEma20
+bool dailyEma200SellWarning =
+     barstate.isconfirmed and
+     showDailyEmaSellWarnings and
+     dailyEma200WarningArmed and
+     not na(dailyEma200) and
+     close[1] < dailyEma200[1] and
+     open < dailyEma200 and
+     high >= dailyEma200 * (1.0 - dailyEmaWarningFraction) and
+     close < dailyEma200
+
+if dailyEma20SellWarning or dailyEma200SellWarning
+    bool bothDailyEmasNear =
+         dailyEma20SellWarning and
+         dailyEma200SellWarning
+    string dailyEmaWarningText =
+         bothDailyEmasNear ? "D EMA 20/200\nSELL WATCH" :
+         dailyEma200SellWarning ? "D EMA 200\nSELL WATCH" :
+         "D EMA 20\nSELL WATCH"
+    color dailyEmaWarningColor =
+         dailyEma200SellWarning ?
+         dailyEma200Color : dailyEma20Color
+    float dailyEmaWarningY =
+         high +
+         (not na(atr) ?
+              atr * dailyEmaLabelDistanceAtr :
+              high * 0.005)
+    string dailyEmaWarningTooltip =
+         "OVERHEAD DAILY EMA WARNING\n" +
+         "Time: " +
+         str.format_time(time, "HH:mm", syminfo.timezone) +
+         "\nDaily EMA 20: " +
+         str.tostring(dailyEma20, format.mintick) +
+         "\nDaily EMA 200: " +
+         str.tostring(dailyEma200, format.mintick) +
+         "\nBar high: " +
+         str.tostring(high, format.mintick) +
+         "\nClose: " +
+         str.tostring(close, format.mintick) +
+         "\nWarning distance: " +
+         str.tostring(dailyEmaWarningDistancePercent, "#.##") +
+         "%\nVisual warning only; the existing early zone alert is unchanged."
+    label dailyEmaWarningLabel = label.new(
+         x = time,
+         y = dailyEmaWarningY,
+         text = dailyEmaWarningText,
+         xloc = xloc.bar_time,
+         yloc = yloc.price,
+         style = label.style_label_down,
+         color = dailyEmaWarningColor,
+         textcolor = color.white,
+         size = size.tiny,
+         tooltip = dailyEmaWarningTooltip)
+    array.push(dailyEmaWarningLabels, dailyEmaWarningLabel)
+
+    if dailyEma20SellWarning
+        dailyEma20WarningArmed := false
+    if dailyEma200SellWarning
+        dailyEma200WarningArmed := false
+
+float dailyEmaCandleRange = high - low
+float dailyEmaSupportLowerWick =
+     math.min(open, close) - low
+bool dailyEmaSupportWickQualified =
+     dailyEmaCandleRange > 0.0 and
+     dailyEmaSupportLowerWick >=
+          dailyEmaCandleRange *
+          dailyEmaDefenseMinimumLowerWickFraction
+bool dailyEma20Defended =
+     barstate.isconfirmed and
+     showDailyEmaDefenseAndFailure and
+     dailyEma20DefenseArmed and
+     dailyEma20NearCurrentPrice and
+     not na(dailyEma20[1]) and
+     close[1] > dailyEma20[1] and
+     low <= dailyEma20 * (1.0 + dailyEmaWarningFraction) and
+     close > dailyEma20 and
+     dailyEmaSupportWickQualified
+bool dailyEma200Defended =
+     barstate.isconfirmed and
+     showDailyEmaDefenseAndFailure and
+     dailyEma200DefenseArmed and
+     dailyEma200NearCurrentPrice and
+     not na(dailyEma200[1]) and
+     close[1] > dailyEma200[1] and
+     low <= dailyEma200 * (1.0 + dailyEmaWarningFraction) and
+     close > dailyEma200 and
+     dailyEmaSupportWickQualified
+bool dailyEma20Failed =
+     barstate.isconfirmed and
+     showDailyEmaDefenseAndFailure and
+     dailyEma20NearCurrentPrice and
+     not na(dailyEma20[1]) and
+     close[1] >= dailyEma20[1] and
+     close < dailyEma20
+bool dailyEma200Failed =
+     barstate.isconfirmed and
+     showDailyEmaDefenseAndFailure and
+     dailyEma200NearCurrentPrice and
+     not na(dailyEma200[1]) and
+     close[1] >= dailyEma200[1] and
+     close < dailyEma200
+
+if dailyEma20Defended or dailyEma200Defended
+    bool bothDailyEmasDefended =
+         dailyEma20Defended and
+         dailyEma200Defended
+    string dailyEmaDefendedText =
+         bothDailyEmasDefended ? "D EMA 20/200\nDEFENDED" :
+         dailyEma200Defended ? "D EMA 200\nDEFENDED" :
+         "D EMA 20\nDEFENDED"
+    float dailyEmaDefendedY =
+         low -
+         (not na(atr) ?
+              atr * dailyEmaLabelDistanceAtr :
+              high * 0.005)
+    label dailyEmaDefendedLabel = label.new(
+         x = time,
+         y = dailyEmaDefendedY,
+         text = dailyEmaDefendedText,
+         xloc = xloc.bar_time,
+         yloc = yloc.price,
+         style = label.style_label_up,
+         color = color.rgb(0, 181, 120),
+         textcolor = color.white,
+         size = size.tiny,
+         tooltip =
+              dailyEmaDefendedText +
+              "\nTime: " +
+              str.format_time(time, "HH:mm", syminfo.timezone) +
+              "\nDaily EMA 20: " +
+              str.tostring(dailyEma20, format.mintick) +
+              "\nDaily EMA 200: " +
+              str.tostring(dailyEma200, format.mintick) +
+              "\nLower wick / range: " +
+              str.tostring(
+                   dailyEmaSupportLowerWick /
+                   dailyEmaCandleRange * 100.0,
+                   "#.##") +
+              "%")
+    array.push(dailyEmaWarningLabels, dailyEmaDefendedLabel)
+
+    if dailyEma20Defended
+        dailyEma20DefenseArmed := false
+    if dailyEma200Defended
+        dailyEma200DefenseArmed := false
+
+if dailyEma20Failed or dailyEma200Failed
+    bool bothDailyEmasFailed =
+         dailyEma20Failed and
+         dailyEma200Failed
+    string dailyEmaFailedText =
+         bothDailyEmasFailed ? "D EMA 20/200\nFAILED" :
+         dailyEma200Failed ? "D EMA 200\nFAILED" :
+         "D EMA 20\nFAILED"
+    float dailyEmaFailedY =
+         high +
+         (not na(atr) ?
+              atr * dailyEmaLabelDistanceAtr :
+              high * 0.005)
+    label dailyEmaFailedLabel = label.new(
+         x = time,
+         y = dailyEmaFailedY,
+         text = dailyEmaFailedText,
+         xloc = xloc.bar_time,
+         yloc = yloc.price,
+         style = label.style_label_down,
+         color = color.rgb(211, 47, 47),
+         textcolor = color.white,
+         size = size.tiny,
+         tooltip =
+              dailyEmaFailedText +
+              "\nTime: " +
+              str.format_time(time, "HH:mm", syminfo.timezone) +
+              "\nClose: " +
+              str.tostring(close, format.mintick) +
+              "\nDaily EMA 20: " +
+              str.tostring(dailyEma20, format.mintick) +
+              "\nDaily EMA 200: " +
+              str.tostring(dailyEma200, format.mintick))
+    array.push(dailyEmaWarningLabels, dailyEmaFailedLabel)
+
+while array.size(dailyEmaWarningLabels) >
+     maximumDailyEmaWarningMarkers
+    label.delete(array.shift(dailyEmaWarningLabels))
 
 // ───────────────────── Markers and alerts ─────────────────────
 // S→D arrows are created only after confirmed pivot support or confirmed immediate

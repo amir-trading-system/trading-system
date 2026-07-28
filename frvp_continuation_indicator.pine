@@ -1,7 +1,7 @@
 //@version=6
 indicator(
-     "FRVP Value-Area Continuation Detector v1.28",
-     shorttitle = "FRVP Continuation v1.28",
+     "FRVP Value-Area Continuation Detector v1.35",
+     shorttitle = "FRVP Continuation v1.35",
      overlay = true,
      max_bars_back = 5000,
      max_lines_count = 500,
@@ -48,6 +48,25 @@ indicator(
 //      breakout identity instead of requiring a lower low than that bar.
 //  16. Expose one combined VAL/POC/VAH defense alert while preserving the
 //      separate chart labels that identify which frozen level was defended.
+//  17. Allow a POC defense to front-run POC by the configured ATR distance and
+//      accept reduced-but-meaningful volume when every price-defense rule passes.
+//  18. When a movement freezes, retrospectively evaluate POC failures inside
+//      the completed profile window. These failures become knowable only at
+//      freeze time, but their labels remain anchored to the actual candles.
+//  19. Recognize a POC-fight continuation when repeated internal POC failures
+//      are followed by a candle that holds above POC and decisively reclaims VAH.
+//  20. Preserve a frozen profile after invalidation and reactivate it only
+//      after price reclaims VAL, establishes acceptance above POC, and then
+//      crosses VAH with decisive price and volume.
+//  21. Allow a relaxed-wick VAH test to become confirmed defense within a
+//      short window when its low remains preserved and buyers respond with
+//      strong price and volume.
+//  22. Plot daily EMA 20 and EMA 200 and mark the first overhead approach from
+//      below as a visual sale warning without changing the existing alerts.
+//  23. Draw each daily EMA only while price is within the configured percentage
+//      above or below it, preventing distant levels from compressing the chart.
+//  24. Mark daily EMA 20/200 support defenses when a pullback forms a meaningful
+//      lower wick and recovers the EMA, and mark the first close that loses it.
 //
 // The profile is approximate. Each candle's volume is spread uniformly over
 // the price rows crossed by that candle. TradingView does not expose the values
@@ -61,6 +80,7 @@ const string GROUP_POC      = "4. POC fight"
 const string GROUP_VAH      = "5. VAH defense"
 const string GROUP_BREAKOUT = "6. Continuation breakout"
 const string GROUP_DISPLAY  = "7. Display"
+const string GROUP_DAILY_EMA = "8. Daily EMA levels and signals"
 
 const int STATE_SEARCHING = 0
 const int STATE_BUILDING  = 1
@@ -292,6 +312,13 @@ int valInvalidationCloses = input.int(
      group = GROUP_VAL,
      display = display.none)
 
+bool enableProfileReactivation = input.bool(
+     true,
+     "Reactivate invalidated profile after ordered reclaim",
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "Keeps the frozen VAL, POC, and VAH available after invalidation. Price must first recover VAL, then maintain acceptance above POC, and finally reclaim VAH with a strong high-volume candle.")
+
 float pocMinimumPenetrationATR = input.float(
      0.00,
      "POC attempt minimum penetration (ATR)",
@@ -326,6 +353,15 @@ float pocDefenseApproachATR = input.float(
      group = GROUP_POC,
      display = display.none,
      tooltip = "A support test may stop slightly above POC and still qualify as buyers front-running the level.")
+
+float pocDefenseMinimumRelativeVolume = input.float(
+     0.80,
+     "POC defense minimum relative volume",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_POC,
+     display = display.none,
+     tooltip = "0.80 permits a reduced-volume selling-exhaustion defense when all POC price, lower-low, wick, and recovery requirements pass.")
 
 float pocDefenseMinimumLowerWickFraction = input.float(
      0.25,
@@ -416,10 +452,110 @@ int vahDefenseSpacingBars = input.int(
      group = GROUP_VAH,
      display = display.none)
 
+bool enableTwoBarVAHDefense = input.bool(
+     true,
+     "Allow VAH test + delayed buyer confirmation",
+     group = GROUP_VAH,
+     display = display.none,
+     tooltip = "A VAH test with a visible lower wick may be confirmed by a later bullish, above-average-volume response while the test low remains preserved.")
+
+float vahCandidateMinimumLowerWickFraction = input.float(
+     0.10,
+     "Delayed VAH test minimum lower wick / range",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_VAH,
+     display = display.none,
+     tooltip = "The direct VAH defense still requires the stricter wick setting. This relaxed value applies only to a test that must receive later buyer confirmation.")
+
+int vahDefenseConfirmationWindowBars = input.int(
+     3,
+     "Delayed VAH confirmation window (bars)",
+     minval = 1,
+     maxval = 10,
+     group = GROUP_VAH,
+     display = display.none,
+     tooltip = "The test low and VAH recovery must remain intact until a qualifying response appears within this many completed bars.")
+
+float twoBarVAHConfirmationBodyATR = input.float(
+     0.50,
+     "Delayed VAH confirmation minimum body (ATR)",
+     minval = 0.10,
+     step = 0.05,
+     group = GROUP_VAH,
+     display = display.none)
+
+float twoBarVAHConfirmationCloseLocation = input.float(
+     0.75,
+     "Delayed VAH confirmation minimum close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_VAH,
+     display = display.none)
+
+float twoBarVAHConfirmationVolumeMultiple = input.float(
+     1.50,
+     "Delayed VAH confirmation volume / test volume",
+     minval = 1.00,
+     step = 0.25,
+     group = GROUP_VAH,
+     display = display.none)
+
 float breakoutStartToleranceATR = input.float(
      0.15,
      "Breakout may start above POC by (ATR)",
      minval = 0.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+bool enablePOCFightVAHReclaim = input.bool(
+     true,
+     "Allow internal POC-fight VAH reclaim",
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "Uses repeated POC failures found inside the frozen movement as context. Entry must then hold above POC and cross from inside value to decisively above VAH.")
+
+float pocFightVAHClearanceATR = input.float(
+     0.50,
+     "POC fight: minimum close above VAH (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float pocFightMinimumBodyRange = input.float(
+     0.55,
+     "POC fight: minimum body / range",
+     minval = 0.30,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float pocFightMinimumCloseLocation = input.float(
+     0.65,
+     "POC fight: minimum close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float pocFightMinimumRelativeVolume = input.float(
+     1.25,
+     "POC fight: minimum relative volume",
+     minval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float pocFightPreviousVolumeMultiple = input.float(
+     1.25,
+     "POC fight: minimum volume / previous bar",
+     minval = 1.00,
      step = 0.05,
      group = GROUP_BREAKOUT,
      display = display.none)
@@ -635,6 +771,93 @@ color continuationColor = input.color(
      group = GROUP_DISPLAY,
      display = display.none)
 
+bool showDailyEMALevels = input.bool(
+     true,
+     "Show daily EMA 20 and EMA 200",
+     group = GROUP_DAILY_EMA,
+     display = display.none)
+
+float dailyEMAMaximumDisplayDistancePercent = input.float(
+     50.00,
+     "Maximum EMA display distance from price (%)",
+     minval = 1.00,
+     maxval = 500.00,
+     step = 1.00,
+     group = GROUP_DAILY_EMA,
+     display = display.none,
+     tooltip = "Each daily EMA is hidden whenever the current bar's close is this percentage or more above or below that EMA.")
+
+bool showDailyEMASellWarnings = input.bool(
+     true,
+     "Show overhead daily-EMA sale warnings",
+     group = GROUP_DAILY_EMA,
+     display = display.none,
+     tooltip = "Marks the first completed candle in each approach from below. A candle that closes above the EMA is treated as a breakout rather than a sale warning.")
+
+bool showDailyEMADefenseAndFailure = input.bool(
+     true,
+     "Show daily EMA defended and failed labels",
+     group = GROUP_DAILY_EMA,
+     display = display.none,
+     tooltip = "DEFENDED requires prior acceptance above the EMA, a pullback into its proximity band, a meaningful lower wick, and a close back above. FAILED marks the first close below an EMA that was accepted above on the previous bar.")
+
+float dailyEMADefenseMinimumLowerWickFraction = input.float(
+     0.25,
+     "EMA defense minimum lower wick / range",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_DAILY_EMA,
+     display = display.none)
+
+float dailyEMAWarningDistancePercent = input.float(
+     1.00,
+     "Warning distance below daily EMA (%)",
+     minval = 0.05,
+     maxval = 10.00,
+     step = 0.05,
+     group = GROUP_DAILY_EMA,
+     display = display.none)
+
+float dailyEMAWarningRearmPercent = input.float(
+     2.00,
+     "Rearm distance below daily EMA (%)",
+     minval = 0.10,
+     maxval = 20.00,
+     step = 0.10,
+     group = GROUP_DAILY_EMA,
+     display = display.none,
+     tooltip = "After a warning, price must move this far below the EMA or close above it before another warning can appear.")
+
+float dailyEMALabelDistanceATR = input.float(
+     0.35,
+     "Warning label distance above bar (ATR)",
+     minval = 0.00,
+     maxval = 5.00,
+     step = 0.05,
+     group = GROUP_DAILY_EMA,
+     display = display.none)
+
+color dailyEMA20Color = input.color(
+     color.rgb(255, 167, 38),
+     "Daily EMA 20 color",
+     group = GROUP_DAILY_EMA,
+     display = display.none)
+
+color dailyEMA200Color = input.color(
+     color.rgb(229, 57, 53),
+     "Daily EMA 200 color",
+     group = GROUP_DAILY_EMA,
+     display = display.none)
+
+int maximumDailyEMAWarningMarkers = input.int(
+     30,
+     "Maximum daily-EMA signal markers",
+     minval = 1,
+     maxval = 40,
+     group = GROUP_DAILY_EMA,
+     display = display.none)
+
 //------------------------------------------------------------------------------
 // Approximate fixed-range volume profile
 //------------------------------------------------------------------------------
@@ -729,6 +952,18 @@ float candleCloseLocation = candleRange > 0.0 ? (close - low) / candleRange : 0.
 float relativeVolume = not na(volumeAverage) and volumeAverage > 0.0 ? volume / volumeAverage : na
 float exceptionalPreviousVolumeAverage =
      ta.sma(volume, exceptionalVolumeLookback)[1]
+float dailyEMA20 = request.security(
+     syminfo.tickerid,
+     "D",
+     ta.ema(close, 20),
+     gaps = barmerge.gaps_off,
+     lookahead = barmerge.lookahead_off)
+float dailyEMA200 = request.security(
+     syminfo.tickerid,
+     "D",
+     ta.ema(close, 200),
+     gaps = barmerge.gaps_off,
+     lookahead = barmerge.lookahead_off)
 bool timeframeSupported = timeframe.isminutes and timeframe.multiplier <= maximumChartMinutes
 bool inPremarketSession = includePremarket and
      not na(time(timeframe.period, premarketSession, syminfo.timezone))
@@ -745,6 +980,31 @@ bool inManualMoveWindow = not na(time(timeframe.period, manualMoveWindow, syminf
 
 int currentDateKey = year * 10000 + month * 100 + dayofmonth
 bool newTradingDate = bar_index > 0 and currentDateKey != currentDateKey[1]
+bool dailyEMA20NearCurrentPrice =
+     not na(dailyEMA20) and
+     dailyEMA20 > 0.0 and
+     math.abs(close - dailyEMA20) / dailyEMA20 * 100.0 <
+          dailyEMAMaximumDisplayDistancePercent
+bool dailyEMA200NearCurrentPrice =
+     not na(dailyEMA200) and
+     dailyEMA200 > 0.0 and
+     math.abs(close - dailyEMA200) / dailyEMA200 * 100.0 <
+          dailyEMAMaximumDisplayDistancePercent
+
+plot(
+     showDailyEMALevels and dailyEMA20NearCurrentPrice ?
+          dailyEMA20 : na,
+     title = "Daily EMA 20",
+     color = dailyEMA20Color,
+     linewidth = 2,
+     display = display.all - display.status_line)
+plot(
+     showDailyEMALevels and dailyEMA200NearCurrentPrice ?
+          dailyEMA200 : na,
+     title = "Daily EMA 200",
+     color = dailyEMA200Color,
+     linewidth = 2,
+     display = display.all - display.status_line)
 bool newEnabledMarketSession =
      activeMarketSession != 0 and
      (bar_index == 0 or activeMarketSession != activeMarketSession[1])
@@ -758,6 +1018,11 @@ var int lifecycleState = STATE_SEARCHING
 var array<float> movementLows = array.new_float()
 var array<float> movementHighs = array.new_float()
 var array<float> movementVolumes = array.new_float()
+var array<float> movementOpens = array.new_float()
+var array<float> movementCloses = array.new_float()
+var array<float> movementATRs = array.new_float()
+var array<int> movementTimes = array.new_int()
+var array<int> movementBarIndices = array.new_int()
 
 var float movementLow = na
 var float movementHigh = na
@@ -777,13 +1042,24 @@ var bool valDefended = false
 var bool valInvalidated = false
 var bool valInvalidationMarked = false
 var int consecutiveClosesBelowProfileLow = 0
+var int profileRecoveryStage = 0
 
 var bool pocDefenseArmed = true
 var int lastPOCDefenseBarIndex = na
 var int failedPOCAttempts = 0
+var int profileInternalFailedPOCAttempts = 0
 var int lastPOCAttemptBarIndex = na
 var bool vahDefenseArmed = true
 var int lastVAHDefenseBarIndex = na
+var bool vahDefenseCandidateActive = false
+var int vahDefenseCandidateBarIndex = na
+var int vahDefenseCandidateTime = na
+var float vahDefenseCandidateOpen = na
+var float vahDefenseCandidateHigh = na
+var float vahDefenseCandidateLow = na
+var float vahDefenseCandidateClose = na
+var float vahDefenseCandidateVolume = na
+var float vahDefenseCandidateLowerWickShare = na
 
 var bool breakoutPending = false
 var bool breakoutConfirmed = false
@@ -804,11 +1080,13 @@ var array<line> retainedProfileLines = array.new_line()
 var array<box> retainedMovementBoxes = array.new_box()
 var array<label> retainedMarkers = array.new_label()
 var array<label> retainedEntryMarkers = array.new_label()
+var array<label> retainedDailyEMAWarningMarkers = array.new_label()
 
 bool entryTriggeredThisBar = false
 bool valDefendedThisBar = false
 bool pocDefendedThisBar = false
 bool vahDefendedThisBar = false
+bool profileReactivatedThisBar = false
 
 // A frozen premarket profile always survives the 09:30 boundary, even if its
 // earlier entry lifecycle completed. Other session changes carry only an
@@ -817,8 +1095,10 @@ bool frozenProfileExists =
      lifecycleState == STATE_PROFILE
 bool frozenProfileStillActionable =
      frozenProfileExists and
-     not valInvalidated and
-     not breakoutConfirmed
+     (
+          (not valInvalidated and not breakoutConfirmed) or
+          (valInvalidated and enableProfileReactivation)
+     )
 bool enteringRegularFromPremarket =
      newEnabledMarketSession and
      bar_index > 0 and
@@ -843,6 +1123,11 @@ if resetLifecycleNow
     array.clear(movementLows)
     array.clear(movementHighs)
     array.clear(movementVolumes)
+    array.clear(movementOpens)
+    array.clear(movementCloses)
+    array.clear(movementATRs)
+    array.clear(movementTimes)
+    array.clear(movementBarIndices)
 
     movementLow := na
     movementHigh := na
@@ -862,13 +1147,24 @@ if resetLifecycleNow
     valInvalidated := false
     valInvalidationMarked := false
     consecutiveClosesBelowProfileLow := 0
+    profileRecoveryStage := 0
 
     pocDefenseArmed := true
     lastPOCDefenseBarIndex := na
     failedPOCAttempts := 0
+    profileInternalFailedPOCAttempts := 0
     lastPOCAttemptBarIndex := na
     vahDefenseArmed := true
     lastVAHDefenseBarIndex := na
+    vahDefenseCandidateActive := false
+    vahDefenseCandidateBarIndex := na
+    vahDefenseCandidateTime := na
+    vahDefenseCandidateOpen := na
+    vahDefenseCandidateHigh := na
+    vahDefenseCandidateLow := na
+    vahDefenseCandidateClose := na
+    vahDefenseCandidateVolume := na
+    vahDefenseCandidateLowerWickShare := na
 
     breakoutPending := false
     breakoutConfirmed := false
@@ -899,9 +1195,19 @@ if barstate.isconfirmed and timeframeSupported
             array.clear(movementLows)
             array.clear(movementHighs)
             array.clear(movementVolumes)
+            array.clear(movementOpens)
+            array.clear(movementCloses)
+            array.clear(movementATRs)
+            array.clear(movementTimes)
+            array.clear(movementBarIndices)
             array.push(movementLows, low)
             array.push(movementHighs, high)
             array.push(movementVolumes, nz(volume))
+            array.push(movementOpens, open)
+            array.push(movementCloses, close)
+            array.push(movementATRs, atrValue)
+            array.push(movementTimes, time)
+            array.push(movementBarIndices, bar_index)
 
             movementLow := low
             movementHigh := high
@@ -916,6 +1222,11 @@ if barstate.isconfirmed and timeframeSupported
                 array.push(movementLows, low)
                 array.push(movementHighs, high)
                 array.push(movementVolumes, nz(volume))
+                array.push(movementOpens, open)
+                array.push(movementCloses, close)
+                array.push(movementATRs, atrValue)
+                array.push(movementTimes, time)
+                array.push(movementBarIndices, bar_index)
 
                 movementLow := math.min(movementLow, low)
                 if high >= movementHigh
@@ -943,6 +1254,11 @@ if barstate.isconfirmed and timeframeSupported
             array.clear(movementLows)
             array.clear(movementHighs)
             array.clear(movementVolumes)
+            array.clear(movementOpens)
+            array.clear(movementCloses)
+            array.clear(movementATRs)
+            array.clear(movementTimes)
+            array.clear(movementBarIndices)
 
             movementLow := low
             movementHigh := high
@@ -964,6 +1280,11 @@ if barstate.isconfirmed and timeframeSupported
                     array.push(movementLows, low[contextOffset])
                     array.push(movementHighs, high[contextOffset])
                     array.push(movementVolumes, nz(volume[contextOffset]))
+                    array.push(movementOpens, open[contextOffset])
+                    array.push(movementCloses, close[contextOffset])
+                    array.push(movementATRs, atrValue[contextOffset])
+                    array.push(movementTimes, time[contextOffset])
+                    array.push(movementBarIndices, bar_index - contextOffset)
                     movementLow := math.min(movementLow, low[contextOffset])
                     if high[contextOffset] > movementHigh
                         movementHigh := high[contextOffset]
@@ -975,6 +1296,11 @@ if barstate.isconfirmed and timeframeSupported
             array.push(movementLows, low)
             array.push(movementHighs, high)
             array.push(movementVolumes, nz(volume))
+            array.push(movementOpens, open)
+            array.push(movementCloses, close)
+            array.push(movementATRs, atrValue)
+            array.push(movementTimes, time)
+            array.push(movementBarIndices, bar_index)
 
             // Prefer the current bar when it ties or exceeds the seeded high,
             // matching the normal movement-high tracking behavior.
@@ -988,6 +1314,11 @@ if barstate.isconfirmed and timeframeSupported
                 array.push(movementLows, low)
                 array.push(movementHighs, high)
                 array.push(movementVolumes, nz(volume))
+                array.push(movementOpens, open)
+                array.push(movementCloses, close)
+                array.push(movementATRs, atrValue)
+                array.push(movementTimes, time)
+                array.push(movementBarIndices, bar_index)
 
                 movementLow := math.min(movementLow, low)
                 if high >= movementHigh
@@ -1028,6 +1359,11 @@ if discardMovementNow
     array.clear(movementLows)
     array.clear(movementHighs)
     array.clear(movementVolumes)
+    array.clear(movementOpens)
+    array.clear(movementCloses)
+    array.clear(movementATRs)
+    array.clear(movementTimes)
+    array.clear(movementBarIndices)
     movementLow := na
     movementHigh := na
     movementPeakVolume := na
@@ -1070,12 +1406,23 @@ if freezeMovementNow
         valInvalidated := false
         valInvalidationMarked := false
         consecutiveClosesBelowProfileLow := 0
+        profileRecoveryStage := 0
         pocDefenseArmed := true
         lastPOCDefenseBarIndex := na
         failedPOCAttempts := 0
+        profileInternalFailedPOCAttempts := 0
         lastPOCAttemptBarIndex := na
         vahDefenseArmed := true
         lastVAHDefenseBarIndex := na
+        vahDefenseCandidateActive := false
+        vahDefenseCandidateBarIndex := na
+        vahDefenseCandidateTime := na
+        vahDefenseCandidateOpen := na
+        vahDefenseCandidateHigh := na
+        vahDefenseCandidateLow := na
+        vahDefenseCandidateClose := na
+        vahDefenseCandidateVolume := na
+        vahDefenseCandidateLowerWickShare := na
         breakoutPending := false
         breakoutConfirmed := false
         breakoutPath := ""
@@ -1132,6 +1479,120 @@ if freezeMovementNow
         while array.size(retainedProfileLines) > maximumHistoricalProfiles * 3
             line.delete(array.shift(retainedProfileLines))
 
+        // POC failures inside the movement cannot be known while the profile
+        // is still building. Once the profile freezes, replay its stored bars
+        // against the final POC and place qualifying labels on their true bars.
+        int storedMovementBarCount = array.size(movementLows)
+        if storedMovementBarCount > 0
+            for storedMovementIndex = 0 to storedMovementBarCount - 1
+                float storedOpen = array.get(
+                     movementOpens,
+                     storedMovementIndex)
+                float storedHigh = array.get(
+                     movementHighs,
+                     storedMovementIndex)
+                float storedClose = array.get(
+                     movementCloses,
+                     storedMovementIndex)
+                float storedATR = array.get(
+                     movementATRs,
+                     storedMovementIndex)
+                int storedTime = array.get(
+                     movementTimes,
+                     storedMovementIndex)
+                int storedBarIndex = array.get(
+                     movementBarIndices,
+                     storedMovementIndex)
+
+                bool storedATRReady =
+                     not na(storedATR) and
+                     storedATR > 0.0
+                bool historicalOpensBelowPOC =
+                     storedOpen < profilePOC
+                bool historicalReachesPOC =
+                     storedATRReady and
+                     storedHigh >=
+                     profilePOC +
+                     storedATR * pocMinimumPenetrationATR
+                bool historicalClosesNearOrBelowPOC =
+                     storedATRReady and
+                     storedClose <=
+                     profilePOC +
+                     storedATR * pocFailedCloseBandATR
+                bool historicalRejectsDown =
+                     storedATRReady and
+                     storedHigh - storedClose >=
+                     storedATR * pocMinimumDownwardRejectionATR
+                bool historicalSpacingOk =
+                     na(lastPOCAttemptBarIndex) or
+                     storedBarIndex - lastPOCAttemptBarIndex >=
+                     pocAttemptSpacingBars
+                bool historicalPOCFail =
+                     historicalOpensBelowPOC and
+                     historicalReachesPOC and
+                     historicalClosesNearOrBelowPOC and
+                     historicalRejectsDown and
+                     historicalSpacingOk
+
+                if historicalPOCFail
+                    failedPOCAttempts += 1
+                    lastPOCAttemptBarIndex := storedBarIndex
+
+                    if showPOCAttemptMarkers
+                        string historicalAttemptTooltip =
+                             "FAILED POC ATTEMPT #" +
+                             str.tostring(failedPOCAttempts) +
+                             "\nAttempt: " +
+                             str.format_time(
+                                  storedTime,
+                                  "HH:mm",
+                                  syminfo.timezone) +
+                             "\nKnown when profile froze: " +
+                             str.format_time(
+                                  time,
+                                  "HH:mm",
+                                  syminfo.timezone) +
+                             "\nPOC: " +
+                             str.tostring(
+                                  profilePOC,
+                                  format.mintick) +
+                             "\nOpen: " +
+                             str.tostring(
+                                  storedOpen,
+                                  format.mintick) +
+                             "\nHigh: " +
+                             str.tostring(
+                                  storedHigh,
+                                  format.mintick) +
+                             "\nClose: " +
+                             str.tostring(
+                                  storedClose,
+                                  format.mintick) +
+                             "\nDownward rejection: " +
+                             str.tostring(
+                                  storedHigh - storedClose,
+                                  format.mintick)
+                        float historicalAttemptY =
+                             storedHigh +
+                             storedATR * pocAttemptLabelDistanceATR
+                        label historicalAttemptLabel = label.new(
+                             x = storedTime,
+                             y = historicalAttemptY,
+                             text = "POC\nFAIL " +
+                                  str.tostring(failedPOCAttempts),
+                             xloc = xloc.bar_time,
+                             yloc = yloc.price,
+                             style = label.style_label_down,
+                             color = color.new(pocColor, 5),
+                             textcolor = color.rgb(30, 30, 30),
+                             size = size.tiny,
+                             tooltip = historicalAttemptTooltip)
+                        array.push(
+                             retainedMarkers,
+                             historicalAttemptLabel)
+
+        profileInternalFailedPOCAttempts := failedPOCAttempts
+
         if showFrozenProfileLabel
             string profileWindow =
                  str.format_time(movementStartTime, "HH:mm", syminfo.timezone) +
@@ -1187,9 +1648,16 @@ if profileCanBeEvaluated
     consecutiveClosesBelowProfileLow :=
          closeAcceptedBelowProfileLow ? consecutiveClosesBelowProfileLow + 1 : 0
 
-    if consecutiveClosesBelowProfileLow >= valInvalidationCloses
+    bool profileInvalidatedThisBar =
+         consecutiveClosesBelowProfileLow >= valInvalidationCloses and
+         not valInvalidated
+
+    if profileInvalidatedThisBar
         valInvalidated := true
         breakoutPending := false
+        breakoutConfirmed := false
+        activeEntryLabel := na
+        profileRecoveryStage := 0
 
         if showVALInvalidation and not valInvalidationMarked
             label valLostLabel = label.new(
@@ -1209,6 +1677,63 @@ if profileCanBeEvaluated
                       str.format_time(time, "HH:mm", syminfo.timezone))
             array.push(retainedMarkers, valLostLabel)
             valInvalidationMarked := true
+
+    // An invalidated profile remains stored as market memory. It can return to
+    // active use only through an ordered recovery: first regain VAL, then show
+    // acceptance above POC on completed bars, and finally launch from inside
+    // value through VAH with strong price and volume. Requiring the POC stage
+    // to exist before the launch prevents one isolated candle from restoring
+    // an obsolete profile.
+    if valInvalidated and enableProfileReactivation
+        int recoveryStageBeforeBar = profileRecoveryStage
+        float recoveryBodyToRange =
+             candleRange > 0.0 ? candleBody / candleRange : 0.0
+        bool recoveryHadPriorPOCAcceptance =
+             recoveryStageBeforeBar >= 2
+        bool recoveryStartsInsideUpperValue =
+             close[1] > profilePOC and
+             close[1] <= profileVAH and
+             open > profilePOC and
+             open <= profileVAH
+        bool recoveryHoldsAbovePOC =
+             low >= profilePOC
+        bool recoveryClosesDecisivelyAboveVAH =
+             close >
+             profileVAH +
+             atrValue * pocFightVAHClearanceATR
+        bool recoveryPriceQuality =
+             close > open and
+             candleBody >= atrValue * breakoutBodyATR and
+             recoveryBodyToRange >= pocFightMinimumBodyRange and
+             candleCloseLocation >= pocFightMinimumCloseLocation
+        bool recoveryVolumeQuality =
+             not na(relativeVolume) and
+             relativeVolume >= breakoutRelativeVolume and
+             not na(volume[1]) and
+             volume[1] > 0.0 and
+             volume >= volume[1] * pocFightPreviousVolumeMultiple
+        bool orderedProfileRecovery =
+             recoveryHadPriorPOCAcceptance and
+             failedPOCAttempts >= minimumFailedPOCAttempts and
+             recoveryStartsInsideUpperValue and
+             recoveryHoldsAbovePOC and
+             recoveryClosesDecisivelyAboveVAH and
+             recoveryPriceQuality and
+             recoveryVolumeQuality
+
+        if orderedProfileRecovery
+            valInvalidated := false
+            valInvalidationMarked := false
+            valDefended := true
+            consecutiveClosesBelowProfileLow := 0
+            profileRecoveryStage := 0
+            profileReactivatedThisBar := true
+            pocDefenseArmed := true
+            vahDefenseArmed := true
+        else
+            profileRecoveryStage :=
+                 close < profileVAL ? 0 :
+                 close < profilePOC ? 1 : 2
 
     // Every completed candle is evaluated independently. A valid VAL defense
     // trades below VAL, recovers to close above it, and shows a lower wick that
@@ -1268,8 +1793,8 @@ if profileCanBeEvaluated
     if pocDefenseArmed
         bool pocWasPreviouslyAcceptedAbove = close[1] > profilePOC
         bool pocDefenseOpensAbove = open > profilePOC
-        bool pocDefenseTouchesOrUndercutsPOC =
-             low <= profilePOC
+        bool pocDefenseTouchesOrApproachesPOC =
+             low <= profilePOC + atrValue * pocDefenseApproachATR
         bool pocDefenseMakesLowerLow =
              low < low[1]
         bool pocDefenseOpensBelowPreviousHigh =
@@ -1285,24 +1810,24 @@ if profileCanBeEvaluated
              candleRange > 0.0 and
              pocDefenseLowerWick >=
              candleRange * pocDefenseMinimumLowerWickFraction
-        bool pocDefenseVolumeAboveAverage =
+        bool pocDefenseVolumeQualified =
              not na(volume) and
              not na(volumeAverage) and
              volumeAverage > 0.0 and
-             volume > volumeAverage
+             volume / volumeAverage >= pocDefenseMinimumRelativeVolume
         bool enoughBarsSinceLastPOCDefense =
              na(lastPOCDefenseBarIndex) or
              bar_index - lastPOCDefenseBarIndex >= pocDefenseSpacingBars
         bool directPOCDefense =
              pocWasPreviouslyAcceptedAbove and
              pocDefenseOpensAbove and
-             pocDefenseTouchesOrUndercutsPOC and
+             pocDefenseTouchesOrApproachesPOC and
              pocDefenseMakesLowerLow and
              pocDefenseOpensBelowPreviousHigh and
              pocDefenseClosesAbove and
              pocDefenseHasLowerWick and
              pocDefenseLowerWickShareOk and
-             pocDefenseVolumeAboveAverage and
+             pocDefenseVolumeQualified and
              enoughBarsSinceLastPOCDefense
 
         if directPOCDefense
@@ -1341,14 +1866,144 @@ if profileCanBeEvaluated
                 array.push(retainedMarkers, pocDefenseLabel)
 
     // VAH defense mirrors POC defense, but permits a small close beneath VAH.
-    // The first bar after a recognized breakout may qualify without making a
-    // lower low than the breakout candle, whose range often began below VAH.
+    // A test with a smaller lower wick or reduced volume can remain pending for
+    // a short confirmation window. Its floor must remain preserved until a
+    // high-quality buyer response confirms the defense.
     bool vahDefenseBandCleared =
          low > profileVAH + atrValue * vahDefenseApproachATR
     if not vahDefenseArmed and vahDefenseBandCleared
         vahDefenseArmed := true
 
-    if vahDefenseArmed
+    if valInvalidated
+        vahDefenseCandidateActive := false
+
+    bool confirmedTwoBarVAHDefense = false
+    if vahDefenseCandidateActive
+        int candidateConfirmationAge =
+             bar_index - vahDefenseCandidateBarIndex
+        bool candidateInsideConfirmationWindow =
+             candidateConfirmationAge >= 1 and
+             candidateConfirmationAge <=
+                  vahDefenseConfirmationWindowBars
+        bool candidateFloorPreserved =
+             low >= vahDefenseCandidateLow
+        bool candidateVAHRecoveryPreserved =
+             close >=
+             profileVAH -
+             atrValue * vahDefenseCloseToleranceATR
+        bool candidateResponseStartsAboveVAH =
+             open > profileVAH
+        bool candidateResponseClosesAboveTest =
+             close > vahDefenseCandidateHigh
+        bool candidateResponsePriceQuality =
+             close > open and
+             candleBody >=
+                  atrValue * twoBarVAHConfirmationBodyATR and
+             candleCloseLocation >=
+                  twoBarVAHConfirmationCloseLocation
+        bool candidateResponseVolumeQuality =
+             not na(volume) and
+             not na(volumeAverage) and
+             volumeAverage > 0.0 and
+             volume > volumeAverage and
+             volume >=
+                  vahDefenseCandidateVolume *
+                  twoBarVAHConfirmationVolumeMultiple
+        confirmedTwoBarVAHDefense :=
+             candidateInsideConfirmationWindow and
+             not valInvalidated and
+             candidateFloorPreserved and
+             candidateVAHRecoveryPreserved and
+             candidateResponseStartsAboveVAH and
+             candidateResponseClosesAboveTest and
+             candidateResponsePriceQuality and
+             candidateResponseVolumeQuality
+
+        if confirmedTwoBarVAHDefense
+            vahDefenseArmed := false
+            lastVAHDefenseBarIndex := bar_index
+            vahDefendedThisBar := true
+            line.set_color(activeVAHLine, vahColor)
+            line.set_width(activeVAHLine, 3)
+
+            if showVAHDefenseMarkers
+                string twoBarVAHDefenseTooltip =
+                     "VAH DEFENDED\n" +
+                     "Test: " +
+                     str.format_time(
+                          vahDefenseCandidateTime,
+                          "HH:mm",
+                          syminfo.timezone) +
+                     "\nConfirmed: " +
+                     str.format_time(
+                          time,
+                          "HH:mm",
+                          syminfo.timezone) +
+                     "\nVAH: " +
+                     str.tostring(
+                          profileVAH,
+                          format.mintick) +
+                     "\nTest open: " +
+                     str.tostring(
+                          vahDefenseCandidateOpen,
+                          format.mintick) +
+                     "\nTest low: " +
+                     str.tostring(
+                          vahDefenseCandidateLow,
+                          format.mintick) +
+                     "\nTest close: " +
+                     str.tostring(
+                          vahDefenseCandidateClose,
+                          format.mintick) +
+                     "\nTest wick / range: " +
+                     str.tostring(
+                          vahDefenseCandidateLowerWickShare * 100.0,
+                          "#.##") +
+                     "%" +
+                     "\nConfirmation close: " +
+                     str.tostring(
+                          close,
+                          format.mintick) +
+                     "\nConfirmation volume / average: " +
+                     str.tostring(
+                          volume / volumeAverage,
+                          "#.##") +
+                     "×"
+                label twoBarVAHDefenseLabel = label.new(
+                     x = vahDefenseCandidateTime,
+                     y = vahDefenseCandidateLow,
+                     text = "VAH\nDEFENDED",
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_up,
+                     color = vahColor,
+                     textcolor = color.white,
+                     size = size.tiny,
+                     tooltip = twoBarVAHDefenseTooltip)
+                array.push(
+                     retainedMarkers,
+                     twoBarVAHDefenseLabel)
+
+        bool candidateConfirmationExpired =
+             candidateConfirmationAge >=
+             vahDefenseConfirmationWindowBars
+        bool candidateStructureFailed =
+             not candidateFloorPreserved or
+             not candidateVAHRecoveryPreserved
+        if confirmedTwoBarVAHDefense or
+             candidateConfirmationExpired or
+             candidateStructureFailed
+            vahDefenseCandidateActive := false
+            vahDefenseCandidateBarIndex := na
+            vahDefenseCandidateTime := na
+            vahDefenseCandidateOpen := na
+            vahDefenseCandidateHigh := na
+            vahDefenseCandidateLow := na
+            vahDefenseCandidateClose := na
+            vahDefenseCandidateVolume := na
+            vahDefenseCandidateLowerWickShare := na
+
+    if vahDefenseArmed and not vahDefenseCandidateActive
         bool vahWasPreviouslyAcceptedAbove = close[1] > profileVAH
         bool vahDefenseOpensAbove = open > profileVAH
         bool vahDefenseTouchesOrApproachesVAH =
@@ -1366,19 +2021,25 @@ if profileCanBeEvaluated
         float vahDefenseLowerWick =
              (vahDefensePositiveBar ? open : close) - low
         bool vahDefenseHasLowerWick = vahDefenseLowerWick > 0.0
-        bool vahDefenseLowerWickShareOk =
+        bool vahDefenseDirectLowerWickShareOk =
              candleRange > 0.0 and
              vahDefenseLowerWick >=
              candleRange * vahDefenseMinimumLowerWickFraction
-        bool vahDefenseVolumeAboveAverage =
+        bool vahDefenseCandidateLowerWickShareOk =
+             candleRange > 0.0 and
+             vahDefenseLowerWick >=
+             candleRange * vahCandidateMinimumLowerWickFraction
+        bool vahDefenseVolumeReady =
              not na(volume) and
              not na(volumeAverage) and
-             volumeAverage > 0.0 and
+             volumeAverage > 0.0
+        bool vahDefenseVolumeAboveAverage =
+             vahDefenseVolumeReady and
              volume > volumeAverage
         bool enoughBarsSinceLastVAHDefense =
              na(lastVAHDefenseBarIndex) or
              bar_index - lastVAHDefenseBarIndex >= vahDefenseSpacingBars
-        bool directVAHDefense =
+        bool vahDefenseCorePriceQualified =
              not valInvalidated and
              vahWasPreviouslyAcceptedAbove and
              vahDefenseOpensAbove and
@@ -1387,9 +2048,11 @@ if profileCanBeEvaluated
              vahDefenseOpensBelowPreviousHigh and
              vahDefenseClosesNearOrAbove and
              vahDefenseHasLowerWick and
-             vahDefenseLowerWickShareOk and
-             vahDefenseVolumeAboveAverage and
              enoughBarsSinceLastVAHDefense
+        bool directVAHDefense =
+             vahDefenseCorePriceQualified and
+             vahDefenseDirectLowerWickShareOk and
+             vahDefenseVolumeAboveAverage
 
         if directVAHDefense
             vahDefenseArmed := false
@@ -1427,6 +2090,26 @@ if profileCanBeEvaluated
                      size = size.tiny,
                      tooltip = vahDefenseTooltip)
                 array.push(retainedMarkers, vahDefenseLabel)
+
+        else
+            bool delayedVAHDefenseCandidate =
+                 enableTwoBarVAHDefense and
+                 vahDefenseCorePriceQualified and
+                 vahDefenseCandidateLowerWickShareOk and
+                 vahDefenseVolumeReady and
+                 not directVAHDefense
+
+            if delayedVAHDefenseCandidate
+                vahDefenseCandidateActive := true
+                vahDefenseCandidateBarIndex := bar_index
+                vahDefenseCandidateTime := time
+                vahDefenseCandidateOpen := open
+                vahDefenseCandidateHigh := high
+                vahDefenseCandidateLow := low
+                vahDefenseCandidateClose := close
+                vahDefenseCandidateVolume := volume
+                vahDefenseCandidateLowerWickShare :=
+                     vahDefenseLowerWick / candleRange
 
     // A pending breakout is confirmed only after later bars avoid a close back
     // below POC. The visible arrow remains on the original breakout candle.
@@ -1527,6 +2210,47 @@ if profileCanBeEvaluated
          breakoutPriceQuality and
          breakoutVolumeQuality
 
+    // POC-fight VAH reclaim:
+    // Repeated internal failures prove that POC was a genuine resistance
+    // battle. A later candle can confirm continuation without a separate VAL
+    // defense when it holds entirely above POC, begins inside value, and
+    // decisively reclaims VAH with renewed participation.
+    float pocFightBodyToRange =
+         candleRange > 0.0 ? candleBody / candleRange : 0.0
+    bool pocFightStartsInsideValue =
+         open > profilePOC and
+         open <= profileVAH and
+         close[1] <= profileVAH
+    bool pocFightHoldsAbovePOC =
+         low >= profilePOC
+    bool pocFightClosesDecisivelyAboveVAH =
+         close >
+         profileVAH +
+         atrValue * pocFightVAHClearanceATR
+    bool pocFightPriceQuality =
+         close > open and
+         candleBody >= atrValue * breakoutBodyATR and
+         pocFightBodyToRange >= pocFightMinimumBodyRange and
+         candleCloseLocation >= pocFightMinimumCloseLocation
+    bool pocFightVolumeQuality =
+         not na(relativeVolume) and
+         relativeVolume >= pocFightMinimumRelativeVolume and
+         not na(volume[1]) and
+         volume[1] > 0.0 and
+         volume >= volume[1] * pocFightPreviousVolumeMultiple
+    bool pocFightVAHReclaimBreakout =
+         not breakoutPending and
+         not breakoutConfirmed and
+         enablePOCFightVAHReclaim and
+         not valInvalidated and
+         profileInternalFailedPOCAttempts >=
+              minimumFailedPOCAttempts and
+         pocFightStartsInsideValue and
+         pocFightHoldsAbovePOC and
+         pocFightClosesDecisivelyAboveVAH and
+         pocFightPriceQuality and
+         pocFightVolumeQuality
+
     // Exceptional initiative expansion:
     // A decisive, full-bodied candle may prove continuation directly through
     // VAH even when price was already accepted above POC or the chart contains
@@ -1557,8 +2281,14 @@ if profileCanBeEvaluated
          exceptionalPriceQuality and
          breakoutVolumeQuality and
          exceptionalRecentVolumeQuality
+    bool profileRecoveryVAHReclaimBreakout =
+         not breakoutPending and
+         not breakoutConfirmed and
+         profileReactivatedThisBar
     bool strongContinuationBreakout =
+         profileRecoveryVAHReclaimBreakout or
          classicPOCContinuationBreakout or
+         pocFightVAHReclaimBreakout or
          exceptionalVAHExpansionBreakout
 
     if strongContinuationBreakout
@@ -1567,8 +2297,12 @@ if profileCanBeEvaluated
         breakoutLow := low
         breakoutHigh := high
         breakoutATRAtSignal := atrValue
-        breakoutPath := exceptionalVAHExpansionBreakout ?
+        breakoutPath := profileRecoveryVAHReclaimBreakout ?
+             "PROFILE RECOVERY / VAH RECLAIM" :
+             exceptionalVAHExpansionBreakout ?
              "EXCEPTIONAL VAH EXPANSION" :
+             pocFightVAHReclaimBreakout ?
+             "POC FIGHT / VAH RECLAIM" :
              "POC-TO-VAH CONTINUATION"
         entryTriggeredThisBar := true
 
@@ -1584,6 +2318,8 @@ if profileCanBeEvaluated
                  "\nVAH: " + str.tostring(profileVAH, format.mintick) +
                  "\nVWAP: " + str.tostring(sessionVWAP, format.mintick) +
                  "\nFailed POC attempts: " + str.tostring(failedPOCAttempts) +
+                 "\nInternal POC failures: " +
+                 str.tostring(profileInternalFailedPOCAttempts) +
                  "\nRelative volume: " + str.tostring(relativeVolume, "#.##") + "×"
             activeEntryLabel := label.new(
                  x = breakoutTime,
@@ -1615,7 +2351,9 @@ if profileCanBeEvaluated
              "\nVAL: " + str.tostring(profileVAL, format.mintick) +
              "\nPOC: " + str.tostring(profilePOC, format.mintick) +
              "\nVAH: " + str.tostring(profileVAH, format.mintick) +
-             "\nFailed POC attempts: " + str.tostring(failedPOCAttempts)
+             "\nFailed POC attempts: " + str.tostring(failedPOCAttempts) +
+             "\nInternal POC failures: " +
+             str.tostring(profileInternalFailedPOCAttempts)
 
         if showEntryMarkers
             if not na(activeEntryLabel)
@@ -1642,6 +2380,251 @@ if profileCanBeEvaluated
         line.set_width(activePOCLine, 3)
         line.set_width(activeVAHLine, 3)
 
+// Daily EMA resistance warning. This is intentionally independent of the FRVP
+// lifecycle: the daily levels remain useful even before a profile freezes or
+// after its entry completes. Only an approach from below that still closes
+// below the EMA is labeled; a close above it is treated as a breakout.
+var bool dailyEMA20WarningArmed = true
+var bool dailyEMA200WarningArmed = true
+var bool dailyEMA20DefenseArmed = true
+var bool dailyEMA200DefenseArmed = true
+
+if newTradingDate
+    dailyEMA20WarningArmed := true
+    dailyEMA200WarningArmed := true
+    dailyEMA20DefenseArmed := true
+    dailyEMA200DefenseArmed := true
+
+float dailyEMAWarningFraction =
+     dailyEMAWarningDistancePercent / 100.0
+float dailyEMARearmFraction =
+     dailyEMAWarningRearmPercent / 100.0
+
+if not dailyEMA20WarningArmed and not na(dailyEMA20)
+    bool dailyEMA20MovedAway =
+         high < dailyEMA20 * (1.0 - dailyEMARearmFraction)
+    bool dailyEMA20BrokenAbove =
+         close > dailyEMA20
+    if dailyEMA20MovedAway or dailyEMA20BrokenAbove
+        dailyEMA20WarningArmed := true
+
+if not dailyEMA200WarningArmed and not na(dailyEMA200)
+    bool dailyEMA200MovedAway =
+         high < dailyEMA200 * (1.0 - dailyEMARearmFraction)
+    bool dailyEMA200BrokenAbove =
+         close > dailyEMA200
+    if dailyEMA200MovedAway or dailyEMA200BrokenAbove
+        dailyEMA200WarningArmed := true
+
+if not dailyEMA20DefenseArmed and not na(dailyEMA20)
+    bool dailyEMA20LeftSupportBand =
+         low > dailyEMA20 * (1.0 + dailyEMARearmFraction)
+    bool dailyEMA20LostSupport = close < dailyEMA20
+    if dailyEMA20LeftSupportBand or dailyEMA20LostSupport
+        dailyEMA20DefenseArmed := true
+
+if not dailyEMA200DefenseArmed and not na(dailyEMA200)
+    bool dailyEMA200LeftSupportBand =
+         low > dailyEMA200 * (1.0 + dailyEMARearmFraction)
+    bool dailyEMA200LostSupport = close < dailyEMA200
+    if dailyEMA200LeftSupportBand or dailyEMA200LostSupport
+        dailyEMA200DefenseArmed := true
+
+bool dailyEMA20SellWarning =
+     barstate.isconfirmed and
+     showDailyEMASellWarnings and
+     dailyEMA20WarningArmed and
+     not na(dailyEMA20) and
+     close[1] < dailyEMA20[1] and
+     open < dailyEMA20 and
+     high >= dailyEMA20 * (1.0 - dailyEMAWarningFraction) and
+     close < dailyEMA20
+bool dailyEMA200SellWarning =
+     barstate.isconfirmed and
+     showDailyEMASellWarnings and
+     dailyEMA200WarningArmed and
+     not na(dailyEMA200) and
+     close[1] < dailyEMA200[1] and
+     open < dailyEMA200 and
+     high >= dailyEMA200 * (1.0 - dailyEMAWarningFraction) and
+     close < dailyEMA200
+
+if dailyEMA20SellWarning or dailyEMA200SellWarning
+    bool bothDailyEMAsNear =
+         dailyEMA20SellWarning and
+         dailyEMA200SellWarning
+    string dailyEMAWarningText =
+         bothDailyEMAsNear ? "D EMA 20/200\nSELL WATCH" :
+         dailyEMA200SellWarning ? "D EMA 200\nSELL WATCH" :
+         "D EMA 20\nSELL WATCH"
+    color dailyEMAWarningColor =
+         dailyEMA200SellWarning ?
+         dailyEMA200Color : dailyEMA20Color
+    float dailyEMAWarningY =
+         high +
+         (not na(atrValue) ?
+              atrValue * dailyEMALabelDistanceATR :
+              high * 0.005)
+    string dailyEMAWarningTooltip =
+         "OVERHEAD DAILY EMA WARNING\n" +
+         "Time: " +
+         str.format_time(time, "HH:mm", syminfo.timezone) +
+         "\nDaily EMA 20: " +
+         str.tostring(dailyEMA20, format.mintick) +
+         "\nDaily EMA 200: " +
+         str.tostring(dailyEMA200, format.mintick) +
+         "\nBar high: " +
+         str.tostring(high, format.mintick) +
+         "\nClose: " +
+         str.tostring(close, format.mintick) +
+         "\nWarning distance: " +
+         str.tostring(dailyEMAWarningDistancePercent, "#.##") +
+         "%\nVisual warning only; existing FRVP alerts are unchanged."
+    label dailyEMAWarningLabel = label.new(
+         x = time,
+         y = dailyEMAWarningY,
+         text = dailyEMAWarningText,
+         xloc = xloc.bar_time,
+         yloc = yloc.price,
+         style = label.style_label_down,
+         color = dailyEMAWarningColor,
+         textcolor = color.white,
+         size = size.tiny,
+         tooltip = dailyEMAWarningTooltip)
+    array.push(
+         retainedDailyEMAWarningMarkers,
+         dailyEMAWarningLabel)
+
+    if dailyEMA20SellWarning
+        dailyEMA20WarningArmed := false
+    if dailyEMA200SellWarning
+        dailyEMA200WarningArmed := false
+
+float dailyEMASupportLowerWick =
+     math.min(open, close) - low
+bool dailyEMASupportWickQualified =
+     candleRange > 0.0 and
+     dailyEMASupportLowerWick >=
+          candleRange *
+          dailyEMADefenseMinimumLowerWickFraction
+bool dailyEMA20Defended =
+     barstate.isconfirmed and
+     showDailyEMADefenseAndFailure and
+     dailyEMA20DefenseArmed and
+     dailyEMA20NearCurrentPrice and
+     not na(dailyEMA20[1]) and
+     close[1] > dailyEMA20[1] and
+     low <= dailyEMA20 * (1.0 + dailyEMAWarningFraction) and
+     close > dailyEMA20 and
+     dailyEMASupportWickQualified
+bool dailyEMA200Defended =
+     barstate.isconfirmed and
+     showDailyEMADefenseAndFailure and
+     dailyEMA200DefenseArmed and
+     dailyEMA200NearCurrentPrice and
+     not na(dailyEMA200[1]) and
+     close[1] > dailyEMA200[1] and
+     low <= dailyEMA200 * (1.0 + dailyEMAWarningFraction) and
+     close > dailyEMA200 and
+     dailyEMASupportWickQualified
+bool dailyEMA20Failed =
+     barstate.isconfirmed and
+     showDailyEMADefenseAndFailure and
+     dailyEMA20NearCurrentPrice and
+     not na(dailyEMA20[1]) and
+     close[1] >= dailyEMA20[1] and
+     close < dailyEMA20
+bool dailyEMA200Failed =
+     barstate.isconfirmed and
+     showDailyEMADefenseAndFailure and
+     dailyEMA200NearCurrentPrice and
+     not na(dailyEMA200[1]) and
+     close[1] >= dailyEMA200[1] and
+     close < dailyEMA200
+
+if dailyEMA20Defended or dailyEMA200Defended
+    bool bothDailyEMAsDefended =
+         dailyEMA20Defended and
+         dailyEMA200Defended
+    string dailyEMADefendedText =
+         bothDailyEMAsDefended ? "D EMA 20/200\nDEFENDED" :
+         dailyEMA200Defended ? "D EMA 200\nDEFENDED" :
+         "D EMA 20\nDEFENDED"
+    float dailyEMADefendedY =
+         low -
+         (not na(atrValue) ?
+              atrValue * dailyEMALabelDistanceATR :
+              high * 0.005)
+    label dailyEMADefendedLabel = label.new(
+         x = time,
+         y = dailyEMADefendedY,
+         text = dailyEMADefendedText,
+         xloc = xloc.bar_time,
+         yloc = yloc.price,
+         style = label.style_label_up,
+         color = color.rgb(0, 181, 120),
+         textcolor = color.white,
+         size = size.tiny,
+         tooltip =
+              dailyEMADefendedText +
+              "\nTime: " +
+              str.format_time(time, "HH:mm", syminfo.timezone) +
+              "\nDaily EMA 20: " +
+              str.tostring(dailyEMA20, format.mintick) +
+              "\nDaily EMA 200: " +
+              str.tostring(dailyEMA200, format.mintick) +
+              "\nLower wick / range: " +
+              str.tostring(
+                   dailyEMASupportLowerWick /
+                   candleRange * 100.0,
+                   "#.##") +
+              "%")
+    array.push(
+         retainedDailyEMAWarningMarkers,
+         dailyEMADefendedLabel)
+
+    if dailyEMA20Defended
+        dailyEMA20DefenseArmed := false
+    if dailyEMA200Defended
+        dailyEMA200DefenseArmed := false
+
+if dailyEMA20Failed or dailyEMA200Failed
+    bool bothDailyEMAsFailed =
+         dailyEMA20Failed and
+         dailyEMA200Failed
+    string dailyEMAFailedText =
+         bothDailyEMAsFailed ? "D EMA 20/200\nFAILED" :
+         dailyEMA200Failed ? "D EMA 200\nFAILED" :
+         "D EMA 20\nFAILED"
+    float dailyEMAFailedY =
+         high +
+         (not na(atrValue) ?
+              atrValue * dailyEMALabelDistanceATR :
+              high * 0.005)
+    label dailyEMAFailedLabel = label.new(
+         x = time,
+         y = dailyEMAFailedY,
+         text = dailyEMAFailedText,
+         xloc = xloc.bar_time,
+         yloc = yloc.price,
+         style = label.style_label_down,
+         color = color.rgb(211, 47, 47),
+         textcolor = color.white,
+         size = size.tiny,
+         tooltip =
+              dailyEMAFailedText +
+              "\nTime: " +
+              str.format_time(time, "HH:mm", syminfo.timezone) +
+              "\nClose: " +
+              str.tostring(close, format.mintick) +
+              "\nDaily EMA 20: " +
+              str.tostring(dailyEMA20, format.mintick) +
+              "\nDaily EMA 200: " +
+              str.tostring(dailyEMA200, format.mintick))
+    array.push(
+         retainedDailyEMAWarningMarkers,
+         dailyEMAFailedLabel)
+
 // Keep drawings within the declared object limits.
 while array.size(retainedMarkers) > maximumHistoricalMarkers
     label.delete(array.shift(retainedMarkers))
@@ -1651,12 +2634,17 @@ while array.size(retainedMarkers) > maximumHistoricalMarkers
 while array.size(retainedEntryMarkers) > maximumHistoricalEntryMarkers
     label.delete(array.shift(retainedEntryMarkers))
 
+while array.size(retainedDailyEMAWarningMarkers) >
+     maximumDailyEMAWarningMarkers
+    label.delete(
+         array.shift(retainedDailyEMAWarningMarkers))
+
 // Dedicated alert choices. All events use confirmed bars because the frozen
 // profile lifecycle is intentionally evaluated only after candle close.
 alertcondition(
      entryTriggeredThisBar,
      title = "FRVP Entry Bar",
-     message = "FRVP Entry Bar: qualifying POC-to-VAH continuation or exceptional-volume VAH expansion.")
+     message = "FRVP Entry Bar: qualifying profile recovery, POC-to-VAH continuation, POC-fight VAH reclaim, or exceptional-volume VAH expansion.")
 
 bool defendedLevelTriggeredThisBar =
      valDefendedThisBar or
