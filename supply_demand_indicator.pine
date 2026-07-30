@@ -1,5 +1,5 @@
 //@version=6
-indicator("Bullish Supply→Demand Flip Zones [v6.45 • Daily EMA Defended/Failed]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500)
+indicator("Bullish Supply→Demand Flip Zones [v6.47 • Trading-Session Daily Resistance]", overlay = true, max_bars_back = 5000, max_boxes_count = 500, max_labels_count = 500, max_lines_count = 200)
 
 // Invisible output anchor for TradingView editor compatibility.
 plot(na, title = "Output anchor", display = display.none)
@@ -73,6 +73,9 @@ plot(na, title = "Output anchor", display = display.none)
 //  29. Daily EMA support defenses require a meaningful lower wick and recovery
 //      above the EMA. The first confirmed close that loses accepted EMA support
 //      is labeled as EMA FAILED.
+//  30. A separate daily-resistance module retains live-safe pivot highs for 44
+//      trading sessions when the red origin day has an upper wick, above-average
+//      volume, and both price and volume exceed the neighboring daily candles.
 
 // ─────────────────────── Inputs ─────────────────────────
 groupSupply = "1. Hidden supply qualification"
@@ -316,6 +319,18 @@ dailyEma20Color = input.color(color.rgb(255, 167, 38), "Daily EMA 20 color", gro
 dailyEma200Color = input.color(color.rgb(229, 57, 53), "Daily EMA 200 color", group = groupDailyEma, display = display.none)
 maximumDailyEmaWarningMarkers = input.int(30, "Maximum daily-EMA signal markers", minval = 1, maxval = 40, group = groupDailyEma, display = display.none)
 
+groupOlderDailyResistance = "7. Older daily resistance sell points"
+showOlderDailyResistance = input.bool(true, "Show qualifying daily resistance levels", group = groupOlderDailyResistance, display = display.none)
+olderDailyResistanceTradingSessions = input.int(44, "Level lifetime (trading sessions)", minval = 5, maxval = 252, group = groupOlderDailyResistance,
+     tooltip = "The default represents approximately two months of completed exchange trading days. Weekends and market holidays do not age the level.", display = display.none)
+olderDailyResistanceVolumeAverageLength = input.int(20, "Daily volume average length", minval = 2, maxval = 200, group = groupOlderDailyResistance, display = display.none)
+olderDailyResistanceMinimumWickToBody = input.float(0.25, "Minimum upper wick / body", minval = 0.0, maxval = 10.0, step = 0.05, group = groupOlderDailyResistance,
+     tooltip = "0.25 requires the red origin day's upper wick to be at least 25% as large as its candle body.", display = display.none)
+removeDailyResistanceAfterCloseAbove = input.bool(true, "Remove after confirmed daily close above", group = groupOlderDailyResistance,
+     tooltip = "A completed daily close above the old high invalidates it as an overhead sell point.", display = display.none)
+maximumOlderDailyResistanceLevels = input.int(20, "Maximum active daily resistance levels", minval = 1, maxval = 50, group = groupOlderDailyResistance, display = display.none)
+olderDailyResistanceColor = input.color(color.rgb(198, 40, 40), "Resistance line and label color", group = groupOlderDailyResistance, display = display.none)
+
 // ────────────────────── Core calculations ──────────────────────
 float atr = ta.atr(14)
 float volumeAverage = ta.sma(volume, volumeAverageLength)
@@ -326,6 +341,45 @@ float dailyEma20 = request.security(syminfo.tickerid, "D", ta.ema(close, 20),
      gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_off)
 float dailyEma200 = request.security(syminfo.tickerid, "D", ta.ema(close, 200),
      gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_off)
+[olderDailyResistanceConfirmed, olderDailyResistanceHigh,
+     olderDailyResistanceOriginTime, olderDailyResistanceOriginVolume,
+     olderDailyResistanceOriginVolumeAverage,
+     olderDailyResistanceOriginUpperWick,
+     olderDailyResistanceOriginBody] = request.security(
+     syminfo.tickerid,
+     "D",
+     [
+          close[2] < open[2] and
+               high[2] > high[3] and
+               high[2] > high[1] and
+               volume[2] > volume[3] and
+               volume[2] > volume[1] and
+               volume[2] >
+                    ta.sma(
+                         volume,
+                         olderDailyResistanceVolumeAverageLength)[2] and
+               high[2] - open[2] >
+                    0.0 and
+               high[2] - open[2] >=
+                    (open[2] - close[2]) *
+                    olderDailyResistanceMinimumWickToBody,
+          high[2],
+          time[2],
+          volume[2],
+          ta.sma(
+               volume,
+               olderDailyResistanceVolumeAverageLength)[2],
+          high[2] - open[2],
+          open[2] - close[2]
+     ],
+     gaps = barmerge.gaps_off,
+     lookahead = barmerge.lookahead_on)
+float lastCompletedDailyClose = request.security(
+     syminfo.tickerid,
+     "D",
+     close[1],
+     gaps = barmerge.gaps_off,
+     lookahead = barmerge.lookahead_on)
 float confirmedPivotHigh = ta.pivothigh(high, pivotLeft, pivotRight)
 float confirmedPivotLow = ta.pivotlow(low, demandPivotLeft, demandPivotRight)
 float postDemandHigh = ta.highest(high, demandPivotRight)
@@ -2762,6 +2816,176 @@ if displayZoneCount > 0 and barstate.islast and (barstate.ishistory or barstate.
                 box.set_bgcolor(displayStructureBox, hiddenDrawingColor)
                 box.set_border_color(displayStructureBox, hiddenDrawingColor)
                 box.set_text(displayStructureBox, "")
+
+// ───────────── Older daily resistance sell points ─────────────
+// The origin day is evaluated two daily offsets back. This makes both its
+// previous day and following day fully confirmed before the level can appear.
+// No future information is used on the intraday chart.
+var array<line> olderDailyResistanceLines = array.new_line()
+var array<label> olderDailyResistanceLabels = array.new_label()
+var array<int> olderDailyResistanceOriginTimes = array.new_int()
+var array<float> olderDailyResistancePrices = array.new_float()
+var array<int> olderDailyResistanceSessionAges = array.new_int()
+var int lastStoredDailyResistanceOriginTime = na
+
+if newExchangeDate and
+     array.size(olderDailyResistanceSessionAges) > 0
+    for resistanceAgeIndex = 0 to array.size(olderDailyResistanceSessionAges) - 1
+        array.set(
+             olderDailyResistanceSessionAges,
+             resistanceAgeIndex,
+             array.get(
+                  olderDailyResistanceSessionAges,
+                  resistanceAgeIndex) + 1)
+
+bool newOlderDailyResistance =
+     showOlderDailyResistance and
+     olderDailyResistanceConfirmed and
+     not na(olderDailyResistanceOriginTime) and
+     (
+          na(lastStoredDailyResistanceOriginTime) or
+          olderDailyResistanceOriginTime !=
+               lastStoredDailyResistanceOriginTime
+     )
+
+if newOlderDailyResistance
+    line resistanceLine = line.new(
+         x1 = olderDailyResistanceOriginTime,
+         y1 = olderDailyResistanceHigh,
+         x2 = time,
+         y2 = olderDailyResistanceHigh,
+         xloc = xloc.bar_time,
+         extend = extend.none,
+         color = olderDailyResistanceColor,
+         style = line.style_dashed,
+         width = 2)
+    string resistanceLabelText =
+         "2M DAILY RESISTANCE\nSELL " +
+         str.tostring(
+              olderDailyResistanceHigh,
+              format.mintick)
+    string resistanceTooltip =
+         "OLDER DAILY RESISTANCE SELL POINT\n" +
+         "Origin: " +
+         str.format_time(
+              olderDailyResistanceOriginTime,
+              "yyyy-MM-dd",
+              syminfo.timezone) +
+         "\nHigh: " +
+         str.tostring(
+              olderDailyResistanceHigh,
+              format.mintick) +
+         "\nRed-day volume: " +
+         str.tostring(
+              olderDailyResistanceOriginVolume,
+              "#") +
+         "\nVolume average: " +
+         str.tostring(
+              olderDailyResistanceOriginVolumeAverage,
+              "#") +
+         "\nUpper wick: " +
+         str.tostring(
+              olderDailyResistanceOriginUpperWick,
+              format.mintick) +
+         "\nBody: " +
+         str.tostring(
+              olderDailyResistanceOriginBody,
+              format.mintick) +
+         "\nKnown live after the following daily candle closed."
+    label resistanceLabel = label.new(
+         x = time,
+         y = olderDailyResistanceHigh,
+         text = resistanceLabelText,
+         xloc = xloc.bar_time,
+         yloc = yloc.price,
+         style = label.style_label_left,
+         color = olderDailyResistanceColor,
+         textcolor = color.white,
+         size = size.tiny,
+         tooltip = resistanceTooltip)
+    array.push(
+         olderDailyResistanceLines,
+         resistanceLine)
+    array.push(
+         olderDailyResistanceLabels,
+         resistanceLabel)
+    array.push(
+         olderDailyResistanceOriginTimes,
+         olderDailyResistanceOriginTime)
+    array.push(
+         olderDailyResistancePrices,
+         olderDailyResistanceHigh)
+    // The level becomes knowable on the second trading session after its
+    // origin because the following daily candle must first close.
+    array.push(
+         olderDailyResistanceSessionAges,
+         2)
+    lastStoredDailyResistanceOriginTime :=
+         olderDailyResistanceOriginTime
+
+int olderResistanceIndex = 0
+while olderResistanceIndex <
+     array.size(olderDailyResistanceLines)
+    line resistanceLine = array.get(
+         olderDailyResistanceLines,
+         olderResistanceIndex)
+    label resistanceLabel = array.get(
+         olderDailyResistanceLabels,
+         olderResistanceIndex)
+    int resistanceOriginTime = array.get(
+         olderDailyResistanceOriginTimes,
+         olderResistanceIndex)
+    float resistancePrice = array.get(
+         olderDailyResistancePrices,
+         olderResistanceIndex)
+    int resistanceSessionAge = array.get(
+         olderDailyResistanceSessionAges,
+         olderResistanceIndex)
+    bool resistanceExpired =
+         resistanceSessionAge >
+         olderDailyResistanceTradingSessions
+    bool resistanceBroken =
+         removeDailyResistanceAfterCloseAbove and
+         newExchangeDate and
+         not na(lastCompletedDailyClose) and
+         lastCompletedDailyClose >
+              resistancePrice
+
+    if resistanceExpired or resistanceBroken or
+         not showOlderDailyResistance
+        line.delete(resistanceLine)
+        label.delete(resistanceLabel)
+        array.remove(
+             olderDailyResistanceLines,
+             olderResistanceIndex)
+        array.remove(
+             olderDailyResistanceLabels,
+             olderResistanceIndex)
+        array.remove(
+             olderDailyResistanceOriginTimes,
+             olderResistanceIndex)
+        array.remove(
+             olderDailyResistancePrices,
+             olderResistanceIndex)
+        array.remove(
+             olderDailyResistanceSessionAges,
+             olderResistanceIndex)
+    else
+        line.set_x2(resistanceLine, time)
+        line.set_y2(resistanceLine, resistancePrice)
+        label.set_x(resistanceLabel, time)
+        label.set_y(resistanceLabel, resistancePrice)
+        olderResistanceIndex += 1
+
+while array.size(olderDailyResistanceLines) >
+     maximumOlderDailyResistanceLevels
+    line.delete(
+         array.shift(olderDailyResistanceLines))
+    label.delete(
+         array.shift(olderDailyResistanceLabels))
+    array.shift(olderDailyResistanceOriginTimes)
+    array.shift(olderDailyResistancePrices)
+    array.shift(olderDailyResistanceSessionAges)
 
 // ───────────── Daily EMA overhead sale warning ─────────────
 // This module is visual only so the indicator retains its single early
