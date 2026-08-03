@@ -28,6 +28,8 @@ from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import parse_qs, urlparse
 
+from ibkr_flex import FlexSyncError, FlexSyncManager
+
 
 DEFAULT_CSV_NAME = "Trades_with_PL_Last_Month.csv"
 FLOAT_CACHE_NAME = "yahoo_symbol_cache.json"
@@ -1095,9 +1097,12 @@ HTML_PAGE = r'''<!doctype html>
     }
     .button:hover { transform: translateY(-1px); border-color: #3c5c72; background: #172b3a; }
     .button.primary { border-color: rgba(110, 184, 255, .4); background: rgba(110, 184, 255, .13); }
+    .button:disabled { cursor: not-allowed; opacity: .48; transform: none; }
 
     .status { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 24px 0 14px; color: var(--muted); font-size: 12px; }
     .status-dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 14px rgba(51, 214, 159, .7); }
+    .status-dot.warning { background: var(--amber); box-shadow: 0 0 14px rgba(246, 199, 96, .55); }
+    .status-dot.error-dot { background: var(--red); box-shadow: 0 0 14px rgba(255, 107, 122, .55); }
     .note { color: var(--muted); }
 
     .summary-grid { display: grid; grid-template-columns: repeat(5, minmax(145px, 1fr)); gap: 12px; margin-bottom: 18px; }
@@ -1297,6 +1302,7 @@ HTML_PAGE = r'''<!doctype html>
           <button class="view-tab active" id="calendar-tab" type="button">Calendar</button>
           <button class="view-tab" id="analysis-tab" type="button">Analysis</button>
         </nav>
+        <button class="button" id="ibkr-sync-button" type="button">Sync IBKR</button>
         <button class="button primary" id="reload-button" type="button">Reload CSV</button>
       </div>
       <a
@@ -1309,6 +1315,7 @@ HTML_PAGE = r'''<!doctype html>
 
     <div class="status">
       <span id="file-status"><span class="status-dot"></span>Loading trades…</span>
+      <span id="ibkr-status"><span class="status-dot warning"></span>Checking IBKR sync…</span>
       <span class="note" id="data-note"></span>
     </div>
 
@@ -1452,13 +1459,15 @@ HTML_PAGE = r'''<!doctype html>
       symbolMetadata: {},
       visibleSymbols: [],
       metadataLoading: false,
-      selectedRankSymbol: null
+      selectedRankSymbol: null,
+      lastActivitySync: null
     };
     const monthSelect = document.getElementById('month-select');
     const analysisPeriodSelect = document.getElementById('analysis-period-select');
     const weekRows = document.getElementById('week-rows');
     const errorBox = document.getElementById('error-box');
     const dialog = document.getElementById('trade-dialog');
+    const ibkrSyncButton = document.getElementById('ibkr-sync-button');
 
     const escapeHtml = (value) => String(value ?? '')
       .replaceAll('&', '&amp;')
@@ -2422,6 +2431,81 @@ HTML_PAGE = r'''<!doctype html>
       setView(state.selectedView, false);
     }
 
+    function formatSyncTime(value) {
+      if (!value) return null;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+    }
+
+    function renderIbkrStatus(status) {
+      const statusElement = document.getElementById('ibkr-status');
+      const snapshot = Boolean(window.__TRADE_PAYLOAD__);
+      if (snapshot) {
+        ibkrSyncButton.disabled = true;
+        ibkrSyncButton.title = 'IBKR sync is available in the live WTC server.';
+        statusElement.innerHTML = '<span class="status-dot warning"></span>Offline snapshot';
+        return;
+      }
+      if (!status?.configured) {
+        ibkrSyncButton.disabled = true;
+        ibkrSyncButton.title = 'Add the Flex token and query ID to ibkr_flex.env.';
+        statusElement.innerHTML = '<span class="status-dot warning"></span>IBKR sync not configured';
+        return;
+      }
+      ibkrSyncButton.disabled = Boolean(status.running);
+      ibkrSyncButton.title = status.running ? 'IBKR synchronization is running.' : 'Download the latest IBKR Flex reports now.';
+      const finalSync = formatSyncTime(status.last_activity_success);
+      const tradeSync = formatSyncTime(status.last_trade_success);
+      const parts = [];
+      if (finalSync) parts.push(`final P&L ${finalSync}`);
+      if (tradeSync) {
+        const count = status.confirmation_rows == null ? '' : ` · ${status.confirmation_rows} executions`;
+        parts.push(`confirmations ${tradeSync}${count}`);
+      }
+      if (status.running) parts.unshift('syncing now');
+      const dotClass = status.error ? 'status-dot error-dot' : 'status-dot';
+      const copy = status.error
+        ? `IBKR: ${status.error}`
+        : `IBKR ${parts.length ? parts.join(' · ') : 'ready'}`;
+      statusElement.innerHTML = `<span class="${dotClass}"></span>${escapeHtml(copy)}`;
+      state.lastActivitySync = status.last_activity_success || state.lastActivitySync;
+    }
+
+    async function syncIbkr() {
+      ibkrSyncButton.disabled = true;
+      ibkrSyncButton.textContent = 'Syncing…';
+      errorBox.classList.add('hidden');
+      try {
+        const response = await fetch('/api/ibkr/sync', { method: 'POST', cache: 'no-store' });
+        const result = await response.json();
+        renderIbkrStatus(result.status || result);
+        if (!response.ok) throw new Error(result.error || 'IBKR synchronization failed.');
+        await loadData();
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.classList.remove('hidden');
+      } finally {
+        ibkrSyncButton.textContent = 'Sync IBKR';
+        if (state.payload?.ibkr) renderIbkrStatus(state.payload.ibkr);
+      }
+    }
+
+    async function pollIbkrStatus() {
+      if (window.__TRADE_PAYLOAD__) return;
+      try {
+        const response = await fetch(`/api/ibkr/status?refresh=${Date.now()}`, { cache: 'no-store' });
+        const result = await response.json();
+        if (!response.ok) return;
+        const previousActivitySync = state.lastActivitySync;
+        renderIbkrStatus(result);
+        if (previousActivitySync && result.last_activity_success && result.last_activity_success !== previousActivitySync) {
+          await loadData();
+        }
+      } catch (_) {
+        // A temporary status-poll failure should not interrupt the dashboard.
+      }
+    }
+
     async function loadData({ preserveMonth = true } = {}) {
       const reloadButton = document.getElementById('reload-button');
       reloadButton.disabled = true;
@@ -2450,6 +2534,7 @@ HTML_PAGE = r'''<!doctype html>
           `<span class="status-dot"></span>${escapeHtml(result.metadata.file_name)} · refreshed ${escapeHtml(loaded)}`;
         document.getElementById('data-note').textContent =
           `P&L: ${result.metadata.pnl_column} · Time: ${result.metadata.time_column || 'not available'} · ${result.metadata.count_definition}`;
+        renderIbkrStatus(result.ibkr);
         renderAll();
       } catch (error) {
         errorBox.textContent = error.message;
@@ -2486,6 +2571,7 @@ HTML_PAGE = r'''<!doctype html>
       if (index < state.payload.months.length - 1) { state.selectedMonth = state.payload.months[index + 1]; renderAll(); }
     });
     document.getElementById('reload-button').addEventListener('click', () => loadData());
+    ibkrSyncButton.addEventListener('click', syncIbkr);
     document.getElementById('modal-close').addEventListener('click', () => dialog.close());
     dialog.addEventListener('click', event => {
       if (event.target === dialog) dialog.close();
@@ -2495,13 +2581,16 @@ HTML_PAGE = r'''<!doctype html>
     });
 
     loadData({ preserveMonth: false });
+    if (!window.__TRADE_PAYLOAD__) setInterval(pollIbkrStatus, 60000);
   </script>
 </body>
 </html>
 '''
 
 
-def make_handler(csv_path: Path) -> type[BaseHTTPRequestHandler]:
+def make_handler(
+    csv_path: Path, ibkr_sync: FlexSyncManager
+) -> type[BaseHTTPRequestHandler]:
     metadata_store = YahooMetadataStore(csv_path.parent / FLOAT_CACHE_NAME)
 
     class TradeCalendarHandler(BaseHTTPRequestHandler):
@@ -2531,6 +2620,7 @@ def make_handler(csv_path: Path) -> type[BaseHTTPRequestHandler]:
             if path == "/api/data":
                 try:
                     payload = load_trade_payload(csv_path)
+                    payload["ibkr"] = ibkr_sync.status()
                     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
                     self.send_bytes(body, "application/json; charset=utf-8")
                 except (OSError, TradeDataError) as exc:
@@ -2540,6 +2630,12 @@ def make_handler(csv_path: Path) -> type[BaseHTTPRequestHandler]:
                         "application/json; charset=utf-8",
                         HTTPStatus.UNPROCESSABLE_ENTITY,
                     )
+                return
+            if path == "/api/ibkr/status":
+                body = json.dumps(
+                    ibkr_sync.status(), separators=(",", ":")
+                ).encode("utf-8")
+                self.send_bytes(body, "application/json; charset=utf-8")
                 return
             if path in ("/api/symbol-metadata", "/api/floats"):
                 query = parse_qs(parsed_url.query)
@@ -2572,6 +2668,28 @@ def make_handler(csv_path: Path) -> type[BaseHTTPRequestHandler]:
                 self.send_bytes(b"", "image/x-icon", HTTPStatus.NO_CONTENT)
                 return
             self.send_bytes(b"Not found", "text/plain", HTTPStatus.NOT_FOUND)
+
+        def do_POST(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
+            path = urlparse(self.path).path
+            if path != "/api/ibkr/sync":
+                self.send_bytes(b"Not found", "text/plain", HTTPStatus.NOT_FOUND)
+                return
+            try:
+                status = ibkr_sync.sync()
+                body = json.dumps({"status": status}, separators=(",", ":")).encode(
+                    "utf-8"
+                )
+                self.send_bytes(body, "application/json; charset=utf-8")
+            except FlexSyncError as exc:
+                body = json.dumps(
+                    {"error": str(exc), "status": ibkr_sync.status()},
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                self.send_bytes(
+                    body,
+                    "application/json; charset=utf-8",
+                    HTTPStatus.BAD_GATEWAY,
+                )
 
     return TradeCalendarHandler
 
@@ -2674,7 +2792,8 @@ def main() -> int:
             webbrowser.open(snapshot_path.resolve().as_uri())
         return 0
 
-    handler = make_handler(csv_path)
+    ibkr_sync = FlexSyncManager(csv_path, load_trade_payload)
+    handler = make_handler(csv_path, ibkr_sync)
     try:
         server = ThreadingHTTPServer((args.host, args.port), handler)
     except OSError as exc:
@@ -2683,16 +2802,27 @@ def main() -> int:
     url = f"http://{args.host}:{actual_port}/"
     print(f"WTC - World Trade Center is running at {url}")
     print(f"Reading: {csv_path}")
+    if ibkr_sync.config.configured:
+        configured_reports = []
+        if ibkr_sync.config.activity_configured:
+            configured_reports.append("final Activity report")
+        if ibkr_sync.config.trade_configured:
+            configured_reports.append("intraday Trade Confirmations")
+        print(f"IBKR automatic sync: {', '.join(configured_reports)}")
+    else:
+        print("IBKR automatic sync: not configured (see README.md)")
     print("Press Ctrl+C to stop.")
 
     if not args.no_browser:
         threading.Timer(0.45, lambda: webbrowser.open(url)).start()
 
+    ibkr_sync.start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nWTC - World Trade Center stopped.")
     finally:
+        ibkr_sync.stop()
         server.server_close()
     return 0
 

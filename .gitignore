@@ -12,3 +12,5 @@ stocks_by*.csv
 logs/*
 positive_30pct_trend_start_candidates.csv
 positive_30pct_trend_start_days_all_bars.csv
+*.dat
+*.env

@@ -1236,6 +1236,25 @@
       "short_percent_float": 0.135,
       "short_ratio": 9.07
     },
+    "HYFM": {
+      "average_volume": 46533,
+      "average_volume_10d": 51240,
+      "beta": 2.345,
+      "country": "United States",
+      "current_price": 0.54,
+      "error": null,
+      "exchange": "NCM",
+      "fetched_at": "2026-08-03T12:32:10+00:00",
+      "float_shares": 3491174,
+      "held_percent_insiders": 0.26322,
+      "held_percent_institutions": 0.13219,
+      "industry": "Farm & Heavy Construction Machinery",
+      "market_cap": 2572890,
+      "sector": "Industrials",
+      "shares_outstanding": 4764612,
+      "short_percent_float": 0.0165,
+      "short_ratio": 1.64
+    },
     "IBIO": {
       "average_volume": 925008,
       "average_volume_10d": 684010,
@@ -3023,6 +3042,6 @@
       "short_ratio": 0.9
     }
   },
-  "updated_at": "2026-08-02T20:40:43+00:00",
+  "updated_at": "2026-08-03T12:32:10+00:00",
   "version": 3
 }
