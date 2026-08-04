@@ -214,13 +214,13 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
 def run_retroactive_check():
     get_only_statistics = True
     symbols_data = []
-    symbols = [
-        common.objects.SymbolTest(
-            name="CAST",
-            datetime_str="06.15.26T08:20:00",
-            is_positive=True,
-        ),
-    ]
+    # symbols = [
+    #     common.objects.SymbolTest(
+    #         name="CAST",
+    #         datetime_str="06.15.26T08:20:00",
+    #         is_positive=True,
+    #     ),
+    # ]
     symbols = explore_past_potential_symbols()
     for symbol in symbols:
         print(f"{symbol.name}: {symbol.date_time}")

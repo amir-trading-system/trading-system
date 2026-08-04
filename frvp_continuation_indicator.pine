@@ -1,7 +1,7 @@
 //@version=6
 indicator(
-     "FRVP Value-Area Continuation Detector v1.35",
-     shorttitle = "FRVP Continuation v1.35",
+     "FRVP Value-Area Continuation Detector v1.46",
+     shorttitle = "FRVP Continuation v1.46",
      overlay = true,
      max_bars_back = 5000,
      max_lines_count = 500,
@@ -20,7 +20,7 @@ indicator(
 //   2. Freeze an approximate fixed-range volume profile for that movement.
 //   3. Preserve session VWAP as informational context without using it to
 //      reject an otherwise valid first-move profile.
-//   4. Mark defended VAL/POC support and repeated failed attempts below the POC.
+//   4. Track defended VAL/POC support and repeated failed attempts below the POC.
 //   5. Confirm continuation when a strong, high-volume candle crosses from
 //      below the POC to above the VAH and then holds above the POC.
 //   6. Keep a frozen premarket profile active after the regular market opens;
@@ -67,6 +67,52 @@ indicator(
 //      above or below it, preventing distant levels from compressing the chart.
 //  24. Mark daily EMA 20/200 support defenses when a pullback forms a meaningful
 //      lower wick and recovers the EMA, and mark the first close that loses it.
+//  25. Continue scanning after the first profile freezes. Up to the configured
+//      number of distinct higher-trend profiles may be created in each market
+//      session while every earlier profile keeps monitoring its own levels.
+//  26. Preserve an overlapping later movement when its trigger is exceptional
+//      and the completed movement expands materially above the earlier range.
+//      Ordinary overlapping candidates still use the original duplicate gate.
+//  27. Keep the chart label-free except for confirmed FRVP entries. The entry
+//      label is created only after the hold confirmation and is offset beneath
+//      its original entry candle so it does not cover price bars.
+//  28. Stitch an EMA-9-supported pause to the same later-trend movement when a
+//      strong higher-high restart arrives shortly afterward. Confirmation bars
+//      after the final expansion high are excluded from the frozen profile.
+//  29. Recognize a deep value-area sweep that briefly reaches below POC, holds
+//      near VAL, and then reclaims VAH with exceptional price and volume. This
+//      path must preserve VAH on every later hold-confirmation bar.
+//  30. Select one dominant reference profile by requiring VAL to sit at least
+//      25% above the movement low and ranking qualified profiles by cumulative
+//      volume multiplied by movement range. A later profile replaces the
+//      reference only when its score is at least as large by default.
+//  31. Carry a dominant after-hours profile across one trading-date transition,
+//      allowing Friday postmarket value to remain active on Monday premarket.
+//  32. Confirm dominant-profile VAL defense from level behavior only: price
+//      reaches or narrowly front-runs VAL and closes back above it within the
+//      configured window. Candle color, wick shape, lower-low behavior, and
+//      defense-candle volume are deliberately not required.
+//  33. Rearm another VAL-defense entry only after price reaches the dominant
+//      profile's POC, proving the prior defense produced a meaningful departure.
+//  34. Allow an exceptional high-volume bullish launch to start the first
+//      movement with a slightly lower close-location requirement. Ordinary
+//      movement starts retain their established price and volume thresholds.
+//  35. Apply EMA-9-supported pause stitching to the session's primary movement
+//      as well as later movements, preventing one continuing trend from being
+//      split into nearby fixed-range profiles.
+//  36. Seed pre-trigger context only from contiguous chart bars, so a sparse
+//      premarket print many minutes earlier cannot move the FRVP's true start.
+//  37. Keep VAL defense distinct from POC interaction: every bar in a VAL
+//      test and confirmation sequence must remain strictly below POC. Reaching
+//      or crossing POC cancels that VAL-defense attempt without changing POC's
+//      independent defense and continuation logic.
+//  38. Preserve meaningful FRVPs as a stack instead of replacing a lower value
+//      area with the next higher one. A higher stacked profile must first reach
+//      its own VAH after freezing before its VAL can qualify as defended; the
+//      lower profile remains available if price searches for deeper support.
+//  39. Permanently retire a higher stacked profile from VAL-defense entries
+//      after two consecutive closes below its VAL. That sequence proves the
+//      higher value failed; the lower meaningful profile remains available.
 //
 // The profile is approximate. Each candle's volume is spread uniformly over
 // the price rows crossed by that candle. TradingView does not expose the values
@@ -81,10 +127,14 @@ const string GROUP_VAH      = "5. VAH defense"
 const string GROUP_BREAKOUT = "6. Continuation breakout"
 const string GROUP_DISPLAY  = "7. Display"
 const string GROUP_DAILY_EMA = "8. Daily EMA levels and signals"
+const string GROUP_MULTI    = "1b. Additional session trends"
 
 const int STATE_SEARCHING = 0
 const int STATE_BUILDING  = 1
 const int STATE_PROFILE   = 2
+const int STATE_STITCHING = 3
+const string BREAKOUT_PATH_VALUE_AREA_SWEEP =
+     "VALUE-AREA SWEEP / VAH RECLAIM"
 
 //------------------------------------------------------------------------------
 // Inputs
@@ -96,7 +146,7 @@ string detectionMode = input.string(
      options = ["Auto", "Manual window"],
      group = GROUP_MOVE,
      display = display.none,
-     tooltip = "Auto finds the first qualifying bullish movement. Manual window profiles the exact exchange-time window below.")
+     tooltip = "Auto finds the first qualifying bullish movement and, when enabled, rearms for later distinct trends. Manual window profiles only the exact exchange-time window below.")
 
 bool includePremarket = input.bool(
      true,
@@ -125,6 +175,165 @@ bool carryActiveProfileAcrossSessions = input.bool(
      group = GROUP_MOVE,
      display = display.none,
      tooltip = "Always carries a frozen premarket profile through 09:30 so its levels remain actionable during regular hours. At later session changes, an unfinished profile is carried while a completed one may reset.")
+
+bool enableAdditionalSessionTrends = input.bool(
+     true,
+     "Recognize additional trends in the same session",
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "Rearms the automatic movement scanner after a profile freezes. Earlier profiles remain independently active while later qualifying trends build their own VAL, POC, and VAH.")
+
+int maximumProfilesPerSession = input.int(
+     3,
+     "Maximum profiles per market session",
+     minval = 1,
+     maxval = 6,
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "Includes the session's first profile. Premarket, regular hours, and after-hours each receive a separate allowance.")
+
+int additionalTrendMinimumSpacingBars = input.int(
+     10,
+     "Minimum bars between profile starts",
+     minval = 3,
+     maxval = 120,
+     group = GROUP_MULTI,
+     display = display.none)
+
+int additionalTrendResetLookbackBars = input.int(
+     4,
+     "Pullback/contraction lookback bars",
+     minval = 2,
+     maxval = 30,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float additionalTrendMinimumPullbackATR = input.float(
+     0.75,
+     "Minimum pullback from prior trend high (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float additionalTrendContractionRatio = input.float(
+     0.85,
+     "Reset volume / average",
+     minval = 0.10,
+     maxval = 1.50,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "A new phase may begin after either a sufficient pullback or a completed lookback whose average volume contracted to this fraction of normal volume.")
+
+bool enableEMA9MovementStitching = input.bool(
+     true,
+     "Stitch EMA-9-supported continuation pauses",
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "When the first or a later movement appears to stall while its pullback holds near EMA 9, keep it provisional for a few bars. A strong close through the movement high extends the existing profile instead of freezing or creating a second nearby profile.")
+
+int ema9StitchRestartWindowBars = input.int(
+     3,
+     "EMA-9 stitch restart window (bars)",
+     minval = 1,
+     maxval = 10,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float ema9StitchCloseToleranceATR = input.float(
+     0.15,
+     "EMA-9 stitch close tolerance (ATR)",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "During the pause, recent closes may undercut EMA 9 only by this ATR distance.")
+
+float ema9StitchTouchDistanceATR = input.float(
+     0.25,
+     "EMA-9 stitch support-touch distance (ATR)",
+     minval = 0.00,
+     maxval = 2.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "At least one recent low must reach this close to EMA 9 before the pause can be stitched.")
+
+bool additionalTrendRequireHigherHigh = input.bool(
+     true,
+     "Require the completed trend to make a higher high",
+     group = GROUP_MULTI,
+     display = display.none)
+
+float additionalTrendHigherHighBufferATR = input.float(
+     0.00,
+     "Higher-high buffer (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float additionalTrendMaximumRangeOverlap = input.float(
+     0.65,
+     "Maximum overlap with an existing movement",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "Overlap is measured against the smaller movement range. A candidate that duplicates more than this fraction of an existing same-day movement is rejected.")
+
+bool allowInitiativeBreakoutOverlap = input.bool(
+     true,
+     "Allow exceptional higher-high overlap",
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "Allows an otherwise overlapping candidate only when its original trigger candle is exceptionally strong and the completed movement expands materially above every overlapping earlier range.")
+
+float initiativeOverlapMinimumRelativeVolume = input.float(
+     3.00,
+     "Overlap exception: trigger relative volume",
+     minval = 1.00,
+     step = 0.25,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float initiativeOverlapMinimumBodyATR = input.float(
+     1.50,
+     "Overlap exception: trigger body (ATR)",
+     minval = 0.10,
+     step = 0.10,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float initiativeOverlapMinimumCloseLocation = input.float(
+     0.85,
+     "Overlap exception: trigger close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float initiativeOverlapMinimumExtensionATR = input.float(
+     0.50,
+     "Overlap exception: higher-high extension (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none)
+
+float initiativeOverlapMinimumExtensionShare = input.float(
+     0.20,
+     "Overlap exception: range above earlier high",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_MULTI,
+     display = display.none,
+     tooltip = "Requires this fraction of the candidate's complete price range to extend above the overlapping earlier movement high.")
 
 string premarketSession = input.session(
      "0400-0930",
@@ -208,6 +417,39 @@ float startCloseLocation = input.float(
      display = display.none,
      tooltip = "0.70 means the close must be in the upper 30% of the candle range.")
 
+bool enableExceptionalLaunchStart = input.bool(
+     true,
+     "Allow exceptional high-volume launch",
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "Allows an unusually strong bullish launch to begin a movement even when its upper wick places the close slightly below the ordinary close-location threshold. The separate exceptional volume, body, and close-location requirements must all pass.")
+
+float exceptionalLaunchRelativeVolume = input.float(
+     5.00,
+     "Exceptional launch relative volume",
+     minval = 1.00,
+     step = 0.25,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float exceptionalLaunchBodyATR = input.float(
+     1.50,
+     "Exceptional launch bullish body (ATR)",
+     minval = 0.50,
+     step = 0.10,
+     group = GROUP_MOVE,
+     display = display.none)
+
+float exceptionalLaunchCloseLocation = input.float(
+     0.60,
+     "Exceptional launch minimum close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_MOVE,
+     display = display.none,
+     tooltip = "0.60 means the exceptional launch must still close within the upper 40% of its full candle range.")
+
 int autoPreTriggerBars = input.int(
      1,
      "Auto: include bars before trigger",
@@ -235,12 +477,12 @@ float minimumMoveRangeATR = input.float(
 
 float minimumMoveCumulativeVolume = input.float(
      100000.0,
-     "Minimum first-move cumulative volume",
+     "Minimum movement cumulative volume",
      minval = 0.0,
      step = 5000.0,
      group = GROUP_MOVE,
      display = display.none,
-     tooltip = "The complete detected movement must contain at least this much total volume before its profile can be frozen and drawn. Set to 0 to disable.")
+     tooltip = "Every complete detected movement—first or later—must contain at least this much total volume before its profile can be frozen and drawn. Set to 0 to disable.")
 
 int contractionBars = input.int(
      3,
@@ -304,6 +546,166 @@ float valMinimumLowerWickToBody = input.float(
      display = display.none,
      tooltip = "0.25 means the lower wick must be at least 25% as large as the candle body.")
 
+bool enableVALEntryConfirmation = input.bool(
+     true,
+     "Enable VAL-defense entry confirmation",
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "With dominant-profile mode enabled, confirms when price tests or narrowly front-runs the selected VAL and closes back above it while the full test remains below POC. Candle shape and defense-candle volume are not required.")
+
+bool enableDominantProfileVALReference = input.bool(
+     true,
+     "Use dominant FRVP for VAL entries",
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "Selects one meaningful reference FRVP and suppresses the older candle-shape VAL-entry path. The normal POC/VAH continuation logic remains unchanged.")
+
+bool enableStackedMeaningfulVALProfiles = input.bool(
+     true,
+     "Preserve stacked meaningful FRVPs for VAL entries",
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "Keeps lower meaningful value areas active when a newer FRVP forms above them. A higher stacked FRVP must first depart to its own VAH after freezing before its VAL can produce a defense entry. The established POC/VAH continuation engine is unchanged.")
+
+float dominantMinimumVALElevationPercent = input.float(
+     25.0,
+     "Dominant FRVP minimum VAL elevation (%)",
+     minval = 0.0,
+     maxval = 90.0,
+     step = 1.0,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "VAL must be this far through the movement from its low toward its high. This proves meaningful price advancement already occurred beneath VAL.")
+
+float meaningfulVALMinimumAdvanceATR = input.float(
+     1.00,
+     "Meaningful VAL minimum advance from FRVP low (ATR)",
+     minval = 0.00,
+     maxval = 10.00,
+     step = 0.10,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "Alternative qualification for a profile whose VAL does not reach the percentage-of-range threshold. The move from the FRVP low to VAL must satisfy both this ATR distance and the percentage distance below.")
+
+float meaningfulVALMinimumAdvancePricePercent = input.float(
+     5.00,
+     "Meaningful VAL minimum advance from FRVP low (%)",
+     minval = 0.00,
+     maxval = 100.00,
+     step = 0.50,
+     group = GROUP_VAL,
+     display = display.none)
+
+int maximumStackedMeaningfulVALProfiles = input.int(
+     30,
+     "Maximum active meaningful VAL profiles",
+     minval = 3,
+     maxval = 40,
+     group = GROUP_VAL,
+     display = display.none)
+
+float stackedVALProfileRowTolerance = input.float(
+     0.50,
+     "Stacked VAL profile-row tolerance",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "For an after-hours profile carried into the next trading date, permits this fraction of one approximate profile row when it is wider than the normal ATR allowance. Current-day profiles retain the established ATR front-run rule.")
+
+float dominantReplacementScoreRatio = input.float(
+     1.00,
+     "Dominant FRVP replacement score ratio",
+     minval = 0.25,
+     maxval = 3.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "A later elevated-VAL profile replaces the current reference only when (volume × range) is at least this multiple of the current reference score.")
+
+int dominantAfterHoursCarryTradingDates = input.int(
+     1,
+     "Carry dominant after-hours FRVP (trading dates)",
+     minval = 0,
+     maxval = 3,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "One transition carries Friday after-hours value into Monday. Premarket and regular-session profiles reset at a new trading date.")
+
+float dominantVALFrontRunATR = input.float(
+     0.20,
+     "Dominant VAL maximum front-run (ATR)",
+     minval = 0.00,
+     maxval = 2.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "Allows demand to stop slightly above the selected VAL. Undercuts are allowed unless sustained closes invalidate the original movement low.")
+
+float valEntryMaximumUndercutATR = input.float(
+     0.50,
+     "VAL entry maximum undercut (ATR)",
+     minval = 0.00,
+     maxval = 3.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
+float valEntryMaximumFrontRunATR = input.float(
+     0.15,
+     "VAL entry maximum front-run above VAL (ATR)",
+     minval = 0.00,
+     maxval = 2.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "Allows buyers to defend just above VAL without requiring an exact touch.")
+
+float valEntryMinimumLowerWickRange = input.float(
+     0.25,
+     "VAL entry minimum lower wick / range",
+     minval = 0.00,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
+float valEntryMinimumLowerWickBody = input.float(
+     0.50,
+     "VAL entry minimum lower wick / body",
+     minval = 0.00,
+     maxval = 10.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
+float valEntryMinimumRelativeVolume = input.float(
+     1.00,
+     "VAL entry minimum relative volume",
+     minval = 0.00,
+     maxval = 20.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
+int valEntryConfirmationBars = input.int(
+     3,
+     "VAL entry confirmation window (bars)",
+     minval = 1,
+     maxval = 10,
+     group = GROUP_VAL,
+     display = display.none)
+
+float valEntryLabelDistanceATR = input.float(
+     0.35,
+     "VAL entry label distance below bar (ATR)",
+     minval = 0.00,
+     maxval = 5.00,
+     step = 0.05,
+     group = GROUP_VAL,
+     display = display.none)
+
 int valInvalidationCloses = input.int(
      2,
      "Consecutive closes below FRVP low that invalidate",
@@ -311,6 +713,15 @@ int valInvalidationCloses = input.int(
      maxval = 5,
      group = GROUP_VAL,
      display = display.none)
+
+int stackedVALInvalidationCloses = input.int(
+     2,
+     "Consecutive closes below a higher stacked VAL that retire it",
+     minval = 1,
+     maxval = 5,
+     group = GROUP_VAL,
+     display = display.none,
+     tooltip = "Applies only when a meaningful lower FRVP remains active. Acceptance below the higher VAL retires that higher profile from future VAL-defense entries while preserving the lower profile.")
 
 bool enableProfileReactivation = input.bool(
      true,
@@ -652,6 +1063,90 @@ float exceptionalRecentVolumeMultiplier = input.float(
      display = display.none,
      tooltip = "Compares the breakout candle with the average volume of the completed bars immediately before it. The current candle is excluded.")
 
+bool enableValueAreaSweepReclaim = input.bool(
+     true,
+     "Allow value-area sweep and VAH reclaim",
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "Recognizes a high-volume bullish candle that starts inside value, sweeps below POC without materially losing VAL, and then closes decisively above VAH.")
+
+float valueAreaSweepMaximumVALUndercutATR = input.float(
+     0.15,
+     "Value sweep: maximum low below VAL (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float valueAreaSweepVAHClearanceATR = input.float(
+     0.50,
+     "Value sweep: minimum close above VAH (ATR)",
+     minval = 0.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float valueAreaSweepMinimumBodyATR = input.float(
+     1.00,
+     "Value sweep: minimum bullish body (ATR)",
+     minval = 0.10,
+     step = 0.10,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float valueAreaSweepMinimumBodyRange = input.float(
+     0.40,
+     "Value sweep: minimum body / range",
+     minval = 0.20,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float valueAreaSweepMinimumCloseLocation = input.float(
+     0.85,
+     "Value sweep: minimum close location",
+     minval = 0.50,
+     maxval = 1.00,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float valueAreaSweepMinimumLowerWickRange = input.float(
+     0.25,
+     "Value sweep: minimum lower wick / range",
+     minval = 0.05,
+     maxval = 0.80,
+     step = 0.05,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float valueAreaSweepMinimumRelativeVolume = input.float(
+     2.00,
+     "Value sweep: minimum relative volume",
+     minval = 1.00,
+     step = 0.25,
+     group = GROUP_BREAKOUT,
+     display = display.none)
+
+float valueAreaSweepRecentVolumeMultiplier = input.float(
+     3.00,
+     "Value sweep: volume / previous-bar average",
+     minval = 1.00,
+     step = 0.25,
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "Uses the same completed-bar lookback as the exceptional-volume path.")
+
+int valueAreaSweepMinimumFailedPOCAttempts = input.int(
+     2,
+     "Value sweep: minimum failed POC attempts",
+     minval = 0,
+     maxval = 10,
+     group = GROUP_BREAKOUT,
+     display = display.none,
+     tooltip = "The setup may also qualify when VAL was already defended, even if fewer attempts were counted.")
+
 int breakoutHoldBars = input.int(
      2,
      "Bars required to hold after breakout",
@@ -659,7 +1154,7 @@ int breakoutHoldBars = input.int(
      maxval = 10,
      group = GROUP_BREAKOUT,
      display = display.none,
-     tooltip = "The arrow is placed on the breakout candle after this many later bars avoid a close back below POC.")
+     tooltip = "The label is placed on the entry candle after this many later bars hold. Normal paths must avoid losing POC; a value-area sweep must keep every confirmation close above VAH.")
 
 float breakoutFailureBelowPOCATR = input.float(
      0.05,
@@ -675,47 +1170,19 @@ bool showMovementBox = input.bool(
      group = GROUP_DISPLAY,
      display = display.none)
 
-bool showFrozenProfileLabel = input.bool(
-     true,
-     "Show frozen-profile summary",
-     group = GROUP_DISPLAY,
-     display = display.none)
-
-bool showVALDefenseMarkers = input.bool(
-     true,
-     "Mark VAL defense",
-     group = GROUP_DISPLAY,
-     display = display.none)
-
-bool showPOCDefenseMarkers = input.bool(
-     true,
-     "Mark POC defense",
-     group = GROUP_DISPLAY,
-     display = display.none)
-
-bool showVAHDefenseMarkers = input.bool(
-     true,
-     "Mark VAH defense",
-     group = GROUP_DISPLAY,
-     display = display.none)
-
-bool showPOCAttemptMarkers = input.bool(
-     true,
-     "Mark failed POC attempts",
-     group = GROUP_DISPLAY,
-     display = display.none)
+const bool showFrozenProfileLabel = false
+const bool showVALDefenseMarkers = false
+const bool showPOCDefenseMarkers = false
+const bool showVAHDefenseMarkers = false
+const bool showPOCAttemptMarkers = false
 
 bool showEntryMarkers = input.bool(
      true,
-     "Mark entry bars",
+     "Show confirmed FRVP entry labels",
      group = GROUP_DISPLAY,
      display = display.none)
 
-bool showVALInvalidation = input.bool(
-     true,
-     "Mark VAL invalidation",
-     group = GROUP_DISPLAY,
-     display = display.none)
+const bool showVALInvalidation = false
 
 int maximumHistoricalProfiles = input.int(
      100,
@@ -759,12 +1226,6 @@ color vahColor = input.color(
      group = GROUP_DISPLAY,
      display = display.none)
 
-color entryCandidateColor = input.color(
-     color.rgb(245, 166, 35),
-     "Pending entry marker color",
-     group = GROUP_DISPLAY,
-     display = display.none)
-
 color continuationColor = input.color(
      color.rgb(0, 181, 120),
      "Confirmed entry marker color",
@@ -787,19 +1248,8 @@ float dailyEMAMaximumDisplayDistancePercent = input.float(
      display = display.none,
      tooltip = "Each daily EMA is hidden whenever the current bar's close is this percentage or more above or below that EMA.")
 
-bool showDailyEMASellWarnings = input.bool(
-     true,
-     "Show overhead daily-EMA sale warnings",
-     group = GROUP_DAILY_EMA,
-     display = display.none,
-     tooltip = "Marks the first completed candle in each approach from below. A candle that closes above the EMA is treated as a breakout rather than a sale warning.")
-
-bool showDailyEMADefenseAndFailure = input.bool(
-     true,
-     "Show daily EMA defended and failed labels",
-     group = GROUP_DAILY_EMA,
-     display = display.none,
-     tooltip = "DEFENDED requires prior acceptance above the EMA, a pullback into its proximity band, a meaningful lower wick, and a close back above. FAILED marks the first close below an EMA that was accepted above on the previous bar.")
+const bool showDailyEMASellWarnings = false
+const bool showDailyEMADefenseAndFailure = false
 
 float dailyEMADefenseMinimumLowerWickFraction = input.float(
      0.25,
@@ -857,6 +1307,238 @@ int maximumDailyEMAWarningMarkers = input.int(
      maxval = 40,
      group = GROUP_DAILY_EMA,
      display = display.none)
+
+//------------------------------------------------------------------------------
+// Additional frozen profiles
+//------------------------------------------------------------------------------
+
+// The original profile continues to use the long-established scalar lifecycle
+// below. Later same-session profiles use this object so their support, failure,
+// recovery, and entry states can be evaluated independently on every bar.
+type AdditionalProfile
+    int number = 0
+    int dateKey = 0
+    int sessionId = 0
+    int movementStartTime = na
+    int movementEndTime = na
+    int readyBarIndex = na
+    int lastVisibleTime = na
+    float movementLow = na
+    float movementHigh = na
+    float val = na
+    float poc = na
+    float vah = na
+    float freezeVWAP = na
+    bool valDefended = false
+    bool valEntryCandidateActive = false
+    int valEntryCandidateBarIndex = na
+    int valEntryCandidateTime = na
+    float valEntryCandidateHigh = na
+    float valEntryCandidateLow = na
+    bool invalidated = false
+    bool invalidationMarked = false
+    int closesBelowMovementLow = 0
+    int recoveryStage = 0
+    bool pocDefenseArmed = true
+    int lastPOCDefenseBarIndex = na
+    bool vahDefenseArmed = true
+    int lastVAHDefenseBarIndex = na
+    int failedPOCAttempts = 0
+    int internalFailedPOCAttempts = 0
+    int lastPOCAttemptBarIndex = na
+    bool vahCandidateActive = false
+    int vahCandidateBarIndex = na
+    int vahCandidateTime = na
+    float vahCandidateOpen = na
+    float vahCandidateHigh = na
+    float vahCandidateLow = na
+    float vahCandidateClose = na
+    float vahCandidateVolume = na
+    float vahCandidateLowerWickShare = na
+    bool breakoutPending = false
+    bool breakoutConfirmed = false
+    int breakoutBarIndex = na
+    int breakoutTime = na
+    float breakoutLow = na
+    float breakoutHigh = na
+    float breakoutATR = na
+    string breakoutPath = ""
+    line valLine = na
+    line pocLine = na
+    line vahLine = na
+    box movementBox = na
+    label entryLabel = na
+
+// Meaningful value areas have a separate lightweight lifecycle. The first
+// meaningful profile is a foundation. Every later profile whose VAL is higher
+// than an active lower VAL is stacked above that foundation and must prove a
+// post-freeze departure to VAH before its own VAL becomes actionable.
+type MeaningfulVALProfile
+    int dateKey = 0
+    int sessionId = 0
+    int movementStartTime = na
+    int movementEndTime = na
+    int readyBarIndex = na
+    int ageTradingDates = 0
+    float movementLow = na
+    float movementHigh = na
+    float val = na
+    float poc = na
+    float vah = na
+    float cumulativeVolume = na
+    float score = na
+    bool invalidated = false
+    int closesBelowMovementLow = 0
+    int closesBelowVAL = 0
+    bool stackedAboveLower = false
+    int lowerProfileStartTime = na
+    float lowerProfileVAL = na
+    bool departureProven = false
+    bool defenseArmed = false
+    bool testActive = false
+    int testBarIndex = na
+    int testTime = na
+    float testLow = na
+    line valLine = na
+    line pocLine = na
+    line vahLine = na
+
+f_registerMeaningfulVALProfile(
+     array<MeaningfulVALProfile> profiles,
+     int profileDateKey,
+     int profileSessionId,
+     int profileStartTime,
+     int profileEndTime,
+     int profileReadyBarIndex,
+     float profileMovementLow,
+     float profileMovementHigh,
+     float profileVAL,
+     float profilePOC,
+     float profileVAH,
+     float profileVolume,
+     float profileFreezeATR,
+     line profileVALLine,
+     line profilePOCLine,
+     line profileVAHLine) =>
+    float profileRange = profileMovementHigh - profileMovementLow
+    float valAdvance = profileVAL - profileMovementLow
+    float valElevation =
+         profileRange > syminfo.mintick ?
+         valAdvance / profileRange : 0.0
+    float valAdvanceATR =
+         not na(profileFreezeATR) and profileFreezeATR > 0.0 ?
+         valAdvance / profileFreezeATR : 0.0
+    float valAdvancePercent =
+         profileMovementLow > 0.0 ?
+         valAdvance / profileMovementLow * 100.0 : 0.0
+    bool meaningfulProfile =
+         valElevation >=
+              dominantMinimumVALElevationPercent / 100.0 or
+         (
+              valAdvanceATR >= meaningfulVALMinimumAdvanceATR and
+              valAdvancePercent >=
+                   meaningfulVALMinimumAdvancePricePercent
+         )
+
+    bool duplicateProfile = false
+    if array.size(profiles) > 0
+        for profileIndex = 0 to array.size(profiles) - 1
+            MeaningfulVALProfile existingProfile =
+                 array.get(profiles, profileIndex)
+            if existingProfile.movementStartTime == profileStartTime
+                duplicateProfile := true
+
+    if meaningfulProfile and not duplicateProfile
+        int lowerProfileStartTime = na
+        float lowerProfileVAL = na
+        if array.size(profiles) > 0
+            for lowerProfileIndex = 0 to array.size(profiles) - 1
+                MeaningfulVALProfile lowerCandidate =
+                     array.get(profiles, lowerProfileIndex)
+                bool betterActiveLowerProfile =
+                     not lowerCandidate.invalidated and
+                     lowerCandidate.val < profileVAL and
+                     (
+                          na(lowerProfileVAL) or
+                          lowerCandidate.val > lowerProfileVAL
+                     )
+                if betterActiveLowerProfile
+                    lowerProfileStartTime :=
+                         lowerCandidate.movementStartTime
+                    lowerProfileVAL := lowerCandidate.val
+
+        bool stackedAboveLower = not na(lowerProfileVAL)
+        float profileScore =
+             profileVolume *
+             math.max(profileRange, syminfo.mintick)
+        MeaningfulVALProfile newProfile = MeaningfulVALProfile.new(
+             dateKey = profileDateKey,
+             sessionId = profileSessionId,
+             movementStartTime = profileStartTime,
+             movementEndTime = profileEndTime,
+             readyBarIndex = profileReadyBarIndex,
+             movementLow = profileMovementLow,
+             movementHigh = profileMovementHigh,
+             val = profileVAL,
+             poc = profilePOC,
+             vah = profileVAH,
+             cumulativeVolume = profileVolume,
+             score = profileScore,
+             stackedAboveLower = stackedAboveLower,
+             lowerProfileStartTime = lowerProfileStartTime,
+             lowerProfileVAL = lowerProfileVAL,
+             departureProven = not stackedAboveLower,
+             defenseArmed = not stackedAboveLower,
+             valLine = profileVALLine,
+             pocLine = profilePOCLine,
+             vahLine = profileVAHLine)
+        array.push(profiles, newProfile)
+        while array.size(profiles) > maximumStackedMeaningfulVALProfiles
+            array.shift(profiles)
+
+    array.size(profiles)
+
+f_rangeOverlapFraction(
+     float firstLow,
+     float firstHigh,
+     float secondLow,
+     float secondHigh) =>
+    float overlap =
+         math.max(
+              0.0,
+              math.min(firstHigh, secondHigh) -
+              math.max(firstLow, secondLow))
+    float smallerRange =
+         math.min(firstHigh - firstLow, secondHigh - secondLow)
+    smallerRange > syminfo.mintick ? overlap / smallerRange : 1.0
+
+f_initiativeOverlapException(
+     float candidateLow,
+     float candidateHigh,
+     float referenceHigh,
+     float triggerRelativeVolume,
+     float triggerBodyATR,
+     float triggerCloseLocation,
+     float comparisonATR) =>
+    float candidateRange = candidateHigh - candidateLow
+    float extensionAboveReference = candidateHigh - referenceHigh
+    float requiredExtension =
+         math.max(
+              comparisonATR * initiativeOverlapMinimumExtensionATR,
+              candidateRange * initiativeOverlapMinimumExtensionShare)
+    allowInitiativeBreakoutOverlap and
+         candidateRange > syminfo.mintick and
+         not na(triggerRelativeVolume) and
+         triggerRelativeVolume >=
+              initiativeOverlapMinimumRelativeVolume and
+         not na(triggerBodyATR) and
+         triggerBodyATR >= initiativeOverlapMinimumBodyATR and
+         not na(triggerCloseLocation) and
+         triggerCloseLocation >=
+              initiativeOverlapMinimumCloseLocation and
+         not na(comparisonATR) and
+         comparisonATR > 0.0 and
+         extensionAboveReference >= requiredExtension
 
 //------------------------------------------------------------------------------
 // Approximate fixed-range volume profile
@@ -946,12 +1628,25 @@ float atrValue = ta.atr(atrLength)
 float volumeAverage = ta.sma(volume, volumeAverageLength)
 float contractionVolumeAverage = ta.sma(volume, contractionBars)
 float sessionVWAP = ta.vwap(hlc3)
+float intradayEMA9 = ta.ema(close, 9)
 float candleRange = high - low
 float candleBody = math.abs(close - open)
 float candleCloseLocation = candleRange > 0.0 ? (close - low) / candleRange : 0.5
 float relativeVolume = not na(volumeAverage) and volumeAverage > 0.0 ? volume / volumeAverage : na
 float exceptionalPreviousVolumeAverage =
      ta.sma(volume, exceptionalVolumeLookback)[1]
+float additionalTrendPriorLow =
+     ta.lowest(low, additionalTrendResetLookbackBars)[1]
+float additionalTrendPriorVolumeAverage =
+     ta.sma(volume, additionalTrendResetLookbackBars)[1]
+float recentEMA9MinimumCloseDifference =
+     ta.lowest(
+          close - intradayEMA9,
+          additionalTrendResetLookbackBars)
+float recentEMA9MinimumLowDistance =
+     ta.lowest(
+          math.abs(low - intradayEMA9),
+          additionalTrendResetLookbackBars)
 float dailyEMA20 = request.security(
      syminfo.tickerid,
      "D",
@@ -1030,6 +1725,10 @@ var float movementPeakVolume = na
 var int movementStartTime = na
 var int movementEndTime = na
 var int movementHighBarIndex = na
+var bool movementStartedExceptionally = false
+var bool movementWasStitched = false
+var int movementStitchDeadlineBarIndex = na
+var float movementStitchReferenceHigh = na
 
 var float profileVAL = na
 var float profilePOC = na
@@ -1039,6 +1738,11 @@ var int profileReadyBarIndex = na
 var int profileLastVisibleTime = na
 
 var bool valDefended = false
+var bool valEntryCandidateActive = false
+var int valEntryCandidateBarIndex = na
+var int valEntryCandidateTime = na
+var float valEntryCandidateHigh = na
+var float valEntryCandidateLow = na
 var bool valInvalidated = false
 var bool valInvalidationMarked = false
 var int consecutiveClosesBelowProfileLow = 0
@@ -1076,13 +1780,78 @@ var line activeVAHLine = na
 var box activeMovementBox = na
 var label activeEntryLabel = na
 
+// One independently preserved reference profile drives the new VAL-entry
+// lifecycle. It is fed by both the primary and additional movement scanners,
+// but it does not disturb their established POC/VAH continuation state.
+var bool dominantReferenceReady = false
+var bool dominantReferenceInvalidated = false
+var int dominantReferenceDateKey = na
+var int dominantReferenceSessionId = 0
+var int dominantReferenceStartTime = na
+var int dominantReferenceEndTime = na
+var int dominantReferenceReadyBarIndex = na
+var int dominantReferenceAgeTradingDates = 0
+var float dominantReferenceMovementLow = na
+var float dominantReferenceMovementHigh = na
+var float dominantReferenceVAL = na
+var float dominantReferencePOC = na
+var float dominantReferenceVAH = na
+var float dominantReferenceCumulativeVolume = na
+var float dominantReferenceScore = na
+var int dominantReferenceClosesBelowLow = 0
+var bool dominantReferenceDefenseArmed = true
+var bool dominantReferenceTestActive = false
+var int dominantReferenceTestBarIndex = na
+var int dominantReferenceTestTime = na
+var float dominantReferenceTestLow = na
+var line dominantReferenceVALLine = na
+var line dominantReferencePOCLine = na
+var line dominantReferenceVAHLine = na
+
 var array<line> retainedProfileLines = array.new_line()
 var array<box> retainedMovementBoxes = array.new_box()
 var array<label> retainedMarkers = array.new_label()
 var array<label> retainedEntryMarkers = array.new_label()
 var array<label> retainedDailyEMAWarningMarkers = array.new_label()
 
+var array<AdditionalProfile> additionalProfiles =
+     array.new<AdditionalProfile>()
+var array<MeaningfulVALProfile> meaningfulVALProfiles =
+     array.new<MeaningfulVALProfile>()
+var int additionalScannerState = STATE_SEARCHING
+var int additionalScannerSessionId = 0
+var int profilesCreatedInCurrentSession = 0
+var int nextProfileNumber = 2
+var int lastProfileStartBarIndex = na
+var int lastProfileFreezeBarIndex = na
+var float highestAcceptedTrendHigh = na
+
+var array<float> additionalMovementLows = array.new_float()
+var array<float> additionalMovementHighs = array.new_float()
+var array<float> additionalMovementVolumes = array.new_float()
+var array<float> additionalMovementOpens = array.new_float()
+var array<float> additionalMovementCloses = array.new_float()
+var array<float> additionalMovementATRs = array.new_float()
+var array<int> additionalMovementTimes = array.new_int()
+var array<int> additionalMovementBarIndices = array.new_int()
+var float additionalMovementLow = na
+var float additionalMovementHigh = na
+var float additionalMovementPeakVolume = na
+var int additionalMovementStartTime = na
+var int additionalMovementEndTime = na
+var int additionalMovementHighBarIndex = na
+var int additionalMovementHighEndTime = na
+var float additionalMovementTriggerRelativeVolume = na
+var float additionalMovementTriggerBodyATR = na
+var float additionalMovementTriggerCloseLocation = na
+var int additionalMovementTriggerBarIndex = na
+var int additionalMovementTriggerTime = na
+var bool additionalMovementWasStitched = false
+var int additionalStitchDeadlineBarIndex = na
+var float additionalStitchReferenceHigh = na
+
 bool entryTriggeredThisBar = false
+bool valEntryConfirmedThisBar = false
 bool valDefendedThisBar = false
 bool pocDefendedThisBar = false
 bool vahDefendedThisBar = false
@@ -1113,6 +1882,94 @@ bool resetLifecycleNow =
      newTradingDate or
      (newEnabledMarketSession and not preserveProfileAtSessionBoundary)
 
+// Only after-hours profiles may carry into the next trading date. Each carried
+// profile is rearmed for the new date when its departure had already been
+// proven; this preserves a Friday postmarket VAL as support on Monday.
+if newTradingDate and array.size(meaningfulVALProfiles) > 0
+    int meaningfulCleanupIndex =
+         array.size(meaningfulVALProfiles) - 1
+    while meaningfulCleanupIndex >= 0
+        MeaningfulVALProfile cleanupProfile =
+             array.get(
+                  meaningfulVALProfiles,
+                  meaningfulCleanupIndex)
+        bool carryMeaningfulAfterHours =
+             enableStackedMeaningfulVALProfiles and
+             not cleanupProfile.invalidated and
+             cleanupProfile.sessionId == 3 and
+             cleanupProfile.ageTradingDates <
+                  dominantAfterHoursCarryTradingDates
+        if carryMeaningfulAfterHours
+            cleanupProfile.ageTradingDates += 1
+            cleanupProfile.closesBelowMovementLow := 0
+            cleanupProfile.closesBelowVAL := 0
+            cleanupProfile.defenseArmed :=
+                 cleanupProfile.departureProven
+            cleanupProfile.testActive := false
+            cleanupProfile.testBarIndex := na
+            cleanupProfile.testTime := na
+            cleanupProfile.testLow := na
+            array.set(
+                 meaningfulVALProfiles,
+                 meaningfulCleanupIndex,
+                 cleanupProfile)
+        else
+            array.remove(
+                 meaningfulVALProfiles,
+                 meaningfulCleanupIndex)
+        meaningfulCleanupIndex -= 1
+
+// The ordinary primary lifecycle still resets by date. The dominant reference
+// is intentionally separate so a valid after-hours auction can remain the
+// controlling value structure on the next trading date.
+if newTradingDate and dominantReferenceReady
+    bool carryDominantAfterHours =
+         enableDominantProfileVALReference and
+         not dominantReferenceInvalidated and
+         dominantReferenceSessionId == 3 and
+         dominantReferenceAgeTradingDates <
+              dominantAfterHoursCarryTradingDates
+
+    if carryDominantAfterHours
+        dominantReferenceAgeTradingDates += 1
+        dominantReferenceClosesBelowLow := 0
+        dominantReferenceDefenseArmed := true
+        dominantReferenceTestActive := false
+        dominantReferenceTestBarIndex := na
+        dominantReferenceTestTime := na
+        dominantReferenceTestLow := na
+    else
+        dominantReferenceReady := false
+        dominantReferenceInvalidated := false
+        dominantReferenceDateKey := na
+        dominantReferenceSessionId := 0
+        dominantReferenceStartTime := na
+        dominantReferenceEndTime := na
+        dominantReferenceReadyBarIndex := na
+        dominantReferenceAgeTradingDates := 0
+        dominantReferenceMovementLow := na
+        dominantReferenceMovementHigh := na
+        dominantReferenceVAL := na
+        dominantReferencePOC := na
+        dominantReferenceVAH := na
+        dominantReferenceCumulativeVolume := na
+        dominantReferenceScore := na
+        dominantReferenceClosesBelowLow := 0
+        dominantReferenceDefenseArmed := true
+        dominantReferenceTestActive := false
+        dominantReferenceTestBarIndex := na
+        dominantReferenceTestTime := na
+        dominantReferenceTestLow := na
+        if not na(dominantReferenceVALLine)
+            line.delete(dominantReferenceVALLine)
+        if not na(dominantReferencePOCLine)
+            line.delete(dominantReferencePOCLine)
+        if not na(dominantReferenceVAHLine)
+            line.delete(dominantReferenceVAHLine)
+        dominantReferenceVALLine := na
+        dominantReferencePOCLine := na
+        dominantReferenceVAHLine := na
+
 //------------------------------------------------------------------------------
 // Reset at a new date or at an enabled session boundary where no frozen profile
 // qualifies for carry-forward. Historical drawings remain on the chart.
@@ -1135,6 +1992,10 @@ if resetLifecycleNow
     movementStartTime := na
     movementEndTime := na
     movementHighBarIndex := na
+    movementStartedExceptionally := false
+    movementWasStitched := false
+    movementStitchDeadlineBarIndex := na
+    movementStitchReferenceHigh := na
 
     profileVAL := na
     profilePOC := na
@@ -1144,6 +2005,11 @@ if resetLifecycleNow
     profileLastVisibleTime := na
 
     valDefended := false
+    valEntryCandidateActive := false
+    valEntryCandidateBarIndex := na
+    valEntryCandidateTime := na
+    valEntryCandidateHigh := na
+    valEntryCandidateLow := na
     valInvalidated := false
     valInvalidationMarked := false
     consecutiveClosesBelowProfileLow := 0
@@ -1215,6 +2081,10 @@ if barstate.isconfirmed and timeframeSupported
             movementStartTime := time
             movementEndTime := time_close
             movementHighBarIndex := bar_index
+            movementStartedExceptionally := false
+            movementWasStitched := false
+            movementStitchDeadlineBarIndex := na
+            movementStitchReferenceHigh := na
             lifecycleState := STATE_BUILDING
 
         else if lifecycleState == STATE_BUILDING
@@ -1239,7 +2109,7 @@ if barstate.isconfirmed and timeframeSupported
                 discardMovementNow := not freezeMovementNow
 
     else
-        bool bullishMovementStart =
+        bool ordinaryBullishMovementStart =
              lifecycleState == STATE_SEARCHING and
              inAnalysisSession and
              inAutoStartWindow and
@@ -1249,6 +2119,22 @@ if barstate.isconfirmed and timeframeSupported
              candleBody >= atrValue * startBodyATR and
              candleCloseLocation >= startCloseLocation and
              relativeVolume >= startRelativeVolume
+
+        bool exceptionalBullishMovementStart =
+             lifecycleState == STATE_SEARCHING and
+             inAnalysisSession and
+             inAutoStartWindow and
+             enableExceptionalLaunchStart and
+             not na(atrValue) and
+             not na(relativeVolume) and
+             close > open and
+             candleBody >= atrValue * exceptionalLaunchBodyATR and
+             candleCloseLocation >= exceptionalLaunchCloseLocation and
+             relativeVolume >= exceptionalLaunchRelativeVolume
+
+        bool bullishMovementStart =
+             ordinaryBullishMovementStart or
+             exceptionalBullishMovementStart
 
         if bullishMovementStart
             array.clear(movementLows)
@@ -1266,6 +2152,11 @@ if barstate.isconfirmed and timeframeSupported
             movementStartTime := time
             movementEndTime := time_close
             movementHighBarIndex := bar_index
+            movementStartedExceptionally :=
+                 exceptionalBullishMovementStart
+            movementWasStitched := false
+            movementStitchDeadlineBarIndex := na
+            movementStitchReferenceHigh := na
 
             // The qualifying expansion candle can be the second bar of the
             // actual movement. Seed a small amount of completed context before
@@ -1275,7 +2166,10 @@ if barstate.isconfirmed and timeframeSupported
                 bool contextBarEligible =
                      inAnalysisSession[contextOffset] and
                      activeMarketSession[contextOffset] == activeMarketSession and
-                     currentDateKey[contextOffset] == currentDateKey
+                     currentDateKey[contextOffset] == currentDateKey and
+                     time - time[contextOffset] <=
+                          timeframe.in_seconds(timeframe.period) *
+                          1000 * contextOffset
                 if contextBarEligible
                     array.push(movementLows, low[contextOffset])
                     array.push(movementHighs, high[contextOffset])
@@ -1342,9 +2236,30 @@ if barstate.isconfirmed and timeframeSupported
                      barsSinceMovementHigh >= contractionBars and
                      volumeHasContracted
                 bool movementReachedMaximum = movementBarCount >= maximumMoveBars
+                bool primaryPauseHeldEMA9 =
+                     enableEMA9MovementStitching and
+                     movementIsLargeEnough and
+                     movementHasStalled and
+                     not movementReachedMaximum and
+                     not na(recentEMA9MinimumCloseDifference) and
+                     not na(recentEMA9MinimumLowDistance) and
+                     recentEMA9MinimumCloseDifference >=
+                          -atrValue * ema9StitchCloseToleranceATR and
+                     recentEMA9MinimumLowDistance <=
+                          atrValue * ema9StitchTouchDistanceATR
 
-                freezeMovementNow := movementIsLargeEnough and (movementHasStalled or movementReachedMaximum)
-                discardMovementNow := not movementIsLargeEnough and (movementHasStalled or movementReachedMaximum)
+                if primaryPauseHeldEMA9
+                    lifecycleState := STATE_STITCHING
+                    movementStitchDeadlineBarIndex :=
+                         bar_index + ema9StitchRestartWindowBars
+                    movementStitchReferenceHigh := movementHigh
+                else
+                    freezeMovementNow :=
+                         movementIsLargeEnough and
+                         (movementHasStalled or movementReachedMaximum)
+                    discardMovementNow :=
+                         not movementIsLargeEnough and
+                         (movementHasStalled or movementReachedMaximum)
             else
                 int movementBarCount = array.size(movementLows)
                 bool movementIsLargeEnough =
@@ -1353,6 +2268,75 @@ if barstate.isconfirmed and timeframeSupported
                      movementHigh - movementLow >= atrValue[1] * minimumMoveRangeATR
                 freezeMovementNow := movementIsLargeEnough
                 discardMovementNow := not movementIsLargeEnough
+
+        else if lifecycleState == STATE_STITCHING
+            if inAnalysisSession
+                array.push(movementLows, low)
+                array.push(movementHighs, high)
+                array.push(movementVolumes, nz(volume))
+                array.push(movementOpens, open)
+                array.push(movementCloses, close)
+                array.push(movementATRs, atrValue)
+                array.push(movementTimes, time)
+                array.push(movementBarIndices, bar_index)
+
+                movementLow := math.min(movementLow, low)
+                if high >= movementHigh
+                    movementHigh := high
+                    movementHighBarIndex := bar_index
+                movementPeakVolume :=
+                     math.max(movementPeakVolume, nz(volume))
+                movementEndTime := time_close
+
+                bool ordinaryPrimaryStitchRestart =
+                     not na(atrValue) and
+                     not na(relativeVolume) and
+                     close > open and
+                     candleBody >= atrValue * startBodyATR and
+                     candleCloseLocation >= startCloseLocation and
+                     relativeVolume >= startRelativeVolume
+                bool exceptionalPrimaryStitchRestart =
+                     enableExceptionalLaunchStart and
+                     not na(atrValue) and
+                     not na(relativeVolume) and
+                     close > open and
+                     candleBody >=
+                          atrValue * exceptionalLaunchBodyATR and
+                     candleCloseLocation >=
+                          exceptionalLaunchCloseLocation and
+                     relativeVolume >=
+                          exceptionalLaunchRelativeVolume
+                bool strongPrimaryStitchRestart =
+                     not na(movementStitchReferenceHigh) and
+                     high > movementStitchReferenceHigh and
+                     close > movementStitchReferenceHigh and
+                     (
+                          ordinaryPrimaryStitchRestart or
+                          exceptionalPrimaryStitchRestart
+                     )
+                bool primaryStitchSupportFailed =
+                     na(intradayEMA9) or
+                     close <
+                          intradayEMA9 -
+                          atrValue * ema9StitchCloseToleranceATR
+                bool primaryStitchWindowExpired =
+                     not na(movementStitchDeadlineBarIndex) and
+                     bar_index >= movementStitchDeadlineBarIndex
+                bool primaryStitchReachedMaximum =
+                     array.size(movementLows) >= maximumMoveBars
+
+                if strongPrimaryStitchRestart
+                    movementWasStitched := true
+                    lifecycleState := STATE_BUILDING
+                    movementStitchDeadlineBarIndex := na
+                    movementStitchReferenceHigh := na
+                else if primaryStitchSupportFailed or
+                     primaryStitchWindowExpired or
+                     primaryStitchReachedMaximum
+                    freezeMovementNow := true
+            else
+                freezeMovementNow :=
+                     array.size(movementLows) >= minimumMoveBars
 
 if discardMovementNow
     lifecycleState := STATE_SEARCHING
@@ -1370,6 +2354,10 @@ if discardMovementNow
     movementStartTime := na
     movementEndTime := na
     movementHighBarIndex := na
+    movementStartedExceptionally := false
+    movementWasStitched := false
+    movementStitchDeadlineBarIndex := na
+    movementStitchReferenceHigh := na
 
 if freezeMovementNow
     float movementCumulativeVolume = array.sum(movementVolumes)
@@ -1478,6 +2466,111 @@ if freezeMovementNow
         array.push(retainedProfileLines, activeVAHLine)
         while array.size(retainedProfileLines) > maximumHistoricalProfiles * 3
             line.delete(array.shift(retainedProfileLines))
+
+        float primaryVALElevation =
+             movementHigh > movementLow ?
+             (profileVAL - movementLow) /
+                  (movementHigh - movementLow) :
+             0.0
+        float primaryDominanceScore =
+             movementCumulativeVolume *
+             math.max(movementHigh - movementLow, syminfo.mintick)
+        if enableStackedMeaningfulVALProfiles
+            f_registerMeaningfulVALProfile(
+                 meaningfulVALProfiles,
+                 currentDateKey,
+                 activeMarketSession,
+                 movementStartTime,
+                 movementEndTime,
+                 bar_index,
+                 movementLow,
+                 movementHigh,
+                 profileVAL,
+                 profilePOC,
+                 profileVAH,
+                 movementCumulativeVolume,
+                 atrValue,
+                 activeVALLine,
+                 activePOCLine,
+                 activeVAHLine)
+        bool primaryDominantElevationQualified =
+             primaryVALElevation >=
+                  dominantMinimumVALElevationPercent / 100.0
+        bool primaryDominantIsLater =
+             na(dominantReferenceEndTime) or
+             movementEndTime > dominantReferenceEndTime
+        bool primaryDominantScoreQualified =
+             not dominantReferenceReady or
+             dominantReferenceInvalidated or
+             primaryDominanceScore >=
+                  dominantReferenceScore *
+                  dominantReplacementScoreRatio
+        bool selectPrimaryAsDominant =
+             enableDominantProfileVALReference and
+             not enableStackedMeaningfulVALProfiles and
+             primaryDominantElevationQualified and
+             primaryDominantIsLater and
+             primaryDominantScoreQualified
+
+        if selectPrimaryAsDominant
+            if not na(dominantReferenceVALLine)
+                line.delete(dominantReferenceVALLine)
+            if not na(dominantReferencePOCLine)
+                line.delete(dominantReferencePOCLine)
+            if not na(dominantReferenceVAHLine)
+                line.delete(dominantReferenceVAHLine)
+
+            dominantReferenceReady := true
+            dominantReferenceInvalidated := false
+            dominantReferenceDateKey := currentDateKey
+            dominantReferenceSessionId := activeMarketSession
+            dominantReferenceStartTime := movementStartTime
+            dominantReferenceEndTime := movementEndTime
+            dominantReferenceReadyBarIndex := bar_index
+            dominantReferenceAgeTradingDates := 0
+            dominantReferenceMovementLow := movementLow
+            dominantReferenceMovementHigh := movementHigh
+            dominantReferenceVAL := profileVAL
+            dominantReferencePOC := profilePOC
+            dominantReferenceVAH := profileVAH
+            dominantReferenceCumulativeVolume :=
+                 movementCumulativeVolume
+            dominantReferenceScore := primaryDominanceScore
+            dominantReferenceClosesBelowLow := 0
+            dominantReferenceDefenseArmed := true
+            dominantReferenceTestActive := false
+            dominantReferenceTestBarIndex := na
+            dominantReferenceTestTime := na
+            dominantReferenceTestLow := na
+
+            dominantReferenceVALLine := line.new(
+                 x1 = movementStartTime,
+                 y1 = profileVAL,
+                 x2 = time_close,
+                 y2 = profileVAL,
+                 xloc = xloc.bar_time,
+                 extend = extend.none,
+                 color = color.new(valColor, 0),
+                 width = 4)
+            dominantReferencePOCLine := line.new(
+                 x1 = movementStartTime,
+                 y1 = profilePOC,
+                 x2 = time_close,
+                 y2 = profilePOC,
+                 xloc = xloc.bar_time,
+                 extend = extend.none,
+                 color = pocColor,
+                 width = 3,
+                 style = line.style_dashed)
+            dominantReferenceVAHLine := line.new(
+                 x1 = movementStartTime,
+                 y1 = profileVAH,
+                 x2 = time_close,
+                 y2 = profileVAH,
+                 xloc = xloc.bar_time,
+                 extend = extend.none,
+                 color = vahColor,
+                 width = 3)
 
         // POC failures inside the movement cannot be known while the profile
         // is still building. Once the profile freezes, replay its stored bars
@@ -1605,6 +2698,10 @@ if freezeMovementNow
                  "  •  POC " + str.tostring(profilePOC, format.mintick) +
                  "  •  VAH " + str.tostring(profileVAH, format.mintick) +
                  "\nCumulative volume " + str.tostring(math.round(movementCumulativeVolume)) +
+                 "\nStart trigger " +
+                 (movementStartedExceptionally ? "exceptional" : "ordinary") +
+                 "\nEMA-9 stitched " +
+                 (movementWasStitched ? "yes" : "no") +
                  "\nFreeze VWAP " + str.tostring(profileVWAPAtFreeze, format.mintick)
             label profileLabel = label.new(
                  x = movementEndTime,
@@ -1654,6 +2751,11 @@ if profileCanBeEvaluated
 
     if profileInvalidatedThisBar
         valInvalidated := true
+        valEntryCandidateActive := false
+        valEntryCandidateBarIndex := na
+        valEntryCandidateTime := na
+        valEntryCandidateHigh := na
+        valEntryCandidateLow := na
         breakoutPending := false
         breakoutConfirmed := false
         activeEntryLabel := na
@@ -1740,6 +2842,119 @@ if profileCanBeEvaluated
     // is at least the configured fraction of its body. Its open is unrestricted.
     if not valInvalidated
         float valDefenseLowerWick = math.min(open, close) - low
+
+        // The entry lifecycle is deliberately stricter than the general VAL
+        // defense marker. A candidate may touch/undercut VAL or front-run it
+        // slightly, but it must show participation, a meaningful rejection
+        // wick, and a lower low. Entry is confirmed only on a later close above
+        // the defense candle's high while every intervening low preserves its
+        // floor.
+        bool primaryVALEntryConfirmedNow = false
+        if enableVALEntryConfirmation and
+             not enableDominantProfileVALReference and
+             valEntryCandidateActive
+            int barsSinceVALEntryCandidate =
+                 bar_index - valEntryCandidateBarIndex
+            bool valEntryFloorBroken =
+                 low < valEntryCandidateLow
+            bool valEntryReachedPOC =
+                 high >= profilePOC
+            bool valEntryHighConfirmed =
+                 barsSinceVALEntryCandidate >= 1 and
+                 barsSinceVALEntryCandidate <=
+                      valEntryConfirmationBars and
+                 close > valEntryCandidateHigh
+
+            if valEntryFloorBroken or valEntryReachedPOC
+                valEntryCandidateActive := false
+            else if valEntryHighConfirmed
+                primaryVALEntryConfirmedNow := true
+                valEntryConfirmedThisBar := true
+                valEntryCandidateActive := false
+
+                float valEntryLabelY =
+                     low -
+                     math.max(
+                          atrValue * valEntryLabelDistanceATR,
+                          high * 0.003)
+                string valEntryTooltip =
+                     "VAL ENTRY CONFIRMED\n" +
+                     "Defense: " +
+                     str.format_time(
+                          valEntryCandidateTime,
+                          "HH:mm",
+                          syminfo.timezone) +
+                     "\nConfirmed: " +
+                     str.format_time(time, "HH:mm", syminfo.timezone) +
+                     "\nVAL: " +
+                     str.tostring(profileVAL, format.mintick) +
+                     "\nDefended low: " +
+                     str.tostring(
+                          valEntryCandidateLow,
+                          format.mintick) +
+                     "\nDefense high: " +
+                     str.tostring(
+                          valEntryCandidateHigh,
+                          format.mintick)
+
+                if showEntryMarkers
+                    label valEntryLabel = label.new(
+                         x = time,
+                         y = valEntryLabelY,
+                         text = "VAL ENTRY\nCONFIRMED",
+                         xloc = xloc.bar_time,
+                         yloc = yloc.price,
+                         style = label.style_label_up,
+                         color = continuationColor,
+                         textcolor = color.white,
+                         size = size.tiny,
+                         tooltip = valEntryTooltip)
+                    array.push(retainedEntryMarkers, valEntryLabel)
+            else if barsSinceVALEntryCandidate >=
+                 valEntryConfirmationBars
+                valEntryCandidateActive := false
+
+        bool valEntryCandidateNearVAL =
+             not na(atrValue) and
+             atrValue > 0.0 and
+             low >=
+                  profileVAL -
+                  atrValue * valEntryMaximumUndercutATR and
+             low <=
+                  profileVAL +
+                  atrValue * valEntryMaximumFrontRunATR
+        bool valEntryCandidateWickQuality =
+             candleRange > 0.0 and
+             valDefenseLowerWick >=
+                  candleRange * valEntryMinimumLowerWickRange and
+             valDefenseLowerWick >=
+                  candleBody * valEntryMinimumLowerWickBody
+        bool valEntryCandidateVolumeQuality =
+             not na(relativeVolume) and
+             relativeVolume > valEntryMinimumRelativeVolume
+        bool primaryVALEntryCandidate =
+             enableVALEntryConfirmation and
+             not enableDominantProfileVALReference and
+             not valEntryCandidateActive and
+             not primaryVALEntryConfirmedNow and
+             valEntryCandidateNearVAL and
+             close > profileVAL and
+             high < profilePOC and
+             valEntryCandidateWickQuality and
+             valEntryCandidateVolumeQuality and
+             low < low[1]
+
+        if primaryVALEntryCandidate
+            valEntryCandidateActive := true
+            valEntryCandidateBarIndex := bar_index
+            valEntryCandidateTime := time
+            valEntryCandidateHigh := high
+            valEntryCandidateLow := low
+            valDefended := true
+            valDefendedThisBar := true
+            line.set_color(activeVALLine, color.new(valColor, 0))
+            line.set_width(activeVALLine, 3)
+
         bool valDefenseClosesAbove = close > profileVAL
         bool valDefenseTradesBelow = low < profileVAL
         bool valDefenseHasBody = candleBody > 0.0
@@ -1749,15 +2964,19 @@ if profileCanBeEvaluated
         bool directVALDefense =
              valDefenseClosesAbove and
              valDefenseTradesBelow and
+             high < profilePOC and
              valDefenseLowerWickOk
 
         if directVALDefense
             valDefended := true
-            valDefendedThisBar := true
             line.set_color(activeVALLine, color.new(valColor, 0))
             line.set_width(activeVALLine, 3)
 
-            if showVALDefenseMarkers
+            if not enableDominantProfileVALReference
+                valDefendedThisBar := true
+
+            if showVALDefenseMarkers and
+                 not enableDominantProfileVALReference
                 string defenseTooltip =
                      "VAL DEFENDED\n" +
                      "Defense: " + str.format_time(time, "HH:mm", syminfo.timezone) +
@@ -2111,25 +3330,20 @@ if profileCanBeEvaluated
                 vahDefenseCandidateLowerWickShare :=
                      vahDefenseLowerWick / candleRange
 
-    // A pending breakout is confirmed only after later bars avoid a close back
-    // below POC. The visible arrow remains on the original breakout candle.
+    // A pending breakout is confirmed only after the required later bars hold.
+    // Normal paths must avoid losing POC. A deep value-area sweep has already
+    // traversed the profile, so its stronger confirmation requires every later
+    // hold bar to close at or above VAH.
     if breakoutPending
-        bool holdFailed = close < profilePOC - atrValue * breakoutFailureBelowPOCATR
+        bool valueAreaSweepPending =
+             breakoutPath == BREAKOUT_PATH_VALUE_AREA_SWEEP
+        bool holdFailed = valueAreaSweepPending ?
+             close < profileVAH :
+             close < profilePOC - atrValue * breakoutFailureBelowPOCATR
         int elapsedHoldBars = bar_index - breakoutBarIndex
 
         if holdFailed
             breakoutPending := false
-
-            if showEntryMarkers and not na(activeEntryLabel)
-                string failedEntryTooltip =
-                     "FRVP ENTRY FAILED\n" +
-                     "Entry: " + str.format_time(breakoutTime, "HH:mm", syminfo.timezone) +
-                     "\nFailed: " + str.format_time(time, "HH:mm", syminfo.timezone) +
-                     "\nReason: price closed back below POC"
-                label.set_text(activeEntryLabel, "FRVP ENTRY\nFAILED")
-                label.set_color(activeEntryLabel, color.new(color.red, 15))
-                label.set_tooltip(activeEntryLabel, failedEntryTooltip)
-
             activeEntryLabel := na
         else if elapsedHoldBars >= breakoutHoldBars
             confirmBreakoutNow := true
@@ -2281,12 +3495,68 @@ if profileCanBeEvaluated
          exceptionalPriceQuality and
          breakoutVolumeQuality and
          exceptionalRecentVolumeQuality
+
+    // Deep value-area sweep and VAH reclaim:
+    // The candle starts from accepted value, sweeps through POC toward VAL,
+    // and then closes decisively beyond VAH. A large lower wick is intentional
+    // here: it shows the failed lower auction, while body, close, and volume
+    // rules require buyers to finish in control.
+    float valueAreaSweepLowerWick =
+         math.min(open, close) - low
+    float valueAreaSweepLowerWickToRange =
+         candleRange > 0.0 ?
+         valueAreaSweepLowerWick / candleRange :
+         0.0
+    bool valueAreaSweepStartsInsideValue =
+         open >= profilePOC and
+         open <= profileVAH and
+         close[1] >= profilePOC and
+         close[1] <= profileVAH
+    bool valueAreaSweepTestsPOCAndPreservesVAL =
+         low <= profilePOC and
+         low >=
+              profileVAL -
+              atrValue * valueAreaSweepMaximumVALUndercutATR
+    bool valueAreaSweepClosesDecisivelyAboveVAH =
+         close >
+              profileVAH +
+              atrValue * valueAreaSweepVAHClearanceATR
+    bool valueAreaSweepPriceQuality =
+         close > open and
+         candleBody >= atrValue * valueAreaSweepMinimumBodyATR and
+         exceptionalBodyToRange >= valueAreaSweepMinimumBodyRange and
+         candleCloseLocation >= valueAreaSweepMinimumCloseLocation and
+         valueAreaSweepLowerWickToRange >=
+              valueAreaSweepMinimumLowerWickRange
+    bool valueAreaSweepVolumeQuality =
+         not na(relativeVolume) and
+         relativeVolume >= valueAreaSweepMinimumRelativeVolume and
+         not na(exceptionalPreviousVolumeAverage) and
+         exceptionalPreviousVolumeAverage > 0.0 and
+         volume >=
+              exceptionalPreviousVolumeAverage *
+              valueAreaSweepRecentVolumeMultiplier
+    bool valueAreaSweepHasPriorEvidence =
+         valDefended or
+         failedPOCAttempts >= valueAreaSweepMinimumFailedPOCAttempts
+    bool valueAreaSweepVAHReclaimBreakout =
+         not breakoutPending and
+         not breakoutConfirmed and
+         enableValueAreaSweepReclaim and
+         not valInvalidated and
+         valueAreaSweepHasPriorEvidence and
+         valueAreaSweepStartsInsideValue and
+         valueAreaSweepTestsPOCAndPreservesVAL and
+         valueAreaSweepClosesDecisivelyAboveVAH and
+         valueAreaSweepPriceQuality and
+         valueAreaSweepVolumeQuality
     bool profileRecoveryVAHReclaimBreakout =
          not breakoutPending and
          not breakoutConfirmed and
          profileReactivatedThisBar
     bool strongContinuationBreakout =
          profileRecoveryVAHReclaimBreakout or
+         valueAreaSweepVAHReclaimBreakout or
          classicPOCContinuationBreakout or
          pocFightVAHReclaimBreakout or
          exceptionalVAHExpansionBreakout
@@ -2299,40 +3569,14 @@ if profileCanBeEvaluated
         breakoutATRAtSignal := atrValue
         breakoutPath := profileRecoveryVAHReclaimBreakout ?
              "PROFILE RECOVERY / VAH RECLAIM" :
+             valueAreaSweepVAHReclaimBreakout ?
+             BREAKOUT_PATH_VALUE_AREA_SWEEP :
              exceptionalVAHExpansionBreakout ?
              "EXCEPTIONAL VAH EXPANSION" :
              pocFightVAHReclaimBreakout ?
              "POC FIGHT / VAH RECLAIM" :
              "POC-TO-VAH CONTINUATION"
         entryTriggeredThisBar := true
-
-        if showEntryMarkers
-            string pendingEntryStatus = breakoutHoldBars > 0 ? "PENDING " + str.tostring(breakoutHoldBars) + "-BAR HOLD" : "CONFIRMS AT THIS CLOSE"
-            string entryTooltip =
-                 "FRVP ENTRY\n" +
-                 "Time: " + str.format_time(breakoutTime, "HH:mm", syminfo.timezone) +
-                 "\nType: " + breakoutPath +
-                 "\nStatus: " + pendingEntryStatus +
-                 "\nVAL: " + str.tostring(profileVAL, format.mintick) +
-                 "\nPOC: " + str.tostring(profilePOC, format.mintick) +
-                 "\nVAH: " + str.tostring(profileVAH, format.mintick) +
-                 "\nVWAP: " + str.tostring(sessionVWAP, format.mintick) +
-                 "\nFailed POC attempts: " + str.tostring(failedPOCAttempts) +
-                 "\nInternal POC failures: " +
-                 str.tostring(profileInternalFailedPOCAttempts) +
-                 "\nRelative volume: " + str.tostring(relativeVolume, "#.##") + "×"
-            activeEntryLabel := label.new(
-                 x = breakoutTime,
-                 y = breakoutLow - breakoutATRAtSignal * 0.15,
-                 text = "FRVP\nENTRY",
-                 xloc = xloc.bar_time,
-                 yloc = yloc.price,
-                 style = label.style_label_up,
-                 color = entryCandidateColor,
-                 textcolor = color.white,
-                 size = size.small,
-                 tooltip = entryTooltip)
-            array.push(retainedEntryMarkers, activeEntryLabel)
 
         if breakoutHoldBars == 0
             confirmBreakoutNow := true
@@ -2356,29 +3600,2241 @@ if profileCanBeEvaluated
              str.tostring(profileInternalFailedPOCAttempts)
 
         if showEntryMarkers
-            if not na(activeEntryLabel)
-                label.set_text(activeEntryLabel, "FRVP ENTRY\nCONFIRMED")
-                label.set_color(activeEntryLabel, continuationColor)
-                label.set_tooltip(activeEntryLabel, continuationTooltip)
-            else
-                activeEntryLabel := label.new(
-                     x = breakoutTime,
-                     y = breakoutLow - breakoutATRAtSignal * 0.15,
-                     text = "FRVP ENTRY\nCONFIRMED",
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_up,
-                     color = continuationColor,
-                     textcolor = color.white,
-                     size = size.small,
-                     tooltip = continuationTooltip)
-                array.push(retainedEntryMarkers, activeEntryLabel)
+            activeEntryLabel := label.new(
+                 x = breakoutTime,
+                 y = breakoutLow,
+                 text = "FRVP ENTRY\nCONFIRMED",
+                 xloc = xloc.bar_time,
+                 yloc = yloc.belowbar,
+                 style = label.style_label_up,
+                 color = continuationColor,
+                 textcolor = color.white,
+                 size = size.tiny,
+                 tooltip = continuationTooltip)
+            array.push(retainedEntryMarkers, activeEntryLabel)
 
         line.set_color(activeVALLine, color.new(valColor, 20))
         line.set_color(activePOCLine, pocColor)
         line.set_color(activeVAHLine, vahColor)
         line.set_width(activePOCLine, 3)
         line.set_width(activeVAHLine, 3)
+
+//------------------------------------------------------------------------------
+// Additional same-session trend scanner
+//------------------------------------------------------------------------------
+
+// Once the primary profile freezes, this independent scanner rearms. Each
+// accepted later movement is stored as an AdditionalProfile and remains
+// actionable without replacing the earlier profile.
+bool primaryProfileFrozenThisBar =
+     lifecycleState == STATE_PROFILE and
+     profileReadyBarIndex == bar_index
+
+if newTradingDate
+    array.clear(additionalProfiles)
+    additionalScannerState := STATE_SEARCHING
+    additionalScannerSessionId := 0
+    profilesCreatedInCurrentSession := 0
+    nextProfileNumber := 2
+    lastProfileStartBarIndex := na
+    lastProfileFreezeBarIndex := na
+    highestAcceptedTrendHigh := na
+    array.clear(additionalMovementLows)
+    array.clear(additionalMovementHighs)
+    array.clear(additionalMovementVolumes)
+    array.clear(additionalMovementOpens)
+    array.clear(additionalMovementCloses)
+    array.clear(additionalMovementATRs)
+    array.clear(additionalMovementTimes)
+    array.clear(additionalMovementBarIndices)
+    additionalMovementLow := na
+    additionalMovementHigh := na
+    additionalMovementPeakVolume := na
+    additionalMovementStartTime := na
+    additionalMovementEndTime := na
+    additionalMovementHighBarIndex := na
+    additionalMovementHighEndTime := na
+    additionalMovementTriggerRelativeVolume := na
+    additionalMovementTriggerBodyATR := na
+    additionalMovementTriggerCloseLocation := na
+    additionalMovementTriggerBarIndex := na
+    additionalMovementTriggerTime := na
+    additionalMovementWasStitched := false
+    additionalStitchDeadlineBarIndex := na
+    additionalStitchReferenceHigh := na
+
+if newEnabledMarketSession
+    additionalScannerState := STATE_SEARCHING
+    additionalScannerSessionId := activeMarketSession
+    profilesCreatedInCurrentSession := 0
+    lastProfileStartBarIndex := na
+    lastProfileFreezeBarIndex := na
+    array.clear(additionalMovementLows)
+    array.clear(additionalMovementHighs)
+    array.clear(additionalMovementVolumes)
+    array.clear(additionalMovementOpens)
+    array.clear(additionalMovementCloses)
+    array.clear(additionalMovementATRs)
+    array.clear(additionalMovementTimes)
+    array.clear(additionalMovementBarIndices)
+    additionalMovementLow := na
+    additionalMovementHigh := na
+    additionalMovementPeakVolume := na
+    additionalMovementStartTime := na
+    additionalMovementEndTime := na
+    additionalMovementHighBarIndex := na
+    additionalMovementHighEndTime := na
+    additionalMovementTriggerRelativeVolume := na
+    additionalMovementTriggerBodyATR := na
+    additionalMovementTriggerCloseLocation := na
+    additionalMovementTriggerBarIndex := na
+    additionalMovementTriggerTime := na
+    additionalMovementWasStitched := false
+    additionalStitchDeadlineBarIndex := na
+    additionalStitchReferenceHigh := na
+
+if primaryProfileFrozenThisBar
+    profilesCreatedInCurrentSession :=
+         math.max(profilesCreatedInCurrentSession, 1)
+    lastProfileStartBarIndex :=
+         bar_index - array.size(movementLows) + 1
+    lastProfileFreezeBarIndex := bar_index
+    highestAcceptedTrendHigh :=
+         na(highestAcceptedTrendHigh) ?
+         movementHigh :
+         math.max(highestAcceptedTrendHigh, movementHigh)
+    additionalScannerState := STATE_SEARCHING
+
+bool additionalScannerHasProfileContext =
+     not na(highestAcceptedTrendHigh) and
+     (
+          lifecycleState == STATE_PROFILE or
+          array.size(additionalProfiles) > 0
+     )
+bool additionalScannerHasCapacity =
+     profilesCreatedInCurrentSession < maximumProfilesPerSession
+bool additionalScannerSpacingReady =
+     (
+          na(lastProfileStartBarIndex) or
+          bar_index - lastProfileStartBarIndex >=
+               additionalTrendMinimumSpacingBars
+     ) and
+     (
+          na(lastProfileFreezeBarIndex) or
+          bar_index > lastProfileFreezeBarIndex
+     )
+bool additionalScannerPullbackSeen =
+     not na(additionalTrendPriorLow) and
+     not na(atrValue[1]) and
+     additionalTrendPriorLow <=
+          highestAcceptedTrendHigh -
+          atrValue[1] * additionalTrendMinimumPullbackATR
+bool additionalScannerContractionSeen =
+     not na(additionalTrendPriorVolumeAverage) and
+     not na(volumeAverage[1]) and
+     volumeAverage[1] > 0.0 and
+     additionalTrendPriorVolumeAverage <=
+          volumeAverage[1] * additionalTrendContractionRatio
+bool additionalScannerResetSeen =
+     additionalScannerPullbackSeen or
+     additionalScannerContractionSeen
+
+bool freezeAdditionalMovementNow = false
+bool discardAdditionalMovementNow = false
+
+if barstate.isconfirmed and
+     timeframeSupported and
+     detectionMode == "Auto" and
+     enableAdditionalSessionTrends
+    bool additionalBullishMovementStart =
+         additionalScannerState == STATE_SEARCHING and
+         inAnalysisSession and
+         inAutoStartWindow and
+         additionalScannerHasProfileContext and
+         additionalScannerHasCapacity and
+         additionalScannerSpacingReady and
+         additionalScannerResetSeen and
+         not na(atrValue) and
+         not na(relativeVolume) and
+         close > open and
+         candleBody >= atrValue * startBodyATR and
+         candleCloseLocation >= startCloseLocation and
+         relativeVolume >= startRelativeVolume
+
+    if additionalBullishMovementStart
+        array.clear(additionalMovementLows)
+        array.clear(additionalMovementHighs)
+        array.clear(additionalMovementVolumes)
+        array.clear(additionalMovementOpens)
+        array.clear(additionalMovementCloses)
+        array.clear(additionalMovementATRs)
+        array.clear(additionalMovementTimes)
+        array.clear(additionalMovementBarIndices)
+
+        additionalMovementLow := low
+        additionalMovementHigh := high
+        additionalMovementPeakVolume := nz(volume)
+        additionalMovementStartTime := time
+        additionalMovementEndTime := time_close
+        additionalMovementHighBarIndex := bar_index
+        additionalMovementHighEndTime := time_close
+        additionalMovementTriggerRelativeVolume := relativeVolume
+        additionalMovementTriggerBodyATR := candleBody / atrValue
+        additionalMovementTriggerCloseLocation :=
+             candleCloseLocation
+        additionalMovementTriggerBarIndex := bar_index
+        additionalMovementTriggerTime := time
+        additionalMovementWasStitched := false
+        additionalStitchDeadlineBarIndex := na
+        additionalStitchReferenceHigh := na
+
+        int additionalContextOffset = autoPreTriggerBars
+        while additionalContextOffset >= 1
+            bool additionalContextEligible =
+                 inAnalysisSession[additionalContextOffset] and
+                 activeMarketSession[additionalContextOffset] ==
+                      activeMarketSession and
+                 currentDateKey[additionalContextOffset] == currentDateKey and
+                 time - time[additionalContextOffset] <=
+                      timeframe.in_seconds(timeframe.period) *
+                      1000 * additionalContextOffset
+            if additionalContextEligible
+                array.push(
+                     additionalMovementLows,
+                     low[additionalContextOffset])
+                array.push(
+                     additionalMovementHighs,
+                     high[additionalContextOffset])
+                array.push(
+                     additionalMovementVolumes,
+                     nz(volume[additionalContextOffset]))
+                array.push(
+                     additionalMovementOpens,
+                     open[additionalContextOffset])
+                array.push(
+                     additionalMovementCloses,
+                     close[additionalContextOffset])
+                array.push(
+                     additionalMovementATRs,
+                     atrValue[additionalContextOffset])
+                array.push(
+                     additionalMovementTimes,
+                     time[additionalContextOffset])
+                array.push(
+                     additionalMovementBarIndices,
+                     bar_index - additionalContextOffset)
+                additionalMovementLow :=
+                     math.min(
+                          additionalMovementLow,
+                          low[additionalContextOffset])
+                if high[additionalContextOffset] >
+                     additionalMovementHigh
+                    additionalMovementHigh :=
+                         high[additionalContextOffset]
+                    additionalMovementHighBarIndex :=
+                         bar_index - additionalContextOffset
+                    additionalMovementHighEndTime :=
+                         time_close[additionalContextOffset]
+                additionalMovementPeakVolume :=
+                     math.max(
+                          additionalMovementPeakVolume,
+                          nz(volume[additionalContextOffset]))
+                additionalMovementStartTime :=
+                     math.min(
+                          additionalMovementStartTime,
+                          time[additionalContextOffset])
+            additionalContextOffset -= 1
+
+        array.push(additionalMovementLows, low)
+        array.push(additionalMovementHighs, high)
+        array.push(additionalMovementVolumes, nz(volume))
+        array.push(additionalMovementOpens, open)
+        array.push(additionalMovementCloses, close)
+        array.push(additionalMovementATRs, atrValue)
+        array.push(additionalMovementTimes, time)
+        array.push(additionalMovementBarIndices, bar_index)
+        if high >= additionalMovementHigh
+            additionalMovementHigh := high
+            additionalMovementHighBarIndex := bar_index
+            additionalMovementHighEndTime := time_close
+        lastProfileStartBarIndex :=
+             bar_index - array.size(additionalMovementLows) + 1
+        additionalScannerState := STATE_BUILDING
+
+    else if additionalScannerState == STATE_BUILDING
+        if inAnalysisSession and
+             activeMarketSession == additionalScannerSessionId
+            array.push(additionalMovementLows, low)
+            array.push(additionalMovementHighs, high)
+            array.push(additionalMovementVolumes, nz(volume))
+            array.push(additionalMovementOpens, open)
+            array.push(additionalMovementCloses, close)
+            array.push(additionalMovementATRs, atrValue)
+            array.push(additionalMovementTimes, time)
+            array.push(additionalMovementBarIndices, bar_index)
+
+            additionalMovementLow :=
+                 math.min(additionalMovementLow, low)
+            if high >= additionalMovementHigh
+                additionalMovementHigh := high
+                additionalMovementHighBarIndex := bar_index
+                additionalMovementHighEndTime := time_close
+            additionalMovementPeakVolume :=
+                 math.max(additionalMovementPeakVolume, nz(volume))
+            additionalMovementEndTime := time_close
+
+            int additionalMovementBarCount =
+                 array.size(additionalMovementLows)
+            int barsSinceAdditionalMovementHigh =
+                 bar_index - additionalMovementHighBarIndex
+            bool additionalMovementIsLargeEnough =
+                 additionalMovementBarCount >= minimumMoveBars and
+                 not na(atrValue) and
+                 additionalMovementHigh - additionalMovementLow >=
+                      atrValue * minimumMoveRangeATR
+            bool additionalMovementVolumeContracted =
+                 not na(contractionVolumeAverage) and
+                 not na(volumeAverage) and
+                 contractionVolumeAverage <=
+                      volumeAverage * contractionVsAverage and
+                 nz(volume) <=
+                      additionalMovementPeakVolume * contractionVsPeak
+            bool additionalMovementStalled =
+                 barsSinceAdditionalMovementHigh >= contractionBars and
+                 additionalMovementVolumeContracted
+            bool additionalMovementReachedMaximum =
+                 additionalMovementBarCount >= maximumMoveBars
+            bool additionalPauseHeldEMA9 =
+                 enableEMA9MovementStitching and
+                 additionalMovementStalled and
+                 not additionalMovementReachedMaximum and
+                 not na(recentEMA9MinimumCloseDifference) and
+                 not na(recentEMA9MinimumLowDistance) and
+                 recentEMA9MinimumCloseDifference >=
+                      -atrValue * ema9StitchCloseToleranceATR and
+                 recentEMA9MinimumLowDistance <=
+                      atrValue * ema9StitchTouchDistanceATR
+
+            if additionalMovementIsLargeEnough and
+                 additionalPauseHeldEMA9
+                additionalScannerState := STATE_STITCHING
+                additionalStitchDeadlineBarIndex :=
+                     bar_index + ema9StitchRestartWindowBars
+                additionalStitchReferenceHigh :=
+                     additionalMovementHigh
+            else
+                freezeAdditionalMovementNow :=
+                     additionalMovementIsLargeEnough and
+                     (
+                          additionalMovementStalled or
+                          additionalMovementReachedMaximum
+                     )
+                discardAdditionalMovementNow :=
+                     not additionalMovementIsLargeEnough and
+                     (
+                          additionalMovementStalled or
+                          additionalMovementReachedMaximum
+                     )
+        else
+            discardAdditionalMovementNow := true
+
+    else if additionalScannerState == STATE_STITCHING
+        if inAnalysisSession and
+             activeMarketSession == additionalScannerSessionId
+            array.push(additionalMovementLows, low)
+            array.push(additionalMovementHighs, high)
+            array.push(additionalMovementVolumes, nz(volume))
+            array.push(additionalMovementOpens, open)
+            array.push(additionalMovementCloses, close)
+            array.push(additionalMovementATRs, atrValue)
+            array.push(additionalMovementTimes, time)
+            array.push(additionalMovementBarIndices, bar_index)
+
+            additionalMovementLow :=
+                 math.min(additionalMovementLow, low)
+            if high >= additionalMovementHigh
+                additionalMovementHigh := high
+                additionalMovementHighBarIndex := bar_index
+                additionalMovementHighEndTime := time_close
+            additionalMovementPeakVolume :=
+                 math.max(additionalMovementPeakVolume, nz(volume))
+            additionalMovementEndTime := time_close
+
+            bool additionalStrongStitchRestart =
+                 not na(additionalStitchReferenceHigh) and
+                 not na(atrValue) and
+                 not na(relativeVolume) and
+                 close > open and
+                 candleBody >= atrValue * startBodyATR and
+                 candleCloseLocation >= startCloseLocation and
+                 relativeVolume >= startRelativeVolume and
+                 high > additionalStitchReferenceHigh and
+                 close > additionalStitchReferenceHigh
+            bool additionalStitchSupportFailed =
+                 na(intradayEMA9) or
+                 close <
+                      intradayEMA9 -
+                      atrValue * ema9StitchCloseToleranceATR
+            bool additionalStitchWindowExpired =
+                 not na(additionalStitchDeadlineBarIndex) and
+                 bar_index >= additionalStitchDeadlineBarIndex
+            bool additionalStitchReachedMaximum =
+                 array.size(additionalMovementLows) >= maximumMoveBars
+
+            if additionalStrongStitchRestart
+                additionalMovementWasStitched := true
+                additionalScannerState := STATE_BUILDING
+                additionalStitchDeadlineBarIndex := na
+                additionalStitchReferenceHigh := na
+            else if additionalStitchSupportFailed or
+                 additionalStitchWindowExpired or
+                 additionalStitchReachedMaximum
+                freezeAdditionalMovementNow := true
+        else
+            freezeAdditionalMovementNow :=
+                 array.size(additionalMovementLows) >= minimumMoveBars
+
+if freezeAdditionalMovementNow
+    // A stitched movement keeps the internal EMA-supported pause, but the
+    // pre-trigger context and the trailing stall-confirmation bars are not
+    // part of its final fixed-range profile.
+    if additionalMovementWasStitched
+        while array.size(additionalMovementBarIndices) > 0 and
+             array.last(additionalMovementBarIndices) >
+                  additionalMovementHighBarIndex
+            array.pop(additionalMovementLows)
+            array.pop(additionalMovementHighs)
+            array.pop(additionalMovementVolumes)
+            array.pop(additionalMovementOpens)
+            array.pop(additionalMovementCloses)
+            array.pop(additionalMovementATRs)
+            array.pop(additionalMovementTimes)
+            array.pop(additionalMovementBarIndices)
+
+        while array.size(additionalMovementBarIndices) > 0 and
+             array.first(additionalMovementBarIndices) <
+                  additionalMovementTriggerBarIndex
+            array.shift(additionalMovementLows)
+            array.shift(additionalMovementHighs)
+            array.shift(additionalMovementVolumes)
+            array.shift(additionalMovementOpens)
+            array.shift(additionalMovementCloses)
+            array.shift(additionalMovementATRs)
+            array.shift(additionalMovementTimes)
+            array.shift(additionalMovementBarIndices)
+
+        if array.size(additionalMovementLows) > 0
+            additionalMovementLow :=
+                 array.min(additionalMovementLows)
+            additionalMovementHigh :=
+                 array.max(additionalMovementHighs)
+            additionalMovementPeakVolume :=
+                 array.max(additionalMovementVolumes)
+            additionalMovementStartTime :=
+                 additionalMovementTriggerTime
+            additionalMovementEndTime :=
+                 additionalMovementHighEndTime
+            lastProfileStartBarIndex :=
+                 array.first(additionalMovementBarIndices)
+
+    float additionalMovementCumulativeVolume =
+         array.sum(additionalMovementVolumes)
+    array<float> additionalCalculatedProfile =
+         f_calculateProfile(
+              additionalMovementLows,
+              additionalMovementHighs,
+              additionalMovementVolumes,
+              additionalMovementLow,
+              additionalMovementHigh,
+              profileRows,
+              valueAreaPercent / 100.0)
+    float additionalCalculatedVAL =
+         array.get(additionalCalculatedProfile, 0)
+    float additionalCalculatedPOC =
+         array.get(additionalCalculatedProfile, 1)
+    float additionalCalculatedVAH =
+         array.get(additionalCalculatedProfile, 2)
+
+    bool additionalMovementMakesHigherHigh =
+         not additionalTrendRequireHigherHigh or
+         additionalMovementHigh >
+              highestAcceptedTrendHigh +
+              atrValue * additionalTrendHigherHighBufferATR
+    bool additionalMovementOverlapsTooMuch = false
+    if not na(movementLow) and not na(movementHigh)
+        float primaryMovementOverlap =
+             f_rangeOverlapFraction(
+                  additionalMovementLow,
+                  additionalMovementHigh,
+                  movementLow,
+                  movementHigh)
+        bool primaryInitiativeOverlapException =
+             f_initiativeOverlapException(
+                  additionalMovementLow,
+                  additionalMovementHigh,
+                  movementHigh,
+                  additionalMovementTriggerRelativeVolume,
+                  additionalMovementTriggerBodyATR,
+                  additionalMovementTriggerCloseLocation,
+                  atrValue)
+        additionalMovementOverlapsTooMuch :=
+             primaryMovementOverlap >
+                  additionalTrendMaximumRangeOverlap and
+             not primaryInitiativeOverlapException
+
+    if array.size(additionalProfiles) > 0
+        for existingProfileIndex = 0 to
+             array.size(additionalProfiles) - 1
+            AdditionalProfile existingProfile =
+                 array.get(
+                      additionalProfiles,
+                      existingProfileIndex)
+            bool sameDateExistingProfile =
+                 existingProfile.dateKey == currentDateKey
+            float existingOverlap =
+                 f_rangeOverlapFraction(
+                      additionalMovementLow,
+                      additionalMovementHigh,
+                      existingProfile.movementLow,
+                      existingProfile.movementHigh)
+            bool existingInitiativeOverlapException =
+                 f_initiativeOverlapException(
+                      additionalMovementLow,
+                      additionalMovementHigh,
+                      existingProfile.movementHigh,
+                      additionalMovementTriggerRelativeVolume,
+                      additionalMovementTriggerBodyATR,
+                      additionalMovementTriggerCloseLocation,
+                      atrValue)
+            if sameDateExistingProfile and
+                 existingOverlap >
+                      additionalTrendMaximumRangeOverlap and
+                 not existingInitiativeOverlapException
+                additionalMovementOverlapsTooMuch := true
+
+    bool additionalProfileValuesReady =
+         additionalMovementCumulativeVolume >=
+              minimumMoveCumulativeVolume and
+         additionalMovementMakesHigherHigh and
+         not additionalMovementOverlapsTooMuch and
+         not na(additionalCalculatedVAL) and
+         not na(additionalCalculatedPOC) and
+         not na(additionalCalculatedVAH)
+
+    if additionalProfileValuesReady
+        line additionalVALLine = line.new(
+             x1 = additionalMovementStartTime,
+             y1 = additionalCalculatedVAL,
+             x2 = additionalMovementEndTime,
+             y2 = additionalCalculatedVAL,
+             xloc = xloc.bar_time,
+             extend = extend.none,
+             color = valColor,
+             width = 2)
+        line additionalPOCLine = line.new(
+             x1 = additionalMovementStartTime,
+             y1 = additionalCalculatedPOC,
+             x2 = additionalMovementEndTime,
+             y2 = additionalCalculatedPOC,
+             xloc = xloc.bar_time,
+             extend = extend.none,
+             color = pocColor,
+             width = 2,
+             style = line.style_dashed)
+        line additionalVAHLine = line.new(
+             x1 = additionalMovementStartTime,
+             y1 = additionalCalculatedVAH,
+             x2 = additionalMovementEndTime,
+             y2 = additionalCalculatedVAH,
+             xloc = xloc.bar_time,
+             extend = extend.none,
+             color = vahColor,
+             width = 2)
+        box additionalMovementBox = na
+        if showMovementBox
+            additionalMovementBox := box.new(
+                 left = additionalMovementStartTime,
+                 top = additionalMovementHigh,
+                 right = additionalMovementEndTime,
+                 bottom = additionalMovementLow,
+                 xloc = xloc.bar_time,
+                 border_color = color.new(vahColor, 45),
+                 border_width = 1,
+                 bgcolor = color.new(vahColor, 91))
+            array.push(
+                 retainedMovementBoxes,
+                 additionalMovementBox)
+            if array.size(retainedMovementBoxes) >
+                 maximumHistoricalProfiles
+                box.delete(array.shift(retainedMovementBoxes))
+
+        AdditionalProfile additionalProfile = AdditionalProfile.new(
+             number = nextProfileNumber,
+             dateKey = currentDateKey,
+             sessionId = activeMarketSession,
+             movementStartTime = additionalMovementStartTime,
+             movementEndTime = additionalMovementEndTime,
+             readyBarIndex = bar_index,
+             lastVisibleTime = time_close,
+             movementLow = additionalMovementLow,
+             movementHigh = additionalMovementHigh,
+             val = additionalCalculatedVAL,
+             poc = additionalCalculatedPOC,
+             vah = additionalCalculatedVAH,
+             freezeVWAP = sessionVWAP,
+             valLine = additionalVALLine,
+             pocLine = additionalPOCLine,
+             vahLine = additionalVAHLine,
+             movementBox = additionalMovementBox)
+
+        int additionalStoredBarCount =
+             array.size(additionalMovementLows)
+        if additionalStoredBarCount > 0
+            for storedAdditionalIndex = 0 to
+                 additionalStoredBarCount - 1
+                float storedAdditionalOpen =
+                     array.get(
+                          additionalMovementOpens,
+                          storedAdditionalIndex)
+                float storedAdditionalHigh =
+                     array.get(
+                          additionalMovementHighs,
+                          storedAdditionalIndex)
+                float storedAdditionalClose =
+                     array.get(
+                          additionalMovementCloses,
+                          storedAdditionalIndex)
+                float storedAdditionalATR =
+                     array.get(
+                          additionalMovementATRs,
+                          storedAdditionalIndex)
+                int storedAdditionalTime =
+                     array.get(
+                          additionalMovementTimes,
+                          storedAdditionalIndex)
+                int storedAdditionalBarIndex =
+                     array.get(
+                          additionalMovementBarIndices,
+                          storedAdditionalIndex)
+                bool storedAdditionalPOCFail =
+                     not na(storedAdditionalATR) and
+                     storedAdditionalATR > 0.0 and
+                     storedAdditionalOpen < additionalProfile.poc and
+                     storedAdditionalHigh >=
+                          additionalProfile.poc +
+                          storedAdditionalATR *
+                          pocMinimumPenetrationATR and
+                     storedAdditionalClose <=
+                          additionalProfile.poc +
+                          storedAdditionalATR *
+                          pocFailedCloseBandATR and
+                     storedAdditionalHigh - storedAdditionalClose >=
+                          storedAdditionalATR *
+                          pocMinimumDownwardRejectionATR and
+                     (
+                          na(additionalProfile.lastPOCAttemptBarIndex) or
+                          storedAdditionalBarIndex -
+                          additionalProfile.lastPOCAttemptBarIndex >=
+                          pocAttemptSpacingBars
+                     )
+                if storedAdditionalPOCFail
+                    additionalProfile.failedPOCAttempts += 1
+                    additionalProfile.lastPOCAttemptBarIndex :=
+                         storedAdditionalBarIndex
+                    if showPOCAttemptMarkers
+                        label storedAdditionalFailLabel = label.new(
+                             x = storedAdditionalTime,
+                             y = storedAdditionalHigh +
+                                  storedAdditionalATR *
+                                  pocAttemptLabelDistanceATR,
+                             text = "P" +
+                                  str.tostring(additionalProfile.number) +
+                                  " POC\nFAIL " +
+                                  str.tostring(
+                                       additionalProfile.failedPOCAttempts),
+                             xloc = xloc.bar_time,
+                             yloc = yloc.price,
+                             style = label.style_label_down,
+                             color = color.new(pocColor, 5),
+                             textcolor = color.rgb(30, 30, 30),
+                             size = size.tiny,
+                             tooltip =
+                                  "PROFILE " +
+                                  str.tostring(additionalProfile.number) +
+                                  " FAILED POC ATTEMPT\nPOC: " +
+                                  str.tostring(
+                                       additionalProfile.poc,
+                                       format.mintick))
+                        array.push(
+                             retainedMarkers,
+                             storedAdditionalFailLabel)
+        additionalProfile.internalFailedPOCAttempts :=
+             additionalProfile.failedPOCAttempts
+        array.push(additionalProfiles, additionalProfile)
+
+        array.push(retainedProfileLines, additionalVALLine)
+        array.push(retainedProfileLines, additionalPOCLine)
+        array.push(retainedProfileLines, additionalVAHLine)
+        while array.size(retainedProfileLines) >
+             maximumHistoricalProfiles * 3
+            line.delete(array.shift(retainedProfileLines))
+
+        float additionalVALElevation =
+             additionalMovementHigh > additionalMovementLow ?
+             (additionalCalculatedVAL - additionalMovementLow) /
+                  (additionalMovementHigh - additionalMovementLow) :
+             0.0
+        float additionalDominanceScore =
+             additionalMovementCumulativeVolume *
+             math.max(
+                  additionalMovementHigh - additionalMovementLow,
+                  syminfo.mintick)
+        if enableStackedMeaningfulVALProfiles
+            f_registerMeaningfulVALProfile(
+                 meaningfulVALProfiles,
+                 currentDateKey,
+                 activeMarketSession,
+                 additionalMovementStartTime,
+                 additionalMovementEndTime,
+                 bar_index,
+                 additionalMovementLow,
+                 additionalMovementHigh,
+                 additionalCalculatedVAL,
+                 additionalCalculatedPOC,
+                 additionalCalculatedVAH,
+                 additionalMovementCumulativeVolume,
+                 atrValue,
+                 additionalVALLine,
+                 additionalPOCLine,
+                 additionalVAHLine)
+        bool additionalDominantElevationQualified =
+             additionalVALElevation >=
+                  dominantMinimumVALElevationPercent / 100.0
+        bool additionalDominantIsLater =
+             na(dominantReferenceEndTime) or
+             additionalMovementEndTime > dominantReferenceEndTime
+        bool additionalDominantScoreQualified =
+             not dominantReferenceReady or
+             dominantReferenceInvalidated or
+             additionalDominanceScore >=
+                  dominantReferenceScore *
+                  dominantReplacementScoreRatio
+        bool selectAdditionalAsDominant =
+             enableDominantProfileVALReference and
+             not enableStackedMeaningfulVALProfiles and
+             additionalDominantElevationQualified and
+             additionalDominantIsLater and
+             additionalDominantScoreQualified
+
+        if selectAdditionalAsDominant
+            if not na(dominantReferenceVALLine)
+                line.delete(dominantReferenceVALLine)
+            if not na(dominantReferencePOCLine)
+                line.delete(dominantReferencePOCLine)
+            if not na(dominantReferenceVAHLine)
+                line.delete(dominantReferenceVAHLine)
+
+            dominantReferenceReady := true
+            dominantReferenceInvalidated := false
+            dominantReferenceDateKey := currentDateKey
+            dominantReferenceSessionId := activeMarketSession
+            dominantReferenceStartTime :=
+                 additionalMovementStartTime
+            dominantReferenceEndTime := additionalMovementEndTime
+            dominantReferenceReadyBarIndex := bar_index
+            dominantReferenceAgeTradingDates := 0
+            dominantReferenceMovementLow := additionalMovementLow
+            dominantReferenceMovementHigh := additionalMovementHigh
+            dominantReferenceVAL := additionalCalculatedVAL
+            dominantReferencePOC := additionalCalculatedPOC
+            dominantReferenceVAH := additionalCalculatedVAH
+            dominantReferenceCumulativeVolume :=
+                 additionalMovementCumulativeVolume
+            dominantReferenceScore := additionalDominanceScore
+            dominantReferenceClosesBelowLow := 0
+            dominantReferenceDefenseArmed := true
+            dominantReferenceTestActive := false
+            dominantReferenceTestBarIndex := na
+            dominantReferenceTestTime := na
+            dominantReferenceTestLow := na
+
+            dominantReferenceVALLine := line.new(
+                 x1 = additionalMovementStartTime,
+                 y1 = additionalCalculatedVAL,
+                 x2 = time_close,
+                 y2 = additionalCalculatedVAL,
+                 xloc = xloc.bar_time,
+                 extend = extend.none,
+                 color = color.new(valColor, 0),
+                 width = 4)
+            dominantReferencePOCLine := line.new(
+                 x1 = additionalMovementStartTime,
+                 y1 = additionalCalculatedPOC,
+                 x2 = time_close,
+                 y2 = additionalCalculatedPOC,
+                 xloc = xloc.bar_time,
+                 extend = extend.none,
+                 color = pocColor,
+                 width = 3,
+                 style = line.style_dashed)
+            dominantReferenceVAHLine := line.new(
+                 x1 = additionalMovementStartTime,
+                 y1 = additionalCalculatedVAH,
+                 x2 = time_close,
+                 y2 = additionalCalculatedVAH,
+                 xloc = xloc.bar_time,
+                 extend = extend.none,
+                 color = vahColor,
+                 width = 3)
+
+        if showFrozenProfileLabel
+            string additionalProfileTooltip =
+                 "FRVP " +
+                 str.tostring(additionalProfile.number) +
+                 " FROZEN\n" +
+                 str.format_time(
+                      additionalMovementStartTime,
+                      "HH:mm",
+                      syminfo.timezone) +
+                 "–" +
+                 str.format_time(
+                      additionalMovementEndTime,
+                      "HH:mm",
+                      syminfo.timezone) +
+                 "\nVAL " +
+                 str.tostring(additionalProfile.val, format.mintick) +
+                 "  •  POC " +
+                 str.tostring(additionalProfile.poc, format.mintick) +
+                 "  •  VAH " +
+                 str.tostring(additionalProfile.vah, format.mintick) +
+                 "\nCumulative volume " +
+                 str.tostring(
+                      math.round(additionalMovementCumulativeVolume))
+            label additionalProfileLabel = label.new(
+                 x = additionalMovementEndTime,
+                 y = additionalMovementHigh,
+                 text = "FRVP " +
+                      str.tostring(additionalProfile.number) +
+                      "\nFROZEN",
+                 xloc = xloc.bar_time,
+                 yloc = yloc.price,
+                 style = label.style_label_down,
+                 color = color.new(vahColor, 5),
+                 textcolor = color.white,
+                 size = size.tiny,
+                 tooltip = additionalProfileTooltip)
+            array.push(retainedMarkers, additionalProfileLabel)
+
+        profilesCreatedInCurrentSession += 1
+        nextProfileNumber += 1
+        lastProfileFreezeBarIndex := bar_index
+        highestAcceptedTrendHigh :=
+             math.max(
+                  highestAcceptedTrendHigh,
+                  additionalMovementHigh)
+
+    additionalScannerState := STATE_SEARCHING
+    array.clear(additionalMovementLows)
+    array.clear(additionalMovementHighs)
+    array.clear(additionalMovementVolumes)
+    array.clear(additionalMovementOpens)
+    array.clear(additionalMovementCloses)
+    array.clear(additionalMovementATRs)
+    array.clear(additionalMovementTimes)
+    array.clear(additionalMovementBarIndices)
+    additionalMovementLow := na
+    additionalMovementHigh := na
+    additionalMovementPeakVolume := na
+    additionalMovementStartTime := na
+    additionalMovementEndTime := na
+    additionalMovementHighBarIndex := na
+    additionalMovementHighEndTime := na
+    additionalMovementTriggerRelativeVolume := na
+    additionalMovementTriggerBodyATR := na
+    additionalMovementTriggerCloseLocation := na
+    additionalMovementTriggerBarIndex := na
+    additionalMovementTriggerTime := na
+    additionalMovementWasStitched := false
+    additionalStitchDeadlineBarIndex := na
+    additionalStitchReferenceHigh := na
+
+if discardAdditionalMovementNow
+    additionalScannerState := STATE_SEARCHING
+    array.clear(additionalMovementLows)
+    array.clear(additionalMovementHighs)
+    array.clear(additionalMovementVolumes)
+    array.clear(additionalMovementOpens)
+    array.clear(additionalMovementCloses)
+    array.clear(additionalMovementATRs)
+    array.clear(additionalMovementTimes)
+    array.clear(additionalMovementBarIndices)
+    additionalMovementLow := na
+    additionalMovementHigh := na
+    additionalMovementPeakVolume := na
+    additionalMovementStartTime := na
+    additionalMovementEndTime := na
+    additionalMovementHighBarIndex := na
+    additionalMovementHighEndTime := na
+    additionalMovementTriggerRelativeVolume := na
+    additionalMovementTriggerBodyATR := na
+    additionalMovementTriggerCloseLocation := na
+    additionalMovementTriggerBarIndex := na
+    additionalMovementTriggerTime := na
+    additionalMovementWasStitched := false
+    additionalStitchDeadlineBarIndex := na
+    additionalStitchReferenceHigh := na
+
+//------------------------------------------------------------------------------
+// Independent lifecycle for every additional frozen profile
+//------------------------------------------------------------------------------
+
+if barstate.isconfirmed and
+     timeframeSupported and
+     inAnalysisSession and
+     array.size(additionalProfiles) > 0
+    for additionalProfileIndex = 0 to
+         array.size(additionalProfiles) - 1
+        AdditionalProfile additionalProfile =
+             array.get(additionalProfiles, additionalProfileIndex)
+        bool additionalProfileCanBeEvaluated =
+             additionalProfile.dateKey == currentDateKey and
+             bar_index > additionalProfile.readyBarIndex
+
+        if additionalProfileCanBeEvaluated
+            bool additionalConfirmBreakoutNow = false
+            bool additionalProfileReactivatedNow = false
+            additionalProfile.lastVisibleTime := time_close
+            line.set_x2(
+                 additionalProfile.valLine,
+                 additionalProfile.lastVisibleTime)
+            line.set_x2(
+                 additionalProfile.pocLine,
+                 additionalProfile.lastVisibleTime)
+            line.set_x2(
+                 additionalProfile.vahLine,
+                 additionalProfile.lastVisibleTime)
+
+            bool additionalCloseBelowMovementLow =
+                 close < additionalProfile.movementLow
+            additionalProfile.closesBelowMovementLow :=
+                 additionalCloseBelowMovementLow ?
+                 additionalProfile.closesBelowMovementLow + 1 :
+                 0
+            bool additionalProfileInvalidatedNow =
+                 additionalProfile.closesBelowMovementLow >=
+                      valInvalidationCloses and
+                 not additionalProfile.invalidated
+
+            if additionalProfileInvalidatedNow
+                additionalProfile.invalidated := true
+                additionalProfile.valEntryCandidateActive := false
+                additionalProfile.valEntryCandidateBarIndex := na
+                additionalProfile.valEntryCandidateTime := na
+                additionalProfile.valEntryCandidateHigh := na
+                additionalProfile.valEntryCandidateLow := na
+                additionalProfile.breakoutPending := false
+                additionalProfile.breakoutConfirmed := false
+                additionalProfile.entryLabel := na
+                additionalProfile.recoveryStage := 0
+                if showVALInvalidation and
+                     not additionalProfile.invalidationMarked
+                    label additionalLostLabel = label.new(
+                         x = time,
+                         y = low,
+                         text = "FRVP " +
+                              str.tostring(additionalProfile.number) +
+                              "\nLOST",
+                         xloc = xloc.bar_time,
+                         yloc = yloc.price,
+                         style = label.style_label_up,
+                         color = color.new(color.red, 5),
+                         textcolor = color.white,
+                         size = size.tiny,
+                         tooltip =
+                              "Profile " +
+                              str.tostring(additionalProfile.number) +
+                              " was accepted below its movement low " +
+                              str.tostring(
+                                   additionalProfile.movementLow,
+                                   format.mintick))
+                    array.push(retainedMarkers, additionalLostLabel)
+                    additionalProfile.invalidationMarked := true
+
+            if additionalProfile.invalidated and
+                 enableProfileReactivation
+                int additionalRecoveryStageBefore =
+                     additionalProfile.recoveryStage
+                float additionalRecoveryBodyToRange =
+                     candleRange > 0.0 ?
+                     candleBody / candleRange :
+                     0.0
+                bool additionalOrderedRecovery =
+                     additionalRecoveryStageBefore >= 2 and
+                     additionalProfile.failedPOCAttempts >=
+                          minimumFailedPOCAttempts and
+                     close[1] > additionalProfile.poc and
+                     close[1] <= additionalProfile.vah and
+                     open > additionalProfile.poc and
+                     open <= additionalProfile.vah and
+                     low >= additionalProfile.poc and
+                     close >
+                          additionalProfile.vah +
+                          atrValue * pocFightVAHClearanceATR and
+                     close > open and
+                     candleBody >= atrValue * breakoutBodyATR and
+                     additionalRecoveryBodyToRange >=
+                          pocFightMinimumBodyRange and
+                     candleCloseLocation >=
+                          pocFightMinimumCloseLocation and
+                     not na(relativeVolume) and
+                     relativeVolume >= breakoutRelativeVolume and
+                     not na(volume[1]) and
+                     volume[1] > 0.0 and
+                     volume >=
+                          volume[1] * pocFightPreviousVolumeMultiple
+                if additionalOrderedRecovery
+                    additionalProfile.invalidated := false
+                    additionalProfile.invalidationMarked := false
+                    additionalProfile.valDefended := true
+                    additionalProfile.closesBelowMovementLow := 0
+                    additionalProfile.recoveryStage := 0
+                    additionalProfile.pocDefenseArmed := true
+                    additionalProfile.vahDefenseArmed := true
+                    additionalProfileReactivatedNow := true
+                    profileReactivatedThisBar := true
+                else
+                    additionalProfile.recoveryStage :=
+                         close < additionalProfile.val ? 0 :
+                         close < additionalProfile.poc ? 1 : 2
+
+            if not additionalProfile.invalidated
+                float additionalVALLowerWick =
+                     math.min(open, close) - low
+
+                bool additionalVALEntryConfirmedNow = false
+                if enableVALEntryConfirmation and
+                     not enableDominantProfileVALReference and
+                     additionalProfile.valEntryCandidateActive
+                    int additionalBarsSinceVALCandidate =
+                         bar_index -
+                         additionalProfile.valEntryCandidateBarIndex
+                    bool additionalVALEntryFloorBroken =
+                         low < additionalProfile.valEntryCandidateLow
+                    bool additionalVALEntryReachedPOC =
+                         high >= additionalProfile.poc
+                    bool additionalVALEntryHighConfirmed =
+                         additionalBarsSinceVALCandidate >= 1 and
+                         additionalBarsSinceVALCandidate <=
+                              valEntryConfirmationBars and
+                         close >
+                              additionalProfile.valEntryCandidateHigh
+
+                    if additionalVALEntryFloorBroken or
+                         additionalVALEntryReachedPOC
+                        additionalProfile.valEntryCandidateActive :=
+                             false
+                    else if additionalVALEntryHighConfirmed
+                        additionalVALEntryConfirmedNow := true
+                        valEntryConfirmedThisBar := true
+                        additionalProfile.valEntryCandidateActive :=
+                             false
+
+                        float additionalVALEntryLabelY =
+                             low -
+                             math.max(
+                                  atrValue * valEntryLabelDistanceATR,
+                                  high * 0.003)
+                        string additionalVALEntryTooltip =
+                             "VAL ENTRY CONFIRMED\n" +
+                             "Profile: " +
+                             str.tostring(additionalProfile.number) +
+                             "\nDefense: " +
+                             str.format_time(
+                                  additionalProfile.valEntryCandidateTime,
+                                  "HH:mm",
+                                  syminfo.timezone) +
+                             "\nConfirmed: " +
+                             str.format_time(
+                                  time,
+                                  "HH:mm",
+                                  syminfo.timezone) +
+                             "\nVAL: " +
+                             str.tostring(
+                                  additionalProfile.val,
+                                  format.mintick) +
+                             "\nDefended low: " +
+                             str.tostring(
+                                  additionalProfile.valEntryCandidateLow,
+                                  format.mintick) +
+                             "\nDefense high: " +
+                             str.tostring(
+                                  additionalProfile.valEntryCandidateHigh,
+                                  format.mintick)
+
+                        if showEntryMarkers
+                            label additionalVALEntryLabel = label.new(
+                                 x = time,
+                                 y = additionalVALEntryLabelY,
+                                 text = "VAL ENTRY\nCONFIRMED",
+                                 xloc = xloc.bar_time,
+                                 yloc = yloc.price,
+                                 style = label.style_label_up,
+                                 color = continuationColor,
+                                 textcolor = color.white,
+                                 size = size.tiny,
+                                 tooltip =
+                                      additionalVALEntryTooltip)
+                            array.push(
+                                 retainedEntryMarkers,
+                                 additionalVALEntryLabel)
+                    else if additionalBarsSinceVALCandidate >=
+                         valEntryConfirmationBars
+                        additionalProfile.valEntryCandidateActive :=
+                             false
+
+                bool additionalVALEntryNearVAL =
+                     not na(atrValue) and
+                     atrValue > 0.0 and
+                     low >=
+                          additionalProfile.val -
+                          atrValue * valEntryMaximumUndercutATR and
+                     low <=
+                          additionalProfile.val +
+                          atrValue * valEntryMaximumFrontRunATR
+                bool additionalVALEntryWickQuality =
+                     candleRange > 0.0 and
+                     additionalVALLowerWick >=
+                          candleRange *
+                          valEntryMinimumLowerWickRange and
+                     additionalVALLowerWick >=
+                          candleBody * valEntryMinimumLowerWickBody
+                bool additionalVALEntryVolumeQuality =
+                     not na(relativeVolume) and
+                     relativeVolume > valEntryMinimumRelativeVolume
+                bool additionalVALEntryCandidate =
+                     enableVALEntryConfirmation and
+                     not enableDominantProfileVALReference and
+                     not additionalProfile.valEntryCandidateActive and
+                     not additionalVALEntryConfirmedNow and
+                     additionalVALEntryNearVAL and
+                     close > additionalProfile.val and
+                     high < additionalProfile.poc and
+                     additionalVALEntryWickQuality and
+                     additionalVALEntryVolumeQuality and
+                     low < low[1]
+
+                if additionalVALEntryCandidate
+                    additionalProfile.valEntryCandidateActive := true
+                    additionalProfile.valEntryCandidateBarIndex :=
+                         bar_index
+                    additionalProfile.valEntryCandidateTime := time
+                    additionalProfile.valEntryCandidateHigh := high
+                    additionalProfile.valEntryCandidateLow := low
+                    additionalProfile.valDefended := true
+                    valDefendedThisBar := true
+                    line.set_color(
+                         additionalProfile.valLine,
+                         color.new(valColor, 0))
+                    line.set_width(additionalProfile.valLine, 3)
+
+                bool additionalVALDefense =
+                     close > additionalProfile.val and
+                     low < additionalProfile.val and
+                     high < additionalProfile.poc and
+                     candleBody > 0.0 and
+                     additionalVALLowerWick >=
+                          candleBody * valMinimumLowerWickToBody
+                if additionalVALDefense
+                    additionalProfile.valDefended := true
+                    line.set_color(
+                         additionalProfile.valLine,
+                         color.new(valColor, 0))
+                    line.set_width(additionalProfile.valLine, 3)
+                    if not enableDominantProfileVALReference
+                        valDefendedThisBar := true
+                    if showVALDefenseMarkers and
+                         not enableDominantProfileVALReference
+                        label additionalVALDefenseLabel = label.new(
+                             x = time,
+                             y = low,
+                             text = "P" +
+                                  str.tostring(additionalProfile.number) +
+                                  " VAL\nDEFENDED",
+                             xloc = xloc.bar_time,
+                             yloc = yloc.price,
+                             style = label.style_label_up,
+                             color = color.new(valColor, 0),
+                             textcolor = color.white,
+                             size = size.tiny,
+                             tooltip =
+                                  "PROFILE " +
+                                  str.tostring(additionalProfile.number) +
+                                  " VAL DEFENDED\nVAL: " +
+                                  str.tostring(
+                                       additionalProfile.val,
+                                       format.mintick))
+                        array.push(
+                             retainedMarkers,
+                             additionalVALDefenseLabel)
+
+                bool additionalPOCBandCleared =
+                     low >
+                     additionalProfile.poc +
+                     atrValue * pocDefenseApproachATR
+                if not additionalProfile.pocDefenseArmed and
+                     additionalPOCBandCleared
+                    additionalProfile.pocDefenseArmed := true
+
+                if additionalProfile.pocDefenseArmed
+                    bool additionalPOCPositiveBar = close >= open
+                    float additionalPOCLowerWick =
+                         (
+                              additionalPOCPositiveBar ?
+                              open :
+                              close
+                         ) - low
+                    bool additionalDirectPOCDefense =
+                         close[1] > additionalProfile.poc and
+                         open > additionalProfile.poc and
+                         low <=
+                              additionalProfile.poc +
+                              atrValue * pocDefenseApproachATR and
+                         low < low[1] and
+                         open < high[1] and
+                         close >
+                              additionalProfile.poc +
+                              atrValue * pocDefenseCloseBufferATR and
+                         additionalPOCLowerWick > 0.0 and
+                         candleRange > 0.0 and
+                         additionalPOCLowerWick >=
+                              candleRange *
+                              pocDefenseMinimumLowerWickFraction and
+                         not na(volumeAverage) and
+                         volumeAverage > 0.0 and
+                         volume / volumeAverage >=
+                              pocDefenseMinimumRelativeVolume and
+                         (
+                              na(
+                                   additionalProfile.lastPOCDefenseBarIndex) or
+                              bar_index -
+                              additionalProfile.lastPOCDefenseBarIndex >=
+                                   pocDefenseSpacingBars
+                         )
+                    if additionalDirectPOCDefense
+                        additionalProfile.pocDefenseArmed := false
+                        additionalProfile.lastPOCDefenseBarIndex :=
+                             bar_index
+                        pocDefendedThisBar := true
+                        line.set_color(
+                             additionalProfile.pocLine,
+                             pocColor)
+                        line.set_width(additionalProfile.pocLine, 3)
+                        if showPOCDefenseMarkers
+                            label additionalPOCDefenseLabel = label.new(
+                                 x = time,
+                                 y = low,
+                                 text = "P" +
+                                      str.tostring(
+                                           additionalProfile.number) +
+                                      " POC\nDEFENDED",
+                                 xloc = xloc.bar_time,
+                                 yloc = yloc.price,
+                                 style = label.style_label_up,
+                                 color = pocColor,
+                                 textcolor = color.rgb(30, 30, 30),
+                                 size = size.tiny,
+                                 tooltip =
+                                      "PROFILE " +
+                                      str.tostring(
+                                           additionalProfile.number) +
+                                      " POC DEFENDED\nPOC: " +
+                                      str.tostring(
+                                           additionalProfile.poc,
+                                           format.mintick) +
+                                      "\nVolume / average: " +
+                                      str.tostring(
+                                           volume / volumeAverage,
+                                           "#.##") +
+                                      "×")
+                            array.push(
+                                 retainedMarkers,
+                                 additionalPOCDefenseLabel)
+
+                bool additionalVAHBandCleared =
+                     low >
+                     additionalProfile.vah +
+                     atrValue * vahDefenseApproachATR
+                if not additionalProfile.vahDefenseArmed and
+                     additionalVAHBandCleared
+                    additionalProfile.vahDefenseArmed := true
+
+                if additionalProfile.vahCandidateActive
+                    int additionalVAHCandidateAge =
+                         bar_index -
+                         additionalProfile.vahCandidateBarIndex
+                    bool additionalVAHCandidateFloorHeld =
+                         low >= additionalProfile.vahCandidateLow
+                    bool additionalVAHCandidateValueHeld =
+                         close >=
+                         additionalProfile.vah -
+                         atrValue * vahDefenseCloseToleranceATR
+                    bool additionalTwoBarVAHDefense =
+                         additionalVAHCandidateAge >= 1 and
+                         additionalVAHCandidateAge <=
+                              vahDefenseConfirmationWindowBars and
+                         additionalVAHCandidateFloorHeld and
+                         additionalVAHCandidateValueHeld and
+                         open > additionalProfile.vah and
+                         close > additionalProfile.vahCandidateHigh and
+                         close > open and
+                         candleBody >=
+                              atrValue *
+                              twoBarVAHConfirmationBodyATR and
+                         candleCloseLocation >=
+                              twoBarVAHConfirmationCloseLocation and
+                         not na(volumeAverage) and
+                         volumeAverage > 0.0 and
+                         volume > volumeAverage and
+                         volume >=
+                              additionalProfile.vahCandidateVolume *
+                              twoBarVAHConfirmationVolumeMultiple
+                    if additionalTwoBarVAHDefense
+                        additionalProfile.vahDefenseArmed := false
+                        additionalProfile.lastVAHDefenseBarIndex :=
+                             bar_index
+                        vahDefendedThisBar := true
+                        line.set_color(
+                             additionalProfile.vahLine,
+                             vahColor)
+                        line.set_width(additionalProfile.vahLine, 3)
+                        if showVAHDefenseMarkers
+                            label additionalTwoBarVAHLabel = label.new(
+                                 x = additionalProfile.vahCandidateTime,
+                                 y = additionalProfile.vahCandidateLow,
+                                 text = "P" +
+                                      str.tostring(
+                                           additionalProfile.number) +
+                                      " VAH\nDEFENDED",
+                                 xloc = xloc.bar_time,
+                                 yloc = yloc.price,
+                                 style = label.style_label_up,
+                                 color = vahColor,
+                                 textcolor = color.white,
+                                 size = size.tiny,
+                                 tooltip =
+                                      "PROFILE " +
+                                      str.tostring(
+                                           additionalProfile.number) +
+                                      " VAH DEFENDED\nTest: " +
+                                      str.format_time(
+                                           additionalProfile.vahCandidateTime,
+                                           "HH:mm",
+                                           syminfo.timezone) +
+                                      "\nConfirmed: " +
+                                      str.format_time(
+                                           time,
+                                           "HH:mm",
+                                           syminfo.timezone) +
+                                      "\nVAH: " +
+                                      str.tostring(
+                                           additionalProfile.vah,
+                                           format.mintick))
+                            array.push(
+                                 retainedMarkers,
+                                 additionalTwoBarVAHLabel)
+
+                    bool additionalVAHCandidateExpired =
+                         additionalVAHCandidateAge >=
+                         vahDefenseConfirmationWindowBars
+                    bool additionalVAHCandidateFailed =
+                         not additionalVAHCandidateFloorHeld or
+                         not additionalVAHCandidateValueHeld
+                    if additionalTwoBarVAHDefense or
+                         additionalVAHCandidateExpired or
+                         additionalVAHCandidateFailed
+                        additionalProfile.vahCandidateActive := false
+                        additionalProfile.vahCandidateBarIndex := na
+                        additionalProfile.vahCandidateTime := na
+                        additionalProfile.vahCandidateOpen := na
+                        additionalProfile.vahCandidateHigh := na
+                        additionalProfile.vahCandidateLow := na
+                        additionalProfile.vahCandidateClose := na
+                        additionalProfile.vahCandidateVolume := na
+                        additionalProfile.vahCandidateLowerWickShare :=
+                             na
+
+                if additionalProfile.vahDefenseArmed and
+                     not additionalProfile.vahCandidateActive
+                    bool additionalImmediateVAHRetest =
+                         not na(additionalProfile.breakoutBarIndex) and
+                         bar_index ==
+                              additionalProfile.breakoutBarIndex + 1 and
+                         (
+                              additionalProfile.breakoutPending or
+                              additionalProfile.breakoutConfirmed
+                         )
+                    bool additionalVAHPositiveBar = close >= open
+                    float additionalVAHLowerWick =
+                         (
+                              additionalVAHPositiveBar ?
+                              open :
+                              close
+                         ) - low
+                    bool additionalVAHVolumeReady =
+                         not na(volumeAverage) and
+                         volumeAverage > 0.0
+                    bool additionalVAHCoreQualified =
+                         close[1] > additionalProfile.vah and
+                         open > additionalProfile.vah and
+                         low <=
+                              additionalProfile.vah +
+                              atrValue * vahDefenseApproachATR and
+                         (
+                              low < low[1] or
+                              additionalImmediateVAHRetest
+                         ) and
+                         open < high[1] and
+                         close >=
+                              additionalProfile.vah -
+                              atrValue * vahDefenseCloseToleranceATR and
+                         additionalVAHLowerWick > 0.0 and
+                         candleRange > 0.0 and
+                         (
+                              na(
+                                   additionalProfile.lastVAHDefenseBarIndex) or
+                              bar_index -
+                              additionalProfile.lastVAHDefenseBarIndex >=
+                                   vahDefenseSpacingBars
+                         )
+                    bool additionalDirectVAHDefense =
+                         additionalVAHCoreQualified and
+                         additionalVAHLowerWick >=
+                              candleRange *
+                              vahDefenseMinimumLowerWickFraction and
+                         additionalVAHVolumeReady and
+                         volume > volumeAverage
+                    if additionalDirectVAHDefense
+                        additionalProfile.vahDefenseArmed := false
+                        additionalProfile.lastVAHDefenseBarIndex :=
+                             bar_index
+                        vahDefendedThisBar := true
+                        line.set_color(
+                             additionalProfile.vahLine,
+                             vahColor)
+                        line.set_width(additionalProfile.vahLine, 3)
+                        if showVAHDefenseMarkers
+                            label additionalVAHDefenseLabel = label.new(
+                                 x = time,
+                                 y = low,
+                                 text = "P" +
+                                      str.tostring(
+                                           additionalProfile.number) +
+                                      " VAH\nDEFENDED",
+                                 xloc = xloc.bar_time,
+                                 yloc = yloc.price,
+                                 style = label.style_label_up,
+                                 color = vahColor,
+                                 textcolor = color.white,
+                                 size = size.tiny,
+                                 tooltip =
+                                      "PROFILE " +
+                                      str.tostring(
+                                           additionalProfile.number) +
+                                      " VAH DEFENDED\nVAH: " +
+                                      str.tostring(
+                                           additionalProfile.vah,
+                                           format.mintick))
+                            array.push(
+                                 retainedMarkers,
+                                 additionalVAHDefenseLabel)
+                    else
+                        bool additionalDelayedVAHCandidate =
+                             enableTwoBarVAHDefense and
+                             additionalVAHCoreQualified and
+                             additionalVAHLowerWick >=
+                                  candleRange *
+                                  vahCandidateMinimumLowerWickFraction and
+                             additionalVAHVolumeReady
+                        if additionalDelayedVAHCandidate
+                            additionalProfile.vahCandidateActive := true
+                            additionalProfile.vahCandidateBarIndex :=
+                                 bar_index
+                            additionalProfile.vahCandidateTime := time
+                            additionalProfile.vahCandidateOpen := open
+                            additionalProfile.vahCandidateHigh := high
+                            additionalProfile.vahCandidateLow := low
+                            additionalProfile.vahCandidateClose := close
+                            additionalProfile.vahCandidateVolume :=
+                                 volume
+                            additionalProfile.vahCandidateLowerWickShare :=
+                                 additionalVAHLowerWick / candleRange
+
+            if additionalProfile.breakoutPending
+                bool additionalValueAreaSweepPending =
+                     additionalProfile.breakoutPath ==
+                     BREAKOUT_PATH_VALUE_AREA_SWEEP
+                bool additionalHoldFailed =
+                     additionalValueAreaSweepPending ?
+                     close < additionalProfile.vah :
+                     close <
+                          additionalProfile.poc -
+                          atrValue * breakoutFailureBelowPOCATR
+                int additionalElapsedHoldBars =
+                     bar_index - additionalProfile.breakoutBarIndex
+                if additionalHoldFailed
+                    additionalProfile.breakoutPending := false
+                    additionalProfile.entryLabel := na
+                else if additionalElapsedHoldBars >=
+                     breakoutHoldBars
+                    additionalConfirmBreakoutNow := true
+
+            bool additionalOpensBelowPOC =
+                 open < additionalProfile.poc
+            bool additionalReachesPOC =
+                 high >=
+                 additionalProfile.poc +
+                 atrValue * pocMinimumPenetrationATR
+            bool additionalClosesNearPOC =
+                 close <=
+                 additionalProfile.poc +
+                 atrValue * pocFailedCloseBandATR
+            bool additionalRejectsFromPOC =
+                 high - close >=
+                 atrValue * pocMinimumDownwardRejectionATR
+            bool additionalPOCFailSpacing =
+                 na(additionalProfile.lastPOCAttemptBarIndex) or
+                 bar_index -
+                 additionalProfile.lastPOCAttemptBarIndex >=
+                 pocAttemptSpacingBars
+            bool additionalPOCFailNow =
+                 not additionalProfile.invalidated and
+                 not additionalProfile.breakoutPending and
+                 not additionalProfile.breakoutConfirmed and
+                 additionalOpensBelowPOC and
+                 additionalReachesPOC and
+                 additionalClosesNearPOC and
+                 additionalRejectsFromPOC and
+                 additionalPOCFailSpacing
+            if additionalPOCFailNow
+                additionalProfile.failedPOCAttempts += 1
+                additionalProfile.lastPOCAttemptBarIndex := bar_index
+                if showPOCAttemptMarkers
+                    label additionalPOCFailLabel = label.new(
+                         x = time,
+                         y = high +
+                              atrValue * pocAttemptLabelDistanceATR,
+                         text = "P" +
+                              str.tostring(additionalProfile.number) +
+                              " POC\nFAIL " +
+                              str.tostring(
+                                   additionalProfile.failedPOCAttempts),
+                         xloc = xloc.bar_time,
+                         yloc = yloc.price,
+                         style = label.style_label_down,
+                         color = color.new(pocColor, 5),
+                         textcolor = color.rgb(30, 30, 30),
+                         size = size.tiny,
+                         tooltip =
+                              "PROFILE " +
+                              str.tostring(additionalProfile.number) +
+                              " FAILED POC ATTEMPT\nPOC: " +
+                              str.tostring(
+                                   additionalProfile.poc,
+                                   format.mintick))
+                    array.push(
+                         retainedMarkers,
+                         additionalPOCFailLabel)
+
+            bool additionalBreakoutStartsNearPOC =
+                 open <=
+                      additionalProfile.poc +
+                      atrValue * breakoutStartToleranceATR or
+                 close[1] <=
+                      additionalProfile.poc +
+                      atrValue * breakoutStartToleranceATR
+            bool additionalBreakoutAboveVAH =
+                 close >
+                 additionalProfile.vah +
+                 atrValue * breakoutVAHBufferATR
+            bool additionalBreakoutPriceQuality =
+                 close > open and
+                 candleBody >= atrValue * breakoutBodyATR and
+                 candleCloseLocation >= breakoutCloseLocation
+            bool additionalBreakoutVolumeQuality =
+                 not na(relativeVolume) and
+                 relativeVolume >= breakoutRelativeVolume
+            bool additionalClassicBreakout =
+                 not additionalProfile.breakoutPending and
+                 not additionalProfile.breakoutConfirmed and
+                 additionalProfile.valDefended and
+                 not additionalProfile.invalidated and
+                 additionalProfile.failedPOCAttempts >=
+                      minimumFailedPOCAttempts and
+                 additionalBreakoutStartsNearPOC and
+                 additionalBreakoutAboveVAH and
+                 additionalBreakoutPriceQuality and
+                 additionalBreakoutVolumeQuality
+
+            float additionalBodyToRange =
+                 candleRange > 0.0 ?
+                 candleBody / candleRange :
+                 0.0
+            bool additionalPOCFightBreakout =
+                 not additionalProfile.breakoutPending and
+                 not additionalProfile.breakoutConfirmed and
+                 enablePOCFightVAHReclaim and
+                 not additionalProfile.invalidated and
+                 additionalProfile.internalFailedPOCAttempts >=
+                      minimumFailedPOCAttempts and
+                 open > additionalProfile.poc and
+                 open <= additionalProfile.vah and
+                 close[1] <= additionalProfile.vah and
+                 low >= additionalProfile.poc and
+                 close >
+                      additionalProfile.vah +
+                      atrValue * pocFightVAHClearanceATR and
+                 close > open and
+                 candleBody >= atrValue * breakoutBodyATR and
+                 additionalBodyToRange >=
+                      pocFightMinimumBodyRange and
+                 candleCloseLocation >=
+                      pocFightMinimumCloseLocation and
+                 not na(relativeVolume) and
+                 relativeVolume >=
+                      pocFightMinimumRelativeVolume and
+                 not na(volume[1]) and
+                 volume[1] > 0.0 and
+                 volume >=
+                      volume[1] * pocFightPreviousVolumeMultiple
+
+            bool additionalExceptionalBreakout =
+                 not additionalProfile.breakoutPending and
+                 not additionalProfile.breakoutConfirmed and
+                 enableExceptionalVAHExpansion and
+                 additionalProfile.valDefended and
+                 not additionalProfile.invalidated and
+                 close[1] <= additionalProfile.vah and
+                 close >
+                      additionalProfile.vah +
+                      atrValue * exceptionalVAHClearanceATR and
+                 close > open and
+                 candleBody >= atrValue * exceptionalBodyATR and
+                 additionalBodyToRange >=
+                      exceptionalBodyRangeFraction and
+                 candleCloseLocation >= exceptionalCloseLocation and
+                 additionalBreakoutVolumeQuality and
+                 not na(exceptionalPreviousVolumeAverage) and
+                 exceptionalPreviousVolumeAverage > 0.0 and
+                 volume >=
+                      exceptionalPreviousVolumeAverage *
+                      exceptionalRecentVolumeMultiplier
+            float additionalValueAreaSweepLowerWick =
+                 math.min(open, close) - low
+            float additionalValueAreaSweepLowerWickToRange =
+                 candleRange > 0.0 ?
+                 additionalValueAreaSweepLowerWick / candleRange :
+                 0.0
+            bool additionalValueAreaSweepBreakout =
+                 not additionalProfile.breakoutPending and
+                 not additionalProfile.breakoutConfirmed and
+                 enableValueAreaSweepReclaim and
+                 not additionalProfile.invalidated and
+                 (
+                      additionalProfile.valDefended or
+                      additionalProfile.failedPOCAttempts >=
+                           valueAreaSweepMinimumFailedPOCAttempts
+                 ) and
+                 open >= additionalProfile.poc and
+                 open <= additionalProfile.vah and
+                 close[1] >= additionalProfile.poc and
+                 close[1] <= additionalProfile.vah and
+                 low <= additionalProfile.poc and
+                 low >=
+                      additionalProfile.val -
+                      atrValue * valueAreaSweepMaximumVALUndercutATR and
+                 close >
+                      additionalProfile.vah +
+                      atrValue * valueAreaSweepVAHClearanceATR and
+                 close > open and
+                 candleBody >=
+                      atrValue * valueAreaSweepMinimumBodyATR and
+                 additionalBodyToRange >=
+                      valueAreaSweepMinimumBodyRange and
+                 candleCloseLocation >=
+                      valueAreaSweepMinimumCloseLocation and
+                 additionalValueAreaSweepLowerWickToRange >=
+                      valueAreaSweepMinimumLowerWickRange and
+                 not na(relativeVolume) and
+                 relativeVolume >=
+                      valueAreaSweepMinimumRelativeVolume and
+                 not na(exceptionalPreviousVolumeAverage) and
+                 exceptionalPreviousVolumeAverage > 0.0 and
+                 volume >=
+                      exceptionalPreviousVolumeAverage *
+                      valueAreaSweepRecentVolumeMultiplier
+            bool additionalStrongBreakout =
+                 additionalProfileReactivatedNow or
+                 additionalValueAreaSweepBreakout or
+                 additionalClassicBreakout or
+                 additionalPOCFightBreakout or
+                 additionalExceptionalBreakout
+
+            if additionalStrongBreakout
+                additionalProfile.breakoutBarIndex := bar_index
+                additionalProfile.breakoutTime := time
+                additionalProfile.breakoutLow := low
+                additionalProfile.breakoutHigh := high
+                additionalProfile.breakoutATR := atrValue
+                additionalProfile.breakoutPath :=
+                     additionalProfileReactivatedNow ?
+                     "PROFILE RECOVERY / VAH RECLAIM" :
+                     additionalValueAreaSweepBreakout ?
+                     BREAKOUT_PATH_VALUE_AREA_SWEEP :
+                     additionalExceptionalBreakout ?
+                     "EXCEPTIONAL VAH EXPANSION" :
+                     additionalPOCFightBreakout ?
+                     "POC FIGHT / VAH RECLAIM" :
+                     "POC-TO-VAH CONTINUATION"
+                entryTriggeredThisBar := true
+                if breakoutHoldBars == 0
+                    additionalConfirmBreakoutNow := true
+                else
+                    additionalProfile.breakoutPending := true
+
+            if additionalConfirmBreakoutNow
+                additionalProfile.breakoutPending := false
+                additionalProfile.breakoutConfirmed := true
+                if showEntryMarkers
+                    string additionalConfirmedEntryTooltip =
+                         "FRVP ENTRY CONFIRMED\n" +
+                         "Profile: " +
+                         str.tostring(additionalProfile.number) +
+                         "\nEntry: " +
+                         str.format_time(
+                              additionalProfile.breakoutTime,
+                              "HH:mm",
+                              syminfo.timezone) +
+                         "\nConfirmed: " +
+                         str.format_time(
+                              time,
+                              "HH:mm",
+                              syminfo.timezone) +
+                         "\nType: " +
+                         additionalProfile.breakoutPath +
+                         "\nVAL: " +
+                         str.tostring(
+                              additionalProfile.val,
+                              format.mintick) +
+                         "\nPOC: " +
+                         str.tostring(
+                              additionalProfile.poc,
+                              format.mintick) +
+                         "\nVAH: " +
+                         str.tostring(
+                              additionalProfile.vah,
+                              format.mintick)
+                    additionalProfile.entryLabel := label.new(
+                         x = additionalProfile.breakoutTime,
+                         y = additionalProfile.breakoutLow,
+                         text = "FRVP ENTRY\nCONFIRMED",
+                         xloc = xloc.bar_time,
+                         yloc = yloc.belowbar,
+                         style = label.style_label_up,
+                         color = continuationColor,
+                         textcolor = color.white,
+                         size = size.tiny,
+                         tooltip = additionalConfirmedEntryTooltip)
+                    array.push(
+                         retainedEntryMarkers,
+                         additionalProfile.entryLabel)
+                line.set_color(
+                     additionalProfile.valLine,
+                     color.new(valColor, 20))
+                line.set_color(additionalProfile.pocLine, pocColor)
+                line.set_color(additionalProfile.vahLine, vahColor)
+                line.set_width(additionalProfile.pocLine, 3)
+                line.set_width(additionalProfile.vahLine, 3)
+
+            array.set(
+                 additionalProfiles,
+                 additionalProfileIndex,
+                 additionalProfile)
+
+//------------------------------------------------------------------------------
+// Stacked meaningful-profile VAL defense
+//------------------------------------------------------------------------------
+// Lower meaningful value areas remain active. A higher profile is initially
+// unproven because buyers can still wait at the lower value structure. It earns
+// its own VAL-defense eligibility only after a post-freeze trip to its VAH.
+
+bool stackedMeaningfulVALCanBeEvaluated =
+     barstate.isconfirmed and
+     timeframeSupported and
+     inAnalysisSession and
+     enableVALEntryConfirmation and
+     enableStackedMeaningfulVALProfiles and
+     array.size(meaningfulVALProfiles) > 0
+
+int bestStackedDefenseIndex = -1
+float bestStackedDefenseDistance = na
+int bestStackedDefenseTestTime = na
+float bestStackedDefenseTestLow = na
+
+if stackedMeaningfulVALCanBeEvaluated
+    for meaningfulProfileIndex = 0 to
+         array.size(meaningfulVALProfiles) - 1
+        MeaningfulVALProfile meaningfulProfile =
+             array.get(
+                  meaningfulVALProfiles,
+                  meaningfulProfileIndex)
+
+        if not na(meaningfulProfile.valLine)
+            line.set_x2(meaningfulProfile.valLine, time_close)
+        if not na(meaningfulProfile.pocLine)
+            line.set_x2(meaningfulProfile.pocLine, time_close)
+        if not na(meaningfulProfile.vahLine)
+            line.set_x2(meaningfulProfile.vahLine, time_close)
+
+        bool meaningfulProfileMayAdvance =
+             bar_index > meaningfulProfile.readyBarIndex and
+             not meaningfulProfile.invalidated
+        if meaningfulProfileMayAdvance
+            meaningfulProfile.closesBelowMovementLow :=
+                 close < meaningfulProfile.movementLow ?
+                 meaningfulProfile.closesBelowMovementLow + 1 : 0
+            meaningfulProfile.closesBelowVAL :=
+                 meaningfulProfile.stackedAboveLower and
+                 close < meaningfulProfile.val ?
+                 meaningfulProfile.closesBelowVAL + 1 : 0
+
+            bool meaningfulMovementLowLost =
+                 meaningfulProfile.closesBelowMovementLow >=
+                      valInvalidationCloses
+            bool meaningfulStackedVALLost =
+                 meaningfulProfile.stackedAboveLower and
+                 meaningfulProfile.closesBelowVAL >=
+                      stackedVALInvalidationCloses
+            bool meaningfulProfileInvalidatedNow =
+                 meaningfulMovementLowLost or
+                 meaningfulStackedVALLost
+            if meaningfulProfileInvalidatedNow
+                meaningfulProfile.invalidated := true
+                meaningfulProfile.defenseArmed := false
+                meaningfulProfile.testActive := false
+                meaningfulProfile.testBarIndex := na
+                meaningfulProfile.testTime := na
+                meaningfulProfile.testLow := na
+                if not na(meaningfulProfile.valLine)
+                    line.set_color(
+                         meaningfulProfile.valLine,
+                         color.new(valColor, 75))
+                if not na(meaningfulProfile.pocLine)
+                    line.set_color(
+                         meaningfulProfile.pocLine,
+                         color.new(pocColor, 75))
+                if not na(meaningfulProfile.vahLine)
+                    line.set_color(
+                         meaningfulProfile.vahLine,
+                         color.new(vahColor, 75))
+
+            if not meaningfulProfile.invalidated
+                // This is the decisive stacked-profile gate. The profile's own
+                // construction bars cannot prove that its higher value holds.
+                if not meaningfulProfile.departureProven and
+                     high >= meaningfulProfile.vah
+                    meaningfulProfile.departureProven := true
+                    meaningfulProfile.defenseArmed := true
+
+                if meaningfulProfile.departureProven
+                    if not meaningfulProfile.defenseArmed and
+                         high >= meaningfulProfile.poc
+                        meaningfulProfile.defenseArmed := true
+
+                    float meaningfulProfileRowHeight =
+                         (meaningfulProfile.movementHigh -
+                              meaningfulProfile.movementLow) /
+                         profileRows
+                    float meaningfulProfileApproachAllowance =
+                         meaningfulProfile.ageTradingDates > 0 ?
+                         math.max(
+                              atrValue * dominantVALFrontRunATR,
+                              meaningfulProfileRowHeight *
+                                   stackedVALProfileRowTolerance) :
+                         atrValue * dominantVALFrontRunATR
+                    bool startsMeaningfulVALTest =
+                         meaningfulProfile.defenseArmed and
+                         not meaningfulProfile.testActive and
+                         not na(atrValue) and
+                         atrValue > 0.0 and
+                         low <= meaningfulProfile.val +
+                              meaningfulProfileApproachAllowance and
+                         high < meaningfulProfile.poc
+                    if startsMeaningfulVALTest
+                        meaningfulProfile.testActive := true
+                        meaningfulProfile.testBarIndex := bar_index
+                        meaningfulProfile.testTime := time
+                        meaningfulProfile.testLow := low
+
+                    if meaningfulProfile.defenseArmed and
+                         meaningfulProfile.testActive
+                        meaningfulProfile.testLow :=
+                             math.min(
+                                  meaningfulProfile.testLow,
+                                  low)
+                        int meaningfulBarsSinceTest =
+                             bar_index -
+                             meaningfulProfile.testBarIndex
+                        bool meaningfulVALRecovered =
+                             meaningfulBarsSinceTest <=
+                                  valEntryConfirmationBars and
+                             close > meaningfulProfile.val and
+                             high < meaningfulProfile.poc
+
+                        if meaningfulVALRecovered
+                            float meaningfulDefenseDistance =
+                                 math.abs(
+                                      meaningfulProfile.testLow -
+                                      meaningfulProfile.val) /
+                                 atrValue
+                            bool betterMeaningfulDefense =
+                                 bestStackedDefenseIndex < 0 or
+                                 meaningfulDefenseDistance <
+                                      bestStackedDefenseDistance
+                            if betterMeaningfulDefense
+                                bestStackedDefenseIndex :=
+                                     meaningfulProfileIndex
+                                bestStackedDefenseDistance :=
+                                     meaningfulDefenseDistance
+                                bestStackedDefenseTestTime :=
+                                     meaningfulProfile.testTime
+                                bestStackedDefenseTestLow :=
+                                     meaningfulProfile.testLow
+                        else if high >= meaningfulProfile.poc or
+                             meaningfulBarsSinceTest >=
+                                  valEntryConfirmationBars
+                            meaningfulProfile.testActive := false
+                            meaningfulProfile.testBarIndex := na
+                            meaningfulProfile.testTime := na
+                            meaningfulProfile.testLow := na
+
+        array.set(
+             meaningfulVALProfiles,
+             meaningfulProfileIndex,
+             meaningfulProfile)
+
+if bestStackedDefenseIndex >= 0
+    MeaningfulVALProfile defendedMeaningfulProfile =
+         array.get(
+              meaningfulVALProfiles,
+              bestStackedDefenseIndex)
+    valEntryConfirmedThisBar := true
+    valDefendedThisBar := true
+
+    // Only the closest qualifying value level owns this bar. Clear any other
+    // profile that recovered on the same candle so overlapping stacks cannot
+    // print delayed duplicate entries on the following bar.
+    if array.size(meaningfulVALProfiles) > 0
+        for recoveredProfileIndex = 0 to
+             array.size(meaningfulVALProfiles) - 1
+            MeaningfulVALProfile recoveredProfile =
+                 array.get(
+                      meaningfulVALProfiles,
+                      recoveredProfileIndex)
+            bool competingRecovery =
+                 recoveredProfile.testActive and
+                 close > recoveredProfile.val and
+                 high < recoveredProfile.poc
+            if competingRecovery
+                recoveredProfile.testActive := false
+                recoveredProfile.testBarIndex := na
+                recoveredProfile.testTime := na
+                recoveredProfile.testLow := na
+                if recoveredProfileIndex == bestStackedDefenseIndex
+                    recoveredProfile.defenseArmed := false
+                array.set(
+                     meaningfulVALProfiles,
+                     recoveredProfileIndex,
+                     recoveredProfile)
+
+    // Preserve compatibility with the existing profile-specific continuation
+    // state without letting that state choose or replace the stacked reference.
+    if lifecycleState == STATE_PROFILE and
+         movementStartTime ==
+              defendedMeaningfulProfile.movementStartTime
+        valDefended := true
+    if array.size(additionalProfiles) > 0
+        for meaningfulMatchIndex = 0 to
+             array.size(additionalProfiles) - 1
+            AdditionalProfile meaningfulMatchProfile =
+                 array.get(
+                      additionalProfiles,
+                      meaningfulMatchIndex)
+            if meaningfulMatchProfile.movementStartTime ==
+                 defendedMeaningfulProfile.movementStartTime
+                meaningfulMatchProfile.valDefended := true
+                array.set(
+                     additionalProfiles,
+                     meaningfulMatchIndex,
+                     meaningfulMatchProfile)
+
+    float stackedEntryLabelY =
+         low -
+         math.max(
+              atrValue * valEntryLabelDistanceATR,
+              high * 0.003)
+    string stackedEntryTooltip =
+         "FRVP ENTRY CONFIRMED\n" +
+         "Type: STACKED MEANINGFUL VAL DEFENSE\n" +
+         "Profile: " +
+         str.format_time(
+              defendedMeaningfulProfile.movementStartTime,
+              "MM-dd HH:mm",
+              syminfo.timezone) +
+         "–" +
+         str.format_time(
+              defendedMeaningfulProfile.movementEndTime,
+              "HH:mm",
+              syminfo.timezone) +
+         "\nTest: " +
+         str.format_time(
+              bestStackedDefenseTestTime,
+              "HH:mm",
+              syminfo.timezone) +
+         "\nConfirmed: " +
+         str.format_time(time, "HH:mm", syminfo.timezone) +
+         "\nVAL: " +
+         str.tostring(
+              defendedMeaningfulProfile.val,
+              format.mintick) +
+         "\nPOC: " +
+         str.tostring(
+              defendedMeaningfulProfile.poc,
+              format.mintick) +
+         "\nVAH: " +
+         str.tostring(
+              defendedMeaningfulProfile.vah,
+              format.mintick) +
+         "\nDefended low: " +
+         str.tostring(
+              bestStackedDefenseTestLow,
+              format.mintick) +
+         (
+              defendedMeaningfulProfile.stackedAboveLower ?
+              "\nHigher profile proved by post-freeze VAH departure." :
+              "\nFoundation meaningful profile."
+         )
+
+    if showEntryMarkers
+        label stackedEntryLabel = label.new(
+             x = time,
+             y = stackedEntryLabelY,
+             text = "VAL DEFENDED\nENTRY CONFIRMED",
+             xloc = xloc.bar_time,
+             yloc = yloc.price,
+             style = label.style_label_up,
+             color = continuationColor,
+             textcolor = color.white,
+             size = size.tiny,
+             tooltip = stackedEntryTooltip)
+        array.push(
+             retainedEntryMarkers,
+             stackedEntryLabel)
+
+    if not na(defendedMeaningfulProfile.valLine)
+        line.set_color(
+             defendedMeaningfulProfile.valLine,
+             color.new(valColor, 0))
+        line.set_width(defendedMeaningfulProfile.valLine, 4)
+
+//------------------------------------------------------------------------------
+// Dominant-profile VAL defense (legacy single-reference fallback)
+//------------------------------------------------------------------------------
+// Profile selection occurs in both freeze blocks above. This lifecycle watches
+// only the selected reference. A defense is an auction outcome: price reaches
+// or narrowly front-runs VAL, remains below POC, and regains a close above VAL.
+// It deliberately does not inspect candle color, wick proportions, lower lows,
+// or relative volume.
+
+bool dominantReferenceCanBeEvaluated =
+     barstate.isconfirmed and
+     timeframeSupported and
+     inAnalysisSession and
+     enableVALEntryConfirmation and
+     enableDominantProfileVALReference and
+     not enableStackedMeaningfulVALProfiles and
+     dominantReferenceReady and
+     bar_index > dominantReferenceReadyBarIndex
+
+if dominantReferenceCanBeEvaluated
+    if not na(dominantReferenceVALLine)
+        line.set_x2(dominantReferenceVALLine, time_close)
+    if not na(dominantReferencePOCLine)
+        line.set_x2(dominantReferencePOCLine, time_close)
+    if not na(dominantReferenceVAHLine)
+        line.set_x2(dominantReferenceVAHLine, time_close)
+
+    dominantReferenceClosesBelowLow :=
+         close < dominantReferenceMovementLow ?
+         dominantReferenceClosesBelowLow + 1 :
+         0
+
+    bool dominantReferenceInvalidatedNow =
+         not dominantReferenceInvalidated and
+         dominantReferenceClosesBelowLow >= valInvalidationCloses
+
+    if dominantReferenceInvalidatedNow
+        dominantReferenceInvalidated := true
+        dominantReferenceDefenseArmed := false
+        dominantReferenceTestActive := false
+        dominantReferenceTestBarIndex := na
+        dominantReferenceTestTime := na
+        dominantReferenceTestLow := na
+        if not na(dominantReferenceVALLine)
+            line.set_color(
+                 dominantReferenceVALLine,
+                 color.new(valColor, 75))
+        if not na(dominantReferencePOCLine)
+            line.set_color(
+                 dominantReferencePOCLine,
+                 color.new(pocColor, 75))
+        if not na(dominantReferenceVAHLine)
+            line.set_color(
+                 dominantReferenceVAHLine,
+                 color.new(vahColor, 75))
+
+    if not dominantReferenceInvalidated
+        // Reaching POC proves the prior defense produced enough separation to
+        // make a later return to VAL a fresh entry rather than duplicate noise.
+        if not dominantReferenceDefenseArmed and
+             high >= dominantReferencePOC
+            dominantReferenceDefenseArmed := true
+
+        if dominantReferenceDefenseArmed and
+             not dominantReferenceTestActive and
+             not na(atrValue) and
+             atrValue > 0.0 and
+             low <=
+                  dominantReferenceVAL +
+                  atrValue * dominantVALFrontRunATR and
+             high < dominantReferencePOC
+            dominantReferenceTestActive := true
+            dominantReferenceTestBarIndex := bar_index
+            dominantReferenceTestTime := time
+            dominantReferenceTestLow := low
+
+        if dominantReferenceDefenseArmed and
+             dominantReferenceTestActive
+            dominantReferenceTestLow :=
+                 math.min(dominantReferenceTestLow, low)
+            int dominantBarsSinceTest =
+                 bar_index - dominantReferenceTestBarIndex
+            bool dominantVALRecovered =
+                 dominantBarsSinceTest <= valEntryConfirmationBars and
+                 close > dominantReferenceVAL and
+                 high < dominantReferencePOC
+
+            if dominantVALRecovered
+                valEntryConfirmedThisBar := true
+                valDefendedThisBar := true
+                dominantReferenceDefenseArmed := false
+                dominantReferenceTestActive := false
+
+                // Preserve compatibility with the established continuation
+                // paths when their underlying profile is the selected one.
+                if lifecycleState == STATE_PROFILE and
+                     movementStartTime == dominantReferenceStartTime
+                    valDefended := true
+                if array.size(additionalProfiles) > 0
+                    for dominantMatchIndex = 0 to
+                         array.size(additionalProfiles) - 1
+                        AdditionalProfile dominantMatchProfile =
+                             array.get(
+                                  additionalProfiles,
+                                  dominantMatchIndex)
+                        if dominantMatchProfile.movementStartTime ==
+                             dominantReferenceStartTime
+                            dominantMatchProfile.valDefended := true
+                            array.set(
+                                 additionalProfiles,
+                                 dominantMatchIndex,
+                                 dominantMatchProfile)
+
+                float dominantEntryLabelY =
+                     low -
+                     math.max(
+                          atrValue * valEntryLabelDistanceATR,
+                          high * 0.003)
+                string dominantEntryTooltip =
+                     "FRVP ENTRY CONFIRMED\n" +
+                     "Type: DOMINANT VAL DEFENSE\n" +
+                     "Profile: " +
+                     str.format_time(
+                          dominantReferenceStartTime,
+                          "MM-dd HH:mm",
+                          syminfo.timezone) +
+                     "–" +
+                     str.format_time(
+                          dominantReferenceEndTime,
+                          "HH:mm",
+                          syminfo.timezone) +
+                     "\nTest: " +
+                     str.format_time(
+                          dominantReferenceTestTime,
+                          "HH:mm",
+                          syminfo.timezone) +
+                     "\nConfirmed: " +
+                     str.format_time(
+                          time,
+                          "HH:mm",
+                          syminfo.timezone) +
+                     "\nVAL: " +
+                     str.tostring(
+                          dominantReferenceVAL,
+                          format.mintick) +
+                     "\nPOC: " +
+                     str.tostring(
+                          dominantReferencePOC,
+                          format.mintick) +
+                     "\nVAH: " +
+                     str.tostring(
+                          dominantReferenceVAH,
+                          format.mintick) +
+                     "\nDefended low: " +
+                     str.tostring(
+                          dominantReferenceTestLow,
+                          format.mintick)
+
+                if showEntryMarkers
+                    label dominantEntryLabel = label.new(
+                         x = time,
+                         y = dominantEntryLabelY,
+                         text = "VAL DEFENDED\nENTRY CONFIRMED",
+                         xloc = xloc.bar_time,
+                         yloc = yloc.price,
+                         style = label.style_label_up,
+                         color = continuationColor,
+                         textcolor = color.white,
+                         size = size.tiny,
+                         tooltip = dominantEntryTooltip)
+                    array.push(
+                         retainedEntryMarkers,
+                         dominantEntryLabel)
+
+                if not na(dominantReferenceVALLine)
+                    line.set_color(
+                         dominantReferenceVALLine,
+                         color.new(valColor, 0))
+                    line.set_width(dominantReferenceVALLine, 4)
+
+                dominantReferenceTestBarIndex := na
+                dominantReferenceTestTime := na
+                dominantReferenceTestLow := na
+            else if high >= dominantReferencePOC or
+                 dominantBarsSinceTest >= valEntryConfirmationBars
+                dominantReferenceTestActive := false
+                dominantReferenceTestBarIndex := na
+                dominantReferenceTestTime := na
+                dominantReferenceTestLow := na
 
 // Daily EMA resistance warning. This is intentionally independent of the FRVP
 // lifecycle: the daily levels remain useful even before a profile freezes or
@@ -2641,10 +6097,14 @@ while array.size(retainedDailyEMAWarningMarkers) >
 
 // Dedicated alert choices. All events use confirmed bars because the frozen
 // profile lifecycle is intentionally evaluated only after candle close.
+bool anyFRVPEntryTriggeredThisBar =
+     entryTriggeredThisBar or
+     valEntryConfirmedThisBar
+
 alertcondition(
-     entryTriggeredThisBar,
+     anyFRVPEntryTriggeredThisBar,
      title = "FRVP Entry Bar",
-     message = "FRVP Entry Bar: qualifying profile recovery, POC-to-VAH continuation, POC-fight VAH reclaim, or exceptional-volume VAH expansion.")
+     message = "FRVP Entry Bar: {{ticker}} {{interval}} produced a confirmed meaningful-profile VAL defense or a qualifying recovery, POC-to-VAH continuation, POC-fight VAH reclaim, exceptional-volume VAH expansion, or deep value-area sweep and VAH reclaim. Close: {{close}}.")
 
 bool defendedLevelTriggeredThisBar =
      valDefendedThisBar or
@@ -2654,4 +6114,4 @@ bool defendedLevelTriggeredThisBar =
 alertcondition(
      defendedLevelTriggeredThisBar,
      title = "FRVP VAL / POC / VAH Defended",
-     message = "FRVP Defended: {{ticker}} {{interval}} defended a frozen VAL, POC, or VAH level. Check the chart label for the defended level. Close: {{close}}.")
+     message = "FRVP Defended: {{ticker}} {{interval}} defended a VAL, POC, or VAH belonging to an active frozen profile. Close: {{close}}.")
