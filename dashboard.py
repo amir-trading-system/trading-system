@@ -1111,6 +1111,41 @@ HTML_PAGE = r'''<!doctype html>
     .summary-value { margin-top: 8px; font-size: 27px; font-weight: 850; letter-spacing: -.035em; }
     .summary-detail { margin-top: 5px; color: var(--muted); font-size: 12px; }
 
+    .calendar-balance-panel {
+      margin: 0 0 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background:
+        linear-gradient(145deg, rgba(110, 184, 255, .075), transparent 55%),
+        var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .calendar-balance-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 17px 20px 5px;
+    }
+    .calendar-balance-title { margin: 0; font-size: 14px; font-weight: 850; }
+    .calendar-balance-subtitle { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+    .calendar-balance-current { text-align: right; }
+    .calendar-balance-current-label { color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .calendar-balance-current-value { margin-top: 3px; font-size: 22px; font-weight: 850; font-variant-numeric: tabular-nums; }
+    .calendar-balance-chart { min-height: 190px; overflow-x: auto; padding: 0 10px 8px; }
+    .calendar-balance-svg { display: block; width: 100%; min-width: 720px; height: 190px; }
+    .balance-grid { stroke: rgba(143, 165, 181, .13); stroke-width: 1; }
+    .balance-zero { stroke: rgba(246, 199, 96, .42); stroke-width: 1; stroke-dasharray: 5 5; }
+    .balance-line { fill: none; stroke: var(--blue); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .balance-area { fill: url(#calendar-balance-gradient); }
+    .balance-axis { fill: var(--muted); font-size: 10px; }
+    .balance-point { stroke: #071018; stroke-width: 2; transition: r .12s ease; }
+    .balance-point:hover { r: 6; }
+    .balance-point.positive { fill: var(--green); }
+    .balance-point.negative { fill: var(--red); }
+    .balance-point.flat { fill: var(--amber); }
+
     .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 22px 0 12px; }
     .month-controls { display: flex; align-items: center; gap: 8px; }
     .icon-button { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); font-size: 20px; }
@@ -1321,6 +1356,20 @@ HTML_PAGE = r'''<!doctype html>
 
     <section class="page-view" id="calendar-page">
       <section class="summary-grid" id="summary-grid" aria-label="Monthly summary"></section>
+
+      <article class="calendar-balance-panel" aria-labelledby="calendar-balance-title">
+        <div class="calendar-balance-header">
+          <div>
+            <h2 class="calendar-balance-title" id="calendar-balance-title">Daily balance</h2>
+            <p class="calendar-balance-subtitle">Cumulative realized P&amp;L from the first trade in the loaded file.</p>
+          </div>
+          <div class="calendar-balance-current">
+            <div class="calendar-balance-current-label">Current balance</div>
+            <div class="calendar-balance-current-value" id="calendar-balance-value">—</div>
+          </div>
+        </div>
+        <div class="calendar-balance-chart" id="calendar-balance-chart"></div>
+      </article>
 
       <div class="toolbar">
         <div class="month-controls">
@@ -1618,13 +1667,17 @@ HTML_PAGE = r'''<!doctype html>
       const symbols = new Set();
       days.forEach(day => day.symbols.forEach(item => symbols.add(item.symbol)));
       const positiveDays = days.filter(day => day.pnl > 0).length;
+      const negativeDays = days.filter(day => day.pnl < 0).length;
+      const flatDays = days.length - positiveDays - negativeDays;
+      const decidedDays = positiveDays + negativeDays;
+      const positiveRate = decidedDays ? positiveDays / decidedDays : null;
       const bestDay = days.length
         ? days.reduce((best, day) => day.pnl > best.pnl ? day : best, days[0])
         : null;
       const cards = [
         ['Monthly P&L', `<span class="${toneClass(pnl)}">${formatMoney(pnl)}</span>`, monthName(state.selectedMonth)],
         ['Trade count', String(trades), 'CSV trade rows'],
-        ['Trading days', String(days.length), `${positiveDays} profitable`],
+        ['Positive / Negative days', `<span class="positive-text">${positiveDays}</span> / <span class="negative-text">${negativeDays}</span>`, positiveRate == null ? 'No completed days' : `${formatPercent(positiveRate)} positive${flatDays ? ` · ${flatDays} flat` : ''}`],
         ['Symbols', String(symbols.size), 'Unique tickers'],
         ['Best day', bestDay ? formatMoney(bestDay.pnl) : '—', bestDay ? longDate(bestDay.date) : 'No trades']
       ];
@@ -1636,6 +1689,64 @@ HTML_PAGE = r'''<!doctype html>
         </article>`).join('');
       document.getElementById('month-pnl').innerHTML =
         `${escapeHtml(monthName(state.selectedMonth))}: <span class="${toneClass(pnl)}">${formatMoney(pnl)}</span>`;
+    }
+
+    function renderCalendarBalanceChart() {
+      const target = document.getElementById('calendar-balance-chart');
+      const currentValue = document.getElementById('calendar-balance-value');
+      const rows = state.payload.analysis.all.equity_curve
+        .filter(row => row.date.startsWith(state.selectedMonth));
+      if (!rows.length) {
+        currentValue.textContent = '—';
+        currentValue.className = 'calendar-balance-current-value';
+        target.innerHTML = '<div class="chart-empty">No daily P&amp;L is available for this month.</div>';
+        return;
+      }
+
+      const finalBalance = Number(rows[rows.length - 1].cumulative_pnl || 0);
+      currentValue.textContent = formatMoney(finalBalance);
+      currentValue.className = `calendar-balance-current-value ${toneClass(finalBalance)}`;
+
+      const width = 1400, height = 190, left = 62, right = 18, top = 15, bottom = 30;
+      const chartWidth = width - left - right, chartHeight = height - top - bottom;
+      const values = rows.map(row => Number(row.cumulative_pnl || 0));
+      let minimum = Math.min(...values), maximum = Math.max(...values);
+      if (minimum === maximum) {
+        const spread = Math.max(Math.abs(minimum) * .04, 1);
+        minimum -= spread;
+        maximum += spread;
+      } else {
+        const padding = Math.max((maximum - minimum) * .12, .5);
+        minimum -= padding;
+        maximum += padding;
+      }
+      const x = index => left + (rows.length === 1 ? chartWidth / 2 : index / (rows.length - 1) * chartWidth);
+      const y = value => top + (maximum - value) / (maximum - minimum) * chartHeight;
+      const points = values.map((value, index) => `${x(index).toFixed(2)},${y(value).toFixed(2)}`).join(' ');
+      const showsZero = minimum <= 0 && maximum >= 0;
+      const baseY = showsZero ? y(0) : top + chartHeight;
+      const areaPoints = `${x(0).toFixed(2)},${baseY.toFixed(2)} ${points} ${x(rows.length - 1).toFixed(2)},${baseY.toFixed(2)}`;
+      const midpoint = Math.floor((rows.length - 1) / 2);
+      const pointMarkup = rows.map((row, index) => {
+        const dailyPnl = Number(row.pnl || 0);
+        const pointClass = dailyPnl > 0 ? 'positive' : dailyPnl < 0 ? 'negative' : 'flat';
+        const tooltip = `${longDate(row.date)} · Day ${formatMoney(dailyPnl)} · Balance ${formatMoney(row.cumulative_pnl)}`;
+        return `<circle class="balance-point ${pointClass}" cx="${x(index).toFixed(2)}" cy="${y(values[index]).toFixed(2)}" r="4" tabindex="0"><title>${escapeHtml(tooltip)}</title></circle>`;
+      }).join('');
+      target.innerHTML = `<svg class="calendar-balance-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily cumulative realized profit and loss balance for ${escapeHtml(monthName(state.selectedMonth))}">
+        <defs><linearGradient id="calendar-balance-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6eb8ff" stop-opacity=".30"/><stop offset="1" stop-color="#6eb8ff" stop-opacity=".02"/></linearGradient></defs>
+        <line class="balance-grid" x1="${left}" y1="${top}" x2="${width - right}" y2="${top}"/>
+        <line class="balance-grid" x1="${left}" y1="${top + chartHeight}" x2="${width - right}" y2="${top + chartHeight}"/>
+        ${showsZero ? `<line class="balance-zero" x1="${left}" y1="${y(0).toFixed(2)}" x2="${width - right}" y2="${y(0).toFixed(2)}"/>` : ''}
+        <polygon class="balance-area" points="${areaPoints}"/>
+        <polyline class="balance-line" points="${points}"/>
+        ${pointMarkup}
+        <text class="balance-axis" x="4" y="${top + 4}">${escapeHtml(formatMoney(maximum))}</text>
+        <text class="balance-axis" x="4" y="${top + chartHeight}">${escapeHtml(formatMoney(minimum))}</text>
+        <text class="balance-axis" x="${x(0)}" y="${height - 7}">${escapeHtml(shortDate(rows[0].date))}</text>
+        <text class="balance-axis" x="${x(midpoint)}" y="${height - 7}" text-anchor="middle">${escapeHtml(shortDate(rows[midpoint].date))}</text>
+        <text class="balance-axis" x="${x(rows.length - 1)}" y="${height - 7}" text-anchor="end">${escapeHtml(shortDate(rows[rows.length - 1].date))}</text>
+      </svg>`;
     }
 
     function dayCard(date) {
@@ -2423,6 +2534,7 @@ HTML_PAGE = r'''<!doctype html>
     function renderAll() {
       renderMonthSelector();
       renderSummary();
+      renderCalendarBalanceChart();
       renderCalendar();
       renderAnalysisPeriodSelector();
       renderSymbolRankSelector();
