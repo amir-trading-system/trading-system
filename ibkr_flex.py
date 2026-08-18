@@ -30,6 +30,10 @@ MIN_REQUEST_GAP_SECONDS = 1.10
 # IBKR permits ten Flex requests per minute. Stay below the ceiling so a retry
 # or another process using the token does not immediately trip error 1018.
 MAX_REQUESTS_PER_MINUTE = 8
+# Check quickly once, then fall back to IBKR's documented 20-second retrieval
+# timing. This preserves the former 40-second maximum while avoiding a mandatory
+# 20-second wait when a small report is ready almost immediately.
+REPORT_POLL_DELAYS_SECONDS = (3, 17, 20)
 
 
 class FlexSyncError(RuntimeError):
@@ -114,7 +118,19 @@ class FlexConfig:
 
     @property
     def trade_configured(self) -> bool:
-        return bool(self.token and self.trade_query_id)
+        return bool(
+            self.token
+            and self.trade_query_id
+            and not self.duplicate_query_ids
+        )
+
+    @property
+    def duplicate_query_ids(self) -> bool:
+        return bool(
+            self.activity_query_id
+            and self.trade_query_id
+            and self.activity_query_id == self.trade_query_id
+        )
 
     def missing(self) -> list[str]:
         missing: list[str] = []
@@ -260,11 +276,20 @@ class FlexSyncManager:
     def status(self) -> dict[str, Any]:
         with self._state_lock:
             state = dict(self._state)
+        configuration_warning = None
+        if self.config.duplicate_query_ids:
+            configuration_warning = (
+                "The Trade Confirmation Query ID matches the Activity Query ID, "
+                "so the duplicate report is skipped."
+            )
         state.update(
             {
                 "configured": self.config.configured,
                 "activity_configured": self.config.activity_configured,
                 "trade_configured": self.config.trade_configured,
+                "duplicate_query_ids": self.config.duplicate_query_ids,
+                "configuration_warning": configuration_warning,
+                "activity_file_present": self.csv_path.is_file(),
                 "trade_sync_minutes": self.config.trade_sync_minutes,
                 "missing": self.config.missing(),
             }
@@ -360,12 +385,8 @@ class FlexSyncManager:
             "SendRequest", {"t": token, "q": query_id, "v": FLEX_VERSION}
         )
         reference = parse_generation_response(generation)
-        # IBKR generates the report asynchronously and its own example waits
-        # before the first GetStatement call. Two patient retrieval attempts use
-        # fewer requests than frequent short polling and stay below error 1018.
-        waits = (20, 20)
         last_message = "IBKR is still preparing the Flex report."
-        for wait_seconds in waits:
+        for wait_seconds in REPORT_POLL_DELAYS_SECONDS:
             if wait_seconds and self._stop.wait(wait_seconds):
                 raise FlexSyncError("IBKR synchronization was stopped.")
             payload = self._request(
@@ -415,6 +436,27 @@ class FlexSyncManager:
         completed = self._iso_now()
         self._activity_success_date = datetime.now().astimezone().date().isoformat()
         self._set_state(last_activity_success=completed)
+
+    def refresh_activity(self) -> dict[str, Any]:
+        """Download only the authoritative report used by the dashboard."""
+        if not self.config.activity_configured:
+            raise FlexSyncError(
+                "The Activity Flex report is not configured. Add "
+                "IBKR_FLEX_TOKEN and IBKR_ACTIVITY_QUERY_ID to ibkr_flex.env."
+            )
+        return self.sync(include_activity=True, include_trade=False)
+
+    def ensure_activity_file(self) -> dict[str, Any]:
+        """Bootstrap the dashboard from IBKR when its local history is absent."""
+        if self.csv_path.is_file():
+            return self.status()
+        try:
+            self.csv_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise FlexSyncError(
+                f"WTC could not create the data folder: {self.csv_path.parent}"
+            ) from exc
+        return self.refresh_activity()
 
     def _sync_trade_confirmations(self) -> None:
         query_id = self.config.trade_query_id

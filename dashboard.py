@@ -712,26 +712,13 @@ def find_csv(script_directory: Path, explicit_file: str | None) -> Path:
         candidate = Path(explicit_file).expanduser()
         if not candidate.is_absolute():
             candidate = script_directory / candidate
-        if not candidate.is_file():
-            raise TradeDataError(f"CSV file not found: {candidate}")
         return candidate.resolve()
 
     preferred = script_directory / DEFAULT_CSV_NAME
-    if preferred.is_file():
-        return preferred.resolve()
-
-    candidates = sorted(script_directory.glob("*.csv"))
-    if len(candidates) == 1:
-        return candidates[0].resolve()
-    if not candidates:
-        raise TradeDataError(
-            f"No CSV was found beside the script. Add {DEFAULT_CSV_NAME!r} "
-            "to this folder or provide --file."
-        )
-    raise TradeDataError(
-        "More than one CSV was found beside the script. Rename the intended file "
-        f"to {DEFAULT_CSV_NAME!r} or provide --file."
-    )
+    # Always use the documented default instead of guessing from unrelated CSV
+    # files in the application folder. main() and /api/data can bootstrap this
+    # exact path from the configured IBKR Activity Flex query when it is absent.
+    return preferred.resolve()
 
 
 def decode_csv_text(csv_path: Path) -> tuple[str, str]:
@@ -2564,8 +2551,14 @@ HTML_PAGE = r'''<!doctype html>
         statusElement.innerHTML = '<span class="status-dot warning"></span>IBKR sync not configured';
         return;
       }
+      if (!status.activity_configured) {
+        ibkrSyncButton.disabled = true;
+        ibkrSyncButton.title = 'Add an Activity Flex Query ID to download finalized P&L.';
+        statusElement.innerHTML = '<span class="status-dot warning"></span>IBKR Activity report not configured';
+        return;
+      }
       ibkrSyncButton.disabled = Boolean(status.running);
-      ibkrSyncButton.title = status.running ? 'IBKR synchronization is running.' : 'Download the latest IBKR Flex reports now.';
+      ibkrSyncButton.title = status.running ? 'IBKR synchronization is running.' : 'Download the latest finalized Activity report now.';
       const finalSync = formatSyncTime(status.last_activity_success);
       const tradeSync = formatSyncTime(status.last_trade_success);
       const parts = [];
@@ -2575,6 +2568,7 @@ HTML_PAGE = r'''<!doctype html>
         parts.push(`confirmations ${tradeSync}${count}`);
       }
       if (status.running) parts.unshift('syncing now');
+      if (status.configuration_warning) parts.push(status.configuration_warning);
       const dotClass = status.error ? 'status-dot error-dot' : 'status-dot';
       const copy = status.error
         ? `IBKR: ${status.error}`
@@ -2731,10 +2725,21 @@ def make_handler(
                 return
             if path == "/api/data":
                 try:
+                    ibkr_sync.ensure_activity_file()
                     payload = load_trade_payload(csv_path)
                     payload["ibkr"] = ibkr_sync.status()
                     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
                     self.send_bytes(body, "application/json; charset=utf-8")
+                except FlexSyncError as exc:
+                    body = json.dumps(
+                        {"error": str(exc), "status": ibkr_sync.status()},
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                    self.send_bytes(
+                        body,
+                        "application/json; charset=utf-8",
+                        HTTPStatus.BAD_GATEWAY,
+                    )
                 except (OSError, TradeDataError) as exc:
                     body = json.dumps({"error": str(exc)}).encode("utf-8")
                     self.send_bytes(
@@ -2787,7 +2792,9 @@ def make_handler(
                 self.send_bytes(b"Not found", "text/plain", HTTPStatus.NOT_FOUND)
                 return
             try:
-                status = ibkr_sync.sync()
+                # The dashboard reads the Activity report. Fetching the separate
+                # confirmation report here only delays the visible refresh.
+                status = ibkr_sync.refresh_activity()
                 body = json.dumps({"status": status}, separators=(",", ":")).encode(
                     "utf-8"
                 )
@@ -2886,8 +2893,15 @@ def main() -> int:
     script_directory = Path(__file__).resolve().parent
     try:
         csv_path = find_csv(script_directory, args.file)
+        ibkr_sync = FlexSyncManager(csv_path, load_trade_payload)
+        if not csv_path.is_file():
+            print(
+                f"Local trade history not found. Downloading {csv_path.name} "
+                "from the IBKR Activity Flex query..."
+            )
+            ibkr_sync.ensure_activity_file()
         payload = load_trade_payload(csv_path)
-    except (OSError, TradeDataError) as exc:
+    except (OSError, TradeDataError, FlexSyncError) as exc:
         parser.error(str(exc))
 
     if args.check:
@@ -2904,7 +2918,6 @@ def main() -> int:
             webbrowser.open(snapshot_path.resolve().as_uri())
         return 0
 
-    ibkr_sync = FlexSyncManager(csv_path, load_trade_payload)
     handler = make_handler(csv_path, ibkr_sync)
     try:
         server = ThreadingHTTPServer((args.host, args.port), handler)
