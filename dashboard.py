@@ -19,7 +19,7 @@ import math
 import re
 import threading
 import webbrowser
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
@@ -65,6 +65,7 @@ PNL_COLUMN_ALIASES = (
     "PnL",
 )
 TIME_COLUMN_ALIASES = (
+    "Date/Time",
     "DateTime",
     "ExecutionDateTime",
     "TradeDateTime",
@@ -359,6 +360,8 @@ def parse_execution_datetime(
     date_time_formats = (
         "%Y%m%d;%H%M%S",
         "%Y%m%d;%H%M",
+        "%Y-%m-%d;%H:%M:%S",
+        "%Y-%m-%d;%H:%M",
         "%Y%m%d %H%M%S",
         "%Y%m%d %H:%M:%S",
         "%Y-%m-%d %H:%M:%S",
@@ -429,6 +432,237 @@ def decimal_ratio(
     if decimal_denominator == 0:
         return None
     return as_number(numerator / decimal_denominator, places)
+
+
+def load_provisional_confirmation_records(
+    confirmation_path: Path, authoritative_dates: set[str]
+) -> list[dict[str, Any]]:
+    """Convert non-finalized Trade Confirmations into dashboard records.
+
+    Activity rows remain authoritative for every date they contain. Confirmations
+    for those dates are still processed to establish FIFO lots, but are not added
+    to the result, preventing duplicates after IBKR finalizes a trading day.
+    """
+    if not confirmation_path.is_file():
+        return []
+
+    text, _ = decode_csv_text(confirmation_path)
+    lines = text.splitlines(keepends=True)
+    candidates: list[tuple[int, int, int, str]] = []
+    expected_aliases = (
+        SYMBOL_COLUMN_ALIASES,
+        DATE_COLUMN_ALIASES,
+        ("Buy/Sell", "Side", "Action"),
+        ("Quantity", "Qty"),
+        ("Price", "TradePrice", "Trade Price"),
+    )
+    for line_index, line in enumerate(lines[:30]):
+        if not line.strip():
+            continue
+        for delimiter in (",", ";", "\t", "|"):
+            cells = next(csv.reader([line], delimiter=delimiter))
+            normalized_cells = {normalized_header(cell) for cell in cells}
+            matches = sum(
+                any(normalized_header(alias) in normalized_cells for alias in aliases)
+                for aliases in expected_aliases
+            )
+            candidates.append((matches, len(cells), -line_index, delimiter))
+    if not candidates:
+        return []
+    matches, _, negative_line_index, delimiter = max(candidates)
+    if matches < len(expected_aliases):
+        raise TradeDataError(
+            f"Could not read the required Trade Confirmation fields from "
+            f"{confirmation_path.name}."
+        )
+
+    header_line_index = -negative_line_index
+    reader = csv.DictReader(
+        io.StringIO("".join(lines[header_line_index:])), delimiter=delimiter
+    )
+    headers = [(header or "").strip() for header in (reader.fieldnames or [])]
+    reader.fieldnames = headers
+    columns = {
+        "date": resolve_header(headers, DATE_COLUMN_ALIASES, required=True),
+        "datetime": resolve_header(headers, TIME_COLUMN_ALIASES),
+        "symbol": resolve_header(headers, SYMBOL_COLUMN_ALIASES, required=True),
+        "side": resolve_header(
+            headers, ("Buy/Sell", "Side", "Action"), required=True
+        ),
+        "quantity": resolve_header(headers, ("Quantity", "Qty"), required=True),
+        "price": resolve_header(
+            headers, ("Price", "TradePrice", "Trade Price"), required=True
+        ),
+        "commission": resolve_header(
+            headers, ("Commission", "IBCommission", "Fees")
+        ),
+        "currency": resolve_header(headers, ("CurrencyPrimary", "Currency")),
+        "account": resolve_header(
+            headers, ("ClientAccountID", "Account", "Account ID")
+        ),
+        "description": resolve_header(
+            headers, ("Description", "Security Description")
+        ),
+        "conid": resolve_header(headers, ("Conid", "ConID")),
+        "exec_id": resolve_header(headers, ("ExecID", "Execution ID")),
+        "trade_id": resolve_header(headers, ("TradeID", "Trade ID")),
+    }
+
+    fills: list[dict[str, Any]] = []
+    seen_execution_keys: set[tuple[str, ...]] = set()
+    for row_number, row in enumerate(reader, start=header_line_index + 2):
+        if not any(str(value or "").strip() for value in row.values()):
+            continue
+        trade_date = parse_trade_date(get_value(row, columns["date"]), row_number)
+        execution_datetime = parse_execution_datetime(
+            get_value(row, columns["datetime"]), trade_date, row_number
+        )
+        symbol = get_value(row, columns["symbol"]).strip().upper() or "UNKNOWN"
+        side = get_value(row, columns["side"]).strip().upper()
+        if side in {"BOT", "B"}:
+            side = "BUY"
+        elif side in {"SLD", "S"}:
+            side = "SELL"
+        if side not in {"BUY", "SELL"}:
+            continue
+        quantity = abs(
+            parse_decimal(
+                get_value(row, columns["quantity"]),
+                row_number=row_number,
+                field=columns["quantity"] or "Quantity",
+            )
+        )
+        if quantity == 0:
+            continue
+        price = parse_decimal(
+            get_value(row, columns["price"]),
+            row_number=row_number,
+            field=columns["price"] or "Price",
+        )
+        commission = parse_decimal(
+            get_value(row, columns["commission"]),
+            row_number=row_number,
+            field=columns["commission"] or "Commission",
+        )
+        exec_id = get_value(row, columns["exec_id"]).strip()
+        trade_id = get_value(row, columns["trade_id"]).strip()
+        execution_key = (
+            exec_id or trade_id,
+            trade_date.date().isoformat(),
+            symbol,
+            execution_datetime.isoformat() if execution_datetime else "",
+            side,
+            str(quantity),
+            str(price),
+        )
+        if execution_key in seen_execution_keys:
+            continue
+        seen_execution_keys.add(execution_key)
+        fills.append(
+            {
+                "source_row": row_number,
+                "date": trade_date.date().isoformat(),
+                "symbol": symbol,
+                "side": side,
+                "quantity_decimal": quantity if side == "BUY" else -quantity,
+                "price_decimal": price,
+                "commission_decimal": commission,
+                "datetime_value": execution_datetime,
+                "currency": get_value(row, columns["currency"]).strip().upper()
+                or "USD",
+                "account": get_value(row, columns["account"]).strip(),
+                "description": get_value(row, columns["description"]).strip(),
+                "conid": get_value(row, columns["conid"]).strip(),
+                "exec_id": exec_id,
+                "trade_id": trade_id,
+            }
+        )
+
+    fills.sort(
+        key=lambda fill: (
+            fill["datetime_value"] or datetime.max,
+            fill["source_row"],
+        )
+    )
+    lots: dict[tuple[str, str, str], deque[dict[str, Any]]] = defaultdict(deque)
+    provisional: list[dict[str, Any]] = []
+    for fill in fills:
+        direction = 1 if fill["side"] == "BUY" else -1
+        quantity = abs(fill["quantity_decimal"])
+        remaining = quantity
+        commission_per_share = fill["commission_decimal"] / quantity
+        key = (
+            fill["account"],
+            fill["conid"] or fill["symbol"],
+            fill["currency"],
+        )
+        position_lots = lots[key]
+        realized_pnl = Decimal("0")
+        while (
+            remaining
+            and position_lots
+            and position_lots[0]["direction"] != direction
+        ):
+            lot = position_lots[0]
+            closed_quantity = min(remaining, lot["quantity"])
+            realized_pnl += (
+                (fill["price_decimal"] - lot["price"])
+                * closed_quantity
+                * lot["direction"]
+            )
+            realized_pnl += closed_quantity * (
+                lot["commission_per_share"] + commission_per_share
+            )
+            remaining -= closed_quantity
+            lot["quantity"] -= closed_quantity
+            if lot["quantity"] == 0:
+                position_lots.popleft()
+        if remaining:
+            position_lots.append(
+                {
+                    "direction": direction,
+                    "quantity": remaining,
+                    "price": fill["price_decimal"],
+                    "commission_per_share": commission_per_share,
+                }
+            )
+
+        if fill["date"] in authoritative_dates:
+            continue
+        execution_datetime = fill["datetime_value"]
+        provisional.append(
+            {
+                "source_row": 1_000_000 + fill["source_row"],
+                "date": fill["date"],
+                "symbol": fill["symbol"],
+                "pnl_decimal": realized_pnl,
+                "quantity_decimal": fill["quantity_decimal"],
+                "pnl": as_number(realized_pnl),
+                "quantity": as_number(fill["quantity_decimal"]),
+                "price": as_number(fill["price_decimal"]),
+                "datetime": (
+                    execution_datetime.isoformat(timespec="seconds")
+                    if execution_datetime
+                    else None
+                ),
+                "time": (
+                    execution_datetime.strftime("%H:%M:%S")
+                    if execution_datetime
+                    else None
+                ),
+                "hour": execution_datetime.hour if execution_datetime else None,
+                "side": fill["side"],
+                "commission": as_number(fill["commission_decimal"]),
+                "currency": fill["currency"],
+                "account": fill["account"],
+                "description": fill["description"]
+                or "IBKR intraday confirmation",
+                "provisional": True,
+                "source": "Trade Confirmation",
+                "execution_id": fill["exec_id"] or fill["trade_id"],
+            }
+        )
+    return provisional
 
 
 def build_trade_analysis(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -768,7 +1002,9 @@ def detect_csv_layout(text: str) -> tuple[int, str, list[str]]:
     return -negative_line_index, delimiter, [cell.strip() for cell in cells]
 
 
-def load_trade_payload(csv_path: Path) -> dict[str, Any]:
+def load_trade_payload(
+    csv_path: Path, confirmation_path: Path | None = None
+) -> dict[str, Any]:
     text, encoding = decode_csv_text(csv_path)
     header_line_index, delimiter, detected_headers = detect_csv_layout(text)
     source_lines = text.splitlines(keepends=True)
@@ -877,11 +1113,21 @@ def load_trade_payload(csv_path: Path) -> dict[str, Any]:
                 or "USD",
                 "account": get_value(row, columns["account"]).strip(),
                 "description": get_value(row, columns["description"]).strip(),
+                "provisional": False,
+                "source": "Activity",
             }
         )
 
     if not records:
         raise TradeDataError("The CSV does not contain any trade rows.")
+
+    if confirmation_path is not None:
+        authoritative_dates = {record["date"] for record in records}
+        records.extend(
+            load_provisional_confirmation_records(
+                confirmation_path, authoritative_dates
+            )
+        )
 
     records.sort(
         key=lambda item: (
@@ -927,6 +1173,9 @@ def load_trade_payload(csv_path: Path) -> dict[str, Any]:
         days[date_key] = {
             "date": date_key,
             "trade_count": len(day_records),
+            "provisional_count": sum(
+                1 for item in day_records if item.get("provisional")
+            ),
             "pnl": as_number(day_pnl),
             "symbols": symbols,
             "trades": public_records,
@@ -950,6 +1199,7 @@ def load_trade_payload(csv_path: Path) -> dict[str, Any]:
         "all": build_trade_analysis(records),
         "months": analysis_by_month,
     }
+    provisional_records = [record for record in records if record.get("provisional")]
 
     return {
         "metadata": {
@@ -963,6 +1213,10 @@ def load_trade_payload(csv_path: Path) -> dict[str, Any]:
             "csv_header_row": header_line_index + 1,
             "count_definition": "Each CSV trade row counts as one trade.",
             "currencies": currencies,
+            "provisional_execution_count": len(provisional_records),
+            "provisional_dates": sorted(
+                {record["date"] for record in provisional_records}
+            ),
         },
         "summary": {
             "trade_count": len(records),
@@ -1496,7 +1750,8 @@ HTML_PAGE = r'''<!doctype html>
       visibleSymbols: [],
       metadataLoading: false,
       selectedRankSymbol: null,
-      lastActivitySync: null
+      lastActivitySync: null,
+      lastTradeSync: null
     };
     const monthSelect = document.getElementById('month-select');
     const analysisPeriodSelect = document.getElementById('analysis-period-select');
@@ -1760,7 +2015,7 @@ HTML_PAGE = r'''<!doctype html>
       return `<button class="day-card has-trades ${cardTone(day.pnl)} ${outsideMonth ? 'outside-month' : ''}" type="button" data-date="${dateKey}">
         <div class="day-card-header">
           <div><span class="day-number">${dayNumber}</span> <span class="day-month">${month}</span></div>
-          <span class="trade-pill">${day.trade_count} trade${day.trade_count === 1 ? '' : 's'}</span>
+          <span class="trade-pill">${day.trade_count} trade${day.trade_count === 1 ? '' : 's'}${day.provisional_count ? ` · ${day.provisional_count} provisional` : ''}</span>
         </div>
         <div class="symbols">${symbolLines}${remainder > 0 ? `<div class="more-symbols">+${remainder} more symbols</div>` : ''}</div>
         <div class="day-total">
@@ -1804,7 +2059,8 @@ HTML_PAGE = r'''<!doctype html>
       document.getElementById('modal-title').textContent = longDate(dateKey);
       document.getElementById('modal-summary').innerHTML =
         `${day.trade_count} trade${day.trade_count === 1 ? '' : 's'} · ` +
-        `<span class="${toneClass(day.pnl)}">${formatMoney(day.pnl)}</span>`;
+        `<span class="${toneClass(day.pnl)}">${formatMoney(day.pnl)}</span>` +
+        (day.provisional_count ? ` · <span class="note">${day.provisional_count} provisional</span>` : '');
       const rows = day.trades.map(trade => `
         <tr>
           <td><strong>${escapeHtml(trade.symbol)}</strong></td>
@@ -1814,11 +2070,12 @@ HTML_PAGE = r'''<!doctype html>
           <td class="number">${formatMoney(trade.price)}</td>
           <td class="number money ${toneClass(trade.pnl)}">${formatMoney(trade.pnl)}</td>
           <td class="number">${formatMoney(trade.commission)}</td>
+          <td>${trade.provisional ? '<span class="evidence-badge">Provisional</span>' : 'Final'}</td>
           <td>${escapeHtml(trade.description || '')}</td>
         </tr>`).join('');
       document.getElementById('modal-body').innerHTML = `
         <table>
-          <thead><tr><th>Symbol</th><th>Time</th><th>Side</th><th class="number">Quantity</th><th class="number">Price</th><th class="number">Realized P&L</th><th class="number">Commission</th><th>Description</th></tr></thead>
+          <thead><tr><th>Symbol</th><th>Time</th><th>Side</th><th class="number">Quantity</th><th class="number">Price</th><th class="number">Realized P&L</th><th class="number">Commission</th><th>Status</th><th>Description</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       dialog.showModal();
@@ -2575,6 +2832,7 @@ HTML_PAGE = r'''<!doctype html>
         : `IBKR ${parts.length ? parts.join(' · ') : 'ready'}`;
       statusElement.innerHTML = `<span class="${dotClass}"></span>${escapeHtml(copy)}`;
       state.lastActivitySync = status.last_activity_success || state.lastActivitySync;
+      state.lastTradeSync = status.last_trade_success || state.lastTradeSync;
     }
 
     async function syncIbkr() {
@@ -2603,8 +2861,11 @@ HTML_PAGE = r'''<!doctype html>
         const result = await response.json();
         if (!response.ok) return;
         const previousActivitySync = state.lastActivitySync;
+        const previousTradeSync = state.lastTradeSync;
         renderIbkrStatus(result);
-        if (previousActivitySync && result.last_activity_success && result.last_activity_success !== previousActivitySync) {
+        const activityChanged = previousActivitySync && result.last_activity_success && result.last_activity_success !== previousActivitySync;
+        const tradeChanged = previousTradeSync && result.last_trade_success && result.last_trade_success !== previousTradeSync;
+        if (activityChanged || tradeChanged) {
           await loadData();
         }
       } catch (_) {
@@ -2639,7 +2900,8 @@ HTML_PAGE = r'''<!doctype html>
         document.getElementById('file-status').innerHTML =
           `<span class="status-dot"></span>${escapeHtml(result.metadata.file_name)} · refreshed ${escapeHtml(loaded)}`;
         document.getElementById('data-note').textContent =
-          `P&L: ${result.metadata.pnl_column} · Time: ${result.metadata.time_column || 'not available'} · ${result.metadata.count_definition}`;
+          `P&L: ${result.metadata.pnl_column} · Time: ${result.metadata.time_column || 'not available'} · ${result.metadata.count_definition}` +
+          (result.metadata.provisional_execution_count ? ` · ${result.metadata.provisional_execution_count} current-day executions are provisional` : '');
         renderIbkrStatus(result.ibkr);
         renderAll();
       } catch (error) {
@@ -2726,7 +2988,12 @@ def make_handler(
             if path == "/api/data":
                 try:
                     ibkr_sync.ensure_activity_file()
-                    payload = load_trade_payload(csv_path)
+                    payload = load_trade_payload(
+                        csv_path,
+                        ibkr_sync.trade_report_path
+                        if ibkr_sync.config.trade_configured
+                        else None,
+                    )
                     payload["ibkr"] = ibkr_sync.status()
                     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
                     self.send_bytes(body, "application/json; charset=utf-8")
@@ -2900,7 +3167,12 @@ def main() -> int:
                 "from the IBKR Activity Flex query..."
             )
             ibkr_sync.ensure_activity_file()
-        payload = load_trade_payload(csv_path)
+        payload = load_trade_payload(
+            csv_path,
+            ibkr_sync.trade_report_path
+            if ibkr_sync.config.trade_configured
+            else None,
+        )
     except (OSError, TradeDataError, FlexSyncError) as exc:
         parser.error(str(exc))
 
