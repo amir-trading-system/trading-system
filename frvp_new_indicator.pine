@@ -284,9 +284,13 @@ f_calculateProfile(
         float[] rowDownVolumes = array.new_float(rowCount, 0.0)
         float totalProfileVolume = 0.0
 
-        // Allocate each bar's volume by the percentage of its high-low range
-        // overlapping each profile row. This conserves total volume and avoids
-        // the false concentration at closing prices present in v6.
+        // TradingView's built-in profile uses intrabar price activity that is
+        // unavailable to a custom script at the chart's own resolution. The
+        // closest stable approximation is to distribute each candle's volume
+        // evenly across every profile row traversed by its high-low range.
+        // Weighting by geometric overlap displaced VAL materially on wide bars
+        // (for example, XPON on 2026-08-24), while equal row allocation matches
+        // the built-in profile's levels and still conserves total volume.
         for sourceIndex = 0 to sourceBars - 1
             float barHigh = array.get(highs, sourceIndex)
             float barLow = array.get(lows, sourceIndex)
@@ -326,35 +330,30 @@ f_calculateProfile(
                      rowCount - 1,
                      int(math.floor(
                           (barHigh - profileBottom) / rowHeight)))
+                int touchedRows = math.max(
+                     1,
+                     lastRow - firstRow + 1)
+                float allocatedVolume =
+                     barVolume / float(touchedRows)
 
                 for rowIndex = firstRow to lastRow
-                    float rowLow = profileBottom + rowIndex * rowHeight
-                    float rowHigh =
-                         math.min(profileTop, rowLow + rowHeight)
-                    float overlap = math.max(
-                         0.0,
-                         math.min(barHigh, rowHigh) -
-                              math.max(barLow, rowLow))
-                    if overlap > 0.0
-                        float allocatedVolume =
-                             barVolume * overlap / (barHigh - barLow)
+                    array.set(
+                         rowVolumes,
+                         rowIndex,
+                         array.get(rowVolumes, rowIndex) +
+                              allocatedVolume)
+                    if isUpBar
                         array.set(
-                             rowVolumes,
+                             rowUpVolumes,
                              rowIndex,
-                             array.get(rowVolumes, rowIndex) +
+                             array.get(rowUpVolumes, rowIndex) +
                                   allocatedVolume)
-                        if isUpBar
-                            array.set(
-                                 rowUpVolumes,
-                                 rowIndex,
-                                 array.get(rowUpVolumes, rowIndex) +
-                                      allocatedVolume)
-                        else
-                            array.set(
-                                 rowDownVolumes,
-                                 rowIndex,
-                                 array.get(rowDownVolumes, rowIndex) +
-                                      allocatedVolume)
+                    else
+                        array.set(
+                             rowDownVolumes,
+                             rowIndex,
+                             array.get(rowDownVolumes, rowIndex) +
+                                  allocatedVolume)
 
         // The POC is the row containing the greatest total volume.
         int pocRow = 0
