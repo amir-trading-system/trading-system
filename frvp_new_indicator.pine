@@ -41,6 +41,11 @@ float valueAreaPct = input.float(
      maxval = 100.0,
      step = 1.0,
      group = "Profile Precision Settings")
+bool useNativeFootprint = input.bool(
+     true,
+     title = "Use Native Footprint Data (Premium)",
+     group = "Profile Precision Settings",
+     tooltip = "Builds VAL, POC, VAH and buyer/seller rows from TradingView's native intrabar footprint data. If footprint history is unavailable, the table reports that the OHLCV approximation is being used instead.")
 int profileWidthPct = input.int(
      30,
      title = "Profile Width (% of Range)",
@@ -104,6 +109,19 @@ bool showVALBuyerTransition = input.bool(
      title = "Show Buyer Transition Below VAL",
      group = "VAL Buyer Transition",
      tooltip = "Shows the first meaningful, persistent improvement from seller control toward buyer control below VAL.")
+bool useStableVALBuyerControlRows = input.bool(
+     true,
+     title = "Use Stable Rows for VAL Buyer Control",
+     group = "VAL Buyer Transition",
+     tooltip = "Calculates an additional VAL Buyer Control/Transition signal on a globally anchored fixed-price grid. This prevents inactive prices added to the selected range from changing the signal's local row structure. The original profile signal keeps priority, so existing cases retain their previous label.")
+float valBuyerControlRowHeight = input.float(
+     0.02,
+     title = "Stable Control Row Height ($)",
+     minval = 0.0001,
+     maxval = 1.0,
+     step = 0.01,
+     group = "VAL Buyer Transition",
+     tooltip = "Maximum price height of each stable signal row. The default is two cents. This setting does not change the displayed histogram, VAL, POC, VAH, Buyer Shift, or reversal arrows.")
 float valBuyerMaxDistancePct = input.float(
      5.0,
      title = "Maximum Transition Distance Below VAL (%)",
@@ -194,6 +212,8 @@ color valBuyerControlColor = input.color(
 // in Total mode to stay within TradingView's drawing-object limit.
 const int MAX_ROWS_PER_PROFILE = 240
 const int MAX_SPLIT_ROWS = 120
+const int MAX_SIGNAL_ROWS = 2000
+const int MAX_FOOTPRINT_POINTS = 90000
 const int PROFILE_META_SIZE = 11
 const int META_VAH = 0
 const int META_POC = 1
@@ -212,20 +232,30 @@ const int REGION_BELOW_VAL = 2
 const int REGION_ABOVE_VAH = 3
 
 // =============================================================================
-// 2. CAPTURE THE RANGE'S OHLCV BARS
+// 2. CAPTURE THE RANGE'S PROFILE INPUT DATA
 // =============================================================================
-// The previous version stored a candle's entire volume at its closing price.
-// That creates a close-by-volume histogram, not a fixed-range volume profile.
-// We retain each bar's high, low and volume so the calculation can allocate the
-// bar's volume proportionally to every price row that the bar traversed.
+// Native footprint rows are the primary source. OHLCV is retained both for the
+// profile's complete high-low span and as an explicit fallback when footprint
+// history is unavailable for any nonzero-volume bar in the selected range.
 
 var float[] rangeOpensA = array.new_float(0)
 var float[] rangeHighsA = array.new_float(0)
 var float[] rangeLowsA = array.new_float(0)
 var float[] rangeClosesA = array.new_float(0)
 var float[] rangeVolumesA = array.new_float(0)
+var float[] rangeFootprintPricesA = array.new_float(0)
+var float[] rangeFootprintBuyVolumesA = array.new_float(0)
+var float[] rangeFootprintSellVolumesA = array.new_float(0)
 
 var float totalVolA = 0.0
+var int footprintCoveredBarsA = 0
+var bool footprintCapacityExceededA = false
+
+// A one-tick native footprint preserves TradingView's finest available
+// intrabar price/volume information. The profile calculation below coalesces
+// these rows into the user's selected Number of Rows or Ticks Per Row layout.
+// Pine permits only one request.footprint() call in a script.
+footprint barFootprintA = request.footprint(1)
 
 if barstate.isfirst
     array.clear(rangeOpensA)
@@ -233,7 +263,12 @@ if barstate.isfirst
     array.clear(rangeLowsA)
     array.clear(rangeClosesA)
     array.clear(rangeVolumesA)
+    array.clear(rangeFootprintPricesA)
+    array.clear(rangeFootprintBuyVolumesA)
+    array.clear(rangeFootprintSellVolumesA)
     totalVolA := 0.0
+    footprintCoveredBarsA := 0
+    footprintCapacityExceededA := false
 
 bool inRangeA = time >= startA and time <= endA
 float currentVolume = nz(volume)
@@ -246,10 +281,59 @@ if inRangeA
     array.push(rangeVolumesA, currentVolume)
     totalVolA += currentVolume
 
+    if useNativeFootprint and not footprintCapacityExceededA
+        if not na(barFootprintA)
+            array<volume_row> footprintRowsA = barFootprintA.rows()
+            int footprintRowCountA = array.size(footprintRowsA)
+            bool hasFootprintCapacityA =
+                 array.size(rangeFootprintPricesA) + footprintRowCountA <=
+                      MAX_FOOTPRINT_POINTS
+
+            if hasFootprintCapacityA
+                if footprintRowCountA > 0
+                    for footprintRowIndexA = 0 to footprintRowCountA - 1
+                        volume_row footprintRowA =
+                             array.get(
+                                  footprintRowsA,
+                                  footprintRowIndexA)
+                        float footprintPriceA =
+                             (footprintRowA.down_price() +
+                                  footprintRowA.up_price()) * 0.5
+                        array.push(
+                             rangeFootprintPricesA,
+                             footprintPriceA)
+                        array.push(
+                             rangeFootprintBuyVolumesA,
+                             footprintRowA.buy_volume())
+                        array.push(
+                             rangeFootprintSellVolumesA,
+                             footprintRowA.sell_volume())
+                footprintCoveredBarsA += 1
+            else
+                footprintCapacityExceededA := true
+                footprintCoveredBarsA := 0
+                array.clear(rangeFootprintPricesA)
+                array.clear(rangeFootprintBuyVolumesA)
+                array.clear(rangeFootprintSellVolumesA)
+        else if currentVolume <= 0.0
+            // A zero-volume bar has no footprint rows but is still complete.
+            footprintCoveredBarsA += 1
+
+bool usesNativeFootprintA =
+     useNativeFootprint and
+     not footprintCapacityExceededA and
+     array.size(rangeVolumesA) > 0 and
+     footprintCoveredBarsA == array.size(rangeVolumesA) and
+     array.size(rangeFootprintPricesA) > 0
+
 // =============================================================================
 // 3. PROFILE CALCULATION
 // =============================================================================
-f_ticksPerRow(int totalTicks, string layout, int requestedSize) =>
+f_ticksPerRow(
+     int totalTicks,
+     string layout,
+     int requestedSize,
+     int maximumRows) =>
     int selectedTicks = math.max(1, requestedSize)
 
     if layout == "Number of Rows"
@@ -270,9 +354,10 @@ f_ticksPerRow(int totalTicks, string layout, int requestedSize) =>
     // Keep the histogram within the platform's drawing-object limit. This
     // only affects extremely fine Ticks Per Row selections.
     int calculatedRows = int(math.ceil(float(totalTicks) / selectedTicks))
-    if calculatedRows > MAX_ROWS_PER_PROFILE
+    int safeMaximumRows = math.max(1, maximumRows)
+    if calculatedRows > safeMaximumRows
         selectedTicks :=
-             int(math.ceil(float(totalTicks) / MAX_ROWS_PER_PROFILE))
+             int(math.ceil(float(totalTicks) / safeMaximumRows))
 
     selectedTicks
 
@@ -282,9 +367,15 @@ f_calculateProfile(
      float[] lows,
      float[] closes,
      float[] volumes,
+     float[] footprintPrices,
+     float[] footprintBuyVolumes,
+     float[] footprintSellVolumes,
+     bool useFootprintRows,
      string layout,
      int requestedSize,
-     float targetPct) =>
+     float targetPct,
+     int maximumRows,
+     bool anchorRowsToGrid) =>
     float[] result = array.new_float(0)
     int sourceBars = array.size(volumes)
 
@@ -300,8 +391,32 @@ f_calculateProfile(
              int(math.round(
                   (profileTop - profileBottom) / syminfo.mintick)))
         int ticksPerRow =
-             f_ticksPerRow(totalTicks, layout, requestedSize)
+             f_ticksPerRow(
+                  totalTicks,
+                  layout,
+                  requestedSize,
+                  maximumRows)
         float rowHeight = ticksPerRow * syminfo.mintick
+
+        // The displayed FRVP begins at the selected range's low, matching the
+        // built-in tool. The stable control profile instead anchors boundaries
+        // to absolute multiples of its row height. Adding unused lower prices
+        // therefore cannot shift the buyer-control rows at higher prices.
+        if anchorRowsToGrid
+            profileBottom :=
+                 math.floor(
+                      rawRangeLow / rowHeight + 0.0000001) *
+                      rowHeight
+            profileTop :=
+                 math.ceil(
+                      rawRangeHigh / rowHeight - 0.0000001) *
+                      rowHeight
+            totalTicks := math.max(
+                 1,
+                 int(math.round(
+                      (profileTop - profileBottom) /
+                           syminfo.mintick)))
+
         int rowCount = math.max(
              1,
              int(math.ceil(float(totalTicks) / ticksPerRow)))
@@ -310,76 +425,108 @@ f_calculateProfile(
         float[] rowDownVolumes = array.new_float(rowCount, 0.0)
         float totalProfileVolume = 0.0
 
-        // TradingView's built-in profile uses intrabar price activity that is
-        // unavailable to a custom script at the chart's own resolution. The
-        // closest stable approximation is to distribute each candle's volume
-        // evenly across every profile row traversed by its high-low range.
-        // Weighting by geometric overlap displaced VAL materially on wide bars
-        // (for example, XPON on 2026-08-24), while equal row allocation matches
-        // the built-in profile's levels and still conserves total volume.
-        for sourceIndex = 0 to sourceBars - 1
-            float barHigh = array.get(highs, sourceIndex)
-            float barLow = array.get(lows, sourceIndex)
-            bool isUpBar =
-                 array.get(closes, sourceIndex) >=
-                      array.get(opens, sourceIndex)
-            float barVolume = array.get(volumes, sourceIndex)
-            totalProfileVolume += barVolume
-
-            if barHigh <= barLow
-                int singleRow = math.max(
+        if useFootprintRows and array.size(footprintPrices) > 0
+            int footprintPointCount = array.size(footprintPrices)
+            for footprintIndex = 0 to footprintPointCount - 1
+                float footprintPrice =
+                     array.get(footprintPrices, footprintIndex)
+                float footprintBuyVolume =
+                     nz(array.get(footprintBuyVolumes, footprintIndex))
+                float footprintSellVolume =
+                     nz(array.get(footprintSellVolumes, footprintIndex))
+                float footprintTotalVolume =
+                     footprintBuyVolume + footprintSellVolume
+                int footprintProfileRow = math.max(
                      0,
                      math.min(
                           rowCount - 1,
                           int(math.floor(
-                               (barLow - profileBottom) / rowHeight))))
+                               (footprintPrice - profileBottom) /
+                                    rowHeight))))
+
+                totalProfileVolume += footprintTotalVolume
                 array.set(
                      rowVolumes,
-                     singleRow,
-                     array.get(rowVolumes, singleRow) + barVolume)
-                if isUpBar
-                    array.set(
-                         rowUpVolumes,
-                         singleRow,
-                         array.get(rowUpVolumes, singleRow) + barVolume)
-                else
-                    array.set(
-                         rowDownVolumes,
-                         singleRow,
-                         array.get(rowDownVolumes, singleRow) + barVolume)
-            else
-                int firstRow = math.max(
-                     0,
-                     int(math.floor(
-                          (barLow - profileBottom) / rowHeight)))
-                int lastRow = math.min(
-                     rowCount - 1,
-                     int(math.floor(
-                          (barHigh - profileBottom) / rowHeight)))
-                int touchedRows = math.max(
-                     1,
-                     lastRow - firstRow + 1)
-                float allocatedVolume =
-                     barVolume / float(touchedRows)
+                     footprintProfileRow,
+                     array.get(rowVolumes, footprintProfileRow) +
+                          footprintTotalVolume)
+                array.set(
+                     rowUpVolumes,
+                     footprintProfileRow,
+                     array.get(rowUpVolumes, footprintProfileRow) +
+                          footprintBuyVolume)
+                array.set(
+                     rowDownVolumes,
+                     footprintProfileRow,
+                     array.get(rowDownVolumes, footprintProfileRow) +
+                          footprintSellVolume)
+        else
+            // Explicit fallback for chart history where native footprints are
+            // unavailable: distribute each candle's volume evenly across all
+            // profile rows traversed by its high-low range.
+            for sourceIndex = 0 to sourceBars - 1
+                float barHigh = array.get(highs, sourceIndex)
+                float barLow = array.get(lows, sourceIndex)
+                bool isUpBar =
+                     array.get(closes, sourceIndex) >=
+                          array.get(opens, sourceIndex)
+                float barVolume = array.get(volumes, sourceIndex)
+                totalProfileVolume += barVolume
 
-                for rowIndex = firstRow to lastRow
+                if barHigh <= barLow
+                    int singleRow = math.max(
+                         0,
+                         math.min(
+                              rowCount - 1,
+                              int(math.floor(
+                                   (barLow - profileBottom) / rowHeight))))
                     array.set(
                          rowVolumes,
-                         rowIndex,
-                         array.get(rowVolumes, rowIndex) +
-                              allocatedVolume)
+                         singleRow,
+                         array.get(rowVolumes, singleRow) + barVolume)
                     if isUpBar
                         array.set(
                              rowUpVolumes,
-                             rowIndex,
-                             array.get(rowUpVolumes, rowIndex) +
-                                  allocatedVolume)
+                             singleRow,
+                             array.get(rowUpVolumes, singleRow) + barVolume)
                     else
                         array.set(
                              rowDownVolumes,
+                             singleRow,
+                             array.get(rowDownVolumes, singleRow) + barVolume)
+                else
+                    int firstRow = math.max(
+                         0,
+                         int(math.floor(
+                              (barLow - profileBottom) / rowHeight)))
+                    int lastRow = math.min(
+                         rowCount - 1,
+                         int(math.floor(
+                              (barHigh - profileBottom) / rowHeight)))
+                    int touchedRows = math.max(
+                         1,
+                         lastRow - firstRow + 1)
+                    float allocatedVolume =
+                         barVolume / float(touchedRows)
+
+                    for rowIndex = firstRow to lastRow
+                        array.set(
+                             rowVolumes,
                              rowIndex,
-                             array.get(rowDownVolumes, rowIndex) +
+                             array.get(rowVolumes, rowIndex) +
                                   allocatedVolume)
+                        if isUpBar
+                            array.set(
+                                 rowUpVolumes,
+                                 rowIndex,
+                                 array.get(rowUpVolumes, rowIndex) +
+                                      allocatedVolume)
+                        else
+                            array.set(
+                                 rowDownVolumes,
+                                 rowIndex,
+                                 array.get(rowDownVolumes, rowIndex) +
+                                      allocatedVolume)
 
         // The POC is the row containing the greatest total volume.
         int pocRow = 0
@@ -804,6 +951,7 @@ f_directionalText(float primaryVolume, float opposingVolume) =>
          relativeText
 
 var float[] profileA = array.new_float(0)
+var float[] valBuyerControlProfileA = array.new_float(0)
 var float vahA = na
 var float pocA = na
 var float valA = na
@@ -815,9 +963,39 @@ if barstate.islast
          rangeLowsA,
          rangeClosesA,
          rangeVolumesA,
+         rangeFootprintPricesA,
+         rangeFootprintBuyVolumesA,
+         rangeFootprintSellVolumesA,
+         usesNativeFootprintA,
          rowsLayout,
          rowSize,
-         valueAreaPct)
+         valueAreaPct,
+         MAX_ROWS_PER_PROFILE,
+         false)
+
+    if useStableVALBuyerControlRows
+        int stableControlTicksPerRowA = math.max(
+             1,
+             int(math.round(
+                  valBuyerControlRowHeight /
+                       syminfo.mintick)))
+        valBuyerControlProfileA := f_calculateProfile(
+             rangeOpensA,
+             rangeHighsA,
+             rangeLowsA,
+             rangeClosesA,
+             rangeVolumesA,
+             rangeFootprintPricesA,
+             rangeFootprintBuyVolumesA,
+             rangeFootprintSellVolumesA,
+             usesNativeFootprintA,
+             "Ticks Per Row",
+             stableControlTicksPerRowA,
+             valueAreaPct,
+             MAX_SIGNAL_ROWS,
+             true)
+    else
+        valBuyerControlProfileA := profileA
 
     vahA := array.size(profileA) >= PROFILE_META_SIZE ?
          array.get(profileA, META_VAH) : na
@@ -846,11 +1024,22 @@ float[] directionalPOCToVAHA =
      f_profileRegionDirectionalVolumes(
           profileA,
           REGION_POC_TO_VAH)
-float[] valBuyerTransitionA = f_valBuyerTransition(
+float[] stableVALBuyerTransitionA = f_valBuyerTransition(
+     valBuyerControlProfileA,
+     valBuyerMaxDistancePct,
+     valBuyerMinRowVolumePct,
+     valBuyerMinImprovementPct)
+float[] originalVALBuyerTransitionA = f_valBuyerTransition(
      profileA,
      valBuyerMaxDistancePct,
      valBuyerMinRowVolumePct,
      valBuyerMinImprovementPct)
+float[] valBuyerTransitionA = array.new_float(0)
+if array.size(originalVALBuyerTransitionA) >= 5
+    valBuyerTransitionA := originalVALBuyerTransitionA
+else if useStableVALBuyerControlRows and
+     array.size(stableVALBuyerTransitionA) >= 5
+    valBuyerTransitionA := stableVALBuyerTransitionA
 float[] valBuyerRelativeShiftA = f_highestBuyerRelativeNearVAL(
      profileA,
      valBuyerRelativeMaxDistanceRows)
@@ -1412,7 +1601,7 @@ if barstate.islast
 var table compTable = table.new(
      position = position.top_right,
      columns = 2,
-     rows = 10,
+     rows = 11,
      bgcolor = color.new(color.black, 15),
      border_width = 1,
      border_color = color.gray)
@@ -1421,6 +1610,9 @@ if barstate.islast
     string effectiveRowsA =
          array.size(profileA) >= PROFILE_META_SIZE ?
          str.tostring(int(array.get(profileA, META_ROW_COUNT))) : "n/a"
+    float displayedTotalVolumeA =
+         array.size(profileA) >= PROFILE_META_SIZE ?
+         array.get(profileA, META_TOTAL_VOLUME) : totalVolA
 
     table.cell(
          compTable, 0, 0, "FRVP Summary",
@@ -1436,7 +1628,7 @@ if barstate.islast
          text_color = color.white,
          text_size = size.small)
     table.cell(
-         compTable, 1, 1, str.tostring(totalVolA, "#,###"),
+         compTable, 1, 1, str.tostring(displayedTotalVolumeA, "#,###"),
          text_color = color.yellow,
          text_size = size.small)
 
@@ -1510,4 +1702,21 @@ if barstate.islast
     table.cell(
          compTable, 1, 9, f_formatVolume(volumeAboveVAHA),
          text_color = color.silver,
+         text_size = size.small)
+
+    string profileSourceA =
+         usesNativeFootprintA ? "Native Footprint" :
+         not useNativeFootprint ? "OHLCV Approximation" :
+         footprintCapacityExceededA ? "OHLCV (Footprint Limit)" :
+         "OHLCV (Footprint Unavailable)"
+    color profileSourceColorA =
+         usesNativeFootprintA ? color.lime : color.orange
+
+    table.cell(
+         compTable, 0, 10, "Profile Source:",
+         text_color = color.white,
+         text_size = size.small)
+    table.cell(
+         compTable, 1, 10, profileSourceA,
+         text_color = profileSourceColorA,
          text_size = size.small)
