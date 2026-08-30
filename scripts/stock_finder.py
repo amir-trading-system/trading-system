@@ -84,7 +84,6 @@ def get_dynamic_symbols_data_from_period(
             timeout=30,
         )
 
-        positive_data = historical_data[historical_data["Close"] > historical_data["Open"]] # type: ignore
         positive_data = historical_data
         for symbol in symbols_to_download:
             low_to_high = {}
