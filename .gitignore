@@ -14,3 +14,4 @@ positive_30pct_trend_start_candidates.csv
 positive_30pct_trend_start_days_all_bars.csv
 *.dat
 *.env
+*Trades_*.csv
