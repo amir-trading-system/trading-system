@@ -5,7 +5,7 @@ indicator(
      overlay = true,
      max_boxes_count = 500,
      max_lines_count = 10,
-     max_labels_count = 20)
+     max_labels_count = 500)
 
 // =============================================================================
 // 1. INTERACTIVE INPUTS (drag-and-drop)
@@ -79,45 +79,29 @@ bool extendLevelsRight = input.bool(
      group = "Profile Style")
 bool showBuyerZone = input.bool(
      true,
-     title = "Show Top Two Buyer Zones",
+     title = "Show Top Four Buyer Rows",
      group = "Buyer Zone",
-     tooltip = "Draws the two strongest distinct estimated bullish-volume price areas across the entire selected range, provided buyers / sellers is at least 1.0.")
-float buyerZoneNeighborPct = input.float(
-     90.0,
-     title = "Adjacent Row Minimum (% of Buyer Peak)",
-     minval = 1.0,
-     maxval = 100.0,
-     step = 5.0,
-     group = "Buyer Zone",
-     tooltip = "Includes adjacent price rows in each zone while their bullish volume remains at least this percentage of that zone's peak row.")
+     tooltip = "Draws the four profile rows with the greatest estimated bullish volume. Each result is exactly one histogram row and requires buyers / sellers of at least 1.0. Equal-volume ties favor higher prices.")
 bool showBuyerZoneVolumes = input.bool(
      true,
      title = "Show Buyer x Seller Volume",
      group = "Buyer Zone",
-     tooltip = "Shows a black label at the histogram's left edge with estimated up-volume x down-volume and their relative ratio. The higher-ratio zone is highlighted.")
+     tooltip = "Shows a green label outside the histogram's left edge with estimated up-volume x down-volume and their relative ratio.")
 bool showSellerZone = input.bool(
      true,
-     title = "Show Top Two Seller Zones",
+     title = "Show Top Two Seller Rows",
      group = "Seller Zone",
-     tooltip = "Draws the two strongest distinct estimated bearish-volume price areas across the entire selected range, provided sellers / buyers is at least 1.0.")
-float sellerZoneNeighborPct = input.float(
-     90.0,
-     title = "Adjacent Row Minimum (% of Seller Peak)",
-     minval = 1.0,
-     maxval = 100.0,
-     step = 5.0,
-     group = "Seller Zone",
-     tooltip = "Includes adjacent price rows in each zone while their bearish volume remains at least this percentage of that zone's peak row.")
+     tooltip = "Draws the two profile rows with the greatest estimated bearish volume. Each result is exactly one histogram row and requires sellers / buyers of at least 1.0. Equal-volume ties favor higher prices.")
 bool showSellerZoneVolumes = input.bool(
      true,
      title = "Show Seller x Buyer Volume",
      group = "Seller Zone",
-     tooltip = "Shows a black histogram label with estimated down-volume x up-volume and their relative ratio. The higher-ratio seller zone is highlighted.")
+     tooltip = "Shows a red label outside the histogram's left edge with estimated down-volume x up-volume and their relative ratio.")
 bool showLocalBuyerDominance = input.bool(
      true,
-     title = "Mark Local Buyer-Dominance Rows",
+     title = "Mark Local Buyer-Dominance Reversals",
      group = "Local Buyer Dominance",
-     tooltip = "Marks a row when its buyer volume is strictly greater than both adjacent rows, its seller volume is strictly lower than both adjacent rows, and buyers / sellers is at least 1.0.")
+     tooltip = "Shows a Reversal arrow outside the histogram's left edge when a row's buyer volume is strictly greater than both adjacent rows, its seller volume is strictly lower than both adjacent rows, and buyers / sellers is at least 1.0.")
 
 color upVolumeColor = input.color(
      color.rgb(38, 166, 154),
@@ -153,15 +137,15 @@ color supportLineColor = input.color(
      group = "Profile Colors")
 color buyerZoneColor = input.color(
      color.rgb(0, 188, 212),
-     title = "Top Buyer Zones",
+     title = "Top Four Buyer Rows",
      group = "Profile Colors")
 color sellerZoneColor = input.color(
      color.rgb(239, 83, 80),
-     title = "Top Seller Zones",
+     title = "Top Two Seller Rows",
      group = "Profile Colors")
 color localBuyerDominanceColor = input.color(
      color.lime,
-     title = "Local Buyer-Dominance Rows",
+     title = "Local Buyer-Dominance Reversals",
      group = "Profile Colors")
 
 // A profile above the split threshold retains its calculated rows but renders
@@ -524,11 +508,11 @@ f_supportNodeBelowVAL(float[] profile, float minimumPctOfPOC) =>
 
     supportPrice
 
-f_topDirectionalZones(
+f_topDirectionalRows(
      float[] profile,
-     float neighborMinimumPct,
-     bool useBuyerVolume) =>
-    float[] zones = array.new_float(0)
+     bool useBuyerVolume,
+     int requestedRows) =>
+    float[] strongestRows = array.new_float(0)
 
     if array.size(profile) >= PROFILE_META_SIZE
         int rowCount = int(array.get(profile, META_ROW_COUNT))
@@ -542,144 +526,45 @@ f_topDirectionalZones(
              useBuyerVolume ? upVolumeOffset : downVolumeOffset
         int opposingVolumeOffset =
              useBuyerVolume ? downVolumeOffset : upVolumeOffset
-        int firstPeakRow = 0
-        float firstPeakVolume = array.get(
-             profile,
-             primaryVolumeOffset)
+        int[] selectedRows = array.new_int(0)
+        int resultCount = math.min(requestedRows, rowCount)
 
-        if rowCount > 1
-            for rowIndex = 1 to rowCount - 1
-                float rowDirectionalVolume = array.get(
-                     profile,
-                     primaryVolumeOffset + rowIndex)
-                if rowDirectionalVolume > firstPeakVolume
-                    firstPeakRow := rowIndex
-                    firstPeakVolume := rowDirectionalVolume
+        // Rank individual rows, not merged neighborhoods. Each pass selects
+        // one unused row. Using >= while iterating upward makes the higher
+        // price win an equal-volume tie.
+        if resultCount > 0
+            for resultIndex = 0 to resultCount - 1
+                int selectedRow = -1
+                float selectedVolume = -1.0
 
-        if firstPeakVolume > 0.0
-            float firstMinimum =
-                 firstPeakVolume * neighborMinimumPct / 100.0
-            int firstLowRow = firstPeakRow
-            int firstHighRow = firstPeakRow
-
-            while firstLowRow > 0 and
-                 array.get(
-                      profile,
-                      primaryVolumeOffset + firstLowRow - 1) >=
-                      firstMinimum
-                firstLowRow -= 1
-
-            while firstHighRow < rowCount - 1 and
-                 array.get(
-                      profile,
-                      primaryVolumeOffset + firstHighRow + 1) >=
-                      firstMinimum
-                firstHighRow += 1
-
-            float firstDirectionalVolume = 0.0
-            float firstOpposingVolume = 0.0
-            for rowIndex = firstLowRow to firstHighRow
-                firstDirectionalVolume += array.get(
-                     profile,
-                     primaryVolumeOffset + rowIndex)
-                firstOpposingVolume += array.get(
-                     profile,
-                     opposingVolumeOffset + rowIndex)
-
-            array.push(
-                 zones,
-                 profileBottom + firstLowRow * rowHeight)
-            array.push(
-                 zones,
-                 math.min(
-                      profileTop,
-                      profileBottom +
-                           (firstHighRow + 1) * rowHeight))
-            array.push(zones, firstDirectionalVolume)
-            array.push(zones, firstOpposingVolume)
-
-            int excludedLow = math.max(0, firstLowRow - 1)
-            int excludedHigh = math.min(
-                 rowCount - 1,
-                 firstHighRow + 1)
-            int secondPeakRow = -1
-            float secondPeakVolume = -1.0
-
-            for rowIndex = 0 to rowCount - 1
-                float rowDirectionalVolume = array.get(
-                     profile,
-                     primaryVolumeOffset + rowIndex)
-                float lowerNeighborVolume =
-                     rowIndex > 0 ?
-                     array.get(
-                          profile,
-                          primaryVolumeOffset + rowIndex - 1) : -1.0
-                float upperNeighborVolume =
-                     rowIndex < rowCount - 1 ?
-                     array.get(
-                          profile,
-                          primaryVolumeOffset + rowIndex + 1) : -1.0
-                bool outsideFirstZone =
-                     rowIndex < excludedLow or
-                     rowIndex > excludedHigh
-                bool isLocalDirectionalPeak =
-                     rowDirectionalVolume > 0.0 and
-                     rowDirectionalVolume >= lowerNeighborVolume and
-                     rowDirectionalVolume >= upperNeighborVolume
-
-                if outsideFirstZone and
-                     isLocalDirectionalPeak and
-                     rowDirectionalVolume > secondPeakVolume
-                    secondPeakRow := rowIndex
-                    secondPeakVolume := rowDirectionalVolume
-
-            if secondPeakRow >= 0
-                float secondMinimum =
-                     secondPeakVolume * neighborMinimumPct / 100.0
-                int secondLowRow = secondPeakRow
-                int secondHighRow = secondPeakRow
-
-                while secondLowRow > 0 and
-                     (secondLowRow - 1 < excludedLow or
-                          secondLowRow - 1 > excludedHigh) and
-                     array.get(
-                          profile,
-                          primaryVolumeOffset + secondLowRow - 1) >=
-                          secondMinimum
-                    secondLowRow -= 1
-
-                while secondHighRow < rowCount - 1 and
-                     (secondHighRow + 1 < excludedLow or
-                          secondHighRow + 1 > excludedHigh) and
-                     array.get(
-                          profile,
-                          primaryVolumeOffset + secondHighRow + 1) >=
-                          secondMinimum
-                    secondHighRow += 1
-
-                float secondDirectionalVolume = 0.0
-                float secondOpposingVolume = 0.0
-                for rowIndex = secondLowRow to secondHighRow
-                    secondDirectionalVolume += array.get(
+                for rowIndex = 0 to rowCount - 1
+                    bool wasAlreadySelected =
+                         array.includes(selectedRows, rowIndex)
+                    float rowDirectionalVolume = array.get(
                          profile,
                          primaryVolumeOffset + rowIndex)
-                    secondOpposingVolume += array.get(
-                         profile,
-                         opposingVolumeOffset + rowIndex)
+                    if not wasAlreadySelected and
+                         rowDirectionalVolume >= selectedVolume
+                        selectedRow := rowIndex
+                        selectedVolume := rowDirectionalVolume
 
-                array.push(
-                     zones,
-                     profileBottom + secondLowRow * rowHeight)
-                array.push(
-                     zones,
-                     math.min(
-                          profileTop,
-                          profileBottom +
-                               (secondHighRow + 1) * rowHeight))
-                array.push(zones, secondDirectionalVolume)
-                array.push(zones, secondOpposingVolume)
+                if selectedRow >= 0 and selectedVolume > 0.0
+                    array.push(selectedRows, selectedRow)
+                    float selectedLow =
+                         profileBottom + selectedRow * rowHeight
+                    float selectedHigh = math.min(
+                         profileTop,
+                         selectedLow + rowHeight)
+                    array.push(strongestRows, selectedLow)
+                    array.push(strongestRows, selectedHigh)
+                    array.push(strongestRows, selectedVolume)
+                    array.push(
+                         strongestRows,
+                         array.get(
+                              profile,
+                              opposingVolumeOffset + selectedRow))
 
-    zones
+    strongestRows
 
 f_formatVolume(float volumeValue) =>
     na(volumeValue) ? "n/a" : str.tostring(volumeValue, "#,###")
@@ -801,15 +686,11 @@ var line lineSupportBelowVALA = line.new(
 
 var box[] histBoxesA = array.new_box(0)
 var box profileBackgroundA = na
-var box buyerVolumeZone1A = na
-var box buyerVolumeZone2A = na
-var label buyerVolumeLabel1A = na
-var label buyerVolumeLabel2A = na
-var box sellerVolumeZone1A = na
-var box sellerVolumeZone2A = na
-var label sellerVolumeLabel1A = na
-var label sellerVolumeLabel2A = na
-var box[] localBuyerDominanceBoxesA = array.new_box(0)
+var box[] buyerVolumeZonesA = array.new_box(0)
+var label[] buyerVolumeLabelsA = array.new_label(0)
+var box[] sellerVolumeZonesA = array.new_box(0)
+var label[] sellerVolumeLabelsA = array.new_label(0)
+var label[] localBuyerDominanceLabelsA = array.new_label(0)
 
 f_clearBoxes(box[] boxes) =>
     if array.size(boxes) > 0
@@ -817,11 +698,94 @@ f_clearBoxes(box[] boxes) =>
             box.delete(array.get(boxes, boxIndex))
         array.clear(boxes)
 
-f_drawLocalBuyerDominanceRows(
-     float[] profile,
-     box[] boxes,
+f_clearLabels(label[] labels) =>
+    if array.size(labels) > 0
+        for labelIndex = 0 to array.size(labels) - 1
+            label.delete(array.get(labels, labelIndex))
+        array.clear(labels)
+
+f_drawDirectionalRows(
+     float[] directionalRows,
+     box[] zoneBoxes,
+     label[] volumeLabels,
      int rangeStartTime,
      int rangeEndTime,
+     int labelTime,
+     color zoneColor,
+     color labelColor,
+     bool showRows,
+     bool showVolumes) =>
+    int resultCount = int(array.size(directionalRows) / 4)
+    int highestRelativeIndex = -1
+    float highestRelative = -1.0
+
+    if resultCount > 0
+        for resultIndex = 0 to resultCount - 1
+            int resultOffset = resultIndex * 4
+            float relativeValue = f_directionalRelative(
+                 array.get(directionalRows, resultOffset + 2),
+                 array.get(directionalRows, resultOffset + 3))
+            if relativeValue >= 1.0 and
+                 relativeValue >= highestRelative
+                highestRelativeIndex := resultIndex
+                highestRelative := relativeValue
+
+        if showRows
+            for resultIndex = 0 to resultCount - 1
+                int resultOffset = resultIndex * 4
+                float rowBottom = array.get(
+                     directionalRows,
+                     resultOffset)
+                float rowTop = array.get(
+                     directionalRows,
+                     resultOffset + 1)
+                float primaryVolume = array.get(
+                     directionalRows,
+                     resultOffset + 2)
+                float opposingVolume = array.get(
+                     directionalRows,
+                     resultOffset + 3)
+                float relativeValue = f_directionalRelative(
+                     primaryVolume,
+                     opposingVolume)
+
+                if relativeValue >= 1.0
+                    bool isHighestRelative =
+                         resultIndex == highestRelativeIndex
+                    box directionalRow = box.new(
+                         left = rangeStartTime,
+                         top = rowTop,
+                         right = rangeEndTime,
+                         bottom = rowBottom,
+                         xloc = xloc.bar_time,
+                         bgcolor = color.new(
+                              zoneColor,
+                              isHighestRelative ? 60 : 88),
+                         border_color = color.new(
+                              zoneColor,
+                              isHighestRelative ? 0 : 50),
+                         border_width = 1)
+                    array.push(zoneBoxes, directionalRow)
+
+                    if showVolumes
+                        label directionalLabel = label.new(
+                             x = labelTime,
+                             y = (rowBottom + rowTop) / 2.0,
+                             text = f_directionalText(
+                                  primaryVolume,
+                                  opposingVolume),
+                             xloc = xloc.bar_time,
+                             yloc = yloc.price,
+                             style = label.style_label_right,
+                             color = labelColor,
+                             textcolor = color.white,
+                             size = size.tiny)
+                        array.push(volumeLabels, directionalLabel)
+
+f_drawLocalBuyerDominanceRows(
+     float[] profile,
+     label[] labels,
+     int markerTime,
      color markerColor) =>
     if array.size(profile) >= PROFILE_META_SIZE
         int rowCount = int(array.get(profile, META_ROW_COUNT))
@@ -865,16 +829,17 @@ f_drawLocalBuyerDominanceRows(
                     float rowHigh = math.min(
                          profileTop,
                          rowLow + rowHeight)
-                    box dominanceRow = box.new(
-                         left = rangeStartTime,
-                         top = rowHigh,
-                         right = rangeEndTime,
-                         bottom = rowLow,
+                    label reversalMarker = label.new(
+                         x = markerTime,
+                         y = (rowLow + rowHigh) / 2.0,
+                         text = "Reversal →",
                          xloc = xloc.bar_time,
-                         bgcolor = color.new(markerColor, 88),
-                         border_color = markerColor,
-                         border_width = 1)
-                    array.push(boxes, dominanceRow)
+                         yloc = yloc.price,
+                         style = label.style_label_right,
+                         color = markerColor,
+                         textcolor = color.white,
+                         size = size.tiny)
+                    array.push(labels, reversalMarker)
 
 f_drawHistogram(
      float[] profile,
@@ -1008,34 +973,14 @@ f_drawHistogram(
 
 if barstate.islast
     f_clearBoxes(histBoxesA)
-    f_clearBoxes(localBuyerDominanceBoxesA)
+    f_clearBoxes(buyerVolumeZonesA)
+    f_clearBoxes(sellerVolumeZonesA)
+    f_clearLabels(buyerVolumeLabelsA)
+    f_clearLabels(sellerVolumeLabelsA)
+    f_clearLabels(localBuyerDominanceLabelsA)
     if not na(profileBackgroundA)
         box.delete(profileBackgroundA)
         profileBackgroundA := na
-    if not na(buyerVolumeZone1A)
-        box.delete(buyerVolumeZone1A)
-        buyerVolumeZone1A := na
-    if not na(buyerVolumeZone2A)
-        box.delete(buyerVolumeZone2A)
-        buyerVolumeZone2A := na
-    if not na(buyerVolumeLabel1A)
-        label.delete(buyerVolumeLabel1A)
-        buyerVolumeLabel1A := na
-    if not na(buyerVolumeLabel2A)
-        label.delete(buyerVolumeLabel2A)
-        buyerVolumeLabel2A := na
-    if not na(sellerVolumeZone1A)
-        box.delete(sellerVolumeZone1A)
-        sellerVolumeZone1A := na
-    if not na(sellerVolumeZone2A)
-        box.delete(sellerVolumeZone2A)
-        sellerVolumeZone2A := na
-    if not na(sellerVolumeLabel1A)
-        label.delete(sellerVolumeLabel1A)
-        sellerVolumeLabel1A := na
-    if not na(sellerVolumeLabel2A)
-        label.delete(sellerVolumeLabel2A)
-        sellerVolumeLabel2A := na
 
     int histogramBarMs = math.max(
          1,
@@ -1052,9 +997,15 @@ if barstate.islast
          profilePlacement == "Left" ?
          startA :
          endTimeA - histogramMaximumWidthMsA
+    int outsideLabelGapMsA = math.max(
+         histogramBarMs * 2,
+         int(math.round(histogramMaximumWidthMsA * 0.05)))
+    int buyerHistogramLabelTimeA =
+         histogramLabelTimeA - outsideLabelGapMsA
     int sellerHistogramLabelTimeA =
-         histogramLabelTimeA +
-              int(math.round(histogramMaximumWidthMsA * 0.4))
+         histogramLabelTimeA - outsideLabelGapMsA * 2
+    int reversalMarkerTimeA =
+         histogramLabelTimeA - outsideLabelGapMsA * 3
     color boundaryColorA =
          showRangeBoundaries ?
          color.new(color.aqua, 40) : color.new(color.aqua, 100)
@@ -1117,172 +1068,43 @@ if barstate.islast
              valueAreaDownColor,
              totalVolumeColor,
              valueAreaTotalColor)
-        float[] buyerZonesA = f_topDirectionalZones(
+        float[] buyerRowsA = f_topDirectionalRows(
              profileA,
-             buyerZoneNeighborPct,
-             true)
-        float buyerRatio1A = na
-        float buyerRatio2A = na
-        bool firstZoneHasHigherRelativeA = true
-        if array.size(buyerZonesA) >= 4
-            buyerRatio1A := f_directionalRelative(
-                 array.get(buyerZonesA, 2),
-                 array.get(buyerZonesA, 3))
-        if array.size(buyerZonesA) >= 8
-            buyerRatio2A := f_directionalRelative(
-                 array.get(buyerZonesA, 6),
-                 array.get(buyerZonesA, 7))
-            firstZoneHasHigherRelativeA :=
-                 buyerRatio1A >= buyerRatio2A
-        if showBuyerZone and
-             array.size(buyerZonesA) >= 4 and
-             buyerRatio1A >= 1.0
-            buyerVolumeZone1A := box.new(
-                 left = startA,
-                 top = array.get(buyerZonesA, 1),
-                 right = endTimeA,
-                 bottom = array.get(buyerZonesA, 0),
-                 xloc = xloc.bar_time,
-                 bgcolor = color.new(
-                      buyerZoneColor,
-                      firstZoneHasHigherRelativeA ? 60 : 88),
-                 border_color = color.new(
-                      buyerZoneColor,
-                      firstZoneHasHigherRelativeA ? 0 : 50),
-                 border_width = 1)
-            if showBuyerZoneVolumes
-                buyerVolumeLabel1A := label.new(
-                     x = histogramLabelTimeA,
-                     y =
-                          (array.get(buyerZonesA, 0) +
-                               array.get(buyerZonesA, 1)) / 2.0,
-                     text = f_directionalText(
-                          array.get(buyerZonesA, 2),
-                          array.get(buyerZonesA, 3)),
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_left,
-                     color = color.black,
-                     textcolor = color.white,
-                     size = size.tiny)
-        if showBuyerZone and
-             array.size(buyerZonesA) >= 8 and
-             buyerRatio2A >= 1.0
-            buyerVolumeZone2A := box.new(
-                 left = startA,
-                 top = array.get(buyerZonesA, 5),
-                 right = endTimeA,
-                 bottom = array.get(buyerZonesA, 4),
-                 xloc = xloc.bar_time,
-                 bgcolor = color.new(
-                      buyerZoneColor,
-                      firstZoneHasHigherRelativeA ? 88 : 60),
-                 border_color = color.new(
-                      buyerZoneColor,
-                      firstZoneHasHigherRelativeA ? 50 : 0),
-                 border_width = 1)
-            if showBuyerZoneVolumes
-                buyerVolumeLabel2A := label.new(
-                     x = histogramLabelTimeA,
-                     y =
-                          (array.get(buyerZonesA, 4) +
-                               array.get(buyerZonesA, 5)) / 2.0,
-                     text = f_directionalText(
-                          array.get(buyerZonesA, 6),
-                          array.get(buyerZonesA, 7)),
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_left,
-                     color = color.black,
-                     textcolor = color.white,
-                     size = size.tiny)
+             true,
+             4)
+        f_drawDirectionalRows(
+             buyerRowsA,
+             buyerVolumeZonesA,
+             buyerVolumeLabelsA,
+             startA,
+             endTimeA,
+             buyerHistogramLabelTimeA,
+             buyerZoneColor,
+             color.green,
+             showBuyerZone,
+             showBuyerZoneVolumes)
 
-        float[] sellerZonesA = f_topDirectionalZones(
+        float[] sellerRowsA = f_topDirectionalRows(
              profileA,
-             sellerZoneNeighborPct,
-             false)
-        float sellerRatio1A = na
-        float sellerRatio2A = na
-        bool firstSellerZoneHasHigherRelativeA = true
-        if array.size(sellerZonesA) >= 4
-            sellerRatio1A := f_directionalRelative(
-                 array.get(sellerZonesA, 2),
-                 array.get(sellerZonesA, 3))
-        if array.size(sellerZonesA) >= 8
-            sellerRatio2A := f_directionalRelative(
-                 array.get(sellerZonesA, 6),
-                 array.get(sellerZonesA, 7))
-            firstSellerZoneHasHigherRelativeA :=
-                 sellerRatio1A >= sellerRatio2A
-        if showSellerZone and
-             array.size(sellerZonesA) >= 4 and
-             sellerRatio1A >= 1.0
-            sellerVolumeZone1A := box.new(
-                 left = startA,
-                 top = array.get(sellerZonesA, 1),
-                 right = endTimeA,
-                 bottom = array.get(sellerZonesA, 0),
-                 xloc = xloc.bar_time,
-                 bgcolor = color.new(
-                      sellerZoneColor,
-                      firstSellerZoneHasHigherRelativeA ? 60 : 88),
-                 border_color = color.new(
-                      sellerZoneColor,
-                      firstSellerZoneHasHigherRelativeA ? 0 : 50),
-                 border_width = 1)
-            if showSellerZoneVolumes
-                sellerVolumeLabel1A := label.new(
-                     x = sellerHistogramLabelTimeA,
-                     y =
-                          (array.get(sellerZonesA, 0) +
-                               array.get(sellerZonesA, 1)) / 2.0,
-                     text = f_directionalText(
-                          array.get(sellerZonesA, 2),
-                          array.get(sellerZonesA, 3)),
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_left,
-                     color = color.black,
-                     textcolor = color.white,
-                     size = size.tiny)
-        if showSellerZone and
-             array.size(sellerZonesA) >= 8 and
-             sellerRatio2A >= 1.0
-            sellerVolumeZone2A := box.new(
-                 left = startA,
-                 top = array.get(sellerZonesA, 5),
-                 right = endTimeA,
-                 bottom = array.get(sellerZonesA, 4),
-                 xloc = xloc.bar_time,
-                 bgcolor = color.new(
-                      sellerZoneColor,
-                      firstSellerZoneHasHigherRelativeA ? 88 : 60),
-                 border_color = color.new(
-                      sellerZoneColor,
-                      firstSellerZoneHasHigherRelativeA ? 50 : 0),
-                 border_width = 1)
-            if showSellerZoneVolumes
-                sellerVolumeLabel2A := label.new(
-                     x = sellerHistogramLabelTimeA,
-                     y =
-                          (array.get(sellerZonesA, 4) +
-                               array.get(sellerZonesA, 5)) / 2.0,
-                     text = f_directionalText(
-                          array.get(sellerZonesA, 6),
-                          array.get(sellerZonesA, 7)),
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_left,
-                     color = color.black,
-                     textcolor = color.white,
-                     size = size.tiny)
+             false,
+             2)
+        f_drawDirectionalRows(
+             sellerRowsA,
+             sellerVolumeZonesA,
+             sellerVolumeLabelsA,
+             startA,
+             endTimeA,
+             sellerHistogramLabelTimeA,
+             sellerZoneColor,
+             color.red,
+             showSellerZone,
+             showSellerZoneVolumes)
 
         if showLocalBuyerDominance
             f_drawLocalBuyerDominanceRows(
                  profileA,
-                 localBuyerDominanceBoxesA,
-                 startA,
-                 endTimeA,
+                 localBuyerDominanceLabelsA,
+                 reversalMarkerTimeA,
                  localBuyerDominanceColor)
 
 // =============================================================================
