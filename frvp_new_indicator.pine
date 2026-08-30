@@ -41,14 +41,6 @@ float valueAreaPct = input.float(
      maxval = 100.0,
      step = 1.0,
      group = "Profile Precision Settings")
-float supportNodeMinPct = input.float(
-     50.0,
-     title = "Below-VAL Support Minimum (% of POC Row)",
-     minval = 1.0,
-     maxval = 100.0,
-     step = 5.0,
-     group = "Profile Precision Settings",
-     tooltip = "Draws support only when the strongest local volume peak below VAL reaches this percentage of the POC row's volume.")
 int profileWidthPct = input.int(
      30,
      title = "Profile Width (% of Range)",
@@ -97,6 +89,11 @@ bool showSellerZoneVolumes = input.bool(
      title = "Show Seller x Buyer Volume",
      group = "Seller Zone",
      tooltip = "Shows a red label outside the histogram's left edge with estimated down-volume x up-volume and their relative ratio.")
+bool showValueAreaDirectionalLabels = input.bool(
+     true,
+     title = "Show Value Area Buyer / Seller Labels",
+     group = "Value Area Direction",
+     tooltip = "Shows aggregate estimated buyer volume x seller volume and the buyer / seller ratio for VAL to POC and POC to VAH.")
 bool showLocalBuyerDominance = input.bool(
      true,
      title = "Mark Local Buyer-Dominance Reversals",
@@ -106,14 +103,15 @@ bool showVALBuyerTransition = input.bool(
      true,
      title = "Show Buyer Transition Below VAL",
      group = "VAL Buyer Transition",
-     tooltip = "Marks the first meaningful, persistent improvement from seller control toward buyer control when moving upward through price rows below and near VAL.")
+     tooltip = "Shows the first meaningful, persistent improvement from seller control toward buyer control below VAL.")
 float valBuyerMaxDistancePct = input.float(
      5.0,
-     title = "Maximum Distance Below VAL (%)",
+     title = "Maximum Transition Distance Below VAL (%)",
      minval = 0.1,
      maxval = 20.0,
      step = 0.5,
-     group = "VAL Buyer Transition")
+     group = "VAL Buyer Transition",
+     tooltip = "Maximum percentage distance below VAL searched by the adjacent-row transition signal.")
 float valBuyerMinRowVolumePct = input.float(
      30.0,
      title = "Minimum Row Volume (% of POC Row)",
@@ -121,7 +119,7 @@ float valBuyerMinRowVolumePct = input.float(
      maxval = 100.0,
      step = 5.0,
      group = "VAL Buyer Transition",
-     tooltip = "Both rows around the transition must reach this percentage of the POC row's total volume.")
+     tooltip = "Used only by the adjacent-row transition. The highest-relative shift has no minimum-volume requirement.")
 float valBuyerMinImprovementPct = input.float(
      5.0,
      title = "Minimum Imbalance Improvement (% of POC Row)",
@@ -130,6 +128,18 @@ float valBuyerMinImprovementPct = input.float(
      step = 1.0,
      group = "VAL Buyer Transition",
      tooltip = "Requires the buyer-minus-seller imbalance to improve by at least this percentage of the POC row's total volume.")
+bool showVALBuyerRelativeShift = input.bool(
+     true,
+     title = "Show Highest Buyer Ratio Near VAL",
+     group = "VAL Buyer Shift",
+     tooltip = "Shows the single highest positive buyer / seller ratio within the selected number of histogram rows on either side of VAL.")
+int valBuyerRelativeMaxDistanceRows = input.int(
+     6,
+     title = "Maximum Distance From VAL (Rows)",
+     minval = 1,
+     maxval = 50,
+     group = "VAL Buyer Shift",
+     tooltip = "Counts histogram rows rather than price percentage so the proximity rule adapts to each profile's row size.")
 
 color upVolumeColor = input.color(
      color.rgb(38, 166, 154),
@@ -158,10 +168,6 @@ color valueAreaTotalColor = input.color(
 color profileBackgroundColor = input.color(
      color.new(color.rgb(33, 45, 62), 88),
      title = "Profile Background",
-     group = "Profile Colors")
-color supportLineColor = input.color(
-     color.orange,
-     title = "Potential Support Below VAL",
      group = "Profile Colors")
 color buyerZoneColor = input.color(
      color.rgb(0, 188, 212),
@@ -484,65 +490,38 @@ f_profileRegionVolume(float[] profile, int region) =>
 
     regionVolume
 
-f_supportNodeBelowVAL(float[] profile, float minimumPctOfPOC) =>
-    float supportPrice = na
-    float supportVolume = na
-    int supportRow = na
+f_profileRegionDirectionalVolumes(float[] profile, int region) =>
+    float[] directionalVolumes = array.new_float(0)
 
     if array.size(profile) >= PROFILE_META_SIZE
         int rowCount = int(array.get(profile, META_ROW_COUNT))
         int pocRow = int(array.get(profile, META_POC_ROW))
         int valueLowRow = int(array.get(profile, META_VAL_ROW))
-        float profileBottom = array.get(profile, META_BOTTOM)
-        float profileTop = array.get(profile, META_TOP)
-        float rowHeight = array.get(profile, META_ROW_HEIGHT)
-        float pocVolume = array.get(
-             profile,
-             PROFILE_META_SIZE + pocRow)
-        float requiredVolume =
-             pocVolume * minimumPctOfPOC / 100.0
+        int valueHighRow = int(array.get(profile, META_VAH_ROW))
+        int upVolumeOffset = PROFILE_META_SIZE + rowCount
+        int downVolumeOffset = PROFILE_META_SIZE + rowCount * 2
+        float buyerVolume = 0.0
+        float sellerVolume = 0.0
 
-        if valueLowRow > 0 and pocVolume > 0.0
-            for rowIndex = 0 to valueLowRow - 1
-                float rowVolume = array.get(
+        for rowIndex = 0 to rowCount - 1
+            bool includeRow =
+                 region == REGION_VAL_TO_POC ?
+                      rowIndex >= valueLowRow and rowIndex <= pocRow :
+                 region == REGION_POC_TO_VAH ?
+                      rowIndex > pocRow and rowIndex <= valueHighRow : false
+
+            if includeRow
+                buyerVolume += array.get(
                      profile,
-                     PROFILE_META_SIZE + rowIndex)
-                float lowerNeighborVolume =
-                     rowIndex > 0 ?
-                     array.get(
-                          profile,
-                          PROFILE_META_SIZE + rowIndex - 1) : -1.0
-                float upperNeighborVolume =
-                     rowIndex < rowCount - 1 ?
-                     array.get(
-                          profile,
-                          PROFILE_META_SIZE + rowIndex + 1) : -1.0
-                bool isLocalPeak =
-                     rowVolume > 0.0 and
-                     rowVolume >= lowerNeighborVolume and
-                     rowVolume >= upperNeighborVolume
-                bool isStrongerCandidate =
-                     na(supportVolume) or
-                     rowVolume > supportVolume or
-                     (rowVolume == supportVolume and
-                          rowIndex > supportRow)
+                     upVolumeOffset + rowIndex)
+                sellerVolume += array.get(
+                     profile,
+                     downVolumeOffset + rowIndex)
 
-                if isLocalPeak and
-                     rowVolume >= requiredVolume and
-                     isStrongerCandidate
-                    supportRow := rowIndex
-                    supportVolume := rowVolume
+        array.push(directionalVolumes, buyerVolume)
+        array.push(directionalVolumes, sellerVolume)
 
-            if not na(supportRow)
-                float supportRowLow =
-                     profileBottom + supportRow * rowHeight
-                float supportRowHigh = math.min(
-                     profileTop,
-                     supportRowLow + rowHeight)
-                supportPrice :=
-                     (supportRowLow + supportRowHigh) * 0.5
-
-    supportPrice
+    directionalVolumes
 
 f_topDirectionalRows(
      float[] profile,
@@ -704,6 +683,84 @@ f_valBuyerTransition(
 
     transition
 
+f_highestBuyerRelativeNearVAL(
+     float[] profile,
+     int maximumDistanceRows) =>
+    float[] shift = array.new_float(0)
+
+    if array.size(profile) >= PROFILE_META_SIZE
+        int rowCount = int(array.get(profile, META_ROW_COUNT))
+        float profileBottom = array.get(profile, META_BOTTOM)
+        float profileTop = array.get(profile, META_TOP)
+        float rowHeight = array.get(profile, META_ROW_HEIGHT)
+        int valueLowRow = int(array.get(profile, META_VAL_ROW))
+        int upVolumeOffset = PROFILE_META_SIZE + rowCount
+        int downVolumeOffset = PROFILE_META_SIZE + rowCount * 2
+        int selectedRow = -1
+        float selectedPrice = na
+        float selectedRelative = -1.0
+        int selectedDistance = 1000000000
+        float selectedBuyerVolume = 0.0
+        float selectedSellerVolume = 0.0
+
+        // Select exactly one row within a consistent histogram-row distance
+        // on either side of VAL. There is deliberately no minimum-volume,
+        // persistence, or adjacent-row requirement.
+        if rowCount > 0
+            for rowIndex = 0 to rowCount - 1
+                float rowLow =
+                     profileBottom + rowIndex * rowHeight
+                float rowHigh = math.min(
+                     profileTop,
+                     rowLow + rowHeight)
+                float rowCenter = (rowLow + rowHigh) * 0.5
+                float buyerVolume = array.get(
+                     profile,
+                     upVolumeOffset + rowIndex)
+                float sellerVolume = array.get(
+                     profile,
+                     downVolumeOffset + rowIndex)
+                bool isNearVAL =
+                     math.abs(rowIndex - valueLowRow) <=
+                          maximumDistanceRows
+                bool hasPositiveRelative =
+                     buyerVolume > sellerVolume and
+                     sellerVolume > 0.0
+                float relativeValue =
+                     hasPositiveRelative ?
+                     buyerVolume / sellerVolume : 0.0
+                int distanceFromVAL =
+                     math.abs(rowIndex - valueLowRow)
+                bool isBetterRelative =
+                     relativeValue > selectedRelative
+                bool isCloserTie =
+                     relativeValue == selectedRelative and
+                     distanceFromVAL < selectedDistance
+                bool isHigherPriceTie =
+                     relativeValue == selectedRelative and
+                     distanceFromVAL == selectedDistance and
+                     (na(selectedPrice) or rowCenter > selectedPrice)
+
+                if isNearVAL and
+                     hasPositiveRelative and
+                     (isBetterRelative or
+                          isCloserTie or
+                          isHigherPriceTie)
+                    selectedRow := rowIndex
+                    selectedPrice := rowCenter
+                    selectedRelative := relativeValue
+                    selectedDistance := distanceFromVAL
+                    selectedBuyerVolume := buyerVolume
+                    selectedSellerVolume := sellerVolume
+
+        if selectedRow >= 0
+            array.push(shift, selectedPrice)
+            array.push(shift, selectedRelative)
+            array.push(shift, selectedBuyerVolume)
+            array.push(shift, selectedSellerVolume)
+
+    shift
+
 f_formatVolume(float volumeValue) =>
     na(volumeValue) ? "n/a" : str.tostring(volumeValue, "#,###")
 
@@ -781,13 +838,22 @@ float volumeBelowVALA = f_profileRegionVolume(
 float volumeAboveVAHA = f_profileRegionVolume(
      profileA,
      REGION_ABOVE_VAH)
-float supportBelowVALA =
-     f_supportNodeBelowVAL(profileA, supportNodeMinPct)
+float[] directionalVALToPOCA =
+     f_profileRegionDirectionalVolumes(
+          profileA,
+          REGION_VAL_TO_POC)
+float[] directionalPOCToVAHA =
+     f_profileRegionDirectionalVolumes(
+          profileA,
+          REGION_POC_TO_VAH)
 float[] valBuyerTransitionA = f_valBuyerTransition(
      profileA,
      valBuyerMaxDistancePct,
      valBuyerMinRowVolumePct,
      valBuyerMinImprovementPct)
+float[] valBuyerRelativeShiftA = f_highestBuyerRelativeNearVAL(
+     profileA,
+     valBuyerRelativeMaxDistanceRows)
 
 // =============================================================================
 // 4. LINES AND HISTOGRAMS
@@ -820,12 +886,6 @@ var line lineValA = line.new(
      xloc = xloc.bar_time,
      color = color.green,
      width = 1)
-var line lineSupportBelowVALA = line.new(
-     na, na, na, na,
-     xloc = xloc.bar_time,
-     color = supportLineColor,
-     style = line.style_dashed,
-     width = 1)
 
 var box[] histBoxesA = array.new_box(0)
 var box profileBackgroundA = na
@@ -835,6 +895,9 @@ var box[] sellerVolumeZonesA = array.new_box(0)
 var label[] sellerVolumeLabelsA = array.new_label(0)
 var label[] localBuyerDominanceLabelsA = array.new_label(0)
 var label valBuyerTransitionLabelA = na
+var label valBuyerRelativeShiftLabelA = na
+var label valToPocDirectionalLabelA = na
+var label pocToVahDirectionalLabelA = na
 
 f_clearBoxes(box[] boxes) =>
     if array.size(boxes) > 0
@@ -1125,6 +1188,15 @@ if barstate.islast
     if not na(valBuyerTransitionLabelA)
         label.delete(valBuyerTransitionLabelA)
         valBuyerTransitionLabelA := na
+    if not na(valBuyerRelativeShiftLabelA)
+        label.delete(valBuyerRelativeShiftLabelA)
+        valBuyerRelativeShiftLabelA := na
+    if not na(valToPocDirectionalLabelA)
+        label.delete(valToPocDirectionalLabelA)
+        valToPocDirectionalLabelA := na
+    if not na(pocToVahDirectionalLabelA)
+        label.delete(pocToVahDirectionalLabelA)
+        pocToVahDirectionalLabelA := na
     if not na(profileBackgroundA)
         box.delete(profileBackgroundA)
         profileBackgroundA := na
@@ -1151,6 +1223,8 @@ if barstate.islast
          histogramLabelTimeA - outsideLabelGapMsA
     int sellerHistogramLabelTimeA =
          histogramLabelTimeA - outsideLabelGapMsA * 2
+    int valueAreaDirectionalLabelTimeA =
+         histogramLabelTimeA - outsideLabelGapMsA * 3
     int reversalMarkerTimeA =
          histogramLabelTimeA
     color boundaryColorA =
@@ -1164,19 +1238,6 @@ if barstate.islast
     line.set_extend(lineVahA, levelExtension)
     line.set_extend(linePocA, levelExtension)
     line.set_extend(lineValA, levelExtension)
-    line.set_extend(lineSupportBelowVALA, levelExtension)
-    line.set_color(
-         lineSupportBelowVALA,
-         na(supportBelowVALA) ?
-         color.new(supportLineColor, 100) : supportLineColor)
-    line.set_xy1(
-         lineSupportBelowVALA,
-         startA,
-         supportBelowVALA)
-    line.set_xy2(
-         lineSupportBelowVALA,
-         endTimeA,
-         supportBelowVALA)
 
     if array.size(profileA) >= PROFILE_META_SIZE
         float bottomA = array.get(profileA, META_BOTTOM)
@@ -1247,6 +1308,58 @@ if barstate.islast
              showSellerZone,
              showSellerZoneVolumes)
 
+        if showValueAreaDirectionalLabels and
+             array.size(directionalVALToPOCA) >= 2
+            float valToPocBuyerVolumeA =
+                 array.get(directionalVALToPOCA, 0)
+            float valToPocSellerVolumeA =
+                 array.get(directionalVALToPOCA, 1)
+            if valToPocBuyerVolumeA + valToPocSellerVolumeA > 0.0
+                string valToPocDirectionalTextA =
+                     "VAL to POC | Buyers x Sellers\n" +
+                     f_directionalText(
+                          valToPocBuyerVolumeA,
+                          valToPocSellerVolumeA)
+                color valToPocDirectionalColorA =
+                     valToPocBuyerVolumeA >= valToPocSellerVolumeA ?
+                     color.green : color.red
+                valToPocDirectionalLabelA := label.new(
+                     x = valueAreaDirectionalLabelTimeA,
+                     y = (valA + pocA) * 0.5,
+                     text = valToPocDirectionalTextA,
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_right,
+                     color = valToPocDirectionalColorA,
+                     textcolor = color.white,
+                     size = size.tiny)
+
+        if showValueAreaDirectionalLabels and
+             array.size(directionalPOCToVAHA) >= 2
+            float pocToVahBuyerVolumeA =
+                 array.get(directionalPOCToVAHA, 0)
+            float pocToVahSellerVolumeA =
+                 array.get(directionalPOCToVAHA, 1)
+            if pocToVahBuyerVolumeA + pocToVahSellerVolumeA > 0.0
+                string pocToVahDirectionalTextA =
+                     "POC to VAH | Buyers x Sellers\n" +
+                     f_directionalText(
+                          pocToVahBuyerVolumeA,
+                          pocToVahSellerVolumeA)
+                color pocToVahDirectionalColorA =
+                     pocToVahBuyerVolumeA >= pocToVahSellerVolumeA ?
+                     color.green : color.red
+                pocToVahDirectionalLabelA := label.new(
+                     x = valueAreaDirectionalLabelTimeA,
+                     y = (pocA + vahA) * 0.5,
+                     text = pocToVahDirectionalTextA,
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_right,
+                     color = pocToVahDirectionalColorA,
+                     textcolor = color.white,
+                     size = size.tiny)
+
         if showVALBuyerTransition and
              array.size(valBuyerTransitionA) >= 5
             bool establishesBuyerControlA =
@@ -1265,6 +1378,24 @@ if barstate.islast
                  yloc = yloc.price,
                  style = label.style_label_right,
                  color = transitionColorA,
+                 textcolor = color.white,
+                 size = size.tiny)
+
+        if showVALBuyerRelativeShift and
+             array.size(valBuyerRelativeShiftA) >= 4
+            string relativeShiftTextA =
+                 "VAL Buyer Shift | R: " +
+                 str.tostring(
+                      array.get(valBuyerRelativeShiftA, 1),
+                      "#.##")
+            valBuyerRelativeShiftLabelA := label.new(
+                 x = histogramLabelTimeA,
+                 y = array.get(valBuyerRelativeShiftA, 0),
+                 text = relativeShiftTextA,
+                 xloc = xloc.bar_time,
+                 yloc = yloc.price,
+                 style = label.style_label_right,
+                 color = valBuyerShiftColor,
                  textcolor = color.white,
                  size = size.tiny)
 
