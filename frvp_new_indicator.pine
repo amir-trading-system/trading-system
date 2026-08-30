@@ -102,6 +102,34 @@ bool showLocalBuyerDominance = input.bool(
      title = "Mark Local Buyer-Dominance Reversals",
      group = "Local Buyer Dominance",
      tooltip = "Shows a Reversal arrow outside the histogram's left edge when a row's buyer volume is strictly greater than both adjacent rows, its seller volume is strictly lower than both adjacent rows, and buyers / sellers is at least 1.0.")
+bool showVALBuyerTransition = input.bool(
+     true,
+     title = "Show Buyer Transition Below VAL",
+     group = "VAL Buyer Transition",
+     tooltip = "Marks the first meaningful, persistent improvement from seller control toward buyer control when moving upward through price rows below and near VAL.")
+float valBuyerMaxDistancePct = input.float(
+     5.0,
+     title = "Maximum Distance Below VAL (%)",
+     minval = 0.1,
+     maxval = 20.0,
+     step = 0.5,
+     group = "VAL Buyer Transition")
+float valBuyerMinRowVolumePct = input.float(
+     30.0,
+     title = "Minimum Row Volume (% of POC Row)",
+     minval = 1.0,
+     maxval = 100.0,
+     step = 5.0,
+     group = "VAL Buyer Transition",
+     tooltip = "Both rows around the transition must reach this percentage of the POC row's total volume.")
+float valBuyerMinImprovementPct = input.float(
+     5.0,
+     title = "Minimum Imbalance Improvement (% of POC Row)",
+     minval = 1.0,
+     maxval = 100.0,
+     step = 1.0,
+     group = "VAL Buyer Transition",
+     tooltip = "Requires the buyer-minus-seller imbalance to improve by at least this percentage of the POC row's total volume.")
 
 color upVolumeColor = input.color(
      color.rgb(38, 166, 154),
@@ -146,6 +174,14 @@ color sellerZoneColor = input.color(
 color localBuyerDominanceColor = input.color(
      color.lime,
      title = "Local Buyer-Dominance Reversals",
+     group = "Profile Colors")
+color valBuyerShiftColor = input.color(
+     color.orange,
+     title = "VAL Buyer Shift",
+     group = "Profile Colors")
+color valBuyerControlColor = input.color(
+     color.lime,
+     title = "VAL Buyer Control",
      group = "Profile Colors")
 
 // A profile above the split threshold retains its calculated rows but renders
@@ -566,6 +602,108 @@ f_topDirectionalRows(
 
     strongestRows
 
+f_valBuyerTransition(
+     float[] profile,
+     float maximumDistancePct,
+     float minimumRowVolumePct,
+     float minimumImprovementPct) =>
+    float[] transition = array.new_float(0)
+
+    if array.size(profile) >= PROFILE_META_SIZE
+        int rowCount = int(array.get(profile, META_ROW_COUNT))
+        int pocRow = int(array.get(profile, META_POC_ROW))
+        int valueLowRow = int(array.get(profile, META_VAL_ROW))
+        float profileBottom = array.get(profile, META_BOTTOM)
+        float rowHeight = array.get(profile, META_ROW_HEIGHT)
+        float valPrice = array.get(profile, META_VAL)
+        int totalVolumeOffset = PROFILE_META_SIZE
+        int upVolumeOffset = PROFILE_META_SIZE + rowCount
+        int downVolumeOffset =
+             PROFILE_META_SIZE + rowCount * 2
+        float pocRowVolume = array.get(
+             profile,
+             totalVolumeOffset + pocRow)
+        float minimumRowVolume =
+             pocRowVolume * minimumRowVolumePct / 100.0
+        float minimumImprovement =
+             pocRowVolume * minimumImprovementPct / 100.0
+        float minimumBoundaryPrice =
+             valPrice * (1.0 - maximumDistancePct / 100.0)
+        bool foundTransition = false
+
+        // Scan upward through price so the label marks the first persistent
+        // improvement from seller control toward VAL, rather than a later
+        // buyer-dominant row after the transition is already established.
+        if valueLowRow > 0 and pocRowVolume > 0.0
+            for lowerRow = 0 to valueLowRow - 1
+                int upperRow = lowerRow + 1
+                float boundaryPrice =
+                     profileBottom + upperRow * rowHeight
+                float lowerBuyer = array.get(
+                     profile,
+                     upVolumeOffset + lowerRow)
+                float lowerSeller = array.get(
+                     profile,
+                     downVolumeOffset + lowerRow)
+                float upperBuyer = array.get(
+                     profile,
+                     upVolumeOffset + upperRow)
+                float upperSeller = array.get(
+                     profile,
+                     downVolumeOffset + upperRow)
+                float lowerImbalance = lowerBuyer - lowerSeller
+                float upperImbalance = upperBuyer - upperSeller
+                float imbalanceImprovement =
+                     upperImbalance - lowerImbalance
+                float lowerTotalVolume = array.get(
+                     profile,
+                     totalVolumeOffset + lowerRow)
+                float upperTotalVolume = array.get(
+                     profile,
+                     totalVolumeOffset + upperRow)
+                bool isNearVAL =
+                     boundaryPrice >= minimumBoundaryPrice and
+                     boundaryPrice <= valPrice
+                bool hasEnoughVolume =
+                     lowerTotalVolume >= minimumRowVolume and
+                     upperTotalVolume >= minimumRowVolume
+                bool startsWithSellerControl =
+                     lowerImbalance < 0.0
+                bool improvesEnough =
+                     imbalanceImprovement >= minimumImprovement
+                bool improvementPersists = false
+                if upperRow < valueLowRow
+                    float nextImbalance =
+                         array.get(
+                              profile,
+                              upVolumeOffset + upperRow + 1) -
+                         array.get(
+                              profile,
+                              downVolumeOffset + upperRow + 1)
+                    improvementPersists :=
+                         nextImbalance >= upperImbalance
+                else
+                    improvementPersists := upperImbalance > 0.0
+
+                if not foundTransition and
+                     isNearVAL and
+                     hasEnoughVolume and
+                     startsWithSellerControl and
+                     improvesEnough and
+                     improvementPersists
+                    bool establishesBuyerControl =
+                         upperImbalance > 0.0
+                    array.push(transition, boundaryPrice)
+                    array.push(
+                         transition,
+                         establishesBuyerControl ? 1.0 : 0.0)
+                    array.push(transition, imbalanceImprovement)
+                    array.push(transition, lowerImbalance)
+                    array.push(transition, upperImbalance)
+                    foundTransition := true
+
+    transition
+
 f_formatVolume(float volumeValue) =>
     na(volumeValue) ? "n/a" : str.tostring(volumeValue, "#,###")
 
@@ -645,6 +783,11 @@ float volumeAboveVAHA = f_profileRegionVolume(
      REGION_ABOVE_VAH)
 float supportBelowVALA =
      f_supportNodeBelowVAL(profileA, supportNodeMinPct)
+float[] valBuyerTransitionA = f_valBuyerTransition(
+     profileA,
+     valBuyerMaxDistancePct,
+     valBuyerMinRowVolumePct,
+     valBuyerMinImprovementPct)
 
 // =============================================================================
 // 4. LINES AND HISTOGRAMS
@@ -691,6 +834,7 @@ var label[] buyerVolumeLabelsA = array.new_label(0)
 var box[] sellerVolumeZonesA = array.new_box(0)
 var label[] sellerVolumeLabelsA = array.new_label(0)
 var label[] localBuyerDominanceLabelsA = array.new_label(0)
+var label valBuyerTransitionLabelA = na
 
 f_clearBoxes(box[] boxes) =>
     if array.size(boxes) > 0
@@ -832,7 +976,7 @@ f_drawLocalBuyerDominanceRows(
                     label reversalMarker = label.new(
                          x = markerTime,
                          y = (rowLow + rowHigh) / 2.0,
-                         text = "Reversal →",
+                         text = "Reversal",
                          xloc = xloc.bar_time,
                          yloc = yloc.price,
                          style = label.style_label_right,
@@ -978,6 +1122,9 @@ if barstate.islast
     f_clearLabels(buyerVolumeLabelsA)
     f_clearLabels(sellerVolumeLabelsA)
     f_clearLabels(localBuyerDominanceLabelsA)
+    if not na(valBuyerTransitionLabelA)
+        label.delete(valBuyerTransitionLabelA)
+        valBuyerTransitionLabelA := na
     if not na(profileBackgroundA)
         box.delete(profileBackgroundA)
         profileBackgroundA := na
@@ -1005,7 +1152,7 @@ if barstate.islast
     int sellerHistogramLabelTimeA =
          histogramLabelTimeA - outsideLabelGapMsA * 2
     int reversalMarkerTimeA =
-         histogramLabelTimeA - outsideLabelGapMsA * 3
+         histogramLabelTimeA
     color boundaryColorA =
          showRangeBoundaries ?
          color.new(color.aqua, 40) : color.new(color.aqua, 100)
@@ -1099,6 +1246,27 @@ if barstate.islast
              color.red,
              showSellerZone,
              showSellerZoneVolumes)
+
+        if showVALBuyerTransition and
+             array.size(valBuyerTransitionA) >= 5
+            bool establishesBuyerControlA =
+                 array.get(valBuyerTransitionA, 1) == 1.0
+            string transitionTextA =
+                 establishesBuyerControlA ?
+                 "VAL Buyer Control" : "VAL Buyer Shift"
+            color transitionColorA =
+                 establishesBuyerControlA ?
+                 valBuyerControlColor : valBuyerShiftColor
+            valBuyerTransitionLabelA := label.new(
+                 x = histogramLabelTimeA,
+                 y = array.get(valBuyerTransitionA, 0),
+                 text = transitionTextA,
+                 xloc = xloc.bar_time,
+                 yloc = yloc.price,
+                 style = label.style_label_right,
+                 color = transitionColorA,
+                 textcolor = color.white,
+                 size = size.tiny)
 
         if showLocalBuyerDominance
             f_drawLocalBuyerDominanceRows(
