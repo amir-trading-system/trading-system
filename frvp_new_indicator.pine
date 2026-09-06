@@ -1,7 +1,7 @@
 //@version=6
 indicator(
-     "Interactive Fixed Range Volume Profile & Histogram (v7.5)",
-     shorttitle = "Interactive FRVP v7.5",
+     "Interactive Fixed Range Volume Profile & Histogram (v9.0)",
+     shorttitle = "Interactive FRVP v9.0",
      overlay = true,
      max_boxes_count = 500,
      max_lines_count = 10,
@@ -28,7 +28,7 @@ string rowsLayout = input.string(
      group = "Profile Precision Settings",
      tooltip = "Use the same layout and row size in TradingView's FRVP when comparing levels.")
 int rowSize = input.int(
-     100,
+     200,
      title = "Row Size",
      minval = 1,
      maxval = 500,
@@ -62,6 +62,11 @@ string volumeDisplay = input.string(
      title = "Volume Display",
      options = ["Up/Down", "Total"],
      group = "Profile Style")
+bool showHistogramRowVolumes = input.bool(
+     true,
+     title = "Show Buyer x Seller Values",
+     group = "Profile Style",
+     tooltip = "Always draws buyer x seller volume on every nonempty histogram row, matching TradingView's Fixed Range Volume Profile values. The text becomes readable when the price scale is zoomed in. Available when Volume Display is Up/Down.")
 bool showProfileBackground = input.bool(
      true,
      title = "Show Profile Background",
@@ -74,106 +79,69 @@ bool extendLevelsRight = input.bool(
      false,
      title = "Extend VAH / POC / VAL Right",
      group = "Profile Style")
-bool showBuyerZone = input.bool(
+bool showBuyerExpansionSupport = input.bool(
      true,
-     title = "Show Top Four Buyer Rows",
-     group = "Buyer Zone",
-     tooltip = "Draws the four profile rows with the greatest estimated bullish volume. Each result is exactly one histogram row and requires buyers / sellers of at least 1.0. Equal-volume ties favor higher prices.")
-bool showBuyerZoneVolumes = input.bool(
-     true,
-     title = "Show Buyer x Seller Volume",
-     group = "Buyer Zone",
-     tooltip = "Shows a green label outside the histogram's left edge with estimated up-volume x down-volume and their relative ratio.")
-bool showSellerZone = input.bool(
-     true,
-     title = "Show Top Two Seller Rows",
-     group = "Seller Zone",
-     tooltip = "Draws the two profile rows with the greatest estimated bearish volume. Each result is exactly one histogram row and requires sellers / buyers of at least 1.0. Equal-volume ties favor higher prices.")
-bool showSellerZoneVolumes = input.bool(
-     true,
-     title = "Show Seller x Buyer Volume",
-     group = "Seller Zone",
-     tooltip = "Shows a red label outside the histogram's left edge with estimated down-volume x up-volume and their relative ratio.")
-bool showValueAreaDirectionalLabels = input.bool(
-     true,
-     title = "Show Value Area Buyer / Seller Labels",
-     group = "Value Area Direction",
-     tooltip = "Shows aggregate estimated buyer volume x seller volume and the buyer / seller ratio for VAL to POC and POC to VAH.")
-bool showLocalBuyerDominance = input.bool(
-     true,
-     title = "Mark Local Buyer-Dominance Reversals",
-     group = "Local Buyer Dominance",
-     tooltip = "Shows a Reversal arrow outside the histogram's left edge when a row's buyer volume is strictly greater than both adjacent rows, its seller volume is strictly lower than both adjacent rows, and buyers / sellers is at least 1.0.")
-bool showVALBuyerTransition = input.bool(
-     true,
-     title = "Show Buyer Transition Below VAL",
-     group = "VAL Buyer Transition",
-     tooltip = "Shows the first meaningful, persistent improvement from seller control toward buyer control below VAL.")
-bool useStableVALBuyerControlRows = input.bool(
-     true,
-     title = "Use Stable Rows for VAL Buyer Control",
-     group = "VAL Buyer Transition",
-     tooltip = "Calculates an additional VAL Buyer Control/Transition signal on a globally anchored fixed-price grid. This prevents inactive prices added to the selected range from changing the signal's local row structure. The original profile signal keeps priority, so existing cases retain their previous label.")
-float valBuyerControlRowHeight = input.float(
-     0.02,
-     title = "Stable Control Row Height ($)",
-     minval = 0.0001,
-     maxval = 1.0,
-     step = 0.01,
-     group = "VAL Buyer Transition",
-     tooltip = "Maximum price height of each stable signal row. The default is two cents. This setting does not change the displayed histogram, VAL, POC, VAH, Buyer Shift, or reversal arrows.")
-float valBuyerMaxDistancePct = input.float(
-     5.0,
-     title = "Maximum Transition Distance Below VAL (%)",
-     minval = 0.1,
-     maxval = 20.0,
-     step = 0.5,
-     group = "VAL Buyer Transition",
-     tooltip = "Maximum percentage distance below VAL searched by the adjacent-row transition signal.")
-float valBuyerMinRowVolumePct = input.float(
+     title = "Show Buyer Expansion Support",
+     group = "Buyer Expansion Support",
+     tooltip = "Scans every adjacent pair of profile rows from higher to lower prices. All positive buyer increases that pass the seller, buyer-control, row-volume and optional HVN conditions are ranked, and only the two largest buyer increases are shown by default.")
+float buyerExpansionMaximumSellerSharePct = input.float(
      30.0,
-     title = "Minimum Row Volume (% of POC Row)",
-     minval = 1.0,
+     title = "Maximum Seller Increase vs Buyer Increase (%)",
+     minval = 0.0,
      maxval = 100.0,
-     step = 5.0,
-     group = "VAL Buyer Transition",
-     tooltip = "Used only by the adjacent-row transition. The highest-relative shift has no minimum-volume requirement.")
-float valBuyerMinImprovementPct = input.float(
-     5.0,
-     title = "Minimum Imbalance Improvement (% of POC Row)",
+     step = 1.0,
+     group = "Buyer Expansion Support",
+     tooltip = "If sellers increase, their increase may be no greater than this percentage of the buyer increase. Seller volume that stays flat or decreases always passes this condition.")
+float buyerExpansionMinimumEndingRatio = input.float(
+     1.0,
+     title = "Minimum Current Buyer/Seller Ratio",
+     minval = 1.0,
+     maxval = 10.0,
+     step = 0.05,
+     group = "Buyer Expansion Support",
+     tooltip = "The marked row must finish with at least this buyer-volume divided by seller-volume ratio.")
+float buyerExpansionMinimumRowVolumePct = input.float(
+     10.0,
+     title = "Minimum Compared Row Volume (% of POC Row)",
+     minval = 0.1,
+     maxval = 100.0,
+     step = 1.0,
+     group = "Buyer Expansion Support",
+     tooltip = "Both adjacent rows being compared must contain at least this percentage of the POC row's total volume.")
+bool buyerExpansionRequireHVNContinuation = input.bool(
+     true,
+     title = "Require HVN Continuation Below",
+     group = "Buyer Expansion Support",
+     tooltip = "Requires the marked row and the configured number of lower-price rows beneath it to carry meaningful total volume.")
+int buyerExpansionHVNRowsBelow = input.int(
+     2,
+     title = "HVN Continuation Rows Below",
+     minval = 1,
+     maxval = 10,
+     group = "Buyer Expansion Support")
+float buyerExpansionMinimumHVNVolumePct = input.float(
+     30.0,
+     title = "Minimum HVN Row Volume (% of POC Row)",
      minval = 1.0,
      maxval = 100.0,
      step = 1.0,
-     group = "VAL Buyer Transition",
-     tooltip = "Requires the buyer-minus-seller imbalance to improve by at least this percentage of the POC row's total volume.")
-bool showVALBuyerRelativeShift = input.bool(
-     true,
-     title = "Show Highest Buyer Ratio Near VAL",
-     group = "VAL Buyer Shift",
-     tooltip = "Shows the single highest positive buyer / seller ratio within the selected number of histogram rows on either side of VAL.")
-int valBuyerRelativeMaxDistanceRows = input.int(
-     6,
-     title = "Maximum Distance From VAL (Rows)",
+     group = "Buyer Expansion Support",
+     tooltip = "The marked row and every required lower-price continuation row must meet this total-volume threshold.")
+int buyerExpansionMaximumLabels = input.int(
+     2,
+     title = "Maximum Buyer Expansion Labels",
      minval = 1,
-     maxval = 50,
-     group = "VAL Buyer Shift",
-     tooltip = "Counts histogram rows rather than price percentage so the proximity rule adapts to each profile's row size.")
+     maxval = 2,
+     group = "Buyer Expansion Support",
+     tooltip = "Shows the two strongest results by default. When more rows qualify, rows with the largest absolute buyer-volume increases are displayed, and the strongest result receives a check mark.")
 
 color upVolumeColor = input.color(
-     color.rgb(38, 166, 154),
+     color.rgb(38, 198, 218),
      title = "Up Volume",
      group = "Profile Colors")
 color downVolumeColor = input.color(
-     color.rgb(239, 83, 80),
-     title = "Down Volume",
-     group = "Profile Colors")
-color valueAreaUpColor = input.color(
-     color.rgb(0, 188, 212),
-     title = "Value Area Up",
-     group = "Profile Colors")
-color valueAreaDownColor = input.color(
      color.rgb(236, 64, 122),
-     title = "Value Area Down",
+     title = "Down Volume",
      group = "Profile Colors")
 color totalVolumeColor = input.color(
      color.rgb(96, 125, 139),
@@ -187,32 +155,15 @@ color profileBackgroundColor = input.color(
      color.new(color.rgb(33, 45, 62), 88),
      title = "Profile Background",
      group = "Profile Colors")
-color buyerZoneColor = input.color(
-     color.rgb(0, 188, 212),
-     title = "Top Four Buyer Rows",
-     group = "Profile Colors")
-color sellerZoneColor = input.color(
-     color.rgb(239, 83, 80),
-     title = "Top Two Seller Rows",
-     group = "Profile Colors")
-color localBuyerDominanceColor = input.color(
-     color.lime,
-     title = "Local Buyer-Dominance Reversals",
-     group = "Profile Colors")
-color valBuyerShiftColor = input.color(
-     color.orange,
-     title = "VAL Buyer Shift",
-     group = "Profile Colors")
-color valBuyerControlColor = input.color(
-     color.lime,
-     title = "VAL Buyer Control",
+color buyerExpansionSupportColor = input.color(
+     color.rgb(76, 175, 80),
+     title = "Buyer Expansion Support",
      group = "Profile Colors")
 
-// A profile above the split threshold retains its calculated rows but renders
-// in Total mode to stay within TradingView's drawing-object limit.
-const int MAX_ROWS_PER_PROFILE = 240
-const int MAX_SPLIT_ROWS = 120
-const int MAX_SIGNAL_ROWS = 2000
+// Cap the profile so a split Up/Down histogram and its background remain below
+// TradingView's 500-box limit.
+const int MAX_ROWS_PER_PROFILE = 239
+const int MAX_SPLIT_ROWS = 239
 const int MAX_FOOTPRINT_POINTS = 90000
 const int PROFILE_META_SIZE = 11
 const int META_VAH = 0
@@ -230,6 +181,7 @@ const int REGION_VAL_TO_POC = 0
 const int REGION_POC_TO_VAH = 1
 const int REGION_BELOW_VAL = 2
 const int REGION_ABOVE_VAH = 3
+const int BUYER_EXPANSION_RESULT_SIZE = 12
 
 // =============================================================================
 // 2. CAPTURE THE RANGE'S PROFILE INPUT DATA
@@ -374,8 +326,7 @@ f_calculateProfile(
      string layout,
      int requestedSize,
      float targetPct,
-     int maximumRows,
-     bool anchorRowsToGrid) =>
+     int maximumRows) =>
     float[] result = array.new_float(0)
     int sourceBars = array.size(volumes)
 
@@ -397,25 +348,6 @@ f_calculateProfile(
                   requestedSize,
                   maximumRows)
         float rowHeight = ticksPerRow * syminfo.mintick
-
-        // The displayed FRVP begins at the selected range's low, matching the
-        // built-in tool. The stable control profile instead anchors boundaries
-        // to absolute multiples of its row height. Adding unused lower prices
-        // therefore cannot shift the buyer-control rows at higher prices.
-        if anchorRowsToGrid
-            profileBottom :=
-                 math.floor(
-                      rawRangeLow / rowHeight + 0.0000001) *
-                      rowHeight
-            profileTop :=
-                 math.ceil(
-                      rawRangeHigh / rowHeight - 0.0000001) *
-                      rowHeight
-            totalTicks := math.max(
-                 1,
-                 int(math.round(
-                      (profileTop - profileBottom) /
-                           syminfo.mintick)))
 
         int rowCount = math.max(
              1,
@@ -637,276 +569,149 @@ f_profileRegionVolume(float[] profile, int region) =>
 
     regionVolume
 
-f_profileRegionDirectionalVolumes(float[] profile, int region) =>
-    float[] directionalVolumes = array.new_float(0)
+f_buyerSellerRatio(float buyerVolume, float sellerVolume) =>
+    float ratio =
+         sellerVolume > 0.0 ?
+         buyerVolume / sellerVolume :
+         buyerVolume > 0.0 ? 1000000000.0 : 0.0
+
+    ratio
+
+// Rows are stored from low to high, but each comparison represents a scan
+// from the adjacent higher-price row down into the current candidate row.
+// Each result uses twelve values: row low, row high, score, previous buyers,
+// current buyers, previous sellers, current sellers, buyer growth multiple,
+// buyer increase, seller change, seller-increase share of the buyer increase,
+// and the weakest observed HVN-continuation row as a percentage of the POC row.
+f_buyerExpansionSupports(
+     float[] profile,
+     float maximumSellerIncreaseSharePct,
+     float minimumEndingRatio,
+     float minimumComparedRowVolumePct,
+     bool requireHVNContinuation,
+     int hvnRowsBelow,
+     float minimumHVNVolumePct) =>
+    float[] supports = array.new_float(0)
 
     if array.size(profile) >= PROFILE_META_SIZE
         int rowCount = int(array.get(profile, META_ROW_COUNT))
         int pocRow = int(array.get(profile, META_POC_ROW))
-        int valueLowRow = int(array.get(profile, META_VAL_ROW))
-        int valueHighRow = int(array.get(profile, META_VAH_ROW))
-        int upVolumeOffset = PROFILE_META_SIZE + rowCount
-        int downVolumeOffset = PROFILE_META_SIZE + rowCount * 2
-        float buyerVolume = 0.0
-        float sellerVolume = 0.0
-
-        for rowIndex = 0 to rowCount - 1
-            bool includeRow =
-                 region == REGION_VAL_TO_POC ?
-                      rowIndex >= valueLowRow and rowIndex <= pocRow :
-                 region == REGION_POC_TO_VAH ?
-                      rowIndex > pocRow and rowIndex <= valueHighRow : false
-
-            if includeRow
-                buyerVolume += array.get(
-                     profile,
-                     upVolumeOffset + rowIndex)
-                sellerVolume += array.get(
-                     profile,
-                     downVolumeOffset + rowIndex)
-
-        array.push(directionalVolumes, buyerVolume)
-        array.push(directionalVolumes, sellerVolume)
-
-    directionalVolumes
-
-f_topDirectionalRows(
-     float[] profile,
-     bool useBuyerVolume,
-     int requestedRows) =>
-    float[] strongestRows = array.new_float(0)
-
-    if array.size(profile) >= PROFILE_META_SIZE
-        int rowCount = int(array.get(profile, META_ROW_COUNT))
         float profileBottom = array.get(profile, META_BOTTOM)
         float profileTop = array.get(profile, META_TOP)
         float rowHeight = array.get(profile, META_ROW_HEIGHT)
-        int upVolumeOffset = PROFILE_META_SIZE + rowCount
-        int downVolumeOffset =
-             PROFILE_META_SIZE + rowCount * 2
-        int primaryVolumeOffset =
-             useBuyerVolume ? upVolumeOffset : downVolumeOffset
-        int opposingVolumeOffset =
-             useBuyerVolume ? downVolumeOffset : upVolumeOffset
-        int[] selectedRows = array.new_int(0)
-        int resultCount = math.min(requestedRows, rowCount)
-
-        // Rank individual rows, not merged neighborhoods. Each pass selects
-        // one unused row. Using >= while iterating upward makes the higher
-        // price win an equal-volume tie.
-        if resultCount > 0
-            for resultIndex = 0 to resultCount - 1
-                int selectedRow = -1
-                float selectedVolume = -1.0
-
-                for rowIndex = 0 to rowCount - 1
-                    bool wasAlreadySelected =
-                         array.includes(selectedRows, rowIndex)
-                    float rowDirectionalVolume = array.get(
-                         profile,
-                         primaryVolumeOffset + rowIndex)
-                    if not wasAlreadySelected and
-                         rowDirectionalVolume >= selectedVolume
-                        selectedRow := rowIndex
-                        selectedVolume := rowDirectionalVolume
-
-                if selectedRow >= 0 and selectedVolume > 0.0
-                    array.push(selectedRows, selectedRow)
-                    float selectedLow =
-                         profileBottom + selectedRow * rowHeight
-                    float selectedHigh = math.min(
-                         profileTop,
-                         selectedLow + rowHeight)
-                    array.push(strongestRows, selectedLow)
-                    array.push(strongestRows, selectedHigh)
-                    array.push(strongestRows, selectedVolume)
-                    array.push(
-                         strongestRows,
-                         array.get(
-                              profile,
-                              opposingVolumeOffset + selectedRow))
-
-    strongestRows
-
-f_valBuyerTransition(
-     float[] profile,
-     float maximumDistancePct,
-     float minimumRowVolumePct,
-     float minimumImprovementPct) =>
-    float[] transition = array.new_float(0)
-
-    if array.size(profile) >= PROFILE_META_SIZE
-        int rowCount = int(array.get(profile, META_ROW_COUNT))
-        int pocRow = int(array.get(profile, META_POC_ROW))
-        int valueLowRow = int(array.get(profile, META_VAL_ROW))
-        float profileBottom = array.get(profile, META_BOTTOM)
-        float rowHeight = array.get(profile, META_ROW_HEIGHT)
-        float valPrice = array.get(profile, META_VAL)
         int totalVolumeOffset = PROFILE_META_SIZE
         int upVolumeOffset = PROFILE_META_SIZE + rowCount
         int downVolumeOffset =
              PROFILE_META_SIZE + rowCount * 2
-        float pocRowVolume = array.get(
-             profile,
-             totalVolumeOffset + pocRow)
-        float minimumRowVolume =
-             pocRowVolume * minimumRowVolumePct / 100.0
-        float minimumImprovement =
-             pocRowVolume * minimumImprovementPct / 100.0
-        float minimumBoundaryPrice =
-             valPrice * (1.0 - maximumDistancePct / 100.0)
-        bool foundTransition = false
+        float pocRowVolume =
+             rowCount > 0 ?
+             array.get(profile, totalVolumeOffset + pocRow) : 0.0
+        int safeHVNRowsBelow = math.max(1, hvnRowsBelow)
 
-        // Scan upward through price so the label marks the first persistent
-        // improvement from seller control toward VAL, rather than a later
-        // buyer-dominant row after the transition is already established.
-        if valueLowRow > 0 and pocRowVolume > 0.0
-            for lowerRow = 0 to valueLowRow - 1
-                int upperRow = lowerRow + 1
-                float boundaryPrice =
-                     profileBottom + upperRow * rowHeight
-                float lowerBuyer = array.get(
+        if rowCount >= 2 and pocRowVolume > 0.0
+            for currentRow = 0 to rowCount - 2
+                int previousHigherRow = currentRow + 1
+                float previousBuyer = array.get(
                      profile,
-                     upVolumeOffset + lowerRow)
-                float lowerSeller = array.get(
+                     upVolumeOffset + previousHigherRow)
+                float currentBuyer = array.get(
                      profile,
-                     downVolumeOffset + lowerRow)
-                float upperBuyer = array.get(
+                     upVolumeOffset + currentRow)
+                float previousSeller = array.get(
                      profile,
-                     upVolumeOffset + upperRow)
-                float upperSeller = array.get(
+                     downVolumeOffset + previousHigherRow)
+                float currentSeller = array.get(
                      profile,
-                     downVolumeOffset + upperRow)
-                float lowerImbalance = lowerBuyer - lowerSeller
-                float upperImbalance = upperBuyer - upperSeller
-                float imbalanceImprovement =
-                     upperImbalance - lowerImbalance
-                float lowerTotalVolume = array.get(
+                     downVolumeOffset + currentRow)
+                float previousTotal = array.get(
                      profile,
-                     totalVolumeOffset + lowerRow)
-                float upperTotalVolume = array.get(
+                     totalVolumeOffset + previousHigherRow)
+                float currentTotal = array.get(
                      profile,
-                     totalVolumeOffset + upperRow)
-                bool isNearVAL =
-                     boundaryPrice >= minimumBoundaryPrice and
-                     boundaryPrice <= valPrice
-                bool hasEnoughVolume =
-                     lowerTotalVolume >= minimumRowVolume and
-                     upperTotalVolume >= minimumRowVolume
-                bool startsWithSellerControl =
-                     lowerImbalance < 0.0
-                bool improvesEnough =
-                     imbalanceImprovement >= minimumImprovement
-                bool improvementPersists = false
-                if upperRow < valueLowRow
-                    float nextImbalance =
-                         array.get(
-                              profile,
-                              upVolumeOffset + upperRow + 1) -
-                         array.get(
-                              profile,
-                              downVolumeOffset + upperRow + 1)
-                    improvementPersists :=
-                         nextImbalance >= upperImbalance
-                else
-                    improvementPersists := upperImbalance > 0.0
+                     totalVolumeOffset + currentRow)
+                float buyerIncrease = currentBuyer - previousBuyer
+                float sellerChange = currentSeller - previousSeller
+                float buyerMultiple =
+                     previousBuyer > 0.0 ?
+                     currentBuyer / previousBuyer : 0.0
+                float sellerIncreaseSharePct =
+                     buyerIncrease > 0.0 ?
+                     math.max(0.0, sellerChange) /
+                          buyerIncrease * 100.0 : 1000000000.0
+                float endingRatio = f_buyerSellerRatio(
+                     currentBuyer,
+                     currentSeller)
+                float previousRowVolumePct =
+                     previousTotal / pocRowVolume * 100.0
+                float currentRowVolumePct =
+                     currentTotal / pocRowVolume * 100.0
+                bool comparedRowsAreMeaningful =
+                     previousRowVolumePct >=
+                          minimumComparedRowVolumePct and
+                     currentRowVolumePct >=
+                          minimumComparedRowVolumePct
+                bool hasHVNContinuation = not requireHVNContinuation
+                float weakestHVNRowPct = currentRowVolumePct
 
-                if not foundTransition and
-                     isNearVAL and
-                     hasEnoughVolume and
-                     startsWithSellerControl and
-                     improvesEnough and
-                     improvementPersists
-                    bool establishesBuyerControl =
-                         upperImbalance > 0.0
-                    array.push(transition, boundaryPrice)
+                if requireHVNContinuation
+                    hasHVNContinuation :=
+                         currentRow >= safeHVNRowsBelow and
+                         currentRowVolumePct >= minimumHVNVolumePct
+
+                    if hasHVNContinuation
+                        for depth = 1 to safeHVNRowsBelow
+                            float continuationVolume = array.get(
+                                 profile,
+                                 totalVolumeOffset + currentRow - depth)
+                            float continuationVolumePct =
+                                 continuationVolume /
+                                 pocRowVolume * 100.0
+                            weakestHVNRowPct := math.min(
+                                 weakestHVNRowPct,
+                                 continuationVolumePct)
+                            hasHVNContinuation :=
+                                 hasHVNContinuation and
+                                 continuationVolumePct >=
+                                      minimumHVNVolumePct
+
+                bool buyersIncrease =
+                     previousBuyer > 0.0 and
+                     buyerIncrease > 0.0
+                bool sellersStayRelativelyStable =
+                     sellerIncreaseSharePct <=
+                          maximumSellerIncreaseSharePct
+                bool buyersControlCurrentRow =
+                     endingRatio >= minimumEndingRatio
+
+                if buyersIncrease and
+                     sellersStayRelativelyStable and
+                     buyersControlCurrentRow and
+                     comparedRowsAreMeaningful and
+                     hasHVNContinuation
+                    float rowLow =
+                         profileBottom + currentRow * rowHeight
+                    float rowHigh = math.min(
+                         profileTop,
+                         rowLow + rowHeight)
+                    // The user's primary discriminator is the absolute change
+                    // in buyers, so ranking uses that change as its score.
+                    float score = buyerIncrease
+                    array.push(supports, rowLow)
+                    array.push(supports, rowHigh)
+                    array.push(supports, score)
+                    array.push(supports, previousBuyer)
+                    array.push(supports, currentBuyer)
+                    array.push(supports, previousSeller)
+                    array.push(supports, currentSeller)
+                    array.push(supports, buyerMultiple)
+                    array.push(supports, buyerIncrease)
+                    array.push(supports, sellerChange)
                     array.push(
-                         transition,
-                         establishesBuyerControl ? 1.0 : 0.0)
-                    array.push(transition, imbalanceImprovement)
-                    array.push(transition, lowerImbalance)
-                    array.push(transition, upperImbalance)
-                    foundTransition := true
+                         supports,
+                         sellerIncreaseSharePct)
+                    array.push(supports, weakestHVNRowPct)
 
-    transition
-
-f_highestBuyerRelativeNearVAL(
-     float[] profile,
-     int maximumDistanceRows) =>
-    float[] shift = array.new_float(0)
-
-    if array.size(profile) >= PROFILE_META_SIZE
-        int rowCount = int(array.get(profile, META_ROW_COUNT))
-        float profileBottom = array.get(profile, META_BOTTOM)
-        float profileTop = array.get(profile, META_TOP)
-        float rowHeight = array.get(profile, META_ROW_HEIGHT)
-        int valueLowRow = int(array.get(profile, META_VAL_ROW))
-        int upVolumeOffset = PROFILE_META_SIZE + rowCount
-        int downVolumeOffset = PROFILE_META_SIZE + rowCount * 2
-        int selectedRow = -1
-        float selectedPrice = na
-        float selectedRelative = -1.0
-        int selectedDistance = 1000000000
-        float selectedBuyerVolume = 0.0
-        float selectedSellerVolume = 0.0
-
-        // Select exactly one row within a consistent histogram-row distance
-        // on either side of VAL. There is deliberately no minimum-volume,
-        // persistence, or adjacent-row requirement.
-        if rowCount > 0
-            for rowIndex = 0 to rowCount - 1
-                float rowLow =
-                     profileBottom + rowIndex * rowHeight
-                float rowHigh = math.min(
-                     profileTop,
-                     rowLow + rowHeight)
-                float rowCenter = (rowLow + rowHigh) * 0.5
-                float buyerVolume = array.get(
-                     profile,
-                     upVolumeOffset + rowIndex)
-                float sellerVolume = array.get(
-                     profile,
-                     downVolumeOffset + rowIndex)
-                bool isNearVAL =
-                     math.abs(rowIndex - valueLowRow) <=
-                          maximumDistanceRows
-                bool hasPositiveRelative =
-                     buyerVolume > sellerVolume and
-                     sellerVolume > 0.0
-                float relativeValue =
-                     hasPositiveRelative ?
-                     buyerVolume / sellerVolume : 0.0
-                int distanceFromVAL =
-                     math.abs(rowIndex - valueLowRow)
-                bool isBetterRelative =
-                     relativeValue > selectedRelative
-                bool isCloserTie =
-                     relativeValue == selectedRelative and
-                     distanceFromVAL < selectedDistance
-                bool isHigherPriceTie =
-                     relativeValue == selectedRelative and
-                     distanceFromVAL == selectedDistance and
-                     (na(selectedPrice) or rowCenter > selectedPrice)
-
-                if isNearVAL and
-                     hasPositiveRelative and
-                     (isBetterRelative or
-                          isCloserTie or
-                          isHigherPriceTie)
-                    selectedRow := rowIndex
-                    selectedPrice := rowCenter
-                    selectedRelative := relativeValue
-                    selectedDistance := distanceFromVAL
-                    selectedBuyerVolume := buyerVolume
-                    selectedSellerVolume := sellerVolume
-
-        if selectedRow >= 0
-            array.push(shift, selectedPrice)
-            array.push(shift, selectedRelative)
-            array.push(shift, selectedBuyerVolume)
-            array.push(shift, selectedSellerVolume)
-
-    shift
+    supports
 
 f_formatVolume(float volumeValue) =>
     na(volumeValue) ? "n/a" : str.tostring(volumeValue, "#,###")
@@ -927,31 +732,7 @@ f_formatCompactVolume(float volumeValue) =>
 
     formattedVolume
 
-f_directionalRelative(float primaryVolume, float opposingVolume) =>
-    float relativeValue =
-         opposingVolume > 0.0 ?
-         primaryVolume / opposingVolume :
-         primaryVolume > 0.0 ? 1000000000.0 : 0.0
-
-    relativeValue
-
-f_directionalText(float primaryVolume, float opposingVolume) =>
-    string relativeText =
-         opposingVolume > 0.0 ?
-         str.tostring(
-              f_directionalRelative(
-                   primaryVolume,
-                   opposingVolume),
-              "#.##") : "n/a"
-
-    f_formatCompactVolume(primaryVolume) +
-         " x " +
-         f_formatCompactVolume(opposingVolume) +
-         " | R: " +
-         relativeText
-
 var float[] profileA = array.new_float(0)
-var float[] valBuyerControlProfileA = array.new_float(0)
 var float vahA = na
 var float pocA = na
 var float valA = na
@@ -970,32 +751,7 @@ if barstate.islast
          rowsLayout,
          rowSize,
          valueAreaPct,
-         MAX_ROWS_PER_PROFILE,
-         false)
-
-    if useStableVALBuyerControlRows
-        int stableControlTicksPerRowA = math.max(
-             1,
-             int(math.round(
-                  valBuyerControlRowHeight /
-                       syminfo.mintick)))
-        valBuyerControlProfileA := f_calculateProfile(
-             rangeOpensA,
-             rangeHighsA,
-             rangeLowsA,
-             rangeClosesA,
-             rangeVolumesA,
-             rangeFootprintPricesA,
-             rangeFootprintBuyVolumesA,
-             rangeFootprintSellVolumesA,
-             usesNativeFootprintA,
-             "Ticks Per Row",
-             stableControlTicksPerRowA,
-             valueAreaPct,
-             MAX_SIGNAL_ROWS,
-             true)
-    else
-        valBuyerControlProfileA := profileA
+         MAX_ROWS_PER_PROFILE)
 
     vahA := array.size(profileA) >= PROFILE_META_SIZE ?
          array.get(profileA, META_VAH) : na
@@ -1016,33 +772,14 @@ float volumeBelowVALA = f_profileRegionVolume(
 float volumeAboveVAHA = f_profileRegionVolume(
      profileA,
      REGION_ABOVE_VAH)
-float[] directionalVALToPOCA =
-     f_profileRegionDirectionalVolumes(
-          profileA,
-          REGION_VAL_TO_POC)
-float[] directionalPOCToVAHA =
-     f_profileRegionDirectionalVolumes(
-          profileA,
-          REGION_POC_TO_VAH)
-float[] stableVALBuyerTransitionA = f_valBuyerTransition(
-     valBuyerControlProfileA,
-     valBuyerMaxDistancePct,
-     valBuyerMinRowVolumePct,
-     valBuyerMinImprovementPct)
-float[] originalVALBuyerTransitionA = f_valBuyerTransition(
+float[] buyerExpansionSupportsA = f_buyerExpansionSupports(
      profileA,
-     valBuyerMaxDistancePct,
-     valBuyerMinRowVolumePct,
-     valBuyerMinImprovementPct)
-float[] valBuyerTransitionA = array.new_float(0)
-if array.size(originalVALBuyerTransitionA) >= 5
-    valBuyerTransitionA := originalVALBuyerTransitionA
-else if useStableVALBuyerControlRows and
-     array.size(stableVALBuyerTransitionA) >= 5
-    valBuyerTransitionA := stableVALBuyerTransitionA
-float[] valBuyerRelativeShiftA = f_highestBuyerRelativeNearVAL(
-     profileA,
-     valBuyerRelativeMaxDistanceRows)
+     buyerExpansionMaximumSellerSharePct,
+     buyerExpansionMinimumEndingRatio,
+     buyerExpansionMinimumRowVolumePct,
+     buyerExpansionRequireHVNContinuation,
+     buyerExpansionHVNRowsBelow,
+     buyerExpansionMinimumHVNVolumePct)
 
 // =============================================================================
 // 4. LINES AND HISTOGRAMS
@@ -1077,16 +814,10 @@ var line lineValA = line.new(
      width = 1)
 
 var box[] histBoxesA = array.new_box(0)
+var label[] histogramVolumeLabelsA = array.new_label(0)
 var box profileBackgroundA = na
-var box[] buyerVolumeZonesA = array.new_box(0)
-var label[] buyerVolumeLabelsA = array.new_label(0)
-var box[] sellerVolumeZonesA = array.new_box(0)
-var label[] sellerVolumeLabelsA = array.new_label(0)
-var label[] localBuyerDominanceLabelsA = array.new_label(0)
-var label valBuyerTransitionLabelA = na
-var label valBuyerRelativeShiftLabelA = na
-var label valToPocDirectionalLabelA = na
-var label pocToVahDirectionalLabelA = na
+var label[] buyerExpansionSupportLabelsA = array.new_label(0)
+var line[] buyerExpansionSupportLinesA = array.new_line(0)
 
 f_clearBoxes(box[] boxes) =>
     if array.size(boxes) > 0
@@ -1100,146 +831,167 @@ f_clearLabels(label[] labels) =>
             label.delete(array.get(labels, labelIndex))
         array.clear(labels)
 
-f_drawDirectionalRows(
-     float[] directionalRows,
-     box[] zoneBoxes,
-     label[] volumeLabels,
+f_clearLines(line[] lines) =>
+    if array.size(lines) > 0
+        for lineIndex = 0 to array.size(lines) - 1
+            line.delete(array.get(lines, lineIndex))
+        array.clear(lines)
+
+f_drawBuyerExpansionSupports(
+     float[] supports,
+     label[] labels,
+     line[] supportLines,
      int rangeStartTime,
      int rangeEndTime,
-     int labelTime,
-     color zoneColor,
-     color labelColor,
-     bool showRows,
-     bool showVolumes) =>
-    int resultCount = int(array.size(directionalRows) / 4)
-    int highestRelativeIndex = -1
-    float highestRelative = -1.0
-
-    if resultCount > 0
-        for resultIndex = 0 to resultCount - 1
-            int resultOffset = resultIndex * 4
-            float relativeValue = f_directionalRelative(
-                 array.get(directionalRows, resultOffset + 2),
-                 array.get(directionalRows, resultOffset + 3))
-            if relativeValue >= 1.0 and
-                 relativeValue >= highestRelative
-                highestRelativeIndex := resultIndex
-                highestRelative := relativeValue
-
-        if showRows
-            for resultIndex = 0 to resultCount - 1
-                int resultOffset = resultIndex * 4
-                float rowBottom = array.get(
-                     directionalRows,
-                     resultOffset)
-                float rowTop = array.get(
-                     directionalRows,
-                     resultOffset + 1)
-                float primaryVolume = array.get(
-                     directionalRows,
-                     resultOffset + 2)
-                float opposingVolume = array.get(
-                     directionalRows,
-                     resultOffset + 3)
-                float relativeValue = f_directionalRelative(
-                     primaryVolume,
-                     opposingVolume)
-
-                if relativeValue >= 1.0
-                    bool isHighestRelative =
-                         resultIndex == highestRelativeIndex
-                    box directionalRow = box.new(
-                         left = rangeStartTime,
-                         top = rowTop,
-                         right = rangeEndTime,
-                         bottom = rowBottom,
-                         xloc = xloc.bar_time,
-                         bgcolor = color.new(
-                              zoneColor,
-                              isHighestRelative ? 60 : 88),
-                         border_color = color.new(
-                              zoneColor,
-                              isHighestRelative ? 0 : 50),
-                         border_width = 1)
-                    array.push(zoneBoxes, directionalRow)
-
-                    if showVolumes
-                        label directionalLabel = label.new(
-                             x = labelTime,
-                             y = (rowBottom + rowTop) / 2.0,
-                             text = f_directionalText(
-                                  primaryVolume,
-                                  opposingVolume),
-                             xloc = xloc.bar_time,
-                             yloc = yloc.price,
-                             style = label.style_label_right,
-                             color = labelColor,
-                             textcolor = color.white,
-                             size = size.tiny)
-                        array.push(volumeLabels, directionalLabel)
-
-f_drawLocalBuyerDominanceRows(
-     float[] profile,
-     label[] labels,
      int markerTime,
-     color markerColor) =>
-    if array.size(profile) >= PROFILE_META_SIZE
-        int rowCount = int(array.get(profile, META_ROW_COUNT))
-        float profileBottom = array.get(profile, META_BOTTOM)
-        float profileTop = array.get(profile, META_TOP)
-        float rowHeight = array.get(profile, META_ROW_HEIGHT)
-        int upVolumeOffset = PROFILE_META_SIZE + rowCount
-        int downVolumeOffset =
-             PROFILE_META_SIZE + rowCount * 2
+     color markerColor,
+     int maximumLabels) =>
+    int supportCount = int(
+         array.size(supports) / BUYER_EXPANSION_RESULT_SIZE)
+    int displayedCount = math.min(
+         supportCount,
+         math.max(1, maximumLabels))
+    bool[] selectedSupports =
+         array.new_bool(supportCount, false)
 
-        if rowCount >= 3
-            for rowIndex = 1 to rowCount - 2
-                float buyerBelow = array.get(
-                     profile,
-                     upVolumeOffset + rowIndex - 1)
-                float buyerCurrent = array.get(
-                     profile,
-                     upVolumeOffset + rowIndex)
-                float buyerAbove = array.get(
-                     profile,
-                     upVolumeOffset + rowIndex + 1)
-                float sellerBelow = array.get(
-                     profile,
-                     downVolumeOffset + rowIndex - 1)
-                float sellerCurrent = array.get(
-                     profile,
-                     downVolumeOffset + rowIndex)
-                float sellerAbove = array.get(
-                     profile,
-                     downVolumeOffset + rowIndex + 1)
-                bool hasLocalBuyerDominance =
-                     buyerCurrent > buyerBelow and
-                     buyerCurrent > buyerAbove and
-                     sellerCurrent < sellerBelow and
-                     sellerCurrent < sellerAbove and
-                     buyerCurrent >= sellerCurrent
+    if displayedCount > 0
+        for displayIndex = 0 to displayedCount - 1
+            int selectedIndex = -1
+            float selectedScore = -1.0
+            float selectedHigh = na
 
-                if hasLocalBuyerDominance
-                    float rowLow =
-                         profileBottom + rowIndex * rowHeight
-                    float rowHigh = math.min(
-                         profileTop,
-                         rowLow + rowHeight)
-                    label reversalMarker = label.new(
-                         x = markerTime,
-                         y = (rowLow + rowHigh) / 2.0,
-                         text = "Reversal",
-                         xloc = xloc.bar_time,
-                         yloc = yloc.price,
-                         style = label.style_label_right,
-                         color = markerColor,
-                         textcolor = color.white,
-                         size = size.tiny)
-                    array.push(labels, reversalMarker)
+            for supportIndex = 0 to supportCount - 1
+                int supportOffset =
+                     supportIndex * BUYER_EXPANSION_RESULT_SIZE
+                float supportScore = array.get(
+                     supports,
+                     supportOffset + 2)
+                float supportHigh = array.get(
+                     supports,
+                     supportOffset + 1)
+                bool isBetterScore = supportScore > selectedScore
+                bool isHigherPriceTie =
+                     supportScore == selectedScore and
+                     (na(selectedHigh) or supportHigh > selectedHigh)
+
+                if not array.get(
+                     selectedSupports,
+                     supportIndex) and
+                     (isBetterScore or isHigherPriceTie)
+                    selectedIndex := supportIndex
+                    selectedScore := supportScore
+                    selectedHigh := supportHigh
+
+            if selectedIndex >= 0
+                array.set(
+                     selectedSupports,
+                     selectedIndex,
+                     true)
+                int selectedOffset =
+                     selectedIndex * BUYER_EXPANSION_RESULT_SIZE
+                float rowLow = array.get(
+                     supports,
+                     selectedOffset)
+                float rowHigh = array.get(
+                     supports,
+                     selectedOffset + 1)
+                float previousBuyer = array.get(
+                     supports,
+                     selectedOffset + 3)
+                float currentBuyer = array.get(
+                     supports,
+                     selectedOffset + 4)
+                float previousSeller = array.get(
+                     supports,
+                     selectedOffset + 5)
+                float currentSeller = array.get(
+                     supports,
+                     selectedOffset + 6)
+                float buyerMultiple = array.get(
+                     supports,
+                     selectedOffset + 7)
+                float buyerIncrease = array.get(
+                     supports,
+                     selectedOffset + 8)
+                float sellerChange = array.get(
+                     supports,
+                     selectedOffset + 9)
+                float sellerIncreaseSharePct = array.get(
+                     supports,
+                     selectedOffset + 10)
+                float weakestHVNRowPct = array.get(
+                     supports,
+                     selectedOffset + 11)
+                bool isStrongest = displayIndex == 0
+                float supportPrice = (rowLow + rowHigh) * 0.5
+                string markerText =
+                     (isStrongest ? "✅  " : "") +
+                     f_formatCompactVolume(currentBuyer) +
+                     " x " +
+                     f_formatCompactVolume(currentSeller) +
+                     " | Buyers " +
+                     str.tostring(buyerMultiple, "#.##") +
+                     "x"
+                string markerTooltip =
+                     "Buyer Expansion Support" +
+                     (isStrongest ? " (strongest buyer increase)" : "") +
+                     "\nPrice row: " +
+                     str.tostring(rowLow, format.mintick) +
+                     " - " +
+                     str.tostring(rowHigh, format.mintick) +
+                     "\nHigher -> current lower row" +
+                     "\nBuyers: " +
+                     f_formatCompactVolume(previousBuyer) +
+                     " -> " +
+                     f_formatCompactVolume(currentBuyer) +
+                     " (" +
+                     str.tostring(buyerMultiple, "#.##") +
+                     "x, +" +
+                     f_formatCompactVolume(buyerIncrease) +
+                     ")" +
+                     "\nSellers: " +
+                     f_formatCompactVolume(previousSeller) +
+                     " -> " +
+                     f_formatCompactVolume(currentSeller) +
+                     " (change " +
+                     f_formatCompactVolume(sellerChange) +
+                     ")" +
+                     "\nSeller increase / buyer increase: " +
+                     str.tostring(
+                          sellerIncreaseSharePct,
+                          "#.##") +
+                     "%" +
+                     "\nWeakest HVN continuation row: " +
+                     str.tostring(weakestHVNRowPct, "#.##") +
+                     "% of POC row"
+                line supportLine = line.new(
+                     x1 = rangeStartTime,
+                     y1 = supportPrice,
+                     x2 = rangeEndTime,
+                     y2 = supportPrice,
+                     xloc = xloc.bar_time,
+                     extend = extend.right,
+                     color = markerColor,
+                     style = line.style_solid,
+                     width = isStrongest ? 2 : 1)
+                array.push(supportLines, supportLine)
+                label supportLabel = label.new(
+                     x = markerTime,
+                     y = supportPrice,
+                     text = markerText,
+                     tooltip = markerTooltip,
+                     xloc = xloc.bar_time,
+                     yloc = yloc.price,
+                     style = label.style_label_right,
+                     color = markerColor,
+                     textcolor = color.black,
+                     size = size.normal)
+                array.push(labels, supportLabel)
 
 f_drawHistogram(
      float[] profile,
      box[] boxes,
+     label[] volumeLabels,
      int rangeStartTime,
      int rangeEndTime,
      int barDurationMs,
@@ -1248,10 +1000,9 @@ f_drawHistogram(
      string displayMode,
      color upColor,
      color downColor,
-     color valueUpColor,
-     color valueDownColor,
      color totalColor,
-     color valueTotalColor) =>
+     color valueTotalColor,
+     bool displayVolumeLabels) =>
     if array.size(profile) >= PROFILE_META_SIZE and
          not na(rangeStartTime) and
          not na(rangeEndTime)
@@ -1270,6 +1021,9 @@ f_drawHistogram(
         int maximumWidthMs = math.max(
              1,
              int(math.round(rangeWidthMs * widthPct / 100.0)))
+        int profileLeftTime =
+             placement == "Left" ?
+             rangeStartTime : profileEndTime - maximumWidthMs
 
         for rowIndex = 0 to rowCount - 1
             maximumVolume := math.max(
@@ -1335,13 +1089,9 @@ f_drawHistogram(
 
                         int splitTime = rowLeft + upWidthMs
                         color displayedUpColor =
-                             insideValueArea ?
-                             color.new(valueUpColor, 15) :
-                             color.new(upColor, 35)
+                             color.new(upColor, 15)
                         color displayedDownColor =
-                             insideValueArea ?
-                             color.new(valueDownColor, 15) :
-                             color.new(downColor, 35)
+                             color.new(downColor, 15)
 
                         if rowUpVolume > 0.0 and splitTime > rowLeft
                             box upHistogramRow = box.new(
@@ -1367,25 +1117,44 @@ f_drawHistogram(
                                       color.new(displayedDownColor, 100))
                             array.push(boxes, downHistogramRow)
 
+                    if displayVolumeLabels and useSplitDisplay
+                        float rowLabelPrice =
+                             (rowLow + rowHigh) * 0.5
+                        string rowVolumeText =
+                             f_formatCompactVolume(rowUpVolume) +
+                             " x " +
+                             f_formatCompactVolume(rowDownVolume)
+                        string rowVolumeTooltip =
+                             "Buyers: " +
+                             f_formatVolume(rowUpVolume) +
+                             "\nSellers: " +
+                             f_formatVolume(rowDownVolume) +
+                             "\nBuyer/seller ratio: " +
+                             str.tostring(
+                                  f_buyerSellerRatio(
+                                       rowUpVolume,
+                                       rowDownVolume),
+                                  "#.##")
+                        label rowVolumeLabel = label.new(
+                             x = profileLeftTime,
+                             y = rowLabelPrice,
+                             text = rowVolumeText,
+                             tooltip = rowVolumeTooltip,
+                             xloc = xloc.bar_time,
+                             yloc = yloc.price,
+                             style = label.style_label_left,
+                             color = color.new(color.black, 100),
+                             textcolor = color.white,
+                             size = size.small,
+                             text_formatting = text.format_bold,
+                             textalign = text.align_left)
+                        array.push(volumeLabels, rowVolumeLabel)
+
 if barstate.islast
     f_clearBoxes(histBoxesA)
-    f_clearBoxes(buyerVolumeZonesA)
-    f_clearBoxes(sellerVolumeZonesA)
-    f_clearLabels(buyerVolumeLabelsA)
-    f_clearLabels(sellerVolumeLabelsA)
-    f_clearLabels(localBuyerDominanceLabelsA)
-    if not na(valBuyerTransitionLabelA)
-        label.delete(valBuyerTransitionLabelA)
-        valBuyerTransitionLabelA := na
-    if not na(valBuyerRelativeShiftLabelA)
-        label.delete(valBuyerRelativeShiftLabelA)
-        valBuyerRelativeShiftLabelA := na
-    if not na(valToPocDirectionalLabelA)
-        label.delete(valToPocDirectionalLabelA)
-        valToPocDirectionalLabelA := na
-    if not na(pocToVahDirectionalLabelA)
-        label.delete(pocToVahDirectionalLabelA)
-        pocToVahDirectionalLabelA := na
+    f_clearLabels(histogramVolumeLabelsA)
+    f_clearLabels(buyerExpansionSupportLabelsA)
+    f_clearLines(buyerExpansionSupportLinesA)
     if not na(profileBackgroundA)
         box.delete(profileBackgroundA)
         profileBackgroundA := na
@@ -1393,6 +1162,9 @@ if barstate.islast
     int histogramBarMs = math.max(
          1,
          int(timeframe.in_seconds() * 1000.0))
+    bool displayHistogramRowVolumesA =
+         showHistogramRowVolumes and
+         volumeDisplay == "Up/Down"
     int endTimeA = endA + histogramBarMs
     int rangeWidthMsA = math.max(
          histogramBarMs,
@@ -1408,14 +1180,8 @@ if barstate.islast
     int outsideLabelGapMsA = math.max(
          histogramBarMs * 2,
          int(math.round(histogramMaximumWidthMsA * 0.05)))
-    int buyerHistogramLabelTimeA =
+    int buyerExpansionSupportLabelTimeA =
          histogramLabelTimeA - outsideLabelGapMsA
-    int sellerHistogramLabelTimeA =
-         histogramLabelTimeA - outsideLabelGapMsA * 2
-    int valueAreaDirectionalLabelTimeA =
-         histogramLabelTimeA - outsideLabelGapMsA * 3
-    int reversalMarkerTimeA =
-         histogramLabelTimeA
     color boundaryColorA =
          showRangeBoundaries ?
          color.new(color.aqua, 40) : color.new(color.aqua, 100)
@@ -1453,6 +1219,7 @@ if barstate.islast
         f_drawHistogram(
              profileA,
              histBoxesA,
+             histogramVolumeLabelsA,
              startA,
              endA,
              histogramBarMs,
@@ -1461,139 +1228,19 @@ if barstate.islast
              volumeDisplay,
              upVolumeColor,
              downVolumeColor,
-             valueAreaUpColor,
-             valueAreaDownColor,
              totalVolumeColor,
-             valueAreaTotalColor)
-        float[] buyerRowsA = f_topDirectionalRows(
-             profileA,
-             true,
-             4)
-        f_drawDirectionalRows(
-             buyerRowsA,
-             buyerVolumeZonesA,
-             buyerVolumeLabelsA,
-             startA,
-             endTimeA,
-             buyerHistogramLabelTimeA,
-             buyerZoneColor,
-             color.green,
-             showBuyerZone,
-             showBuyerZoneVolumes)
-
-        float[] sellerRowsA = f_topDirectionalRows(
-             profileA,
-             false,
-             2)
-        f_drawDirectionalRows(
-             sellerRowsA,
-             sellerVolumeZonesA,
-             sellerVolumeLabelsA,
-             startA,
-             endTimeA,
-             sellerHistogramLabelTimeA,
-             sellerZoneColor,
-             color.red,
-             showSellerZone,
-             showSellerZoneVolumes)
-
-        if showValueAreaDirectionalLabels and
-             array.size(directionalVALToPOCA) >= 2
-            float valToPocBuyerVolumeA =
-                 array.get(directionalVALToPOCA, 0)
-            float valToPocSellerVolumeA =
-                 array.get(directionalVALToPOCA, 1)
-            if valToPocBuyerVolumeA + valToPocSellerVolumeA > 0.0
-                string valToPocDirectionalTextA =
-                     "VAL to POC | Buyers x Sellers\n" +
-                     f_directionalText(
-                          valToPocBuyerVolumeA,
-                          valToPocSellerVolumeA)
-                color valToPocDirectionalColorA =
-                     valToPocBuyerVolumeA >= valToPocSellerVolumeA ?
-                     color.green : color.red
-                valToPocDirectionalLabelA := label.new(
-                     x = valueAreaDirectionalLabelTimeA,
-                     y = (valA + pocA) * 0.5,
-                     text = valToPocDirectionalTextA,
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_right,
-                     color = valToPocDirectionalColorA,
-                     textcolor = color.white,
-                     size = size.tiny)
-
-        if showValueAreaDirectionalLabels and
-             array.size(directionalPOCToVAHA) >= 2
-            float pocToVahBuyerVolumeA =
-                 array.get(directionalPOCToVAHA, 0)
-            float pocToVahSellerVolumeA =
-                 array.get(directionalPOCToVAHA, 1)
-            if pocToVahBuyerVolumeA + pocToVahSellerVolumeA > 0.0
-                string pocToVahDirectionalTextA =
-                     "POC to VAH | Buyers x Sellers\n" +
-                     f_directionalText(
-                          pocToVahBuyerVolumeA,
-                          pocToVahSellerVolumeA)
-                color pocToVahDirectionalColorA =
-                     pocToVahBuyerVolumeA >= pocToVahSellerVolumeA ?
-                     color.green : color.red
-                pocToVahDirectionalLabelA := label.new(
-                     x = valueAreaDirectionalLabelTimeA,
-                     y = (pocA + vahA) * 0.5,
-                     text = pocToVahDirectionalTextA,
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_right,
-                     color = pocToVahDirectionalColorA,
-                     textcolor = color.white,
-                     size = size.tiny)
-
-        if showVALBuyerTransition and
-             array.size(valBuyerTransitionA) >= 5
-            bool establishesBuyerControlA =
-                 array.get(valBuyerTransitionA, 1) == 1.0
-            string transitionTextA =
-                 establishesBuyerControlA ?
-                 "VAL Buyer Control" : "VAL Buyer Shift"
-            color transitionColorA =
-                 establishesBuyerControlA ?
-                 valBuyerControlColor : valBuyerShiftColor
-            valBuyerTransitionLabelA := label.new(
-                 x = histogramLabelTimeA,
-                 y = array.get(valBuyerTransitionA, 0),
-                 text = transitionTextA,
-                 xloc = xloc.bar_time,
-                 yloc = yloc.price,
-                 style = label.style_label_right,
-                 color = transitionColorA,
-                 textcolor = color.white,
-                 size = size.tiny)
-
-        if showVALBuyerRelativeShift and
-             array.size(valBuyerRelativeShiftA) >= 4
-            string relativeShiftTextA =
-                 "VAL Buyer Shift | R: " +
-                 str.tostring(
-                      array.get(valBuyerRelativeShiftA, 1),
-                      "#.##")
-            valBuyerRelativeShiftLabelA := label.new(
-                 x = histogramLabelTimeA,
-                 y = array.get(valBuyerRelativeShiftA, 0),
-                 text = relativeShiftTextA,
-                 xloc = xloc.bar_time,
-                 yloc = yloc.price,
-                 style = label.style_label_right,
-                 color = valBuyerShiftColor,
-                 textcolor = color.white,
-                 size = size.tiny)
-
-        if showLocalBuyerDominance
-            f_drawLocalBuyerDominanceRows(
-                 profileA,
-                 localBuyerDominanceLabelsA,
-                 reversalMarkerTimeA,
-                 localBuyerDominanceColor)
+             valueAreaTotalColor,
+             displayHistogramRowVolumesA)
+        if showBuyerExpansionSupport
+            f_drawBuyerExpansionSupports(
+                 buyerExpansionSupportsA,
+                 buyerExpansionSupportLabelsA,
+                 buyerExpansionSupportLinesA,
+                 startA,
+                 endTimeA,
+                 buyerExpansionSupportLabelTimeA,
+                 buyerExpansionSupportColor,
+                 buyerExpansionMaximumLabels)
 
 // =============================================================================
 // 5. PROFILE SUMMARY TABLE
