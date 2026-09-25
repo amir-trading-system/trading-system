@@ -1,1369 +1,1490 @@
 //@version=6
 indicator(
-     "Interactive Fixed Range Volume Profile & Histogram (v9.0)",
-     shorttitle = "Interactive FRVP v9.0",
+     "Support to Resistance - Strong Reclaim",
+     shorttitle = "S/R Strong Reclaim",
      overlay = true,
-     max_boxes_count = 500,
-     max_lines_count = 10,
-     max_labels_count = 500)
+     max_bars_back = 500,
+     max_lines_count = 300,
+     max_labels_count = 100)
 
 // =============================================================================
-// 1. INTERACTIVE INPUTS (drag-and-drop)
+// PATTERN DEFINITION AND DEFAULTS
 // =============================================================================
-int startA = input.time(
-     timestamp("2026-01-01 00:00"),
-     title = "Range - Start Point",
-     confirm = true,
-     group = "Range Boundaries")
-int endA = input.time(
-     timestamp("2026-06-30 23:59"),
-     title = "Range - End Point",
-     confirm = true,
-     group = "Range Boundaries")
+// 1. An uptrend forms a compact support shelf that is not sliding lower.
+// 2. Price closes below the shelf.
+// 3. The former support rejects price from below in separate clusters.
+// 4. A high-volume bullish bar closes above the highest rejection.
+// 5. When several levels break together, the highest resistance is selected.
+// 6. Unresolved nearby or cumulatively strong resistance cannot remain above.
+// 7. The reclaim must occur inside a controlled, non-exhausted price expansion.
+// 8. A mature resistance with many separated rejections can use a slower
+//    breakout path without weakening the primary explosive-reclaim rules.
 
-string rowsLayout = input.string(
-     "Number of Rows",
-     title = "Rows Layout",
-     options = ["Number of Rows", "Ticks Per Row"],
-     group = "Profile Precision Settings",
-     tooltip = "Use the same layout and row size in TradingView's FRVP when comparing levels.")
-int rowSize = input.int(
-     200,
-     title = "Row Size",
-     minval = 1,
-     maxval = 500,
-     group = "Profile Precision Settings",
-     tooltip = "Number of rows when Rows Layout is Number of Rows; otherwise ticks in each row.")
-float valueAreaPct = input.float(
-     70.0,
-     title = "Value Area Volume (%)",
-     minval = 1.0,
-     maxval = 100.0,
-     step = 1.0,
-     group = "Profile Precision Settings")
-bool useNativeFootprint = input.bool(
-     true,
-     title = "Use Native Footprint Data (Premium)",
-     group = "Profile Precision Settings",
-     tooltip = "Builds VAL, POC, VAH and buyer/seller rows from TradingView's native intrabar footprint data. If footprint history is unavailable, the table reports that the OHLCV approximation is being used instead.")
-int profileWidthPct = input.int(
-     30,
-     title = "Profile Width (% of Range)",
-     minval = 5,
-     maxval = 100,
-     group = "Profile Style")
-string profilePlacement = input.string(
-     "Left",
-     title = "Profile Placement",
-     options = ["Right", "Left"],
-     group = "Profile Style")
-string volumeDisplay = input.string(
-     "Up/Down",
-     title = "Volume Display",
-     options = ["Up/Down", "Total"],
-     group = "Profile Style")
-bool showHistogramRowVolumes = input.bool(
-     true,
-     title = "Show Buyer x Seller Values",
-     group = "Profile Style",
-     tooltip = "Always draws buyer x seller volume on every nonempty histogram row, matching TradingView's Fixed Range Volume Profile values. The text becomes readable when the price scale is zoomed in. Available when Volume Display is Up/Down.")
-bool showProfileBackground = input.bool(
-     true,
-     title = "Show Profile Background",
-     group = "Profile Style")
-bool showRangeBoundaries = input.bool(
-     false,
-     title = "Show Range Boundaries",
-     group = "Profile Style")
-bool extendLevelsRight = input.bool(
-     false,
-     title = "Extend VAH / POC / VAL Right",
-     group = "Profile Style")
-bool showBuyerExpansionSupport = input.bool(
-     true,
-     title = "Show Buyer Expansion Support",
-     group = "Buyer Expansion Support",
-     tooltip = "Scans every adjacent pair of profile rows from higher to lower prices. All positive buyer increases that pass the seller, buyer-control, row-volume and optional HVN conditions are ranked, and only the two largest buyer increases are shown by default.")
-float buyerExpansionMaximumSellerSharePct = input.float(
-     30.0,
-     title = "Maximum Seller Increase vs Buyer Increase (%)",
-     minval = 0.0,
-     maxval = 100.0,
-     step = 1.0,
-     group = "Buyer Expansion Support",
-     tooltip = "If sellers increase, their increase may be no greater than this percentage of the buyer increase. Seller volume that stays flat or decreases always passes this condition.")
-float buyerExpansionMinimumEndingRatio = input.float(
-     1.0,
-     title = "Minimum Current Buyer/Seller Ratio",
-     minval = 1.0,
-     maxval = 10.0,
-     step = 0.05,
-     group = "Buyer Expansion Support",
-     tooltip = "The marked row must finish with at least this buyer-volume divided by seller-volume ratio.")
-float buyerExpansionMinimumRowVolumePct = input.float(
-     10.0,
-     title = "Minimum Compared Row Volume (% of POC Row)",
+string scanSession = input.session(
+     "0400-2000",
+     title = "Detection Session",
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "The pattern can form during premarket, regular hours, or postmarket. Candidates reset when a new exchange date begins.")
+int supportShelfBars = input.int(
+     4,
+     title = "Support Shelf Bars",
+     minval = 3,
+     maxval = 12,
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "The indicator uses the lows immediately before the close-below break. One high-low outlier is allowed.")
+float maximumShelfWidthPct = input.float(
+     2.0,
+     title = "Maximum Shelf Width (%)",
      minval = 0.1,
+     maxval = 10.0,
+     step = 0.1,
+     group = "Pattern Detection",
+     display = display.data_window)
+int priorAdvanceLookbackBars = input.int(
+     120,
+     title = "Prior Uptrend Lookback Bars",
+     minval = 20,
+     maxval = 240,
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "A support shelf is valid only when it formed after a meaningful advance inside this lookback.")
+int minimumPriorTrendBars = input.int(
+     10,
+     title = "Minimum Prior Trend Bars",
+     minval = 5,
+     maxval = 60,
+     group = "Pattern Detection",
+     display = display.data_window)
+float minimumPriorAdvancePct = input.float(
+     5.0,
+     title = "Minimum Advance Before Support (%)",
+     minval = 1.0,
      maxval = 100.0,
-     step = 1.0,
-     group = "Buyer Expansion Support",
-     tooltip = "Both adjacent rows being compared must contain at least this percentage of the POC row's total volume.")
-bool buyerExpansionRequireHVNContinuation = input.bool(
-     true,
-     title = "Require HVN Continuation Below",
-     group = "Buyer Expansion Support",
-     tooltip = "Requires the marked row and the configured number of lower-price rows beneath it to carry meaningful total volume.")
-int buyerExpansionHVNRowsBelow = input.int(
+     step = 0.5,
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "Rejects local shelves that formed inside an ongoing decline instead of after an uptrend.")
+float maximumShelfDownSlopePctPerBar = input.float(
+     0.45,
+     title = "Maximum Support Down-Slope Per Bar (%)",
+     minval = 0.0,
+     maxval = 5.0,
+     step = 0.05,
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "Rejects bar sequences whose lows are sliding downward too quickly to represent held support.")
+int maximumSetupBars = input.int(
+     240,
+     title = "Maximum Bars From Break to Reclaim",
+     minval = 5,
+     maxval = 480,
+     group = "Pattern Detection",
+     display = display.data_window)
+int maximumActiveCandidates = input.int(
+     100,
+     title = "Maximum Active Candidates",
+     minval = 10,
+     maxval = 200,
+     group = "Pattern Detection",
+     display = display.data_window)
+int minimumOverheadResistanceClusters = input.int(
      2,
-     title = "HVN Continuation Rows Below",
+     title = "Minimum Overhead Resistance Clusters",
      minval = 1,
      maxval = 10,
-     group = "Buyer Expansion Support")
-float buyerExpansionMinimumHVNVolumePct = input.float(
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "A lower reclaim is blocked when a materially stronger unresolved former-support resistance remains overhead.")
+float maximumOverheadResistanceDistancePct = input.float(
+     15.0,
+     title = "Maximum Overhead Resistance Distance (%)",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Pattern Detection",
+     display = display.data_window)
+float minimumOverheadEvidenceRatio = input.float(
+     5.0,
+     title = "Minimum Cumulative Overhead Strength Ratio",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.5,
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "Compares support-shelf plus rejection volume. One strong overhead level, or the combined evidence of stacked levels, can suppress an entry.")
+float maximumNearbyOverheadDistancePct = input.float(
+     5.0,
+     title = "Nearby Overhead Block Distance (%)",
+     minval = 0.5,
+     maxval = 25.0,
+     step = 0.5,
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "Any unresolved former-support resistance with enough rejection clusters inside this distance blocks the reclaim.")
+int minimumStackedOverheadLevels = input.int(
+     2,
+     title = "Minimum Stacked Overhead Levels",
+     minval = 2,
+     maxval = 10,
+     group = "Pattern Detection",
+     display = display.data_window,
+     tooltip = "When at least this many unresolved levels remain overhead, their evidence is combined instead of testing each level separately.")
+
+int entryMomentumLookbackBars = input.int(
+     20,
+     title = "Entry Momentum Lookback Bars",
+     minval = 5,
+     maxval = 100,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window)
+float minimumEntryMomentumPct = input.float(
+     7.0,
+     title = "Minimum Entry Momentum (%)",
+     minval = 0.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window)
+float maximumEntryMomentumPct = input.float(
      30.0,
-     title = "Minimum HVN Row Volume (% of POC Row)",
+     title = "Maximum Entry Momentum (%)",
+     minval = 1.0,
+     maxval = 300.0,
+     step = 0.5,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window,
+     tooltip = "Caps already-extended moves, where the reclaim candle is more likely to be exhaustion than continuation.")
+float minimumEntryRangePct = input.float(
+     4.0,
+     title = "Minimum Entry Candle Range (%)",
+     minval = 0.1,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window)
+float maximumEntryRangePct = input.float(
+     15.0,
+     title = "Maximum Entry Candle Range (%)",
      minval = 1.0,
      maxval = 100.0,
+     step = 0.5,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window,
+     tooltip = "Rejects blow-off candles whose range is already too large for a clean continuation entry.")
+float maximumPreviousHighGapPct = input.float(
+     15.0,
+     title = "Maximum Gap to Recent Structure High (%)",
+     minval = 1.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window,
+     tooltip = "Uses the active setup lookback, rather than an obsolete early-session spike, to reject lower reclaims with too much relevant price structure overhead.")
+float maximumClearSpaceHighGapPct = input.float(
+     5.0,
+     title = "Clear-Space Maximum High Gap (%)",
+     minval = 0.5,
+     maxval = 25.0,
+     step = 0.5,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window)
+float minimumClearSpaceBodyPct = input.float(
+     5.0,
+     title = "Clear-Space Minimum Body (%)",
+     minval = 0.1,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window,
+     tooltip = "Alternative APUS-style path: a strong body can qualify when no confirmed resistance remains overhead and price is already close to the earlier high.")
+float maximumClearSpaceBodyPct = input.float(
+     12.0,
+     title = "Clear-Space Maximum Body (%)",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Immediate Follow-Through Filter",
+     display = display.data_window)
+
+float maximumMatureShelfDownSlopePctPerBar = input.float(
+     0.60,
+     title = "Mature Setup Maximum Shelf Down-Slope (%)",
+     minval = 0.0,
+     maxval = 5.0,
+     step = 0.05,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window,
+     tooltip = "Allows a slightly declining original support shelf only when the later resistance becomes mature and repeatedly confirmed.")
+int minimumMatureSetupBars = input.int(
+     90,
+     title = "Minimum Mature Setup Bars",
+     minval = 10,
+     maxval = 240,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+int minimumMatureResistanceClusters = input.int(
+     6,
+     title = "Minimum Mature Resistance Clusters",
+     minval = 3,
+     maxval = 20,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+float minimumMatureVolumeVsSetupAverage = input.float(
+     1.5,
+     title = "Mature Volume vs Setup Average",
+     minval = 1.0,
+     maxval = 10.0,
+     step = 0.25,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+float maximumMatureVolumeVsSetupAverage = input.float(
+     10.0,
+     title = "Maximum Mature Volume vs Setup Average",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window,
+     tooltip = "Rejects late blow-off candles whose volume is abnormally large relative to the mature setup.")
+float minimumMatureVolumeVsRecentAverage = input.float(
+     2.0,
+     title = "Mature Volume vs Recent Average",
+     minval = 1.0,
+     maxval = 10.0,
+     step = 0.25,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+float maximumMatureVolumeVsRecentAverage = input.float(
+     6.0,
+     title = "Maximum Mature Volume vs Recent Average",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window,
+     tooltip = "Keeps the mature branch focused on controlled participation instead of exhaustion spikes.")
+float minimumMatureVolumeVsPreviousBar = input.float(
+     2.0,
+     title = "Mature Volume vs Previous Bar",
+     minval = 1.0,
+     maxval = 10.0,
+     step = 0.25,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+float maximumMatureBurstVolumeVsRecentAverage = input.float(
+     9.0,
+     title = "Mature Burst Maximum Volume vs Recent Average",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window,
+     tooltip = "A narrow exception for a mature resistance breakout whose participation is stronger than the normal mature-volume ceiling, while still capped to avoid unrestricted blow-off signals.")
+float minimumMatureBurstVolumeVsPreviousBar = input.float(
+     1.75,
+     title = "Mature Burst Minimum Volume vs Previous Bar",
+     minval = 1.0,
+     maxval = 10.0,
+     step = 0.25,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window,
+     tooltip = "Used only when the reclaim volume exceeds the normal mature-volume ceiling. This admits APUS 08:53 without relaxing the standard mature path.")
+float minimumMatureEntryRangePct = input.float(
+     3.0,
+     title = "Minimum Mature Entry Candle Range (%)",
+     minval = 0.1,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+float minimumMatureEntryBodyPct = input.float(
+     3.0,
+     title = "Minimum Mature Entry Body (%)",
+     minval = 0.1,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+float maximumMatureRecentHighGapPct = input.float(
+     8.0,
+     title = "Maximum Mature Gap to Recent High (%)",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Mature Resistance Reclaim",
+     display = display.data_window)
+
+bool enablePivotSupportReclaims = input.bool(
+     true,
+     title = "Enable Single-Pivot Support Reclaims",
+     group = "Pivot Support Reclaim",
+     display = display.data_window,
+     tooltip = "Detects a strong single support pivot that breaks, produces a compact resistance sequence, and is reclaimed with exceptional volume.")
+int pivotPriorAdvanceLookbackBars = input.int(
+     20,
+     title = "Prior Advance Lookback Bars",
+     minval = 10,
+     maxval = 60,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotPriorAdvancePct = input.float(
+     20.0,
+     title = "Minimum Advance Before Pivot Support (%)",
+     minval = 1.0,
+     maxval = 200.0,
+     step = 0.5,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+int maximumPivotSetupBars = input.int(
+     15,
+     title = "Maximum Bars From Pivot Break to Reclaim",
+     minval = 4,
+     maxval = 60,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+int minimumPivotConsecutiveResistanceBars = input.int(
+     4,
+     title = "Minimum Consecutive Resistance Bars",
+     minval = 2,
+     maxval = 10,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotVolumeVsSetupAverage = input.float(
+     3.0,
+     title = "Minimum Volume vs Pivot Setup Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotVolumeVsRejectionAverage = input.float(
+     2.5,
+     title = "Minimum Volume vs Pivot Rejection Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotVolumeVsRecentAverage = input.float(
+     3.0,
+     title = "Minimum Pivot Volume vs Recent Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotVolumeVsPreviousBar = input.float(
+     3.0,
+     title = "Minimum Pivot Volume vs Previous Bar",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotCloseLocationPct = input.float(
+     90.0,
+     title = "Minimum Pivot Reclaim Close Location (%)",
+     minval = 50.0,
+     maxval = 100.0,
      step = 1.0,
-     group = "Buyer Expansion Support",
-     tooltip = "The marked row and every required lower-price continuation row must meet this total-volume threshold.")
-int buyerExpansionMaximumLabels = input.int(
-     2,
-     title = "Maximum Buyer Expansion Labels",
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotEntryMomentumPct = input.float(
+     5.0,
+     title = "Minimum Pivot Entry Momentum (%)",
+     minval = 0.0,
+     maxval = 200.0,
+     step = 0.5,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotEntryRangePct = input.float(
+     5.0,
+     title = "Minimum Pivot Entry Candle Range (%)",
+     minval = 0.1,
+     maxval = 50.0,
+     step = 0.25,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float maximumPivotEntryRangePct = input.float(
+     20.0,
+     title = "Maximum Pivot Entry Candle Range (%)",
+     minval = 1.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float minimumPivotEntryBodyPct = input.float(
+     4.0,
+     title = "Minimum Pivot Entry Candle Body (%)",
+     minval = 0.1,
+     maxval = 50.0,
+     step = 0.25,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float maximumPivotEntryBodyPct = input.float(
+     15.0,
+     title = "Maximum Pivot Entry Candle Body (%)",
+     minval = 1.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+float maximumPivotBreakoutExtensionPct = input.float(
+     15.0,
+     title = "Maximum Pivot Breakout Extension (%)",
+     minval = 0.5,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Pivot Support Reclaim",
+     display = display.data_window)
+
+int minimumResistanceClusters = input.int(
+     3,
+     title = "Minimum Resistance-Rejection Clusters",
+     minval = 2,
+     maxval = 10,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window,
+     tooltip = "Consecutive rejection bars count as one cluster. A new cluster requires at least one non-rejection bar between tests.")
+float minimumCloseAboveResistancePct = input.float(
+     0.0,
+     title = "Minimum Breakout Buffer (%)",
+     minval = 0.0,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window,
+     tooltip = "Zero accepts any confirmed close above resistance. Increase this only when a larger price-clearance buffer is required.")
+float minimumVolumeVsSetupAverage = input.float(
+     2.5,
+     title = "Minimum Volume vs Setup Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window,
+     tooltip = "Compares the reclaim candle with all completed bars after the support break and before the reclaim.")
+float minimumVolumeVsRejectionAverage = input.float(
+     1.0,
+     title = "Minimum Volume vs Rejection Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window,
+     tooltip = "Compares the reclaim candle with the average volume of the bars that rejected at former support.")
+int recentVolumeLookbackBars = input.int(
+     20,
+     title = "Recent Volume Average Bars",
+     minval = 5,
+     maxval = 100,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window)
+float minimumVolumeVsRecentAverage = input.float(
+     2.0,
+     title = "Minimum Volume vs Recent Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window,
+     tooltip = "Compares the reclaim candle with the completed bars immediately before it.")
+float minimumVolumeVsPreviousBar = input.float(
+     3.0,
+     title = "Minimum Volume vs Previous Bar",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window,
+     tooltip = "Requires a clear volume acceleration on the actual resistance-break candle.")
+float minimumCloseLocationPct = input.float(
+     70.0,
+     title = "Minimum Close Location in Candle (%)",
+     minval = 50.0,
+     maxval = 100.0,
+     step = 1.0,
+     group = "Strong Reclaim Confirmation",
+     display = display.data_window,
+     tooltip = "A value of 70 requires the close to finish within the upper 30% of its candle range.")
+
+int duplicateCooldownBars = input.int(
+     10,
+     title = "Duplicate Signal Cooldown (Bars)",
+     minval = 0,
+     maxval = 60,
+     group = "Signal Deduplication",
+     display = display.data_window)
+float duplicateLevelTolerancePct = input.float(
+     3.0,
+     title = "Duplicate Resistance Tolerance (%)",
+     minval = 0.1,
+     maxval = 10.0,
+     step = 0.1,
+     group = "Signal Deduplication",
+     display = display.data_window)
+
+bool showDevelopingResistance = input.bool(
+     true,
+     title = "Show Developing Resistance",
+     group = "Style",
+     display = display.data_window)
+int maximumSavedSignals = input.int(
+     100,
+     title = "Maximum Saved Resistance Lines",
      minval = 1,
-     maxval = 2,
-     group = "Buyer Expansion Support",
-     tooltip = "Shows the two strongest results by default. When more rows qualify, rows with the largest absolute buyer-volume increases are displayed, and the strongest result receives a check mark.")
-
-color upVolumeColor = input.color(
-     color.rgb(38, 198, 218),
-     title = "Up Volume",
-     group = "Profile Colors")
-color downVolumeColor = input.color(
-     color.rgb(236, 64, 122),
-     title = "Down Volume",
-     group = "Profile Colors")
-color totalVolumeColor = input.color(
-     color.rgb(96, 125, 139),
-     title = "Total Volume",
-     group = "Profile Colors")
-color valueAreaTotalColor = input.color(
-     color.rgb(41, 182, 246),
-     title = "Value Area Total",
-     group = "Profile Colors")
-color profileBackgroundColor = input.color(
-     color.new(color.rgb(33, 45, 62), 88),
-     title = "Profile Background",
-     group = "Profile Colors")
-color buyerExpansionSupportColor = input.color(
+     maxval = 200,
+     group = "Style",
+     display = display.data_window)
+color resistanceColor = input.color(
+     color.rgb(244, 67, 54),
+     title = "Resistance Line",
+     group = "Style",
+     display = display.data_window)
+color entryColor = input.color(
      color.rgb(76, 175, 80),
-     title = "Buyer Expansion Support",
-     group = "Profile Colors")
+     title = "Entry Marker",
+     group = "Style",
+     display = display.data_window)
 
-// Cap the profile so a split Up/Down histogram and its background remain below
-// TradingView's 500-box limit.
-const int MAX_ROWS_PER_PROFILE = 239
-const int MAX_SPLIT_ROWS = 239
-const int MAX_FOOTPRINT_POINTS = 90000
-const int PROFILE_META_SIZE = 11
-const int META_VAH = 0
-const int META_POC = 1
-const int META_VAL = 2
-const int META_BOTTOM = 3
-const int META_TOP = 4
-const int META_ROW_HEIGHT = 5
-const int META_ROW_COUNT = 6
-const int META_TOTAL_VOLUME = 7
-const int META_POC_ROW = 8
-const int META_VAL_ROW = 9
-const int META_VAH_ROW = 10
-const int REGION_VAL_TO_POC = 0
-const int REGION_POC_TO_VAH = 1
-const int REGION_BELOW_VAL = 2
-const int REGION_ABOVE_VAH = 3
-const int BUYER_EXPANSION_RESULT_SIZE = 12
+type PatternCandidate
+    int breakBar
+    float shelfLow
+    float shelfHigh
+    float shelfVolume
+    float shelfSlopePctPerBar
+    bool primaryShelfEligible
+    int rejectionBars
+    int rejectionClusters
+    bool previousWasRejection
+    float resistance
+    int firstResistanceBar
+    float setupVolume
+    int setupBars
+    float rejectionVolume
+    int rejectionVolumeBars
+    float maximumCloseAfterBreak
+    line resistanceLine
 
-// =============================================================================
-// 2. CAPTURE THE RANGE'S PROFILE INPUT DATA
-// =============================================================================
-// Native footprint rows are the primary source. OHLCV is retained both for the
-// profile's complete high-low span and as an explicit fallback when footprint
-// history is unavailable for any nonzero-volume bar in the selected range.
+type PivotFlipCandidate
+    int breakBar
+    float support
+    float priorAdvancePct
+    int rejectionBars
+    int consecutiveRejections
+    int maximumConsecutiveRejections
+    float resistance
+    int firstResistanceBar
+    float setupVolume
+    int setupBars
+    float rejectionVolume
+    int rejectionVolumeBars
+    line resistanceLine
 
-var float[] rangeOpensA = array.new_float(0)
-var float[] rangeHighsA = array.new_float(0)
-var float[] rangeLowsA = array.new_float(0)
-var float[] rangeClosesA = array.new_float(0)
-var float[] rangeVolumesA = array.new_float(0)
-var float[] rangeFootprintPricesA = array.new_float(0)
-var float[] rangeFootprintBuyVolumesA = array.new_float(0)
-var float[] rangeFootprintSellVolumesA = array.new_float(0)
+var array<PatternCandidate> candidates = array.new<PatternCandidate>()
+var array<PivotFlipCandidate> pivotCandidates = array.new<PivotFlipCandidate>()
+var array<line> savedResistanceLines = array.new<line>()
+var array<float> shelfLowBuffer = array.new<float>()
+var float previousHighOfDay = na
+var int lastSignalBar = na
+var float lastSignalResistance = na
 
-var float totalVolA = 0.0
-var int footprintCoveredBarsA = 0
-var bool footprintCapacityExceededA = false
+int dateKey = year * 10000 + month * 100 + dayofmonth
+bool newDate = na(dateKey[1]) or dateKey != dateKey[1]
+bool inDetectionSession = not na(time(timeframe.period, scanSession))
 
-// A one-tick native footprint preserves TradingView's finest available
-// intrabar price/volume information. The profile calculation below coalesces
-// these rows into the user's selected Number of Rows or Ticks Per Row layout.
-// Pine permits only one request.footprint() call in a script.
-footprint barFootprintA = request.footprint(1)
+if newDate
+    while array.size(candidates) > 0
+        PatternCandidate expiredCandidate = array.pop(candidates)
+        if not na(expiredCandidate.resistanceLine)
+            line.delete(expiredCandidate.resistanceLine)
+    while array.size(pivotCandidates) > 0
+        PivotFlipCandidate expiredPivot = array.pop(pivotCandidates)
+        if not na(expiredPivot.resistanceLine)
+            line.delete(expiredPivot.resistanceLine)
+    previousHighOfDay := na
 
-if barstate.isfirst
-    array.clear(rangeOpensA)
-    array.clear(rangeHighsA)
-    array.clear(rangeLowsA)
-    array.clear(rangeClosesA)
-    array.clear(rangeVolumesA)
-    array.clear(rangeFootprintPricesA)
-    array.clear(rangeFootprintBuyVolumesA)
-    array.clear(rangeFootprintSellVolumesA)
-    totalVolA := 0.0
-    footprintCoveredBarsA := 0
-    footprintCapacityExceededA := false
+float highOfDayBeforeCurrentBar = previousHighOfDay
+float recentStructureHigh = na
+for structureOffset = 1 to maximumSetupBars
+    if not na(high[structureOffset]) and
+         inDetectionSession[structureOffset] and
+         dateKey[structureOffset] == dateKey
+        recentStructureHigh :=
+             na(recentStructureHigh) ?
+             high[structureOffset] :
+             math.max(
+                  recentStructureHigh,
+                  high[structureOffset])
+float recentAverageVolume =
+     ta.sma(volume, recentVolumeLookbackBars)[1]
+float entryMomentumPct =
+     not na(close[entryMomentumLookbackBars]) ?
+     (close /
+          math.max(
+               close[entryMomentumLookbackBars],
+               syminfo.mintick) - 1.0) * 100.0 : na
+float entryCandleRangePct =
+     (high - low) /
+          math.max(close, syminfo.mintick) * 100.0
+float entryCandleBodyPct =
+     (close - open) /
+          math.max(close, syminfo.mintick) * 100.0
+float previousHighGapPct =
+     not na(recentStructureHigh) ?
+     (recentStructureHigh /
+          math.max(close, syminfo.mintick) - 1.0) * 100.0 : 0.0
 
-bool inRangeA = time >= startA and time <= endA
-float currentVolume = nz(volume)
-
-if inRangeA
-    array.push(rangeOpensA, open)
-    array.push(rangeHighsA, high)
-    array.push(rangeLowsA, low)
-    array.push(rangeClosesA, close)
-    array.push(rangeVolumesA, currentVolume)
-    totalVolA += currentVolume
-
-    if useNativeFootprint and not footprintCapacityExceededA
-        if not na(barFootprintA)
-            array<volume_row> footprintRowsA = barFootprintA.rows()
-            int footprintRowCountA = array.size(footprintRowsA)
-            bool hasFootprintCapacityA =
-                 array.size(rangeFootprintPricesA) + footprintRowCountA <=
-                      MAX_FOOTPRINT_POINTS
-
-            if hasFootprintCapacityA
-                if footprintRowCountA > 0
-                    for footprintRowIndexA = 0 to footprintRowCountA - 1
-                        volume_row footprintRowA =
-                             array.get(
-                                  footprintRowsA,
-                                  footprintRowIndexA)
-                        float footprintPriceA =
-                             (footprintRowA.down_price() +
-                                  footprintRowA.up_price()) * 0.5
-                        array.push(
-                             rangeFootprintPricesA,
-                             footprintPriceA)
-                        array.push(
-                             rangeFootprintBuyVolumesA,
-                             footprintRowA.buy_volume())
-                        array.push(
-                             rangeFootprintSellVolumesA,
-                             footprintRowA.sell_volume())
-                footprintCoveredBarsA += 1
-            else
-                footprintCapacityExceededA := true
-                footprintCoveredBarsA := 0
-                array.clear(rangeFootprintPricesA)
-                array.clear(rangeFootprintBuyVolumesA)
-                array.clear(rangeFootprintSellVolumesA)
-        else if currentVolume <= 0.0
-            // A zero-volume bar has no footprint rows but is still complete.
-            footprintCoveredBarsA += 1
-
-bool usesNativeFootprintA =
-     useNativeFootprint and
-     not footprintCapacityExceededA and
-     array.size(rangeVolumesA) > 0 and
-     footprintCoveredBarsA == array.size(rangeVolumesA) and
-     array.size(rangeFootprintPricesA) > 0
+bool entrySignal = false
+float signaledResistance = na
+float signaledTarget = na
+int bestBreakBar = na
+float bestScore = na
+float bestResistance = na
+bool bestMatureReclaim = false
+int bestPivotBreakBar = na
+float bestPivotScore = na
+float bestPivotResistance = na
 
 // =============================================================================
-// 3. PROFILE CALCULATION
+// UPDATE EVERY ACTIVE SUPPORT-BREAK CANDIDATE
 // =============================================================================
-f_ticksPerRow(
-     int totalTicks,
-     string layout,
-     int requestedSize,
-     int maximumRows) =>
-    int selectedTicks = math.max(1, requestedSize)
+if inDetectionSession
+    int candidateIndex = array.size(candidates) - 1
+    while candidateIndex >= 0
+        PatternCandidate candidate = array.get(candidates, candidateIndex)
+        int elapsedBars = bar_index - candidate.breakBar
 
-    if layout == "Number of Rows"
-        int requestedRows = math.max(1, requestedSize)
-        float rawTicks = float(totalTicks) / requestedRows
-        int ticksDown = math.max(1, int(math.floor(rawTicks)))
-        int ticksUp = math.max(1, int(math.ceil(rawTicks)))
-        int rowsWithDown = int(math.ceil(float(totalTicks) / ticksDown))
-        int rowsWithUp = int(math.ceil(float(totalTicks) / ticksUp))
-
-        // TradingView chooses the whole-tick row height whose resulting row
-        // count is closest to the requested number of rows.
-        selectedTicks :=
-             math.abs(rowsWithDown - requestedRows) <=
-                  math.abs(rowsWithUp - requestedRows) ?
-             ticksDown : ticksUp
-
-    // Keep the histogram within the platform's drawing-object limit. This
-    // only affects extremely fine Ticks Per Row selections.
-    int calculatedRows = int(math.ceil(float(totalTicks) / selectedTicks))
-    int safeMaximumRows = math.max(1, maximumRows)
-    if calculatedRows > safeMaximumRows
-        selectedTicks :=
-             int(math.ceil(float(totalTicks) / safeMaximumRows))
-
-    selectedTicks
-
-f_calculateProfile(
-     float[] opens,
-     float[] highs,
-     float[] lows,
-     float[] closes,
-     float[] volumes,
-     float[] footprintPrices,
-     float[] footprintBuyVolumes,
-     float[] footprintSellVolumes,
-     bool useFootprintRows,
-     string layout,
-     int requestedSize,
-     float targetPct,
-     int maximumRows) =>
-    float[] result = array.new_float(0)
-    int sourceBars = array.size(volumes)
-
-    if sourceBars > 0
-        float rawRangeLow = array.min(lows)
-        float rawRangeHigh = array.max(highs)
-        float profileBottom =
-             math.floor(rawRangeLow / syminfo.mintick) * syminfo.mintick
-        float profileTop =
-             math.ceil(rawRangeHigh / syminfo.mintick) * syminfo.mintick
-        int totalTicks = math.max(
-             1,
-             int(math.round(
-                  (profileTop - profileBottom) / syminfo.mintick)))
-        int ticksPerRow =
-             f_ticksPerRow(
-                  totalTicks,
-                  layout,
-                  requestedSize,
-                  maximumRows)
-        float rowHeight = ticksPerRow * syminfo.mintick
-
-        int rowCount = math.max(
-             1,
-             int(math.ceil(float(totalTicks) / ticksPerRow)))
-        float[] rowVolumes = array.new_float(rowCount, 0.0)
-        float[] rowUpVolumes = array.new_float(rowCount, 0.0)
-        float[] rowDownVolumes = array.new_float(rowCount, 0.0)
-        float totalProfileVolume = 0.0
-
-        if useFootprintRows and array.size(footprintPrices) > 0
-            int footprintPointCount = array.size(footprintPrices)
-            for footprintIndex = 0 to footprintPointCount - 1
-                float footprintPrice =
-                     array.get(footprintPrices, footprintIndex)
-                float footprintBuyVolume =
-                     nz(array.get(footprintBuyVolumes, footprintIndex))
-                float footprintSellVolume =
-                     nz(array.get(footprintSellVolumes, footprintIndex))
-                float footprintTotalVolume =
-                     footprintBuyVolume + footprintSellVolume
-                int footprintProfileRow = math.max(
-                     0,
-                     math.min(
-                          rowCount - 1,
-                          int(math.floor(
-                               (footprintPrice - profileBottom) /
-                                    rowHeight))))
-
-                totalProfileVolume += footprintTotalVolume
-                array.set(
-                     rowVolumes,
-                     footprintProfileRow,
-                     array.get(rowVolumes, footprintProfileRow) +
-                          footprintTotalVolume)
-                array.set(
-                     rowUpVolumes,
-                     footprintProfileRow,
-                     array.get(rowUpVolumes, footprintProfileRow) +
-                          footprintBuyVolume)
-                array.set(
-                     rowDownVolumes,
-                     footprintProfileRow,
-                     array.get(rowDownVolumes, footprintProfileRow) +
-                          footprintSellVolume)
+        if elapsedBars > maximumSetupBars
+            if not na(candidate.resistanceLine)
+                line.delete(candidate.resistanceLine)
+            array.remove(candidates, candidateIndex)
         else
-            // Explicit fallback for chart history where native footprints are
-            // unavailable: distribute each candle's volume evenly across all
-            // profile rows traversed by its high-low range.
-            for sourceIndex = 0 to sourceBars - 1
-                float barHigh = array.get(highs, sourceIndex)
-                float barLow = array.get(lows, sourceIndex)
-                bool isUpBar =
-                     array.get(closes, sourceIndex) >=
-                          array.get(opens, sourceIndex)
-                float barVolume = array.get(volumes, sourceIndex)
-                totalProfileVolume += barVolume
+            candidate.maximumCloseAfterBreak :=
+                 na(candidate.maximumCloseAfterBreak) ?
+                 close : math.max(candidate.maximumCloseAfterBreak, close)
 
-                if barHigh <= barLow
-                    int singleRow = math.max(
-                         0,
-                         math.min(
-                              rowCount - 1,
-                              int(math.floor(
-                                   (barLow - profileBottom) / rowHeight))))
-                    array.set(
-                         rowVolumes,
-                         singleRow,
-                         array.get(rowVolumes, singleRow) + barVolume)
-                    if isUpBar
-                        array.set(
-                             rowUpVolumes,
-                             singleRow,
-                             array.get(rowUpVolumes, singleRow) + barVolume)
+            bool rejectionNow =
+                 high >= candidate.shelfLow and
+                 close <= candidate.shelfHigh
+
+            if rejectionNow
+                candidate.rejectionBars += 1
+                candidate.rejectionVolume += nz(volume, 0.0)
+                candidate.rejectionVolumeBars += 1
+                if not candidate.previousWasRejection
+                    candidate.rejectionClusters += 1
+                candidate.resistance :=
+                     na(candidate.resistance) ?
+                     high : math.max(candidate.resistance, high)
+                if na(candidate.firstResistanceBar)
+                    candidate.firstResistanceBar := bar_index
+
+                if showDevelopingResistance
+                    if na(candidate.resistanceLine)
+                        candidate.resistanceLine := line.new(
+                             candidate.firstResistanceBar,
+                             candidate.resistance,
+                             bar_index,
+                             candidate.resistance,
+                             xloc = xloc.bar_index,
+                             extend = extend.none,
+                             color = resistanceColor,
+                             width = 2)
                     else
-                        array.set(
-                             rowDownVolumes,
-                             singleRow,
-                             array.get(rowDownVolumes, singleRow) + barVolume)
-                else
-                    int firstRow = math.max(
-                         0,
-                         int(math.floor(
-                              (barLow - profileBottom) / rowHeight)))
-                    int lastRow = math.min(
-                         rowCount - 1,
-                         int(math.floor(
-                              (barHigh - profileBottom) / rowHeight)))
-                    int touchedRows = math.max(
-                         1,
-                         lastRow - firstRow + 1)
-                    float allocatedVolume =
-                         barVolume / float(touchedRows)
+                        line.set_xy1(
+                             candidate.resistanceLine,
+                             candidate.firstResistanceBar,
+                             candidate.resistance)
+                        line.set_xy2(
+                             candidate.resistanceLine,
+                             bar_index,
+                             candidate.resistance)
+            else if not na(candidate.resistanceLine)
+                line.set_x2(candidate.resistanceLine, bar_index)
 
-                    for rowIndex = firstRow to lastRow
-                        array.set(
-                             rowVolumes,
-                             rowIndex,
-                             array.get(rowVolumes, rowIndex) +
-                                  allocatedVolume)
-                        if isUpBar
-                            array.set(
-                                 rowUpVolumes,
-                                 rowIndex,
-                                 array.get(rowUpVolumes, rowIndex) +
-                                      allocatedVolume)
-                        else
-                            array.set(
-                                 rowDownVolumes,
-                                 rowIndex,
-                                 array.get(rowDownVolumes, rowIndex) +
-                                      allocatedVolume)
+            candidate.previousWasRejection := rejectionNow
 
-        // The POC is the row containing the greatest total volume.
-        int pocRow = 0
-        float pocRowVolume = array.get(rowVolumes, 0)
-        if rowCount > 1
-            for rowIndex = 1 to rowCount - 1
-                float candidateVolume = array.get(rowVolumes, rowIndex)
-                if candidateVolume > pocRowVolume
-                    pocRow := rowIndex
-                    pocRowVolume := candidateVolume
+            float setupAverageVolume =
+                 candidate.setupBars > 0 ?
+                 candidate.setupVolume / candidate.setupBars : na
+            float rejectionAverageVolume =
+                 candidate.rejectionVolumeBars > 0 ?
+                 candidate.rejectionVolume /
+                      candidate.rejectionVolumeBars : na
+            float candleRange = math.max(high - low, syminfo.mintick)
+            float closeLocation =
+                 (close - low) / candleRange * 100.0
+            float closeAboveResistancePct =
+                 not na(candidate.resistance) ?
+                 (close / candidate.resistance - 1.0) * 100.0 : na
 
-        // Build a contiguous value area from the POC. At each step include the
-        // larger of the immediately adjacent rows. For equal volume, prefer
-        // the row closer to the POC; if distance also ties, prefer the upper
-        // row, matching TradingView's documented tie-break rules.
-        int valueLowRow = pocRow
-        int valueHighRow = pocRow
-        float includedVolume = pocRowVolume
-        float targetVolume = totalProfileVolume * targetPct / 100.0
+            bool enoughHistory = candidate.setupBars >= 3
+            bool clusterConfirmed =
+                 candidate.rejectionClusters >=
+                      minimumResistanceClusters
+            bool decisiveBreak =
+                 not na(candidate.resistance) and
+                 close > candidate.resistance and
+                 not na(closeAboveResistancePct) and
+                 closeAboveResistancePct >=
+                      minimumCloseAboveResistancePct
+            bool setupVolumeConfirmed =
+                 enoughHistory and
+                 not na(setupAverageVolume) and
+                 nz(volume, 0.0) >=
+                      setupAverageVolume *
+                      minimumVolumeVsSetupAverage
+            bool rejectionVolumeConfirmed =
+                 not na(rejectionAverageVolume) and
+                 nz(volume, 0.0) >=
+                      rejectionAverageVolume *
+                      minimumVolumeVsRejectionAverage
+            bool recentVolumeConfirmed =
+                 not na(recentAverageVolume) and
+                 nz(volume, 0.0) >=
+                      recentAverageVolume *
+                      minimumVolumeVsRecentAverage
+            bool previousBarVolumeConfirmed =
+                 not na(volume[1]) and
+                 volume[1] > 0.0 and
+                 nz(volume, 0.0) >=
+                      volume[1] *
+                      minimumVolumeVsPreviousBar
+            bool candleConfirmed =
+                 close > open and
+                 closeLocation >= minimumCloseLocationPct
+            bool standardMatureVolumeAcceleration =
+                 not na(recentAverageVolume) and
+                 nz(volume, 0.0) >=
+                      recentAverageVolume *
+                      minimumMatureVolumeVsRecentAverage and
+                 nz(volume, 0.0) <=
+                      recentAverageVolume *
+                      maximumMatureVolumeVsRecentAverage and
+                 not na(volume[1]) and
+                 volume[1] > 0.0 and
+                 nz(volume, 0.0) >=
+                      volume[1] *
+                      minimumMatureVolumeVsPreviousBar
+            bool burstMatureVolumeAcceleration =
+                 not na(recentAverageVolume) and
+                 nz(volume, 0.0) >
+                      recentAverageVolume *
+                      maximumMatureVolumeVsRecentAverage and
+                 nz(volume, 0.0) <=
+                      recentAverageVolume *
+                      maximumMatureBurstVolumeVsRecentAverage and
+                 not na(volume[1]) and
+                 volume[1] > 0.0 and
+                 nz(volume, 0.0) >=
+                      volume[1] *
+                      minimumMatureBurstVolumeVsPreviousBar
 
-        while includedVolume < targetVolume and
-             (valueLowRow > 0 or valueHighRow < rowCount - 1)
-            float belowVolume =
-                 valueLowRow > 0 ?
-                 array.get(rowVolumes, valueLowRow - 1) : -1.0
-            float aboveVolume =
-                 valueHighRow < rowCount - 1 ?
-                 array.get(rowVolumes, valueHighRow + 1) : -1.0
+            bool primaryCandidateQualified =
+                 barstate.isconfirmed and
+                 candidate.primaryShelfEligible and
+                 clusterConfirmed and
+                 decisiveBreak and
+                 setupVolumeConfirmed and
+                 rejectionVolumeConfirmed and
+                 recentVolumeConfirmed and
+                 previousBarVolumeConfirmed and
+                 candleConfirmed
+            bool matureCandidateQualified =
+                 barstate.isconfirmed and
+                 not candidate.primaryShelfEligible and
+                 candidate.setupBars >= minimumMatureSetupBars and
+                 candidate.rejectionClusters >=
+                      minimumMatureResistanceClusters and
+                 decisiveBreak and
+                 not na(setupAverageVolume) and
+                 nz(volume, 0.0) >=
+                      setupAverageVolume *
+                      minimumMatureVolumeVsSetupAverage and
+                 nz(volume, 0.0) <=
+                      setupAverageVolume *
+                      maximumMatureVolumeVsSetupAverage and
+                 rejectionVolumeConfirmed and
+                 (standardMatureVolumeAcceleration or
+                      burstMatureVolumeAcceleration) and
+                 candleConfirmed and
+                 entryCandleRangePct >=
+                      minimumMatureEntryRangePct and
+                 entryCandleRangePct <= maximumEntryRangePct and
+                 entryCandleBodyPct >=
+                      minimumMatureEntryBodyPct and
+                 previousHighGapPct <=
+                      maximumMatureRecentHighGapPct
+            bool candidateQualified =
+                 primaryCandidateQualified or
+                 matureCandidateQualified
 
-            int belowDistance =
-                 valueLowRow > 0 ?
-                 pocRow - (valueLowRow - 1) : 1000000
-            int aboveDistance =
-                 valueHighRow < rowCount - 1 ?
-                 (valueHighRow + 1) - pocRow : 1000000
-            bool chooseAbove =
-                 aboveVolume > belowVolume or
-                 (aboveVolume == belowVolume and
-                      aboveDistance <= belowDistance)
-            float candidateVolume =
-                 chooseAbove ? aboveVolume : belowVolume
+            if candidateQualified
+                float score =
+                     candidate.resistance /
+                          math.max(close, syminfo.mintick) * 1000000.0 +
+                     candidate.rejectionClusters * 1000.0 +
+                     candidate.rejectionBars * 10.0 +
+                     nz(volume, 0.0) /
+                          math.max(setupAverageVolume, 1.0)
+                if na(bestScore) or score > bestScore
+                    bestScore := score
+                    bestBreakBar := candidate.breakBar
+                    bestResistance := candidate.resistance
+                    bestMatureReclaim := matureCandidateQualified
 
-            // TradingView stops before an adjacent row that would push the
-            // value area beyond its requested percentage. The old logic added
-            // that row first, which displaced VAH/VAL on concentrated profiles.
-            if includedVolume + candidateVolume > targetVolume
-                break
-            else if chooseAbove and valueHighRow < rowCount - 1
-                valueHighRow += 1
-                includedVolume += candidateVolume
-            else if valueLowRow > 0
-                valueLowRow -= 1
-                includedVolume += candidateVolume
+            candidate.setupVolume += nz(volume, 0.0)
+            candidate.setupBars += 1
+            array.set(candidates, candidateIndex, candidate)
 
-        float valPrice = profileBottom + valueLowRow * rowHeight
-        float vahPrice = math.min(
-             profileTop,
-             profileBottom + (valueHighRow + 1) * rowHeight)
-        float pocRowLow = profileBottom + pocRow * rowHeight
-        float pocRowHigh = math.min(profileTop, pocRowLow + rowHeight)
-        float pocPrice = (pocRowLow + pocRowHigh) * 0.5
-
-        array.push(result, vahPrice)
-        array.push(result, pocPrice)
-        array.push(result, valPrice)
-        array.push(result, profileBottom)
-        array.push(result, profileTop)
-        array.push(result, rowHeight)
-        array.push(result, float(rowCount))
-        array.push(result, totalProfileVolume)
-        array.push(result, float(pocRow))
-        array.push(result, float(valueLowRow))
-        array.push(result, float(valueHighRow))
-        for rowIndex = 0 to rowCount - 1
-            array.push(result, array.get(rowVolumes, rowIndex))
-        for rowIndex = 0 to rowCount - 1
-            array.push(result, array.get(rowUpVolumes, rowIndex))
-        for rowIndex = 0 to rowCount - 1
-            array.push(result, array.get(rowDownVolumes, rowIndex))
-
-    result
-
-f_profileRegionVolume(float[] profile, int region) =>
-    float regionVolume = na
-
-    if array.size(profile) >= PROFILE_META_SIZE
-        int rowCount = int(array.get(profile, META_ROW_COUNT))
-        int pocRow = int(array.get(profile, META_POC_ROW))
-        int valueLowRow = int(array.get(profile, META_VAL_ROW))
-        int valueHighRow = int(array.get(profile, META_VAH_ROW))
-        regionVolume := 0.0
-
-        for rowIndex = 0 to rowCount - 1
-            bool includeRow =
-                 region == REGION_VAL_TO_POC ?
-                      rowIndex >= valueLowRow and rowIndex <= pocRow :
-                 region == REGION_POC_TO_VAH ?
-                      rowIndex > pocRow and rowIndex <= valueHighRow :
-                 region == REGION_BELOW_VAL ?
-                      rowIndex < valueLowRow :
-                 region == REGION_ABOVE_VAH ?
-                      rowIndex > valueHighRow : false
-
-            if includeRow
-                regionVolume += array.get(
-                     profile,
-                     PROFILE_META_SIZE + rowIndex)
-
-    regionVolume
-
-f_buyerSellerRatio(float buyerVolume, float sellerVolume) =>
-    float ratio =
-         sellerVolume > 0.0 ?
-         buyerVolume / sellerVolume :
-         buyerVolume > 0.0 ? 1000000000.0 : 0.0
-
-    ratio
-
-// Rows are stored from low to high, but each comparison represents a scan
-// from the adjacent higher-price row down into the current candidate row.
-// Each result uses twelve values: row low, row high, score, previous buyers,
-// current buyers, previous sellers, current sellers, buyer growth multiple,
-// buyer increase, seller change, seller-increase share of the buyer increase,
-// and the weakest observed HVN-continuation row as a percentage of the POC row.
-f_buyerExpansionSupports(
-     float[] profile,
-     float maximumSellerIncreaseSharePct,
-     float minimumEndingRatio,
-     float minimumComparedRowVolumePct,
-     bool requireHVNContinuation,
-     int hvnRowsBelow,
-     float minimumHVNVolumePct) =>
-    float[] supports = array.new_float(0)
-
-    if array.size(profile) >= PROFILE_META_SIZE
-        int rowCount = int(array.get(profile, META_ROW_COUNT))
-        int pocRow = int(array.get(profile, META_POC_ROW))
-        float profileBottom = array.get(profile, META_BOTTOM)
-        float profileTop = array.get(profile, META_TOP)
-        float rowHeight = array.get(profile, META_ROW_HEIGHT)
-        int totalVolumeOffset = PROFILE_META_SIZE
-        int upVolumeOffset = PROFILE_META_SIZE + rowCount
-        int downVolumeOffset =
-             PROFILE_META_SIZE + rowCount * 2
-        float pocRowVolume =
-             rowCount > 0 ?
-             array.get(profile, totalVolumeOffset + pocRow) : 0.0
-        int safeHVNRowsBelow = math.max(1, hvnRowsBelow)
-
-        if rowCount >= 2 and pocRowVolume > 0.0
-            for currentRow = 0 to rowCount - 2
-                int previousHigherRow = currentRow + 1
-                float previousBuyer = array.get(
-                     profile,
-                     upVolumeOffset + previousHigherRow)
-                float currentBuyer = array.get(
-                     profile,
-                     upVolumeOffset + currentRow)
-                float previousSeller = array.get(
-                     profile,
-                     downVolumeOffset + previousHigherRow)
-                float currentSeller = array.get(
-                     profile,
-                     downVolumeOffset + currentRow)
-                float previousTotal = array.get(
-                     profile,
-                     totalVolumeOffset + previousHigherRow)
-                float currentTotal = array.get(
-                     profile,
-                     totalVolumeOffset + currentRow)
-                float buyerIncrease = currentBuyer - previousBuyer
-                float sellerChange = currentSeller - previousSeller
-                float buyerMultiple =
-                     previousBuyer > 0.0 ?
-                     currentBuyer / previousBuyer : 0.0
-                float sellerIncreaseSharePct =
-                     buyerIncrease > 0.0 ?
-                     math.max(0.0, sellerChange) /
-                          buyerIncrease * 100.0 : 1000000000.0
-                float endingRatio = f_buyerSellerRatio(
-                     currentBuyer,
-                     currentSeller)
-                float previousRowVolumePct =
-                     previousTotal / pocRowVolume * 100.0
-                float currentRowVolumePct =
-                     currentTotal / pocRowVolume * 100.0
-                bool comparedRowsAreMeaningful =
-                     previousRowVolumePct >=
-                          minimumComparedRowVolumePct and
-                     currentRowVolumePct >=
-                          minimumComparedRowVolumePct
-                bool hasHVNContinuation = not requireHVNContinuation
-                float weakestHVNRowPct = currentRowVolumePct
-
-                if requireHVNContinuation
-                    hasHVNContinuation :=
-                         currentRow >= safeHVNRowsBelow and
-                         currentRowVolumePct >= minimumHVNVolumePct
-
-                    if hasHVNContinuation
-                        for depth = 1 to safeHVNRowsBelow
-                            float continuationVolume = array.get(
-                                 profile,
-                                 totalVolumeOffset + currentRow - depth)
-                            float continuationVolumePct =
-                                 continuationVolume /
-                                 pocRowVolume * 100.0
-                            weakestHVNRowPct := math.min(
-                                 weakestHVNRowPct,
-                                 continuationVolumePct)
-                            hasHVNContinuation :=
-                                 hasHVNContinuation and
-                                 continuationVolumePct >=
-                                      minimumHVNVolumePct
-
-                bool buyersIncrease =
-                     previousBuyer > 0.0 and
-                     buyerIncrease > 0.0
-                bool sellersStayRelativelyStable =
-                     sellerIncreaseSharePct <=
-                          maximumSellerIncreaseSharePct
-                bool buyersControlCurrentRow =
-                     endingRatio >= minimumEndingRatio
-
-                if buyersIncrease and
-                     sellersStayRelativelyStable and
-                     buyersControlCurrentRow and
-                     comparedRowsAreMeaningful and
-                     hasHVNContinuation
-                    float rowLow =
-                         profileBottom + currentRow * rowHeight
-                    float rowHigh = math.min(
-                         profileTop,
-                         rowLow + rowHeight)
-                    // The user's primary discriminator is the absolute change
-                    // in buyers, so ranking uses that change as its score.
-                    float score = buyerIncrease
-                    array.push(supports, rowLow)
-                    array.push(supports, rowHigh)
-                    array.push(supports, score)
-                    array.push(supports, previousBuyer)
-                    array.push(supports, currentBuyer)
-                    array.push(supports, previousSeller)
-                    array.push(supports, currentSeller)
-                    array.push(supports, buyerMultiple)
-                    array.push(supports, buyerIncrease)
-                    array.push(supports, sellerChange)
-                    array.push(
-                         supports,
-                         sellerIncreaseSharePct)
-                    array.push(supports, weakestHVNRowPct)
-
-    supports
-
-f_formatVolume(float volumeValue) =>
-    na(volumeValue) ? "n/a" : str.tostring(volumeValue, "#,###")
-
-f_formatCompactVolume(float volumeValue) =>
-    string formattedVolume = "n/a"
-
-    if not na(volumeValue)
-        float absoluteVolume = math.abs(volumeValue)
-        formattedVolume :=
-             absoluteVolume >= 1000000000.0 ?
-                  str.tostring(volumeValue / 1000000000.0, "#.##") + "B" :
-             absoluteVolume >= 1000000.0 ?
-                  str.tostring(volumeValue / 1000000.0, "#.##") + "M" :
-             absoluteVolume >= 1000.0 ?
-                  str.tostring(volumeValue / 1000.0, "#.##") + "K" :
-                  str.tostring(volumeValue, "#")
-
-    formattedVolume
-
-var float[] profileA = array.new_float(0)
-var float vahA = na
-var float pocA = na
-var float valA = na
-
-if barstate.islast
-    profileA := f_calculateProfile(
-         rangeOpensA,
-         rangeHighsA,
-         rangeLowsA,
-         rangeClosesA,
-         rangeVolumesA,
-         rangeFootprintPricesA,
-         rangeFootprintBuyVolumesA,
-         rangeFootprintSellVolumesA,
-         usesNativeFootprintA,
-         rowsLayout,
-         rowSize,
-         valueAreaPct,
-         MAX_ROWS_PER_PROFILE)
-
-    vahA := array.size(profileA) >= PROFILE_META_SIZE ?
-         array.get(profileA, META_VAH) : na
-    pocA := array.size(profileA) >= PROFILE_META_SIZE ?
-         array.get(profileA, META_POC) : na
-    valA := array.size(profileA) >= PROFILE_META_SIZE ?
-         array.get(profileA, META_VAL) : na
-
-float volumeVALToPOCA = f_profileRegionVolume(
-     profileA,
-     REGION_VAL_TO_POC)
-float volumePOCToVAHA = f_profileRegionVolume(
-     profileA,
-     REGION_POC_TO_VAH)
-float volumeBelowVALA = f_profileRegionVolume(
-     profileA,
-     REGION_BELOW_VAL)
-float volumeAboveVAHA = f_profileRegionVolume(
-     profileA,
-     REGION_ABOVE_VAH)
-float[] buyerExpansionSupportsA = f_buyerExpansionSupports(
-     profileA,
-     buyerExpansionMaximumSellerSharePct,
-     buyerExpansionMinimumEndingRatio,
-     buyerExpansionMinimumRowVolumePct,
-     buyerExpansionRequireHVNContinuation,
-     buyerExpansionHVNRowsBelow,
-     buyerExpansionMinimumHVNVolumePct)
+        candidateIndex -= 1
 
 // =============================================================================
-// 4. LINES AND HISTOGRAMS
+// UPDATE SINGLE-PIVOT SUPPORT FLIPS
 // =============================================================================
-var line lineStartA = line.new(
-     na, na, na, na,
-     xloc = xloc.bar_time,
-     color = color.new(color.aqua, 40),
-     style = line.style_dashed,
-     width = 1)
-var line lineEndA = line.new(
-     na, na, na, na,
-     xloc = xloc.bar_time,
-     color = color.new(color.aqua, 40),
-     style = line.style_dashed,
-     width = 1)
+if inDetectionSession and enablePivotSupportReclaims
+    int pivotIndex = array.size(pivotCandidates) - 1
+    while pivotIndex >= 0
+        PivotFlipCandidate pivotCandidate =
+             array.get(pivotCandidates, pivotIndex)
+        int pivotElapsedBars =
+             bar_index - pivotCandidate.breakBar
 
-var line lineVahA = line.new(
-     na, na, na, na,
-     xloc = xloc.bar_time,
-     color = color.red,
-     width = 1)
-var line linePocA = line.new(
-     na, na, na, na,
-     xloc = xloc.bar_time,
-     color = color.white,
-     width = 2)
-var line lineValA = line.new(
-     na, na, na, na,
-     xloc = xloc.bar_time,
-     color = color.green,
-     width = 1)
+        if pivotElapsedBars > maximumPivotSetupBars
+            if not na(pivotCandidate.resistanceLine)
+                line.delete(pivotCandidate.resistanceLine)
+            array.remove(pivotCandidates, pivotIndex)
+        else
+            bool pivotRejectionNow =
+                 high >= pivotCandidate.support and
+                 close <= pivotCandidate.support
 
-var box[] histBoxesA = array.new_box(0)
-var label[] histogramVolumeLabelsA = array.new_label(0)
-var box profileBackgroundA = na
-var label[] buyerExpansionSupportLabelsA = array.new_label(0)
-var line[] buyerExpansionSupportLinesA = array.new_line(0)
+            if pivotRejectionNow
+                pivotCandidate.rejectionBars += 1
+                pivotCandidate.consecutiveRejections += 1
+                pivotCandidate.maximumConsecutiveRejections :=
+                     math.max(
+                          pivotCandidate.maximumConsecutiveRejections,
+                          pivotCandidate.consecutiveRejections)
+                pivotCandidate.rejectionVolume +=
+                     nz(volume, 0.0)
+                pivotCandidate.rejectionVolumeBars += 1
+                pivotCandidate.resistance :=
+                     na(pivotCandidate.resistance) ?
+                     high : math.max(
+                          pivotCandidate.resistance,
+                          high)
+                if na(pivotCandidate.firstResistanceBar)
+                    pivotCandidate.firstResistanceBar :=
+                         bar_index
 
-f_clearBoxes(box[] boxes) =>
-    if array.size(boxes) > 0
-        for boxIndex = 0 to array.size(boxes) - 1
-            box.delete(array.get(boxes, boxIndex))
-        array.clear(boxes)
-
-f_clearLabels(label[] labels) =>
-    if array.size(labels) > 0
-        for labelIndex = 0 to array.size(labels) - 1
-            label.delete(array.get(labels, labelIndex))
-        array.clear(labels)
-
-f_clearLines(line[] lines) =>
-    if array.size(lines) > 0
-        for lineIndex = 0 to array.size(lines) - 1
-            line.delete(array.get(lines, lineIndex))
-        array.clear(lines)
-
-f_drawBuyerExpansionSupports(
-     float[] supports,
-     label[] labels,
-     line[] supportLines,
-     int rangeStartTime,
-     int rangeEndTime,
-     int markerTime,
-     color markerColor,
-     int maximumLabels) =>
-    int supportCount = int(
-         array.size(supports) / BUYER_EXPANSION_RESULT_SIZE)
-    int displayedCount = math.min(
-         supportCount,
-         math.max(1, maximumLabels))
-    bool[] selectedSupports =
-         array.new_bool(supportCount, false)
-
-    if displayedCount > 0
-        for displayIndex = 0 to displayedCount - 1
-            int selectedIndex = -1
-            float selectedScore = -1.0
-            float selectedHigh = na
-
-            for supportIndex = 0 to supportCount - 1
-                int supportOffset =
-                     supportIndex * BUYER_EXPANSION_RESULT_SIZE
-                float supportScore = array.get(
-                     supports,
-                     supportOffset + 2)
-                float supportHigh = array.get(
-                     supports,
-                     supportOffset + 1)
-                bool isBetterScore = supportScore > selectedScore
-                bool isHigherPriceTie =
-                     supportScore == selectedScore and
-                     (na(selectedHigh) or supportHigh > selectedHigh)
-
-                if not array.get(
-                     selectedSupports,
-                     supportIndex) and
-                     (isBetterScore or isHigherPriceTie)
-                    selectedIndex := supportIndex
-                    selectedScore := supportScore
-                    selectedHigh := supportHigh
-
-            if selectedIndex >= 0
-                array.set(
-                     selectedSupports,
-                     selectedIndex,
-                     true)
-                int selectedOffset =
-                     selectedIndex * BUYER_EXPANSION_RESULT_SIZE
-                float rowLow = array.get(
-                     supports,
-                     selectedOffset)
-                float rowHigh = array.get(
-                     supports,
-                     selectedOffset + 1)
-                float previousBuyer = array.get(
-                     supports,
-                     selectedOffset + 3)
-                float currentBuyer = array.get(
-                     supports,
-                     selectedOffset + 4)
-                float previousSeller = array.get(
-                     supports,
-                     selectedOffset + 5)
-                float currentSeller = array.get(
-                     supports,
-                     selectedOffset + 6)
-                float buyerMultiple = array.get(
-                     supports,
-                     selectedOffset + 7)
-                float buyerIncrease = array.get(
-                     supports,
-                     selectedOffset + 8)
-                float sellerChange = array.get(
-                     supports,
-                     selectedOffset + 9)
-                float sellerIncreaseSharePct = array.get(
-                     supports,
-                     selectedOffset + 10)
-                float weakestHVNRowPct = array.get(
-                     supports,
-                     selectedOffset + 11)
-                bool isStrongest = displayIndex == 0
-                float supportPrice = (rowLow + rowHigh) * 0.5
-                string markerText =
-                     (isStrongest ? "✅  " : "") +
-                     f_formatCompactVolume(currentBuyer) +
-                     " x " +
-                     f_formatCompactVolume(currentSeller) +
-                     " | Buyers " +
-                     str.tostring(buyerMultiple, "#.##") +
-                     "x"
-                string markerTooltip =
-                     "Buyer Expansion Support" +
-                     (isStrongest ? " (strongest buyer increase)" : "") +
-                     "\nPrice row: " +
-                     str.tostring(rowLow, format.mintick) +
-                     " - " +
-                     str.tostring(rowHigh, format.mintick) +
-                     "\nHigher -> current lower row" +
-                     "\nBuyers: " +
-                     f_formatCompactVolume(previousBuyer) +
-                     " -> " +
-                     f_formatCompactVolume(currentBuyer) +
-                     " (" +
-                     str.tostring(buyerMultiple, "#.##") +
-                     "x, +" +
-                     f_formatCompactVolume(buyerIncrease) +
-                     ")" +
-                     "\nSellers: " +
-                     f_formatCompactVolume(previousSeller) +
-                     " -> " +
-                     f_formatCompactVolume(currentSeller) +
-                     " (change " +
-                     f_formatCompactVolume(sellerChange) +
-                     ")" +
-                     "\nSeller increase / buyer increase: " +
-                     str.tostring(
-                          sellerIncreaseSharePct,
-                          "#.##") +
-                     "%" +
-                     "\nWeakest HVN continuation row: " +
-                     str.tostring(weakestHVNRowPct, "#.##") +
-                     "% of POC row"
-                line supportLine = line.new(
-                     x1 = rangeStartTime,
-                     y1 = supportPrice,
-                     x2 = rangeEndTime,
-                     y2 = supportPrice,
-                     xloc = xloc.bar_time,
-                     extend = extend.right,
-                     color = markerColor,
-                     style = line.style_solid,
-                     width = isStrongest ? 2 : 1)
-                array.push(supportLines, supportLine)
-                label supportLabel = label.new(
-                     x = markerTime,
-                     y = supportPrice,
-                     text = markerText,
-                     tooltip = markerTooltip,
-                     xloc = xloc.bar_time,
-                     yloc = yloc.price,
-                     style = label.style_label_right,
-                     color = markerColor,
-                     textcolor = color.black,
-                     size = size.normal)
-                array.push(labels, supportLabel)
-
-f_drawHistogram(
-     float[] profile,
-     box[] boxes,
-     label[] volumeLabels,
-     int rangeStartTime,
-     int rangeEndTime,
-     int barDurationMs,
-     int widthPct,
-     string placement,
-     string displayMode,
-     color upColor,
-     color downColor,
-     color totalColor,
-     color valueTotalColor,
-     bool displayVolumeLabels) =>
-    if array.size(profile) >= PROFILE_META_SIZE and
-         not na(rangeStartTime) and
-         not na(rangeEndTime)
-        float profileTop = array.get(profile, META_TOP)
-        float rowHeight = array.get(profile, META_ROW_HEIGHT)
-        int rowCount = int(array.get(profile, META_ROW_COUNT))
-        int valueLowRow = int(array.get(profile, META_VAL_ROW))
-        int valueHighRow = int(array.get(profile, META_VAH_ROW))
-        bool useSplitDisplay =
-             displayMode == "Up/Down" and rowCount <= MAX_SPLIT_ROWS
-        float maximumVolume = 0.0
-        int profileEndTime = rangeEndTime + barDurationMs
-        int rangeWidthMs = math.max(
-             barDurationMs,
-             profileEndTime - rangeStartTime)
-        int maximumWidthMs = math.max(
-             1,
-             int(math.round(rangeWidthMs * widthPct / 100.0)))
-        int profileLeftTime =
-             placement == "Left" ?
-             rangeStartTime : profileEndTime - maximumWidthMs
-
-        for rowIndex = 0 to rowCount - 1
-            maximumVolume := math.max(
-                 maximumVolume,
-                 array.get(profile, PROFILE_META_SIZE + rowIndex))
-
-        if maximumVolume > 0.0
-            float profileBottom = array.get(profile, META_BOTTOM)
-            for rowIndex = 0 to rowCount - 1
-                float rowVolume =
-                     array.get(profile, PROFILE_META_SIZE + rowIndex)
-                if rowVolume > 0.0
-                    float rowUpVolume =
-                         array.get(
-                              profile,
-                              PROFILE_META_SIZE + rowCount + rowIndex)
-                    float rowDownVolume =
-                         array.get(
-                              profile,
-                              PROFILE_META_SIZE + rowCount * 2 + rowIndex)
-                    float rowLow =
-                         profileBottom + rowIndex * rowHeight
-                    float rowHigh =
-                         math.min(profileTop, rowLow + rowHeight)
-                    int rowWidthMs = math.max(
-                         1,
-                         int(math.round(
-                              rowVolume / maximumVolume * maximumWidthMs)))
-                    int rowLeft =
-                         placement == "Right" ?
-                         profileEndTime - rowWidthMs : rangeStartTime
-                    int rowRight = rowLeft + rowWidthMs
-                    bool insideValueArea =
-                         rowIndex >= valueLowRow and
-                              rowIndex <= valueHighRow
-
-                    if not useSplitDisplay
-                        color rowColor =
-                             insideValueArea ?
-                             color.new(valueTotalColor, 20) :
-                             color.new(totalColor, 35)
-                        box histogramRow = box.new(
-                             left = rowLeft,
-                             top = rowHigh,
-                             right = rowRight,
-                             bottom = rowLow,
-                             xloc = xloc.bar_time,
-                             bgcolor = rowColor,
-                             border_color = color.new(rowColor, 100))
-                        array.push(boxes, histogramRow)
+                if showDevelopingResistance
+                    if na(pivotCandidate.resistanceLine)
+                        pivotCandidate.resistanceLine := line.new(
+                             pivotCandidate.firstResistanceBar,
+                             pivotCandidate.resistance,
+                             bar_index,
+                             pivotCandidate.resistance,
+                             xloc = xloc.bar_index,
+                             extend = extend.none,
+                             color = resistanceColor,
+                             width = 2)
                     else
-                        int upWidthMs =
-                             int(math.round(
-                                  rowWidthMs * rowUpVolume / rowVolume))
-                        if rowUpVolume > 0.0 and rowDownVolume > 0.0
-                            upWidthMs := math.max(
-                                 1,
-                                 math.min(rowWidthMs - 1, upWidthMs))
-                        else if rowUpVolume > 0.0
-                            upWidthMs := rowWidthMs
-                        else
-                            upWidthMs := 0
+                        line.set_xy1(
+                             pivotCandidate.resistanceLine,
+                             pivotCandidate.firstResistanceBar,
+                             pivotCandidate.resistance)
+                        line.set_xy2(
+                             pivotCandidate.resistanceLine,
+                             bar_index,
+                             pivotCandidate.resistance)
+            else
+                pivotCandidate.consecutiveRejections := 0
+                if not na(pivotCandidate.resistanceLine)
+                    line.set_x2(
+                         pivotCandidate.resistanceLine,
+                         bar_index)
 
-                        int splitTime = rowLeft + upWidthMs
-                        color displayedUpColor =
-                             color.new(upColor, 15)
-                        color displayedDownColor =
-                             color.new(downColor, 15)
+            float pivotSetupAverageVolume =
+                 pivotCandidate.setupBars > 0 ?
+                 pivotCandidate.setupVolume /
+                      pivotCandidate.setupBars : na
+            float pivotRejectionAverageVolume =
+                 pivotCandidate.rejectionVolumeBars > 0 ?
+                 pivotCandidate.rejectionVolume /
+                      pivotCandidate.rejectionVolumeBars : na
+            float pivotCandleRange =
+                 math.max(high - low, syminfo.mintick)
+            float pivotCloseLocation =
+                 (close - low) / pivotCandleRange * 100.0
+            float pivotBreakoutExtensionPct =
+                 not na(pivotCandidate.resistance) ?
+                 (close / pivotCandidate.resistance - 1.0) *
+                      100.0 : na
 
-                        if rowUpVolume > 0.0 and splitTime > rowLeft
-                            box upHistogramRow = box.new(
-                                 left = rowLeft,
-                                 top = rowHigh,
-                                 right = splitTime,
-                                 bottom = rowLow,
-                                 xloc = xloc.bar_time,
-                                 bgcolor = displayedUpColor,
-                                 border_color =
-                                      color.new(displayedUpColor, 100))
-                            array.push(boxes, upHistogramRow)
+            bool pivotCandidateQualified =
+                 barstate.isconfirmed and
+                 pivotCandidate.setupBars >=
+                      minimumPivotConsecutiveResistanceBars and
+                 pivotCandidate.maximumConsecutiveRejections >=
+                      minimumPivotConsecutiveResistanceBars and
+                 not na(pivotCandidate.resistance) and
+                 close > pivotCandidate.resistance and
+                 not na(pivotBreakoutExtensionPct) and
+                 pivotBreakoutExtensionPct > 0.0 and
+                 pivotBreakoutExtensionPct <=
+                      maximumPivotBreakoutExtensionPct and
+                 not na(pivotSetupAverageVolume) and
+                 nz(volume, 0.0) >=
+                      pivotSetupAverageVolume *
+                      minimumPivotVolumeVsSetupAverage and
+                 not na(pivotRejectionAverageVolume) and
+                 nz(volume, 0.0) >=
+                      pivotRejectionAverageVolume *
+                      minimumPivotVolumeVsRejectionAverage and
+                 not na(recentAverageVolume) and
+                 nz(volume, 0.0) >=
+                      recentAverageVolume *
+                      minimumPivotVolumeVsRecentAverage and
+                 not na(volume[1]) and
+                 volume[1] > 0.0 and
+                 nz(volume, 0.0) >=
+                      volume[1] *
+                      minimumPivotVolumeVsPreviousBar and
+                 close > open and
+                 pivotCloseLocation >=
+                      minimumPivotCloseLocationPct and
+                 not na(entryMomentumPct) and
+                 entryMomentumPct >=
+                      minimumPivotEntryMomentumPct and
+                 entryCandleRangePct >=
+                      minimumPivotEntryRangePct and
+                 entryCandleRangePct <=
+                      maximumPivotEntryRangePct and
+                 entryCandleBodyPct >=
+                      minimumPivotEntryBodyPct and
+                 entryCandleBodyPct <=
+                      maximumPivotEntryBodyPct
 
-                        if rowDownVolume > 0.0 and rowRight > splitTime
-                            box downHistogramRow = box.new(
-                                 left = splitTime,
-                                 top = rowHigh,
-                                 right = rowRight,
-                                 bottom = rowLow,
-                                 xloc = xloc.bar_time,
-                                 bgcolor = displayedDownColor,
-                                 border_color =
-                                      color.new(displayedDownColor, 100))
-                            array.push(boxes, downHistogramRow)
+            if pivotCandidateQualified
+                float pivotScore =
+                     pivotCandidate.resistance /
+                          math.max(close, syminfo.mintick) *
+                          1000000.0 +
+                     pivotCandidate.maximumConsecutiveRejections *
+                          1000.0 +
+                     pivotCandidate.rejectionBars * 10.0 +
+                     nz(volume, 0.0) /
+                          math.max(
+                               pivotSetupAverageVolume,
+                               1.0)
+                if na(bestPivotScore) or
+                     pivotScore > bestPivotScore
+                    bestPivotScore := pivotScore
+                    bestPivotBreakBar :=
+                         pivotCandidate.breakBar
+                    bestPivotResistance :=
+                         pivotCandidate.resistance
 
-                    if displayVolumeLabels and useSplitDisplay
-                        float rowLabelPrice =
-                             (rowLow + rowHigh) * 0.5
-                        string rowVolumeText =
-                             f_formatCompactVolume(rowUpVolume) +
-                             " x " +
-                             f_formatCompactVolume(rowDownVolume)
-                        string rowVolumeTooltip =
-                             "Buyers: " +
-                             f_formatVolume(rowUpVolume) +
-                             "\nSellers: " +
-                             f_formatVolume(rowDownVolume) +
-                             "\nBuyer/seller ratio: " +
-                             str.tostring(
-                                  f_buyerSellerRatio(
-                                       rowUpVolume,
-                                       rowDownVolume),
-                                  "#.##")
-                        label rowVolumeLabel = label.new(
-                             x = profileLeftTime,
-                             y = rowLabelPrice,
-                             text = rowVolumeText,
-                             tooltip = rowVolumeTooltip,
-                             xloc = xloc.bar_time,
-                             yloc = yloc.price,
-                             style = label.style_label_left,
-                             color = color.new(color.black, 100),
-                             textcolor = color.white,
-                             size = size.small,
-                             text_formatting = text.format_bold,
-                             textalign = text.align_left)
-                        array.push(volumeLabels, rowVolumeLabel)
+            pivotCandidate.setupVolume += nz(volume, 0.0)
+            pivotCandidate.setupBars += 1
+            array.set(
+                 pivotCandidates,
+                 pivotIndex,
+                 pivotCandidate)
 
-if barstate.islast
-    f_clearBoxes(histBoxesA)
-    f_clearLabels(histogramVolumeLabelsA)
-    f_clearLabels(buyerExpansionSupportLabelsA)
-    f_clearLines(buyerExpansionSupportLinesA)
-    if not na(profileBackgroundA)
-        box.delete(profileBackgroundA)
-        profileBackgroundA := na
-
-    int histogramBarMs = math.max(
-         1,
-         int(timeframe.in_seconds() * 1000.0))
-    bool displayHistogramRowVolumesA =
-         showHistogramRowVolumes and
-         volumeDisplay == "Up/Down"
-    int endTimeA = endA + histogramBarMs
-    int rangeWidthMsA = math.max(
-         histogramBarMs,
-         endTimeA - startA)
-    int histogramMaximumWidthMsA = math.max(
-         1,
-         int(math.round(
-              rangeWidthMsA * profileWidthPct / 100.0)))
-    int histogramLabelTimeA =
-         profilePlacement == "Left" ?
-         startA :
-         endTimeA - histogramMaximumWidthMsA
-    int outsideLabelGapMsA = math.max(
-         histogramBarMs * 2,
-         int(math.round(histogramMaximumWidthMsA * 0.05)))
-    int buyerExpansionSupportLabelTimeA =
-         histogramLabelTimeA - outsideLabelGapMsA
-    color boundaryColorA =
-         showRangeBoundaries ?
-         color.new(color.aqua, 40) : color.new(color.aqua, 100)
-    levelExtension =
-         extendLevelsRight ? extend.right : extend.none
-
-    line.set_color(lineStartA, boundaryColorA)
-    line.set_color(lineEndA, boundaryColorA)
-    line.set_extend(lineVahA, levelExtension)
-    line.set_extend(linePocA, levelExtension)
-    line.set_extend(lineValA, levelExtension)
-
-    if array.size(profileA) >= PROFILE_META_SIZE
-        float bottomA = array.get(profileA, META_BOTTOM)
-        float topA = array.get(profileA, META_TOP)
-        if showProfileBackground
-            profileBackgroundA := box.new(
-                 left = startA,
-                 top = topA,
-                 right = endTimeA,
-                 bottom = bottomA,
-                 xloc = xloc.bar_time,
-                 bgcolor = profileBackgroundColor,
-                 border_color = color.new(color.aqua, 75))
-        line.set_xy1(lineStartA, startA, bottomA)
-        line.set_xy2(lineStartA, startA, topA)
-        line.set_xy1(lineEndA, endTimeA, bottomA)
-        line.set_xy2(lineEndA, endTimeA, topA)
-        line.set_xy1(lineVahA, startA, vahA)
-        line.set_xy2(lineVahA, endTimeA, vahA)
-        line.set_xy1(linePocA, startA, pocA)
-        line.set_xy2(linePocA, endTimeA, pocA)
-        line.set_xy1(lineValA, startA, valA)
-        line.set_xy2(lineValA, endTimeA, valA)
-        f_drawHistogram(
-             profileA,
-             histBoxesA,
-             histogramVolumeLabelsA,
-             startA,
-             endA,
-             histogramBarMs,
-             profileWidthPct,
-             profilePlacement,
-             volumeDisplay,
-             upVolumeColor,
-             downVolumeColor,
-             totalVolumeColor,
-             valueAreaTotalColor,
-             displayHistogramRowVolumesA)
-        if showBuyerExpansionSupport
-            f_drawBuyerExpansionSupports(
-                 buyerExpansionSupportsA,
-                 buyerExpansionSupportLabelsA,
-                 buyerExpansionSupportLinesA,
-                 startA,
-                 endTimeA,
-                 buyerExpansionSupportLabelTimeA,
-                 buyerExpansionSupportColor,
-                 buyerExpansionMaximumLabels)
+        pivotIndex -= 1
 
 // =============================================================================
-// 5. PROFILE SUMMARY TABLE
+// EMIT ONE SIGNAL FOR THE BEST QUALIFYING CANDIDATE ON THIS BAR
 // =============================================================================
-var table compTable = table.new(
-     position = position.top_right,
-     columns = 2,
-     rows = 11,
-     bgcolor = color.new(color.black, 15),
-     border_width = 1,
-     border_color = color.gray)
+if not na(bestBreakBar)
+    bool duplicateSignal =
+         not na(lastSignalBar) and
+         not na(lastSignalResistance) and
+         bar_index - lastSignalBar <= duplicateCooldownBars and
+         math.abs(
+              bestResistance / lastSignalResistance - 1.0) * 100.0 <=
+              duplicateLevelTolerancePct
 
-if barstate.islast
-    string effectiveRowsA =
-         array.size(profileA) >= PROFILE_META_SIZE ?
-         str.tostring(int(array.get(profileA, META_ROW_COUNT))) : "n/a"
-    float displayedTotalVolumeA =
-         array.size(profileA) >= PROFILE_META_SIZE ?
-         array.get(profileA, META_TOTAL_VOLUME) : totalVolA
+    int chosenIndex = na
+    int searchIndex = array.size(candidates) - 1
+    while searchIndex >= 0
+        PatternCandidate candidate = array.get(candidates, searchIndex)
+        if candidate.breakBar == bestBreakBar
+            chosenIndex := searchIndex
+        searchIndex -= 1
 
-    table.cell(
-         compTable, 0, 0, "FRVP Summary",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 0, "Selected Range",
-         text_color = color.aqua,
-         text_size = size.small)
+    bool overheadResistanceBlocked = false
+    int unresolvedOverheadLevels = 0
+    int nearbyOverheadLevels = 0
+    float cumulativeOverheadEvidence = 0.0
+    float strongestOverheadEvidence = 0.0
+    float chosenEvidenceVolume = na
+    if not na(chosenIndex)
+        PatternCandidate chosenForEvidence =
+             array.get(candidates, chosenIndex)
+        chosenEvidenceVolume :=
+             chosenForEvidence.shelfVolume +
+             chosenForEvidence.rejectionVolume
+        int overheadIndex = array.size(candidates) - 1
+        while overheadIndex >= 0
+            PatternCandidate overheadCandidate =
+                 array.get(candidates, overheadIndex)
+            bool differentCandidate =
+                 overheadCandidate.breakBar != bestBreakBar
+            bool confirmedOverheadResistance =
+                 overheadCandidate.rejectionClusters >=
+                      minimumOverheadResistanceClusters and
+                 not na(overheadCandidate.resistance)
+            float overheadDistancePct =
+                 confirmedOverheadResistance ?
+                 (overheadCandidate.resistance /
+                      math.max(close, syminfo.mintick) - 1.0) *
+                      100.0 : na
+            bool unresolvedOverheadResistance =
+                 confirmedOverheadResistance and
+                 not na(overheadCandidate.maximumCloseAfterBreak) and
+                 overheadCandidate.maximumCloseAfterBreak <=
+                      overheadCandidate.resistance
+            float overheadEvidenceVolume =
+                 overheadCandidate.shelfVolume +
+                 overheadCandidate.rejectionVolume
+            if differentCandidate and
+                 confirmedOverheadResistance and
+                 unresolvedOverheadResistance and
+                 not na(overheadDistancePct) and
+                 overheadDistancePct > 0.0 and
+                 overheadDistancePct <=
+                      maximumOverheadResistanceDistancePct
+                unresolvedOverheadLevels += 1
+                cumulativeOverheadEvidence +=
+                     overheadEvidenceVolume
+                strongestOverheadEvidence :=
+                     math.max(
+                          strongestOverheadEvidence,
+                          overheadEvidenceVolume)
+                if overheadDistancePct <=
+                     maximumNearbyOverheadDistancePct
+                    nearbyOverheadLevels += 1
+            overheadIndex -= 1
 
-    table.cell(
-         compTable, 0, 1, "Total Volume Sum:",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 1, str.tostring(displayedTotalVolumeA, "#,###"),
-         text_color = color.yellow,
-         text_size = size.small)
+        bool nearbyOverheadBlocked =
+             nearbyOverheadLevels > 0
+        bool strongestOverheadBlocked =
+             strongestOverheadEvidence >=
+                  chosenEvidenceVolume *
+                  minimumOverheadEvidenceRatio
+        bool cumulativeOverheadBlocked =
+             unresolvedOverheadLevels >=
+                  minimumStackedOverheadLevels and
+             cumulativeOverheadEvidence >=
+                  chosenEvidenceVolume *
+                  minimumOverheadEvidenceRatio
+        overheadResistanceBlocked :=
+             nearbyOverheadBlocked or
+             strongestOverheadBlocked or
+             cumulativeOverheadBlocked
 
-    table.cell(
-         compTable, 0, 2, "VAH (Red Line):",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 2, str.tostring(vahA, format.mintick),
-         text_color = color.red,
-         text_size = size.small)
+    bool previousHighGapConfirmed =
+         previousHighGapPct <= maximumPreviousHighGapPct
+    bool controlledMomentumPath =
+         not na(entryMomentumPct) and
+         entryMomentumPct >= minimumEntryMomentumPct and
+         entryMomentumPct <= maximumEntryMomentumPct and
+         entryCandleRangePct >= minimumEntryRangePct and
+         entryCandleRangePct <= maximumEntryRangePct
+    bool clearSpaceImpulsePath =
+         unresolvedOverheadLevels == 0 and
+         previousHighGapPct <= maximumClearSpaceHighGapPct and
+         entryCandleRangePct >= minimumEntryRangePct and
+         entryCandleRangePct <= maximumEntryRangePct and
+         entryCandleBodyPct >= minimumClearSpaceBodyPct and
+         entryCandleBodyPct <= maximumClearSpaceBodyPct
+    bool immediateFollowThroughQuality =
+         previousHighGapConfirmed and
+         (controlledMomentumPath or
+              clearSpaceImpulsePath or
+              bestMatureReclaim)
 
-    table.cell(
-         compTable, 0, 3, "POC (White Line):",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 3, str.tostring(pocA, format.mintick),
-         text_color = color.white,
-         text_size = size.small)
+    if not duplicateSignal and
+         not overheadResistanceBlocked and
+         immediateFollowThroughQuality and
+         not na(chosenIndex)
+        PatternCandidate chosen = array.get(candidates, chosenIndex)
+        entrySignal := true
+        signaledResistance := chosen.resistance
+        signaledTarget :=
+             close < highOfDayBeforeCurrentBar ?
+             highOfDayBeforeCurrentBar : close * 1.05
+        lastSignalBar := bar_index
+        lastSignalResistance := chosen.resistance
 
-    table.cell(
-         compTable, 0, 4, "VAL (Green Line):",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 4, str.tostring(valA, format.mintick),
-         text_color = color.green,
-         text_size = size.small)
-    table.cell(
-         compTable, 0, 5, "Effective Rows:",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 5, effectiveRowsA,
-         text_color = color.aqua,
-         text_size = size.small)
+        if showDevelopingResistance
+            if na(chosen.resistanceLine)
+                int chosenLineStartBar =
+                     na(chosen.firstResistanceBar) ?
+                     chosen.breakBar : chosen.firstResistanceBar
+                chosen.resistanceLine := line.new(
+                     chosenLineStartBar,
+                     chosen.resistance,
+                     bar_index,
+                     chosen.resistance,
+                     xloc = xloc.bar_index,
+                     extend = extend.none,
+                     color = resistanceColor,
+                     width = 2)
+            else
+                line.set_xy2(
+                     chosen.resistanceLine,
+                     bar_index,
+                     chosen.resistance)
+            array.push(savedResistanceLines, chosen.resistanceLine)
 
-    table.cell(
-         compTable, 0, 6, "Below VAL:",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 6, f_formatVolume(volumeBelowVALA),
-         text_color = color.silver,
-         text_size = size.small)
+            while array.size(savedResistanceLines) > maximumSavedSignals
+                line oldestLine = array.shift(savedResistanceLines)
+                line.delete(oldestLine)
 
-    table.cell(
-         compTable, 0, 7, "VAL to POC:",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 7, f_formatVolume(volumeVALToPOCA),
-         text_color = color.green,
-         text_size = size.small)
+    // Remove the resolved candidate and nearby duplicates, whether this bar
+    // emitted a signal or was suppressed by cooldown/overhead resistance.
+    int cleanupIndex = array.size(candidates) - 1
+    while cleanupIndex >= 0
+        PatternCandidate candidate = array.get(candidates, cleanupIndex)
+        bool sameCandidate = candidate.breakBar == bestBreakBar
+        bool sameLevel =
+             not na(candidate.resistance) and
+             math.abs(
+                  candidate.resistance / bestResistance - 1.0) * 100.0 <=
+                  duplicateLevelTolerancePct
+        if sameCandidate or sameLevel
+            bool keepChosenLine =
+                 entrySignal and
+                 sameCandidate and
+                 not na(candidate.resistanceLine)
+            if not keepChosenLine and not na(candidate.resistanceLine)
+                line.delete(candidate.resistanceLine)
+            array.remove(candidates, cleanupIndex)
+        cleanupIndex -= 1
 
-    table.cell(
-         compTable, 0, 8, "POC to VAH:",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 8, f_formatVolume(volumePOCToVAHA),
-         text_color = color.red,
-         text_size = size.small)
+// A pivot reclaim is intentionally emitted through a separate path. It does
+// not weaken the compact-shelf rules used by the primary and mature setups.
+if not na(bestPivotBreakBar)
+    bool pivotDuplicateSignal =
+         not na(lastSignalBar) and
+         not na(lastSignalResistance) and
+         bar_index - lastSignalBar <= duplicateCooldownBars and
+         math.abs(
+              bestPivotResistance /
+                   lastSignalResistance - 1.0) * 100.0 <=
+              duplicateLevelTolerancePct
 
+    int chosenPivotIndex = na
+    int pivotSearchIndex = array.size(pivotCandidates) - 1
+    while pivotSearchIndex >= 0
+        PivotFlipCandidate pivotCandidate =
+             array.get(
+                  pivotCandidates,
+                  pivotSearchIndex)
+        if pivotCandidate.breakBar == bestPivotBreakBar
+            chosenPivotIndex := pivotSearchIndex
+        pivotSearchIndex -= 1
 
-    table.cell(
-         compTable, 0, 9, "Above VAH:",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 9, f_formatVolume(volumeAboveVAHA),
-         text_color = color.silver,
-         text_size = size.small)
+    if not entrySignal and
+         not pivotDuplicateSignal and
+         not na(chosenPivotIndex)
+        PivotFlipCandidate chosenPivot =
+             array.get(
+                  pivotCandidates,
+                  chosenPivotIndex)
+        entrySignal := true
+        signaledResistance := chosenPivot.resistance
+        signaledTarget :=
+             close < highOfDayBeforeCurrentBar ?
+             highOfDayBeforeCurrentBar : close * 1.05
+        lastSignalBar := bar_index
+        lastSignalResistance := chosenPivot.resistance
 
-    string profileSourceA =
-         usesNativeFootprintA ? "Native Footprint" :
-         not useNativeFootprint ? "OHLCV Approximation" :
-         footprintCapacityExceededA ? "OHLCV (Footprint Limit)" :
-         "OHLCV (Footprint Unavailable)"
-    color profileSourceColorA =
-         usesNativeFootprintA ? color.lime : color.orange
+        if showDevelopingResistance
+            if na(chosenPivot.resistanceLine)
+                int pivotLineStartBar =
+                     na(chosenPivot.firstResistanceBar) ?
+                     chosenPivot.breakBar :
+                     chosenPivot.firstResistanceBar
+                chosenPivot.resistanceLine := line.new(
+                     pivotLineStartBar,
+                     chosenPivot.resistance,
+                     bar_index,
+                     chosenPivot.resistance,
+                     xloc = xloc.bar_index,
+                     extend = extend.none,
+                     color = resistanceColor,
+                     width = 2)
+            else
+                line.set_xy2(
+                     chosenPivot.resistanceLine,
+                     bar_index,
+                     chosenPivot.resistance)
+            array.push(
+                 savedResistanceLines,
+                 chosenPivot.resistanceLine)
 
-    table.cell(
-         compTable, 0, 10, "Profile Source:",
-         text_color = color.white,
-         text_size = size.small)
-    table.cell(
-         compTable, 1, 10, profileSourceA,
-         text_color = profileSourceColorA,
-         text_size = size.small)
+            while array.size(savedResistanceLines) >
+                 maximumSavedSignals
+                line oldestPivotLine =
+                     array.shift(savedResistanceLines)
+                line.delete(oldestPivotLine)
+
+    int pivotCleanupIndex = array.size(pivotCandidates) - 1
+    while pivotCleanupIndex >= 0
+        PivotFlipCandidate pivotCandidate =
+             array.get(
+                  pivotCandidates,
+                  pivotCleanupIndex)
+        bool samePivotCandidate =
+             pivotCandidate.breakBar == bestPivotBreakBar
+        bool samePivotLevel =
+             not na(pivotCandidate.resistance) and
+             math.abs(
+                  pivotCandidate.resistance /
+                       bestPivotResistance - 1.0) * 100.0 <=
+                  duplicateLevelTolerancePct
+        if samePivotCandidate or samePivotLevel
+            bool keepPivotLine =
+                 entrySignal and
+                 samePivotCandidate and
+                 not na(pivotCandidate.resistanceLine)
+            if not keepPivotLine and
+                 not na(pivotCandidate.resistanceLine)
+                line.delete(pivotCandidate.resistanceLine)
+            array.remove(
+                 pivotCandidates,
+                 pivotCleanupIndex)
+        pivotCleanupIndex -= 1
+
+// =============================================================================
+// CREATE A NEW CANDIDATE WHEN A COMPACT SUPPORT SHELF BREAKS
+// =============================================================================
+bool enoughShelfHistory =
+     bar_index >= supportShelfBars and
+     dateKey[supportShelfBars] == dateKey and
+     inDetectionSession[supportShelfBars]
+
+if inDetectionSession and enoughShelfHistory
+    array.clear(shelfLowBuffer)
+    int validSessionBars = 0
+    float shelfVolume = 0.0
+    float shelfMeanLow = 0.0
+    for offset = 1 to supportShelfBars
+        array.push(shelfLowBuffer, low[offset])
+        shelfVolume += nz(volume[offset], 0.0)
+        shelfMeanLow += low[offset] / supportShelfBars
+        if inDetectionSession[offset] and dateKey[offset] == dateKey
+            validSessionBars += 1
+
+    if validSessionBars == supportShelfBars
+        array.sort(shelfLowBuffer, order.ascending)
+        float shelfLow = array.get(shelfLowBuffer, 0)
+        float shelfHigh =
+             array.get(shelfLowBuffer, supportShelfBars - 2)
+        int lowsInsideShelf = 0
+        int closesHoldingShelf = 0
+        for offset = 1 to supportShelfBars
+            if low[offset] >= shelfLow and low[offset] <= shelfHigh
+                lowsInsideShelf += 1
+            if close[offset] >= shelfLow
+                closesHoldingShelf += 1
+
+        float shelfXMean =
+             (supportShelfBars - 1.0) / 2.0
+        float shelfSlopeNumerator = 0.0
+        float shelfSlopeDenominator = 0.0
+        for shelfPosition = 0 to supportShelfBars - 1
+            int chronologicalOffset =
+                 supportShelfBars - shelfPosition
+            float shelfXDistance =
+                 shelfPosition - shelfXMean
+            shelfSlopeNumerator +=
+                 shelfXDistance *
+                 (low[chronologicalOffset] - shelfMeanLow)
+            shelfSlopeDenominator +=
+                 shelfXDistance * shelfXDistance
+        float rawShelfSlope =
+             shelfSlopeDenominator > 0.0 ?
+             shelfSlopeNumerator / shelfSlopeDenominator : 0.0
+        float shelfSlopePctPerBar =
+             rawShelfSlope /
+             math.max(shelfMeanLow, syminfo.mintick) * 100.0
+
+        float priorTrendLow = na
+        int validPriorTrendBars = 0
+        for trendOffset = supportShelfBars + 1 to supportShelfBars + priorAdvanceLookbackBars
+            if not na(low[trendOffset]) and
+                 inDetectionSession[trendOffset] and
+                 dateKey[trendOffset] == dateKey
+                priorTrendLow :=
+                     na(priorTrendLow) ?
+                     low[trendOffset] :
+                     math.min(priorTrendLow, low[trendOffset])
+                validPriorTrendBars += 1
+        float priorAdvancePct =
+             not na(priorTrendLow) ?
+             (shelfLow /
+                  math.max(priorTrendLow, syminfo.mintick) - 1.0) *
+                  100.0 : na
+        bool formedAfterUptrend =
+             validPriorTrendBars >= minimumPriorTrendBars and
+             not na(priorAdvancePct) and
+             priorAdvancePct >= minimumPriorAdvancePct
+
+        float shelfWidthPct =
+             (shelfHigh - shelfLow) /
+                  math.max(close, syminfo.mintick) * 100.0
+        bool shelfStructureConfirmed =
+             lowsInsideShelf >= supportShelfBars - 1 and
+             closesHoldingShelf >= supportShelfBars - 1 and
+             shelfWidthPct <= maximumShelfWidthPct
+        bool primaryCompactShelf =
+             shelfStructureConfirmed and
+             shelfSlopePctPerBar >=
+                  -maximumShelfDownSlopePctPerBar
+        bool matureCompactShelf =
+             shelfStructureConfirmed and
+             shelfSlopePctPerBar >=
+                  -maximumMatureShelfDownSlopePctPerBar
+        bool closedBelowSupport = close < shelfLow
+
+        if matureCompactShelf and
+             formedAfterUptrend and
+             closedBelowSupport and
+             barstate.isconfirmed
+            while array.size(candidates) >= maximumActiveCandidates
+                PatternCandidate oldestCandidate = array.shift(candidates)
+                if not na(oldestCandidate.resistanceLine)
+                    line.delete(oldestCandidate.resistanceLine)
+
+            PatternCandidate newCandidate = PatternCandidate.new(
+                 bar_index,
+                 shelfLow,
+                 shelfHigh,
+                 shelfVolume,
+                 shelfSlopePctPerBar,
+                 primaryCompactShelf,
+                 0,
+                 0,
+                 false,
+                 na,
+                 na,
+                 0.0,
+                 0,
+                 0.0,
+                 0,
+                 na,
+                 na)
+            array.push(candidates, newCandidate)
+
+// A strong one-bar pivot can also establish genuine support. This path is
+// deliberately strict: the pivot must follow a large advance, fail on the
+// next bar, produce a consecutive resistance sequence, and later be reclaimed
+// by exceptional participation. The ELPW 12:13-12:19 sequence is the model.
+bool enoughPivotHistory =
+     bar_index >= pivotPriorAdvanceLookbackBars + 1 and
+     dateKey[pivotPriorAdvanceLookbackBars + 1] == dateKey and
+     inDetectionSession[pivotPriorAdvanceLookbackBars + 1]
+
+if enablePivotSupportReclaims and
+     inDetectionSession and
+     enoughPivotHistory
+    float priorPivotTrendLow = na
+    int validPriorPivotBars = 0
+    for pivotOffset = 2 to pivotPriorAdvanceLookbackBars + 1
+        if not na(low[pivotOffset]) and
+             inDetectionSession[pivotOffset] and
+             dateKey[pivotOffset] == dateKey
+            priorPivotTrendLow :=
+                 na(priorPivotTrendLow) ?
+                 low[pivotOffset] :
+                 math.min(
+                      priorPivotTrendLow,
+                      low[pivotOffset])
+            validPriorPivotBars += 1
+
+    float pivotPriorAdvancePct =
+         not na(priorPivotTrendLow) ?
+         (low[1] /
+              math.max(
+                   priorPivotTrendLow,
+                   syminfo.mintick) - 1.0) * 100.0 : na
+    bool strongPivotSupportBar =
+         close[1] > open[1] and
+         high[1] > high[2] and
+         low[1] > low[2]
+    bool closedBelowPivotSupport =
+         close < low[1]
+    bool pivotFormedAfterAdvance =
+         validPriorPivotBars ==
+              pivotPriorAdvanceLookbackBars and
+         not na(pivotPriorAdvancePct) and
+         pivotPriorAdvancePct >=
+              minimumPivotPriorAdvancePct
+
+    if strongPivotSupportBar and
+         closedBelowPivotSupport and
+         pivotFormedAfterAdvance and
+         barstate.isconfirmed
+        while array.size(pivotCandidates) >=
+             maximumActiveCandidates
+            PivotFlipCandidate oldestPivot =
+                 array.shift(pivotCandidates)
+            if not na(oldestPivot.resistanceLine)
+                line.delete(oldestPivot.resistanceLine)
+
+        PivotFlipCandidate newPivotCandidate =
+             PivotFlipCandidate.new(
+                  bar_index,
+                  low[1],
+                  pivotPriorAdvancePct,
+                  0,
+                  0,
+                  0,
+                  na,
+                  na,
+                  0.0,
+                  0,
+                  0.0,
+                  0,
+                  na)
+        array.push(
+             pivotCandidates,
+             newPivotCandidate)
+
+if inDetectionSession
+    previousHighOfDay :=
+         na(previousHighOfDay) ?
+         high : math.max(previousHighOfDay, high)
+
+plotshape(
+     entrySignal,
+     title = "Strong Reclaim Entry",
+     style = shape.labelup,
+     location = location.belowbar,
+     color = entryColor,
+     text = "ENTRY",
+     textcolor = color.black,
+     size = size.small)
+
+plot(
+     entrySignal ? signaledResistance : na,
+     title = "Reclaimed Resistance",
+     display = display.none)
+plot(
+     entrySignal ? signaledTarget : na,
+     title = "Previous HOD / Continuation Target",
+     display = display.none)
+
+alertcondition(
+     entrySignal,
+     title = "Strong Support-to-Resistance Reclaim",
+     message = "{{ticker}} strong reclaim entry at {{close}}. Reclaimed resistance: {{plot(\"Reclaimed Resistance\")}}. Target: {{plot(\"Previous HOD / Continuation Target\")}}.")
