@@ -458,6 +458,129 @@ float maximumControlledBreakoutExtensionPct = input.float(
      group = "Controlled Consolidation Reclaim",
      display = display.data_window)
 
+bool enableVolumeTransitionReclaims = input.bool(
+     true,
+     title = "Enable Volume-Transition Reclaims",
+     group = "Volume-Transition Reclaim",
+     display = display.data_window,
+     tooltip = "Adds an OR path for a resistance sequence whose volume stays below average, followed by an above-average breakout candle with exceptional relative price expansion. The existing burst-volume rules remain unchanged.")
+int transitionComparisonBars = input.int(
+     5,
+     title = "Resistance Comparison Bars",
+     minval = 3,
+     maxval = 10,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+int minimumBelowAverageTransitionBars = input.int(
+     4,
+     title = "Minimum Prior Bars Below Volume Average",
+     minval = 2,
+     maxval = 10,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+float minimumTransitionVolumeVsAverage = input.float(
+     1.0,
+     title = "Minimum Breakout Volume vs Average",
+     minval = 1.0,
+     maxval = 10.0,
+     step = 0.05,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+float minimumTransitionRangeExpansion = input.float(
+     1.5,
+     title = "Minimum Range Expansion vs Prior Bars",
+     minval = 1.0,
+     maxval = 10.0,
+     step = 0.1,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+float minimumTransitionBodyExpansion = input.float(
+     2.0,
+     title = "Minimum Body Expansion vs Prior Bars",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+float minimumTransitionCloseLocationPct = input.float(
+     90.0,
+     title = "Minimum Breakout Close Location (%)",
+     minval = 50.0,
+     maxval = 100.0,
+     step = 1.0,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+float maximumTransitionEntryRangePct = input.float(
+     25.0,
+     title = "Maximum Breakout Candle Range (%)",
+     minval = 5.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+float maximumTransitionBreakoutExtensionPct = input.float(
+     15.0,
+     title = "Maximum Close Above Support Zone (%)",
+     minval = 1.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window)
+int maximumTransitionHighAgeMinutes = input.int(
+     30,
+     title = "Maximum Age of Prior High (Minutes)",
+     minval = 5,
+     maxval = 240,
+     group = "Volume-Transition Reclaim",
+     display = display.data_window,
+     tooltip = "Uses elapsed clock time rather than printed bars, so trading halts do not make an old high appear recent.")
+int persistentSupportSearchBars = input.int(
+     30,
+     title = "Stored Support Search Bars",
+     minval = 10,
+     maxval = 60,
+     group = "Stored Support Zone",
+     display = display.data_window)
+int persistentSupportWindowBars = input.int(
+     7,
+     title = "Stored Support Window Bars",
+     minval = 5,
+     maxval = 12,
+     group = "Stored Support Zone",
+     display = display.data_window)
+int minimumPersistentSupportTouches = input.int(
+     4,
+     title = "Minimum Support Touches",
+     minval = 3,
+     maxval = 10,
+     group = "Stored Support Zone",
+     display = display.data_window)
+float maximumPersistentSupportWidthPct = input.float(
+     2.0,
+     title = "Maximum Stored Support Width (%)",
+     minval = 0.25,
+     maxval = 10.0,
+     step = 0.25,
+     group = "Stored Support Zone",
+     display = display.data_window)
+float minimumPersistentExpansionPct = input.float(
+     5.0,
+     title = "Minimum Expansion Above Stored Support (%)",
+     minval = 1.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Stored Support Zone",
+     display = display.data_window)
+float persistentSupportTouchTolerancePct = input.float(
+     0.5,
+     title = "Resistance Retest Tolerance (%)",
+     minval = 0.0,
+     maxval = 5.0,
+     step = 0.1,
+     group = "Stored Support Zone",
+     display = display.data_window,
+     tooltip = "Allows a resistance test to stop fractionally below the former support zone, as WFF did at 11:41.")
+
 bool enablePivotSupportReclaims = input.bool(
      true,
      title = "Enable Single-Pivot Support Reclaims",
@@ -709,6 +832,7 @@ type PatternCandidate
     int rejectionVolumeBars
     float maximumCloseAfterBreak
     line resistanceLine
+    bool volumeTransitionOnly
 
 type PivotFlipCandidate
     int breakBar
@@ -725,8 +849,18 @@ type PivotFlipCandidate
     int rejectionVolumeBars
     line resistanceLine
 
+type StoredSupportZone
+    int formedBar
+    float lowerBound
+    float upperBound
+    float supportVolume
+    float maximumHighAfterFormation
+    bool expanded
+
 var array<PatternCandidate> candidates = array.new<PatternCandidate>()
 var array<PivotFlipCandidate> pivotCandidates = array.new<PivotFlipCandidate>()
+var array<StoredSupportZone> storedSupportZones =
+     array.new<StoredSupportZone>()
 var array<line> savedResistanceLines = array.new<line>()
 var array<float> shelfLowBuffer = array.new<float>()
 var float previousHighOfDay = na
@@ -746,22 +880,24 @@ if newDate
         PivotFlipCandidate expiredPivot = array.pop(pivotCandidates)
         if not na(expiredPivot.resistanceLine)
             line.delete(expiredPivot.resistanceLine)
+    array.clear(storedSupportZones)
     previousHighOfDay := na
 
 float highOfDayBeforeCurrentBar = previousHighOfDay
 float recentStructureHigh = na
+int recentStructureHighTime = na
 for structureOffset = 1 to maximumSetupBars
     if not na(high[structureOffset]) and
          inDetectionSession[structureOffset] and
          dateKey[structureOffset] == dateKey
-        recentStructureHigh :=
-             na(recentStructureHigh) ?
-             high[structureOffset] :
-             math.max(
-                  recentStructureHigh,
-                  high[structureOffset])
+        if na(recentStructureHigh) or
+             high[structureOffset] > recentStructureHigh
+            recentStructureHigh := high[structureOffset]
+            recentStructureHighTime := time[structureOffset]
+float volumeAverageSeries =
+     ta.sma(volume, recentVolumeLookbackBars)
 float recentAverageVolume =
-     ta.sma(volume, recentVolumeLookbackBars)[1]
+     volumeAverageSeries[1]
 float entryMomentumPct =
      not na(close[entryMomentumLookbackBars]) ?
      (close /
@@ -774,10 +910,79 @@ float entryCandleRangePct =
 float entryCandleBodyPct =
      (close - open) /
           math.max(close, syminfo.mintick) * 100.0
+float entryCloseLocationPct =
+     (close - low) /
+          math.max(high - low, syminfo.mintick) * 100.0
 float previousHighGapPct =
      not na(recentStructureHigh) ?
      (recentStructureHigh /
           math.max(close, syminfo.mintick) - 1.0) * 100.0 : 0.0
+float recentHighAgeMinutes =
+     not na(recentStructureHighTime) ?
+     (time - recentStructureHighTime) / 60000.0 : na
+
+int transitionBarsBelowAverage = 0
+int validTransitionComparisonBars = 0
+float transitionPriorRangeSum = 0.0
+float transitionPriorBodySum = 0.0
+for transitionOffset = 1 to transitionComparisonBars
+    if not na(close[transitionOffset]) and
+         close[transitionOffset] > 0.0 and
+         not na(volume[transitionOffset]) and
+         not na(volumeAverageSeries[transitionOffset])
+        float priorRangePct =
+             (high[transitionOffset] - low[transitionOffset]) /
+                  math.max(
+                       close[transitionOffset],
+                       syminfo.mintick) * 100.0
+        float priorBodyPct =
+             math.abs(
+                  close[transitionOffset] -
+                       open[transitionOffset]) /
+                  math.max(
+                       close[transitionOffset],
+                       syminfo.mintick) * 100.0
+        transitionPriorRangeSum += priorRangePct
+        transitionPriorBodySum += priorBodyPct
+        validTransitionComparisonBars += 1
+        if volume[transitionOffset] <
+             volumeAverageSeries[transitionOffset]
+            transitionBarsBelowAverage += 1
+
+float transitionPriorRangeAverage =
+     validTransitionComparisonBars > 0 ?
+     transitionPriorRangeSum /
+          validTransitionComparisonBars : na
+float transitionPriorBodyAverage =
+     validTransitionComparisonBars > 0 ?
+     transitionPriorBodySum /
+          validTransitionComparisonBars : na
+bool recentHighAgeConfirmed =
+     not na(recentHighAgeMinutes) and
+     recentHighAgeMinutes >= 0.0 and
+     recentHighAgeMinutes <= maximumTransitionHighAgeMinutes
+bool volumeTransitionExpansionConfirmed =
+     enableVolumeTransitionReclaims and
+     validTransitionComparisonBars == transitionComparisonBars and
+     transitionBarsBelowAverage >=
+          minimumBelowAverageTransitionBars and
+     not na(recentAverageVolume) and
+     nz(volume, 0.0) >=
+          recentAverageVolume *
+          minimumTransitionVolumeVsAverage and
+     not na(transitionPriorRangeAverage) and
+     transitionPriorRangeAverage > 0.0 and
+     entryCandleRangePct >=
+          transitionPriorRangeAverage *
+          minimumTransitionRangeExpansion and
+     entryCandleRangePct <= maximumTransitionEntryRangePct and
+     not na(transitionPriorBodyAverage) and
+     transitionPriorBodyAverage > 0.0 and
+     entryCandleBodyPct >=
+          transitionPriorBodyAverage *
+          minimumTransitionBodyExpansion and
+     entryCloseLocationPct >= minimumTransitionCloseLocationPct and
+     recentHighAgeConfirmed
 
 bool entrySignal = false
 float signaledResistance = na
@@ -787,6 +992,7 @@ float bestScore = na
 float bestResistance = na
 bool bestMatureReclaim = false
 bool bestControlledReclaim = false
+bool bestVolumeTransitionReclaim = false
 int bestPivotBreakBar = na
 float bestPivotScore = na
 float bestPivotResistance = na
@@ -799,8 +1005,11 @@ if inDetectionSession
     while candidateIndex >= 0
         PatternCandidate candidate = array.get(candidates, candidateIndex)
         int elapsedBars = bar_index - candidate.breakBar
+        int candidateMaximumBars =
+             candidate.volumeTransitionOnly ?
+             persistentSupportSearchBars : maximumSetupBars
 
-        if elapsedBars > maximumSetupBars
+        if elapsedBars > candidateMaximumBars
             if not na(candidate.resistanceLine)
                 line.delete(candidate.resistanceLine)
             array.remove(candidates, candidateIndex)
@@ -928,6 +1137,7 @@ if inDetectionSession
 
             bool primaryCandidateQualified =
                  barstate.isconfirmed and
+                 not candidate.volumeTransitionOnly and
                  candidate.primaryShelfEligible and
                  clusterConfirmed and
                  decisiveBreak and
@@ -938,6 +1148,7 @@ if inDetectionSession
                  candleConfirmed
             bool matureCandidateQualified =
                  barstate.isconfirmed and
+                 not candidate.volumeTransitionOnly and
                  not candidate.primaryShelfEligible and
                  candidate.setupBars >= minimumMatureSetupBars and
                  candidate.rejectionClusters >=
@@ -964,6 +1175,7 @@ if inDetectionSession
             bool controlledCandidateQualified =
                  enableControlledConsolidationReclaims and
                  barstate.isconfirmed and
+                 not candidate.volumeTransitionOnly and
                  candidate.primaryShelfEligible and
                  candidate.setupBars >=
                       minimumControlledSetupBars and
@@ -1015,10 +1227,73 @@ if inDetectionSession
                       minimumControlledEntryBodyPct and
                  entryCandleBodyPct <=
                       maximumControlledEntryBodyPct
+            bool transitionCandidatePrecheck =
+                 volumeTransitionExpansionConfirmed and
+                 candidate.primaryShelfEligible and
+                 candidate.setupBars >= transitionComparisonBars and
+                 close > candidate.shelfHigh and
+                 close > open
+            bool transitionBarsHeldBelowZone =
+                 transitionCandidatePrecheck
+            bool transitionZoneRetestSeen = false
+            float transitionResistance = na
+            int firstTransitionResistanceBar = na
+            if transitionCandidatePrecheck
+                for transitionOffset = 1 to transitionComparisonBars
+                    bool barAfterCandidateBreak =
+                         bar_index - transitionOffset >
+                              candidate.breakBar
+                    if not barAfterCandidateBreak or
+                         close[transitionOffset] > candidate.shelfHigh
+                        transitionBarsHeldBelowZone := false
+                    bool retestedStoredZone =
+                         barAfterCandidateBreak and
+                         high[transitionOffset] >=
+                              candidate.shelfLow *
+                              (1.0 -
+                                   persistentSupportTouchTolerancePct /
+                                   100.0) and
+                         close[transitionOffset] <= candidate.shelfHigh
+                    if retestedStoredZone
+                        transitionZoneRetestSeen := true
+                        transitionResistance :=
+                             na(transitionResistance) ?
+                             high[transitionOffset] :
+                             math.max(
+                                  transitionResistance,
+                                  high[transitionOffset])
+                        firstTransitionResistanceBar :=
+                             bar_index - transitionOffset
+            float transitionBreakoutExtensionPct =
+                 (close / math.max(
+                      candidate.shelfHigh,
+                      syminfo.mintick) - 1.0) * 100.0
+            bool transitionCandidateQualified =
+                 barstate.isconfirmed and
+                 transitionCandidatePrecheck and
+                 transitionBarsHeldBelowZone and
+                 transitionZoneRetestSeen and
+                 not na(transitionResistance) and
+                 close > transitionResistance and
+                 transitionBreakoutExtensionPct > 0.0 and
+                 transitionBreakoutExtensionPct <=
+                      maximumTransitionBreakoutExtensionPct and
+                 volumeTransitionExpansionConfirmed
+            if transitionCandidateQualified
+                candidate.resistance :=
+                     na(candidate.resistance) ?
+                     transitionResistance :
+                     math.max(
+                          candidate.resistance,
+                          transitionResistance)
+                if na(candidate.firstResistanceBar)
+                    candidate.firstResistanceBar :=
+                         firstTransitionResistanceBar
             bool candidateQualified =
                  primaryCandidateQualified or
                  matureCandidateQualified or
-                 controlledCandidateQualified
+                 controlledCandidateQualified or
+                 transitionCandidateQualified
 
             if candidateQualified
                 float score =
@@ -1035,6 +1310,8 @@ if inDetectionSession
                     bestMatureReclaim := matureCandidateQualified
                     bestControlledReclaim :=
                          controlledCandidateQualified
+                    bestVolumeTransitionReclaim :=
+                         transitionCandidateQualified
 
             candidate.setupVolume += nz(volume, 0.0)
             candidate.setupBars += 1
@@ -1309,7 +1586,8 @@ if not na(bestBreakBar)
          (controlledMomentumPath or
               clearSpaceImpulsePath or
               bestMatureReclaim or
-              bestControlledReclaim)
+              bestControlledReclaim or
+              bestVolumeTransitionReclaim)
 
     if not duplicateSignal and
          not overheadResistanceBlocked and
@@ -1472,6 +1750,8 @@ bool enoughShelfHistory =
      bar_index >= supportShelfBars and
      dateKey[supportShelfBars] == dateKey and
      inDetectionSession[supportShelfBars]
+float sharedPriorTrendLow = na
+int sharedValidPriorTrendBars = 0
 
 if inDetectionSession and enoughShelfHistory
     array.clear(shelfLowBuffer)
@@ -1530,6 +1810,8 @@ if inDetectionSession and enoughShelfHistory
                      low[trendOffset] :
                      math.min(priorTrendLow, low[trendOffset])
                 validPriorTrendBars += 1
+        sharedPriorTrendLow := priorTrendLow
+        sharedValidPriorTrendBars := validPriorTrendBars
         float priorAdvancePct =
              not na(priorTrendLow) ?
              (shelfLow /
@@ -1583,8 +1865,206 @@ if inDetectionSession and enoughShelfHistory
                  0.0,
                  0,
                  na,
-                 na)
+                 na,
+                 false)
             array.push(candidates, newCandidate)
+
+// Detect a repeated-low support zone once, then preserve it while price expands
+// away from it. This stateful path avoids rescanning old windows on every bar.
+if enableVolumeTransitionReclaims and inDetectionSession
+    int storedZoneIndex = array.size(storedSupportZones) - 1
+    while storedZoneIndex >= 0
+        StoredSupportZone storedZone =
+             array.get(storedSupportZones, storedZoneIndex)
+        int storedZoneAge = bar_index - storedZone.formedBar
+
+        if storedZoneAge > persistentSupportSearchBars
+            array.remove(storedSupportZones, storedZoneIndex)
+        else
+            storedZone.maximumHighAfterFormation :=
+                 math.max(
+                      storedZone.maximumHighAfterFormation,
+                      high)
+            storedZone.expanded :=
+                 storedZone.expanded or
+                 storedZone.maximumHighAfterFormation >=
+                      storedZone.upperBound *
+                      (1.0 + minimumPersistentExpansionPct / 100.0)
+            bool storedZoneBreak =
+                 storedZone.expanded and
+                 close[1] >= storedZone.lowerBound and
+                 close < storedZone.lowerBound
+
+            if storedZoneBreak and barstate.isconfirmed
+                bool storedCandidateAlreadyExists = false
+                int existingStoredIndex = array.size(candidates) - 1
+                while existingStoredIndex >= 0
+                    PatternCandidate existingStoredCandidate =
+                         array.get(candidates, existingStoredIndex)
+                    bool sameStoredBreak =
+                         existingStoredCandidate.breakBar == bar_index
+                    bool sameStoredLevel =
+                         math.abs(
+                              existingStoredCandidate.shelfLow /
+                                   math.max(
+                                        storedZone.lowerBound,
+                                        syminfo.mintick) - 1.0) * 100.0 <=
+                              duplicateLevelTolerancePct
+                    if sameStoredBreak and sameStoredLevel
+                        storedCandidateAlreadyExists := true
+                    existingStoredIndex -= 1
+
+                if not storedCandidateAlreadyExists
+                    while array.size(candidates) >=
+                         maximumActiveCandidates
+                        PatternCandidate oldestStoredCandidate =
+                             array.shift(candidates)
+                        if not na(oldestStoredCandidate.resistanceLine)
+                            line.delete(
+                                 oldestStoredCandidate.resistanceLine)
+
+                    PatternCandidate storedCandidate =
+                         PatternCandidate.new(
+                              bar_index,
+                              storedZone.lowerBound,
+                              storedZone.upperBound,
+                              storedZone.supportVolume,
+                              0.0,
+                              true,
+                              0,
+                              0,
+                              false,
+                              na,
+                              na,
+                              0.0,
+                              0,
+                              0.0,
+                              0,
+                              na,
+                              na,
+                              true)
+                    array.push(candidates, storedCandidate)
+                array.remove(storedSupportZones, storedZoneIndex)
+            else if close < storedZone.lowerBound and
+                 not storedZone.expanded
+                array.remove(storedSupportZones, storedZoneIndex)
+            else
+                array.set(
+                     storedSupportZones,
+                     storedZoneIndex,
+                     storedZone)
+        storedZoneIndex -= 1
+
+    bool enoughStoredZoneHistory =
+         bar_index >=
+              persistentSupportWindowBars +
+                   minimumPriorTrendBars and
+         dateKey[persistentSupportWindowBars +
+              minimumPriorTrendBars] == dateKey and
+         inDetectionSession[persistentSupportWindowBars +
+              minimumPriorTrendBars]
+
+    if enoughStoredZoneHistory
+        int validStoredWindowBars = 0
+        float storedWindowVolume = 0.0
+        for storedWindowOffset = 0 to persistentSupportWindowBars - 1
+            if not na(low[storedWindowOffset]) and
+                 inDetectionSession[storedWindowOffset] and
+                 dateKey[storedWindowOffset] == dateKey
+                validStoredWindowBars += 1
+                storedWindowVolume +=
+                     nz(volume[storedWindowOffset], 0.0)
+
+        float bestNewStoredScore = na
+        float bestNewStoredLow = na
+        float bestNewStoredHigh = na
+        if validStoredWindowBars == persistentSupportWindowBars
+            for storedAnchorOffset = 0 to persistentSupportWindowBars - 1
+                float storedZoneLow = low[storedAnchorOffset]
+                int storedTouches = 0
+                int storedClosesHolding = 0
+                float storedZoneHigh = storedZoneLow
+                for storedTestOffset = 0 to persistentSupportWindowBars - 1
+                    float storedLowDistancePct =
+                         (low[storedTestOffset] /
+                              math.max(
+                                   storedZoneLow,
+                                   syminfo.mintick) - 1.0) * 100.0
+                    if storedLowDistancePct >= 0.0 and
+                         storedLowDistancePct <=
+                              maximumPersistentSupportWidthPct
+                        storedTouches += 1
+                        storedZoneHigh :=
+                             math.max(
+                                  storedZoneHigh,
+                                  low[storedTestOffset])
+                    if close[storedTestOffset] >= storedZoneLow
+                        storedClosesHolding += 1
+
+                float storedPriorAdvancePct =
+                     not na(sharedPriorTrendLow) ?
+                     (storedZoneLow /
+                          math.max(
+                               sharedPriorTrendLow,
+                               syminfo.mintick) - 1.0) * 100.0 : na
+                bool newStoredZoneConfirmed =
+                     storedTouches >=
+                          minimumPersistentSupportTouches and
+                     storedClosesHolding ==
+                          persistentSupportWindowBars and
+                     sharedValidPriorTrendBars >=
+                          minimumPriorTrendBars and
+                     not na(storedPriorAdvancePct) and
+                     storedPriorAdvancePct >= minimumPriorAdvancePct
+
+                if newStoredZoneConfirmed
+                    float storedZoneWidthPct =
+                         (storedZoneHigh - storedZoneLow) /
+                              math.max(
+                                   storedZoneLow,
+                                   syminfo.mintick) * 100.0
+                    float newStoredScore =
+                         storedTouches * 1000000.0 +
+                         storedClosesHolding * 10000.0 -
+                         storedZoneWidthPct
+                    if na(bestNewStoredScore) or
+                         newStoredScore > bestNewStoredScore
+                        bestNewStoredScore := newStoredScore
+                        bestNewStoredLow := storedZoneLow
+                        bestNewStoredHigh := storedZoneHigh
+
+        if not na(bestNewStoredScore)
+            bool duplicateStoredZone = false
+            int duplicateStoredIndex =
+                 array.size(storedSupportZones) - 1
+            while duplicateStoredIndex >= 0
+                StoredSupportZone existingStoredZone =
+                     array.get(
+                          storedSupportZones,
+                          duplicateStoredIndex)
+                bool sameStoredZone =
+                     math.abs(
+                          existingStoredZone.lowerBound /
+                               math.max(
+                                    bestNewStoredLow,
+                                    syminfo.mintick) - 1.0) * 100.0 <=
+                          duplicateLevelTolerancePct
+                if sameStoredZone
+                    duplicateStoredZone := true
+                duplicateStoredIndex -= 1
+
+            if not duplicateStoredZone and barstate.isconfirmed
+                while array.size(storedSupportZones) >= 6
+                    array.shift(storedSupportZones)
+                StoredSupportZone newStoredZone =
+                     StoredSupportZone.new(
+                          bar_index,
+                          bestNewStoredLow,
+                          bestNewStoredHigh,
+                          storedWindowVolume,
+                          bestNewStoredHigh,
+                          false)
+                array.push(storedSupportZones, newStoredZone)
 
 // A strong one-bar pivot can also establish genuine support. This path is
 // deliberately strict: the pivot must follow a large advance, fail on the
