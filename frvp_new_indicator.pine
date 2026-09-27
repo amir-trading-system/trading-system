@@ -316,6 +316,148 @@ float maximumMatureRecentHighGapPct = input.float(
      group = "Mature Resistance Reclaim",
      display = display.data_window)
 
+bool enableControlledConsolidationReclaims = input.bool(
+     true,
+     title = "Enable Controlled Consolidation Reclaims",
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window,
+     tooltip = "Detects a short, continuous resistance sequence after a valid support break. Volume is compared with the consolidation itself when the earlier impulse has inflated the ordinary recent-volume average.")
+int minimumControlledSetupBars = input.int(
+     8,
+     title = "Minimum Controlled Setup Bars",
+     minval = 4,
+     maxval = 30,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+int maximumControlledSetupBars = input.int(
+     15,
+     title = "Maximum Controlled Setup Bars",
+     minval = 5,
+     maxval = 60,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+int minimumControlledResistanceBars = input.int(
+     5,
+     title = "Minimum Consecutive Resistance Bars",
+     minval = 3,
+     maxval = 15,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float minimumControlledVolumeVsSetupAverage = input.float(
+     3.0,
+     title = "Minimum Volume vs Consolidation Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float minimumControlledVolumeVsRejectionAverage = input.float(
+     3.0,
+     title = "Minimum Volume vs Resistance Average",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float minimumControlledVolumeVsPreviousBar = input.float(
+     3.0,
+     title = "Minimum Volume vs Previous Bar",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float minimumControlledVolumeVsRecentAverage = input.float(
+     0.75,
+     title = "Minimum Volume vs Recent Average",
+     minval = 0.1,
+     maxval = 10.0,
+     step = 0.05,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float maximumControlledVolumeVsRecentAverage = input.float(
+     2.0,
+     title = "Maximum Volume vs Recent Average",
+     minval = 0.25,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window,
+     tooltip = "Keeps this exception separate from the ordinary explosive reclaim path, which already requires twice the recent average volume.")
+float minimumControlledRecentVsSetupAverage = input.float(
+     2.5,
+     title = "Minimum Recent Average Inflation",
+     minval = 1.0,
+     maxval = 20.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window,
+     tooltip = "Requires the 20-bar volume average to be materially higher than the post-break consolidation average, confirming that an earlier impulse is distorting the ordinary benchmark.")
+float minimumControlledCloseLocationPct = input.float(
+     90.0,
+     title = "Minimum Close Location (%)",
+     minval = 50.0,
+     maxval = 100.0,
+     step = 1.0,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float minimumControlledEntryMomentumPct = input.float(
+     3.0,
+     title = "Minimum Entry Momentum (%)",
+     minval = 0.0,
+     maxval = 100.0,
+     step = 0.5,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float maximumControlledEntryMomentumPct = input.float(
+     15.0,
+     title = "Maximum Entry Momentum (%)",
+     minval = 1.0,
+     maxval = 200.0,
+     step = 0.5,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float minimumControlledEntryRangePct = input.float(
+     2.0,
+     title = "Minimum Entry Candle Range (%)",
+     minval = 0.1,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float maximumControlledEntryRangePct = input.float(
+     6.0,
+     title = "Maximum Entry Candle Range (%)",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float minimumControlledEntryBodyPct = input.float(
+     2.0,
+     title = "Minimum Entry Candle Body (%)",
+     minval = 0.1,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float maximumControlledEntryBodyPct = input.float(
+     6.0,
+     title = "Maximum Entry Candle Body (%)",
+     minval = 1.0,
+     maxval = 50.0,
+     step = 0.5,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+float maximumControlledBreakoutExtensionPct = input.float(
+     3.0,
+     title = "Maximum Breakout Extension (%)",
+     minval = 0.25,
+     maxval = 25.0,
+     step = 0.25,
+     group = "Controlled Consolidation Reclaim",
+     display = display.data_window)
+
 bool enablePivotSupportReclaims = input.bool(
      true,
      title = "Enable Single-Pivot Support Reclaims",
@@ -644,6 +786,7 @@ int bestBreakBar = na
 float bestScore = na
 float bestResistance = na
 bool bestMatureReclaim = false
+bool bestControlledReclaim = false
 int bestPivotBreakBar = na
 float bestPivotScore = na
 float bestPivotResistance = na
@@ -818,9 +961,64 @@ if inDetectionSession
                       minimumMatureEntryBodyPct and
                  previousHighGapPct <=
                       maximumMatureRecentHighGapPct
+            bool controlledCandidateQualified =
+                 enableControlledConsolidationReclaims and
+                 barstate.isconfirmed and
+                 candidate.primaryShelfEligible and
+                 candidate.setupBars >=
+                      minimumControlledSetupBars and
+                 candidate.setupBars <=
+                      maximumControlledSetupBars and
+                 candidate.rejectionBars >=
+                      minimumControlledResistanceBars and
+                 candidate.rejectionClusters == 1 and
+                 decisiveBreak and
+                 not na(closeAboveResistancePct) and
+                 closeAboveResistancePct <=
+                      maximumControlledBreakoutExtensionPct and
+                 not na(setupAverageVolume) and
+                 nz(volume, 0.0) >=
+                      setupAverageVolume *
+                      minimumControlledVolumeVsSetupAverage and
+                 not na(rejectionAverageVolume) and
+                 nz(volume, 0.0) >=
+                      rejectionAverageVolume *
+                      minimumControlledVolumeVsRejectionAverage and
+                 not na(recentAverageVolume) and
+                 nz(volume, 0.0) >=
+                      recentAverageVolume *
+                      minimumControlledVolumeVsRecentAverage and
+                 nz(volume, 0.0) <
+                      recentAverageVolume *
+                      maximumControlledVolumeVsRecentAverage and
+                 recentAverageVolume >=
+                      setupAverageVolume *
+                      minimumControlledRecentVsSetupAverage and
+                 not na(volume[1]) and
+                 volume[1] > 0.0 and
+                 nz(volume, 0.0) >=
+                      volume[1] *
+                      minimumControlledVolumeVsPreviousBar and
+                 close > open and
+                 closeLocation >=
+                      minimumControlledCloseLocationPct and
+                 not na(entryMomentumPct) and
+                 entryMomentumPct >=
+                      minimumControlledEntryMomentumPct and
+                 entryMomentumPct <=
+                      maximumControlledEntryMomentumPct and
+                 entryCandleRangePct >=
+                      minimumControlledEntryRangePct and
+                 entryCandleRangePct <=
+                      maximumControlledEntryRangePct and
+                 entryCandleBodyPct >=
+                      minimumControlledEntryBodyPct and
+                 entryCandleBodyPct <=
+                      maximumControlledEntryBodyPct
             bool candidateQualified =
                  primaryCandidateQualified or
-                 matureCandidateQualified
+                 matureCandidateQualified or
+                 controlledCandidateQualified
 
             if candidateQualified
                 float score =
@@ -835,6 +1033,8 @@ if inDetectionSession
                     bestBreakBar := candidate.breakBar
                     bestResistance := candidate.resistance
                     bestMatureReclaim := matureCandidateQualified
+                    bestControlledReclaim :=
+                         controlledCandidateQualified
 
             candidate.setupVolume += nz(volume, 0.0)
             candidate.setupBars += 1
@@ -1108,7 +1308,8 @@ if not na(bestBreakBar)
          previousHighGapConfirmed and
          (controlledMomentumPath or
               clearSpaceImpulsePath or
-              bestMatureReclaim)
+              bestMatureReclaim or
+              bestControlledReclaim)
 
     if not duplicateSignal and
          not overheadResistanceBlocked and
