@@ -214,6 +214,8 @@ def explore_past_potential_symbols() -> list[common.objects.SymbolTest]:
 def run_retroactive_check():
     get_only_statistics = True
     symbols_data = []
+    symbols = []
+    # for running on specific symbol
     # symbols = [
     #     common.objects.SymbolTest(
     #         name="CAST",
@@ -221,11 +223,10 @@ def run_retroactive_check():
     #         is_positive=True,
     #     ),
     # ]
-    symbols = explore_past_potential_symbols()
-    for symbol in symbols:
-        print(f"{symbol.name}: {symbol.date_time}")
 
-    return
+
+    # for running on symbols from the last days
+    # symbols = explore_past_potential_symbols()
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()
