@@ -1,0 +1,581 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-04T19:02:46.411810+00:00",
+  "status": "PYTHON_VERIFIED_PINE_RUNTIME_PENDING",
+  "source": {
+    "validation_build_id": 2026100402,
+    "pine_sha256": "1fd923e98f3842632e817e2d9aa084874454757a9dbe9a7937aa617923293b22",
+    "python_sha256": "e528d73dbf2c39dfc38447da1cdbf43016aae942639fdbe1cfe888ddbfbe98e3",
+    "validation_gate_sha256": "b4c4df5eedf89a981305d4d8134511a2a0d34925fc34b8ce6c4a6d4a8a30e11d",
+    "fixture_tree_sha256": "df4404016b6206a82616cc7fc96d1c22379cb87c873c21646f8bd226b0c6dea2",
+    "pine_detection_sha256": "040d971f2cb08d184350b6df21a551b1d8ee970d6b9e36d4a591d3ffd28301c1",
+    "python_detection_sha256": "ac53f57dca89bf2d42f60ad2a1fd35f59ba937adcca388b579507c16867e66d0",
+    "parity_rules": [
+      "candidate_creation",
+      "candidate_evaluation",
+      "nested_reclaim",
+      "qualified_entry_acceptance",
+      "state_model"
+    ],
+    "fixture_files": 23
+  },
+  "regression": {
+    "positive_entry_fixtures": 32,
+    "negative_entry_fixtures": 37,
+    "positive_setup_fixtures": 2,
+    "negative_setup_fixtures": 5,
+    "entry_cases": [
+      {
+        "symbol": "AMOD",
+        "date": "2026-10-02",
+        "fixture": "amod_2026-10-02_11a4e.csv",
+        "required": [
+          "08:45",
+          "08:53",
+          "09:15"
+        ],
+        "forbidden": [
+          "07:32",
+          "08:35",
+          "16:04"
+        ],
+        "actual": [
+          "08:45",
+          "08:53",
+          "09:15"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "NXL",
+        "date": "2026-10-01",
+        "fixture": "nxl_2026-10-01_840ce.csv",
+        "required": [
+          "09:24",
+          "09:44"
+        ],
+        "forbidden": [
+          "10:51",
+          "11:43",
+          "11:55",
+          "12:06"
+        ],
+        "actual": [
+          "09:24",
+          "09:44"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "CMCT",
+        "date": "2026-09-30",
+        "fixture": "cmct_2026-09-30_69205.csv",
+        "required": [
+          "10:25"
+        ],
+        "forbidden": [
+          "10:19",
+          "10:24"
+        ],
+        "actual": [
+          "10:25"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "LGHL",
+        "date": "2026-09-30",
+        "fixture": "lghl_2026-09-30_504a7.csv",
+        "required": [
+          "06:11",
+          "06:43"
+        ],
+        "forbidden": [
+          "06:29"
+        ],
+        "actual": [
+          "06:11",
+          "06:43"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "KNRX",
+        "date": "2026-09-28",
+        "fixture": "knrx_2026-09-28_d348a.csv",
+        "required": [
+          "09:48"
+        ],
+        "forbidden": [
+          "11:45"
+        ],
+        "actual": [
+          "09:48"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "WETO",
+        "date": "2026-08-17",
+        "fixture": "weto_2026-08-17_ec6ab.csv",
+        "required": [
+          "10:12"
+        ],
+        "forbidden": [],
+        "actual": [
+          "09:34",
+          "10:12",
+          "16:46"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "WFF",
+        "date": "2026-08-17",
+        "fixture": "wff_2026-08-17_05f96.csv",
+        "required": [
+          "11:46"
+        ],
+        "forbidden": [],
+        "actual": [
+          "11:46"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "ELPW",
+        "date": "2026-09-25",
+        "fixture": "elpw_2026-09-25_de341.csv",
+        "required": [
+          "12:19"
+        ],
+        "forbidden": [],
+        "actual": [
+          "10:29",
+          "12:19"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "APUS",
+        "date": "2026-09-25",
+        "fixture": "apus_2026-09-25_a4f2d.csv",
+        "required": [
+          "08:53",
+          "09:11"
+        ],
+        "forbidden": [],
+        "actual": [
+          "08:53",
+          "09:11"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "APUS",
+        "date": "2026-09-24",
+        "fixture": "apus_2026-09-24_47305.csv",
+        "required": [
+          "08:56",
+          "09:22"
+        ],
+        "forbidden": [],
+        "actual": [
+          "08:56",
+          "09:22"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "VEEE",
+        "date": "2026-07-13",
+        "fixture": "veee_2026-07-13_dc82b.csv",
+        "required": [
+          "10:14",
+          "10:54"
+        ],
+        "forbidden": [
+          "09:20",
+          "10:39",
+          "11:59",
+          "16:27"
+        ],
+        "actual": [
+          "09:41",
+          "10:14",
+          "10:54"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDOT",
+        "date": "2026-06-26",
+        "fixture": "sdot_2026-06-26_45c94.csv",
+        "required": [
+          "11:54",
+          "13:38",
+          "14:16"
+        ],
+        "forbidden": [
+          "06:42",
+          "06:51",
+          "07:38",
+          "08:47",
+          "10:59",
+          "14:25"
+        ],
+        "actual": [
+          "09:40",
+          "09:47",
+          "11:54",
+          "12:20",
+          "13:38",
+          "14:16"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "BOXL",
+        "date": "2026-08-12",
+        "fixture": "boxl_2026-08-12_fe518.csv",
+        "required": [
+          "14:40"
+        ],
+        "forbidden": [
+          "14:38",
+          "14:39"
+        ],
+        "actual": [
+          "04:53",
+          "05:04",
+          "05:32",
+          "14:40",
+          "19:19",
+          "19:31"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-29",
+        "fixture": "sdev_2026-09-29_51b3f.csv",
+        "required": [
+          "09:44"
+        ],
+        "forbidden": [
+          "09:58",
+          "10:17"
+        ],
+        "actual": [
+          "09:44"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-29",
+        "fixture": "sdev_2026-09-29_138e9.csv",
+        "required": [
+          "09:44",
+          "10:58",
+          "12:08"
+        ],
+        "forbidden": [
+          "12:35",
+          "12:45",
+          "14:11",
+          "14:57"
+        ],
+        "actual": [
+          "09:44",
+          "10:58",
+          "12:08"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-10-02",
+        "fixture": "sdev_2026-10-02_138e9.csv",
+        "required": [],
+        "forbidden": [
+          "12:31"
+        ],
+        "actual": [
+          "06:13",
+          "09:12",
+          "09:42",
+          "10:26",
+          "16:11"
+        ],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-30",
+        "fixture": "sdev_2026-09-30_7a5bd.csv",
+        "required": [],
+        "forbidden": [
+          "10:42"
+        ],
+        "actual": [],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-10-02",
+        "fixture": "sdev_2026-10-02_7a5bd.csv",
+        "required": [
+          "09:42",
+          "10:26",
+          "16:11"
+        ],
+        "forbidden": [
+          "14:24",
+          "14:33",
+          "15:56"
+        ],
+        "actual": [
+          "06:13",
+          "09:12",
+          "09:42",
+          "10:26",
+          "16:11"
+        ],
+        "status": "PASS"
+      }
+    ],
+    "setup_cases": [
+      {
+        "symbol": "AMOD",
+        "date": "2026-10-02",
+        "fixture": "amod_2026-10-02_11a4e.csv",
+        "required": [],
+        "forbidden": [
+          "07:24",
+          "08:45"
+        ],
+        "actual": [],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-29",
+        "fixture": "sdev_2026-09-29_138e9.csv",
+        "required": [],
+        "forbidden": [
+          "12:41",
+          "15:05"
+        ],
+        "actual": [],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-30",
+        "fixture": "sdev_2026-09-30_a770d.csv",
+        "required": [],
+        "forbidden": [
+          "11:03"
+        ],
+        "actual": [],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-10-02",
+        "fixture": "sdev_2026-10-02_7a5bd.csv",
+        "required": [
+          "15:32"
+        ],
+        "forbidden": [],
+        "actual": [
+          "15:32"
+        ],
+        "status": "PASS"
+      }
+    ],
+    "exact_entry_cases": [
+      {
+        "symbol": "AMOD",
+        "date": "2026-10-02",
+        "fixture": "amod_2026-10-02_11a4e.csv",
+        "expected": [
+          "08:45",
+          "08:53",
+          "09:15"
+        ],
+        "actual": [
+          "08:45",
+          "08:53",
+          "09:15"
+        ],
+        "missing": [],
+        "unexpected": [],
+        "status": "PASS"
+      },
+      {
+        "symbol": "NXL",
+        "date": "2026-10-01",
+        "fixture": "nxl_2026-10-01_840ce.csv",
+        "expected": [
+          "09:24",
+          "09:44"
+        ],
+        "actual": [
+          "09:24",
+          "09:44"
+        ],
+        "missing": [],
+        "unexpected": [],
+        "status": "PASS"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-29",
+        "fixture": "sdev_2026-09-29_138e9.csv",
+        "expected": [
+          "09:44",
+          "10:58",
+          "12:08"
+        ],
+        "actual": [
+          "09:44",
+          "10:58",
+          "12:08"
+        ],
+        "missing": [],
+        "unexpected": [],
+        "status": "PASS"
+      }
+    ],
+    "structural_checks": [
+      "SSM exact 15:31 SETUP / 15:45 ENTRY",
+      "SDEV fresh-reclaim guard",
+      "post-entry maturity guard",
+      "expansion and entry confidence metrics",
+      "SDEV accepted support and flip prices",
+      "SDEV 10/01 exact 09:33-only sequence",
+      "SDEV 10/02 exact sequence and line prices",
+      "AMOD 10/02 exact 08:45 / 08:53 / 09:15 sequence"
+    ]
+  },
+  "pine_runtime": {
+    "required_cases": 18,
+    "passing_cases": 0,
+    "complete": false,
+    "cases": [
+      {
+        "symbol": "AMOD",
+        "date": "2026-10-02",
+        "fixture": "amod_2026-10-02_11a4e.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "NXL",
+        "date": "2026-10-01",
+        "fixture": "nxl_2026-10-01_840ce.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "CMCT",
+        "date": "2026-09-30",
+        "fixture": "cmct_2026-09-30_69205.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "LGHL",
+        "date": "2026-09-30",
+        "fixture": "lghl_2026-09-30_504a7.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "KNRX",
+        "date": "2026-09-28",
+        "fixture": "knrx_2026-09-28_d348a.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "WETO",
+        "date": "2026-08-17",
+        "fixture": "weto_2026-08-17_ec6ab.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "WFF",
+        "date": "2026-08-17",
+        "fixture": "wff_2026-08-17_05f96.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "ELPW",
+        "date": "2026-09-25",
+        "fixture": "elpw_2026-09-25_de341.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "APUS",
+        "date": "2026-09-25",
+        "fixture": "apus_2026-09-25_a4f2d.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "APUS",
+        "date": "2026-09-24",
+        "fixture": "apus_2026-09-24_47305.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "VEEE",
+        "date": "2026-07-13",
+        "fixture": "veee_2026-07-13_dc82b.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "SDOT",
+        "date": "2026-06-26",
+        "fixture": "sdot_2026-06-26_45c94.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "BOXL",
+        "date": "2026-08-12",
+        "fixture": "boxl_2026-08-12_fe518.csv",
+        "status": "STALE_TRACE",
+        "trace_build_ids": [
+          2026100401
+        ]
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-29",
+        "fixture": "sdev_2026-09-29_51b3f.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-29",
+        "fixture": "sdev_2026-09-29_138e9.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-10-02",
+        "fixture": "sdev_2026-10-02_138e9.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-09-30",
+        "fixture": "sdev_2026-09-30_7a5bd.csv",
+        "status": "MISSING_TRACE"
+      },
+      {
+        "symbol": "SDEV",
+        "date": "2026-10-02",
+        "fixture": "sdev_2026-10-02_7a5bd.csv",
+        "status": "MISSING_TRACE"
+      }
+    ]
+  }
+}

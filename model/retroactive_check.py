@@ -218,15 +218,19 @@ def run_retroactive_check():
     # for running on specific symbol
     # symbols = [
     #     common.objects.SymbolTest(
-    #         name="CAST",
-    #         datetime_str="06.15.26T08:20:00",
+    #         name="WETO",
+    #         datetime_str="08.17.26T08:20:00",
     #         is_positive=True,
     #     ),
     # ]
 
 
     # for running on symbols from the last days
-    # symbols = explore_past_potential_symbols()
+    symbols = explore_past_potential_symbols()
+    for symbol in symbols:
+        print(f"{symbol.name} - {symbol.date_time}")
+
+    return
 
     symbols_to_collect_queue: queue.Queue[str] = queue.Queue()
     bars_ready_to_analyze_queue: queue.Queue[common.objects.Stock] = queue.Queue()

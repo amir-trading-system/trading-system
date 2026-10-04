@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-04T19:03:26.379286+00:00",
+  "status": "VALIDATION_FAILED",
+  "error": "ValidationError('Full release verification requires fresh TradingView CSV traces for build 2026100402 in /Users/ayaffe/code/trading-system/scripts/fixtures/frvp_pine_traces.')"
+}

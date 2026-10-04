@@ -10,6 +10,10 @@ indicator(
 // Strict sequence: support in an advance -> close below support -> failed
 // reclaim from underneath -> strong-volume close above rejection resistance.
 
+// PARITY_DETECTION_START
+// TradingView CSV exports include this ID. Increment it whenever detection
+// behavior changes so Python cannot accept an export from an older build.
+const int VALIDATION_BUILD_ID = 2026100402
 const string DETECTION_GROUP = "Four-Stage Pattern"
 const string QUALITY_GROUP = "Breakout Quality"
 const string CONTEXT_GROUP = "Context Evidence"
@@ -20,6 +24,86 @@ const float MAXIMUM_EXTENDED_ENTRY_RANGE_PCT = 15.0
 const float MAXIMUM_MODERATE_VWAP_GAP_PCT = 25.0
 const float MAXIMUM_VWAP_GAP_WITHOUT_DEEP_RESET_PCT = 40.0
 const float MINIMUM_DEEP_RESET_BODY_RANGE_PCT = 60.0
+// A compact support shelf can sit fractionally below a still-falling fast
+// EMA. Keep this exception deliberately narrow so it does not weaken the
+// normal trend-alignment path.
+const float NEAR_EMA_SUPPORT_TOLERANCE_PCT = 0.10
+const float NEAR_EMA_ENTRY_TOLERANCE_PCT = 0.15
+const int NEAR_EMA_MAXIMUM_SUPPORT_TOUCHES = 3
+const int NEAR_EMA_MAXIMUM_SUPPORT_SPAN_BARS = 3
+const int NEAR_EMA_MAXIMUM_SUPPORT_TO_BREAK_BARS = 2
+const int NEAR_EMA_MINIMUM_WICK_DEFENSES = 2
+const int NEAR_EMA_MINIMUM_RESISTANCE_BARS = 3
+const int NEAR_EMA_MAXIMUM_RESISTANCE_BARS = 10
+const float NEAR_EMA_MINIMUM_PRIOR_ADVANCE_PCT = 30.0
+const float NEAR_EMA_MINIMUM_BREAKDOWN_BODY_PCT = 80.0
+const float NEAR_EMA_MAXIMUM_SUPPORT_HIGH_GAP_PCT = 3.0
+const float NEAR_EMA_MAXIMUM_ENTRY_DISTANCE_PCT = 5.0
+const float NEAR_EMA_MINIMUM_ENTRY_BODY_PCT = 50.0
+const float NEAR_EMA_MINIMUM_ENTRY_RANGE_PCT = 5.0
+const float NEAR_EMA_MINIMUM_VOLUME_EXPANSION = 1.30
+// A fresh multi-bar support pattern gets one qualified breakout decision.
+// Weak body expansion, or a long unresolved stage without repeated attempts,
+// exhausts that exact pattern instead of allowing a later substitute signal.
+const float MINIMUM_FRESH_BREAKOUT_BODY_EXPANSION = 1.50
+const int MAXIMUM_FRESH_RESISTANCE_STAGE_BARS = 30
+const int MINIMUM_MATURE_FRESH_RESISTANCE_ATTEMPTS = 3
+// Repeatedly crossing the same former-support price turns it into a two-sided
+// congestion level. After four distinct resistance attempts it is no longer a
+// clean support-to-resistance flip.
+const int MAXIMUM_VALID_RESISTANCE_ATTEMPTS = 4
+// Failed expansion: elevated-volume balance, weak acceptance above the
+// balance, then a decisive bearish return into it within three bars.
+const int FAILED_EXPANSION_COMPRESSION_BARS = 20
+const int FAILED_EXPANSION_REJECTION_WINDOW_BARS = 3
+const float MINIMUM_FAILED_EXPANSION_OVERLAP_PCT = 70.0
+const float MINIMUM_FAILED_COMPRESSION_VOLUME_RATIO = 1.50
+const float MINIMUM_FAILED_BREAKOUT_VOLUME_RATIO = 2.0
+const float MAXIMUM_FAILED_BREAKOUT_CLOSE_LOCATION_PCT = 65.0
+const float MINIMUM_FAILED_BREAKOUT_UPPER_WICK_PCT = 30.0
+const float MINIMUM_FAILED_REJECTION_BODY_PCT = 60.0
+const float MAXIMUM_FAILED_REJECTION_CLOSE_LOCATION_PCT = 25.0
+const float MINIMUM_FAILED_REJECTION_VOLUME_RATIO = 0.60
+// A late reclaim inside a persistent staircase of lower highs is not a fresh
+// continuation signal when price already accepted above the resistance-contact
+// line. Four fixed windows keep this test cheap enough for the live indicator.
+const int LOWER_HIGH_WINDOW_BARS = 30
+const float MINIMUM_LOWER_HIGH_STEP_PCT = 1.0
+const float MINIMUM_LOWER_HIGH_DECLINE_PCT = 5.0
+const float LOWER_HIGH_CLEARANCE_TOLERANCE_PCT = 0.20
+const int MINIMUM_ACCEPTED_CONTACT_CLOSES = 2
+// A lower reclaim is a SETUP only when its still-active blocking layer is
+// immediately overhead. If that layer later disappears, a new complete
+// reclaim may mature the prior setup into an entry within this window.
+const float MAXIMUM_NESTED_BLOCKER_GAP_PCT = 1.0
+const int MINIMUM_SETUP_TO_ENTRY_BARS = 2
+const int MAXIMUM_SETUP_TO_ENTRY_BARS = 20
+// Session maturity is based on distinct high/pullback tiers, not every small
+// new high. A tier is confirmed by an 8% pullback; the next tier must clear the
+// prior peak by 5%. It becomes a veto only for a distant, weak micro-reset.
+const float TREND_TIER_PULLBACK_PCT = 8.0
+const float NEW_TREND_TIER_PCT = 5.0
+const int MINIMUM_MATURE_TREND_TIERS = 4
+const int MINIMUM_DECLINING_TREND_TIERS = 2
+const float TREND_TIER_VOLUME_DECLINE_FACTOR = 0.90
+const int MAXIMUM_MATURE_RESET_EXPANSION_SCORE = 1
+const int MINIMUM_MATURE_RESET_DISTANCE_BARS = 20
+// Once a valid entry has already occurred, two more confirmed high/pullback
+// tiers describe a mature continuation rather than the start of a fresh leg.
+// Only a complete 5/5 entry candle may qualify beyond that point.
+const int POST_ENTRY_MATURE_TREND_TIERS = 2
+const int POST_ENTRY_REQUIRED_CONFIRMATION_SCORE = 5
+const float MINIMUM_DECISIVE_BUYER_DEFENSE_WICK_PCT = 20.0
+const float MINIMUM_PIVOT_SUPPORT_CLOSE_LOCATION_PCT = 25.0
+const float SIGNAL_CLUSTER_CLEAR_TOLERANCE_PCT = 4.0
+const int RAPID_HIGHER_CONTINUATION_MINUTES = 35
+const int RAPID_HIGHER_PRIOR_STAGE_BARS = 5
+const float RAPID_HIGHER_MINIMUM_VOLUME_EXPANSION = 4.0
+const float PIVOT_EXPANSION_PASS_THROUGH_BODY_PCT = 75.0
+const int NESTED_EXPANSION_ANCHOR_BARS = 3
+const float MINIMUM_NESTED_ANCHOR_BODY_PCT = 60.0
+const float MINIMUM_NESTED_ANCHOR_CLOSE_LOCATION_PCT = 75.0
+const float MINIMUM_NESTED_ANCHOR_VOLUME_RATIO = 1.15
 
 string scanSession = input.session(
      "0400-2000", "Detection Session", group = DETECTION_GROUP,
@@ -91,6 +175,11 @@ float resistanceTouchTolerancePct = input.float(
      maxval = 10.0, step = 0.25, group = DETECTION_GROUP,
      display = display.data_window,
      tooltip = "After the break, price must return close to the frozen support zone from below.")
+float minimumResistanceUpperWickPct = input.float(
+     15.0, "Minimum Resistance Upper Wick (%)", minval = 0.0,
+     maxval = 100.0, step = 1.0, group = DETECTION_GROUP,
+     display = display.data_window,
+     tooltip = "At least one resistance-stage candle must show active selling through an upper wick of this size relative to its full range.")
 
 int volumeAverageBars = input.int(
      20, "Volume Average Bars", minval = 5, maxval = 100,
@@ -255,6 +344,61 @@ float minimumExpansionRangeRatio = input.float(
      1.0, "Expansion Range vs Prior 5 Bars", minval = 0.5,
      maxval = 10.0, step = 0.05, group = CONTEXT_GROUP,
      display = display.data_window)
+float minimumFullExpansionGainPct = input.float(
+     10.0, "Full Expansion Minimum Gain (%)", minval = 0.0,
+     maxval = 500.0, step = 0.5, group = CONTEXT_GROUP,
+     display = display.data_window,
+     tooltip = "Measures the complete EMA20 expansion regime from its launch through the first support bar, not only the final volume burst.")
+float minimumExpansionBullVolumeRatio = input.float(
+     2.0, "Expansion Bull Volume / Average", minval = 0.5,
+     maxval = 20.0, step = 0.1, group = CONTEXT_GROUP,
+     display = display.data_window,
+     tooltip = "Combined volume of bullish expansion bars above their volume average divided by the combined average volume of those bars.")
+float minimumExpansionBullVolumeSharePct = input.float(
+     50.0, "Expansion Bull Volume Share (%)", minval = 0.0,
+     maxval = 100.0, step = 1.0, group = CONTEXT_GROUP,
+     display = display.data_window)
+float minimumExpansionEfficiencyPct = input.float(
+     40.0, "Expansion Directional Efficiency (%)", minval = 0.0,
+     maxval = 100.0, step = 1.0, group = CONTEXT_GROUP,
+     display = display.data_window)
+float maximumExpansionDrawdownPct = input.float(
+     25.0, "Expansion Maximum Drawdown (%)", minval = 0.0,
+     maxval = 100.0, step = 1.0, group = CONTEXT_GROUP,
+     display = display.data_window)
+int maximumStrongSetupDistanceBars = input.int(
+     20, "Maximum Strong Setup Distance (Bars)", minval = 1,
+     maxval = 240, group = CONTEXT_GROUP,
+     display = display.data_window,
+     tooltip = "Counts bars from the end of support to the reclaim entry. This contributes confidence but does not invalidate an otherwise confirmed pattern.")
+float minimumEntryVolumeVsPrevious = input.float(
+     1.20, "Entry Volume / Previous Bar", minval = 0.5,
+     maxval = 20.0, step = 0.05, group = CONTEXT_GROUP,
+     display = display.data_window)
+float minimumEntryVolumeVsPriorThree = input.float(
+     1.50, "Entry Volume / Prior 3 Bars", minval = 0.5,
+     maxval = 20.0, step = 0.05, group = CONTEXT_GROUP,
+     display = display.data_window)
+float minimumEntryVolumeVsResistance = input.float(
+     1.50, "Entry Volume / Resistance", minval = 0.5,
+     maxval = 20.0, step = 0.05, group = CONTEXT_GROUP,
+     display = display.data_window)
+float minimumEntryRangeVsPriorThree = input.float(
+     1.20, "Entry Range / Prior 3 Bars", minval = 0.5,
+     maxval = 20.0, step = 0.05, group = CONTEXT_GROUP,
+     display = display.data_window)
+float strongEntryMinimumBodyPct = input.float(
+     60.0, "Strong Entry Body / Range (%)", minval = 0.0,
+     maxval = 100.0, step = 1.0, group = CONTEXT_GROUP,
+     display = display.data_window)
+float strongEntryMinimumCloseLocationPct = input.float(
+     75.0, "Strong Entry Close Location (%)", minval = 0.0,
+     maxval = 100.0, step = 1.0, group = CONTEXT_GROUP,
+     display = display.data_window)
+int highConfidenceCombinedScore = input.int(
+     9, "High Confidence Combined Score", minval = 1, maxval = 11,
+     group = CONTEXT_GROUP, display = display.data_window,
+     tooltip = "Five expansion points, five entry-confirmation points, and one proximity point are available. The score changes ranking and marker classification, not basic pattern eligibility.")
 float minimumNestedCloseLocationPct = input.float(
      70.0, "Nested Reclaim Close Location (%)", minval = 50.0,
      maxval = 100.0, step = 1.0, group = CONTEXT_GROUP,
@@ -299,6 +443,7 @@ color nestedEvidenceColor = input.color(
      color.rgb(41, 98, 255), "Nested Evidence Color",
      group = DISPLAY_GROUP, display = display.data_window)
 
+// PARITY_RULE: state_model
 type FlipCandidate
     int breakBar
     int supportStartBar
@@ -307,16 +452,19 @@ type FlipCandidate
     float supportHigh
     float priorAdvancePct
     bool supportBuyerDefense
+    bool nearEmaSupport
     bool reusedLevel
     int stageBars
     int quietStageBars
     int resistanceBars
+    int wickConfirmedResistanceBars
     int resistanceAttempts
     int bullishResistanceBars
     int quietResistanceBars
     float resistanceVolume
     float resistanceBodyPct
     float resistanceHigh
+    float resistancePriceSum
     int lastResistanceBar
     float bullishStageRelativeVolume
     int bullishStageVolumeBars
@@ -325,6 +473,10 @@ type FlipCandidate
     float breakdownVolumeExpansion
     float breakdownBodyRangePct
     float breakdownCloseFromLowPct
+    int acceptedClosesAboveSupport
+    int acceptedClosesAboveResistanceContact
+    bool failedExpansionOrigin
+    float failedExpansionHigh
     bool signaled
 
 type SupportLevel
@@ -337,16 +489,35 @@ type SupportLevel
 
 var array<FlipCandidate> candidates = array.new<FlipCandidate>()
 var array<SupportLevel> knownLevels = array.new<SupportLevel>()
+var array<float> acceptedSignalSupportLows = array.new_float()
 var array<line> savedResistanceLines = array.new<line>()
 var int lastSignalIndex = na
 var float lastSignalResistance = na
 var float lastSignalSupportLow = na
 var float lastSignalSupportHigh = na
+var int lastSignalResistanceStageBars = na
+var int lastAcceptedSignalTime = na
+var float lastAcceptedSignalSupportHigh = na
+var int lastAcceptedSignalResistanceStageBars = na
 var float lowestSinceLastSignal = na
 var int lastNestedEvidenceBar = na
 var float lastNestedClearedResistance = na
 var float lastNestedBlockingResistance = na
 var float lastNestedEvidenceScore = na
+// A direct nested entry resolves one compact support/resistance layer. Keep
+// that layer for one bar so the same completed structure cannot print again
+// on the immediately following candle.
+var int lastNestedDirectEntryBar = na
+var float lastNestedDirectEntryLower = na
+var float lastNestedDirectEntryCeiling = na
+var int lastValidatedSetupBar = na
+var float trendTierPeak = na
+var float trendTierPeakVolumeRatio = na
+var bool trendTierPullbackArmed = false
+var int confirmedTrendTiers = 0
+var int decliningTrendTiers = 0
+var float previousConfirmedTierVolumeRatio = na
+var int lastAcceptedEntryTrendTiers = na
 
 int dateKey = year * 10000 + month * 100 + dayofmonth
 bool newExchangeDate = na(dateKey[1]) or dateKey != dateKey[1]
@@ -355,15 +526,31 @@ bool inSession = not na(time(timeframe.period, scanSession))
 if newExchangeDate
     array.clear(candidates)
     array.clear(knownLevels)
+    array.clear(acceptedSignalSupportLows)
     lastSignalIndex := na
     lastSignalResistance := na
     lastSignalSupportLow := na
     lastSignalSupportHigh := na
+    lastSignalResistanceStageBars := na
+    lastAcceptedSignalTime := na
+    lastAcceptedSignalSupportHigh := na
+    lastAcceptedSignalResistanceStageBars := na
     lowestSinceLastSignal := na
     lastNestedEvidenceBar := na
     lastNestedClearedResistance := na
     lastNestedBlockingResistance := na
     lastNestedEvidenceScore := na
+    lastNestedDirectEntryBar := na
+    lastNestedDirectEntryLower := na
+    lastNestedDirectEntryCeiling := na
+    lastValidatedSetupBar := na
+    trendTierPeak := na
+    trendTierPeakVolumeRatio := na
+    trendTierPullbackArmed := false
+    confirmedTrendTiers := 0
+    decliningTrendTiers := 0
+    previousConfirmedTierVolumeRatio := na
+    lastAcceptedEntryTrendTiers := na
 else if not na(lastSignalIndex) and bar_index > lastSignalIndex
     lowestSinceLastSignal := na(lowestSinceLastSignal) ?
          low : math.min(lowestSinceLastSignal, low)
@@ -375,6 +562,10 @@ if not na(lastNestedEvidenceBar) and
     lastNestedBlockingResistance := na
     lastNestedEvidenceScore := na
 
+if not na(lastValidatedSetupBar) and
+     bar_index - lastValidatedSetupBar > MAXIMUM_SETUP_TO_ENTRY_BARS
+    lastValidatedSetupBar := na
+
 float bodyPctSeries =
      close != 0.0 ? math.abs(close - open) / close * 100.0 : na
 float volumeAverage = ta.sma(volume, volumeAverageBars)
@@ -385,6 +576,33 @@ float momentumEma = ta.ema(close, 20)
 float sessionVwap = ta.vwap(hlc3)
 float previousVolumeAverage = volumeAverage[1]
 float recentStructureHigh = ta.highest(high[1], recentStructureLookbackBars)
+float newestLowerHighWindow = ta.highest(high[1], LOWER_HIGH_WINDOW_BARS)
+float priorLowerHighWindow = ta.highest(
+     high[LOWER_HIGH_WINDOW_BARS + 1], LOWER_HIGH_WINDOW_BARS)
+float olderLowerHighWindow = ta.highest(
+     high[LOWER_HIGH_WINDOW_BARS * 2 + 1], LOWER_HIGH_WINDOW_BARS)
+float oldestLowerHighWindow = ta.highest(
+     high[LOWER_HIGH_WINDOW_BARS * 3 + 1], LOWER_HIGH_WINDOW_BARS)
+bool enoughCurrentDateHistoryForLowerHighTest =
+     not na(dateKey[LOWER_HIGH_WINDOW_BARS * 4]) and
+     dateKey[LOWER_HIGH_WINDOW_BARS * 4] == dateKey
+bool descendingLowerHighWindows =
+     enoughCurrentDateHistoryForLowerHighTest and
+     priorLowerHighWindow > newestLowerHighWindow *
+          (1.0 + MINIMUM_LOWER_HIGH_STEP_PCT / 100.0) and
+     olderLowerHighWindow > priorLowerHighWindow *
+          (1.0 + MINIMUM_LOWER_HIGH_STEP_PCT / 100.0) and
+     oldestLowerHighWindow > olderLowerHighWindow *
+          (1.0 + MINIMUM_LOWER_HIGH_STEP_PCT / 100.0)
+float fullLowerHighDeclinePct =
+     newestLowerHighWindow > 0.0 ?
+     (oldestLowerHighWindow / newestLowerHighWindow - 1.0) * 100.0 : na
+bool matureLowerHighCeiling =
+     descendingLowerHighWindows and
+     not na(fullLowerHighDeclinePct) and
+     fullLowerHighDeclinePct >= MINIMUM_LOWER_HIGH_DECLINE_PCT and
+     close <= priorLowerHighWindow *
+          (1.0 + LOWER_HIGH_CLEARANCE_TOLERANCE_PCT / 100.0)
 float currentCandleRange = math.max(high - low, syminfo.mintick)
 float currentCloseLocationPct =
      (close - low) / currentCandleRange * 100.0
@@ -400,6 +618,16 @@ float currentVolumeVsPriorFive =
 float currentRangeVsPriorFive =
      not na(priorFiveRangeAverage) and priorFiveRangeAverage > 0.0 ?
      currentCandleRange / priorFiveRangeAverage : na
+float overlapsPreviousBar =
+     not na(high[1]) and low <= high[1] and high >= low[1] ? 1.0 : 0.0
+float failedExpansionOverlapPctSeries =
+     ta.sma(
+          overlapsPreviousBar,
+          FAILED_EXPANSION_COMPRESSION_BARS - 1) * 100.0
+float failedExpansionVolumeAverageSeries =
+     ta.sma(volume, FAILED_EXPANSION_COMPRESSION_BARS)
+float failedExpansionCompressionHighSeries =
+     ta.highest(high, FAILED_EXPANSION_COMPRESSION_BARS)
 bool strongExpansionBar =
      barstate.isconfirmed and close > open and
      currentCloseLocationPct >= minimumExpansionCloseLocationPct and
@@ -407,6 +635,423 @@ bool strongExpansionBar =
      currentVolumeVsPriorFive >= minimumExpansionVolumeRatio and
      not na(currentRangeVsPriorFive) and
      currentRangeVsPriorFive >= minimumExpansionRangeRatio
+
+bool failedExpansionDetectedNow = false
+int failedExpansionBreakoutBarNow = na
+float failedExpansionHighNow = na
+
+if inSession and barstate.isconfirmed and close < open
+    float failedRejectionBodyPct =
+         (open - close) / currentCandleRange * 100.0
+    bool failedExpansionDetected = false
+    for rejectionLag = 1 to FAILED_EXPANSION_REJECTION_WINDOW_BARS
+        int compressionOffset = rejectionLag + 1
+        int baselineOffset =
+             rejectionLag + FAILED_EXPANSION_COMPRESSION_BARS + 1
+        int oldestHistoryOffset =
+             rejectionLag + FAILED_EXPANSION_COMPRESSION_BARS * 2
+        bool enoughFailedExpansionHistory =
+             oldestHistoryOffset <= bar_index and
+             not na(dateKey[oldestHistoryOffset]) and
+             dateKey[oldestHistoryOffset] == dateKey
+        float compressionVolume =
+             enoughFailedExpansionHistory ?
+             failedExpansionVolumeAverageSeries[compressionOffset] : na
+        float baselineVolume =
+             enoughFailedExpansionHistory ?
+             failedExpansionVolumeAverageSeries[baselineOffset] : na
+        float compressionHigh =
+             enoughFailedExpansionHistory ?
+             failedExpansionCompressionHighSeries[compressionOffset] : na
+        float compressionOverlapPct =
+             enoughFailedExpansionHistory ?
+             failedExpansionOverlapPctSeries[compressionOffset] : na
+        float expansionRange =
+             enoughFailedExpansionHistory ?
+             math.max(
+                  high[rejectionLag] - low[rejectionLag],
+                  syminfo.mintick) : na
+        float expansionCloseLocationPct =
+             enoughFailedExpansionHistory ?
+             (close[rejectionLag] - low[rejectionLag]) /
+                  expansionRange * 100.0 : na
+        float expansionUpperWickPct =
+             enoughFailedExpansionHistory ?
+             (high[rejectionLag] -
+                  math.max(open[rejectionLag], close[rejectionLag])) /
+                  expansionRange * 100.0 : na
+        bool failedExpansionCandidate =
+             not failedExpansionDetected and
+             enoughFailedExpansionHistory and
+             close[rejectionLag] > open[rejectionLag] and
+             close[rejectionLag] > compressionHigh and
+             not na(compressionOverlapPct) and
+             compressionOverlapPct >=
+                  MINIMUM_FAILED_EXPANSION_OVERLAP_PCT and
+             not na(compressionVolume) and compressionVolume > 0.0 and
+             not na(baselineVolume) and baselineVolume > 0.0 and
+             compressionVolume / baselineVolume >=
+                  MINIMUM_FAILED_COMPRESSION_VOLUME_RATIO and
+             volume[rejectionLag] / compressionVolume >=
+                  MINIMUM_FAILED_BREAKOUT_VOLUME_RATIO and
+             (expansionCloseLocationPct <=
+                  MAXIMUM_FAILED_BREAKOUT_CLOSE_LOCATION_PCT or
+                  expansionUpperWickPct >=
+                       MINIMUM_FAILED_BREAKOUT_UPPER_WICK_PCT) and
+             failedRejectionBodyPct >=
+                  MINIMUM_FAILED_REJECTION_BODY_PCT and
+             currentCloseLocationPct <=
+                  MAXIMUM_FAILED_REJECTION_CLOSE_LOCATION_PCT and
+             volume / math.max(volume[rejectionLag], 1.0) >=
+                  MINIMUM_FAILED_REJECTION_VOLUME_RATIO and
+             close <= compressionHigh
+        if failedExpansionCandidate
+            failedExpansionBreakoutBarNow :=
+                 bar_index - rejectionLag
+            failedExpansionHighNow := high[rejectionLag]
+            failedExpansionDetected := true
+            failedExpansionDetectedNow := true
+            break
+
+float currentTrendTierVolumeRatio =
+     not na(volumeAverage) and volumeAverage > 0.0 ?
+     volume / volumeAverage : na
+if inSession
+    if na(trendTierPeak)
+        trendTierPeak := high
+        trendTierPeakVolumeRatio := currentTrendTierVolumeRatio
+    else if not trendTierPullbackArmed
+        if high > trendTierPeak
+            trendTierPeak := high
+            trendTierPeakVolumeRatio := currentTrendTierVolumeRatio
+        if low <= trendTierPeak *
+             (1.0 - TREND_TIER_PULLBACK_PCT / 100.0)
+            confirmedTrendTiers += 1
+            if not na(previousConfirmedTierVolumeRatio) and
+                 not na(trendTierPeakVolumeRatio) and
+                 trendTierPeakVolumeRatio <=
+                      previousConfirmedTierVolumeRatio *
+                           TREND_TIER_VOLUME_DECLINE_FACTOR
+                decliningTrendTiers += 1
+            previousConfirmedTierVolumeRatio :=
+                 trendTierPeakVolumeRatio
+            trendTierPullbackArmed := true
+    else if high >= trendTierPeak *
+         (1.0 + NEW_TREND_TIER_PCT / 100.0)
+        trendTierPeak := high
+        trendTierPeakVolumeRatio := currentTrendTierVolumeRatio
+        trendTierPullbackArmed := false
+
+// Score the complete expansion regime that produced support. The regime
+// begins on the first bar after the most recent close at/below EMA20 and ends
+// at the first bar of the support formation. This makes a sustained move such
+// as WETO 09:33-09:58 one leg instead of reducing it to its final burst.
+f_confidenceMetrics(
+     int supportStartBar, int supportEndBar,
+     float resistanceVolumeExpansion,
+     float entryVolumeVsPriorThree,
+     float entryBodyRangePct,
+     float entryCloseLocationPct) =>
+    int supportStartOffset = math.max(0, bar_index - supportStartBar)
+    int oldestAvailableOffset = math.min(999, bar_index)
+    int maximumBoundaryOffset = math.min(
+         supportStartOffset + priorAdvanceLookbackBars,
+         oldestAvailableOffset)
+    int expansionStartOffset = supportStartOffset
+    if maximumBoundaryOffset > supportStartOffset
+        for boundaryOffset = supportStartOffset + 1 to maximumBoundaryOffset
+            bool crossedRegimeBoundary =
+                 not inSession[boundaryOffset] or
+                 dateKey[boundaryOffset] != dateKey or
+                 na(momentumEma[boundaryOffset]) or
+                 close[boundaryOffset] <= momentumEma[boundaryOffset]
+            if crossedRegimeBoundary
+                expansionStartOffset := boundaryOffset - 1
+                break
+            expansionStartOffset := boundaryOffset
+
+    float expansionStartPrice = open[expansionStartOffset]
+    float expansionEndPrice = close[supportStartOffset]
+    float expansionGainPct =
+         expansionStartPrice > 0.0 ?
+         (expansionEndPrice / expansionStartPrice - 1.0) * 100.0 : na
+    float expansionPath = 0.0
+    float priorExpansionClose = expansionStartPrice
+    float runningExpansionHigh = na
+    float maximumExpansionDrawdown = 0.0
+    float expansionTotalVolume = 0.0
+    float expansionBullVolume = 0.0
+    float expansionBullAverageVolume = 0.0
+    int expansionBars = expansionStartOffset - supportStartOffset + 1
+    if expansionBars > 0
+        for expansionStep = 0 to expansionBars - 1
+            int expansionOffset = expansionStartOffset - expansionStep
+            float expansionClose = close[expansionOffset]
+            float expansionLow = low[expansionOffset]
+            float expansionHigh = high[expansionOffset]
+            float expansionVolume = nz(volume[expansionOffset], 0.0)
+            float expansionAverageVolume = volumeAverage[expansionOffset]
+            expansionTotalVolume += expansionVolume
+            if not na(priorExpansionClose)
+                expansionPath += math.abs(
+                     expansionClose - priorExpansionClose)
+            priorExpansionClose := expansionClose
+            runningExpansionHigh := na(runningExpansionHigh) ?
+                 expansionHigh : math.max(
+                      runningExpansionHigh, expansionHigh)
+            float expansionDrawdown =
+                 runningExpansionHigh > 0.0 ?
+                 (1.0 - expansionLow / runningExpansionHigh) * 100.0 : 0.0
+            maximumExpansionDrawdown := math.max(
+                 maximumExpansionDrawdown, expansionDrawdown)
+            bool highVolumeBullishExpansionBar =
+                 expansionClose > open[expansionOffset] and
+                 not na(expansionAverageVolume) and
+                 expansionAverageVolume > 0.0 and
+                 expansionVolume >= expansionAverageVolume
+            if highVolumeBullishExpansionBar
+                expansionBullVolume += expansionVolume
+                expansionBullAverageVolume += expansionAverageVolume
+
+    float expansionEfficiencyPct =
+         expansionPath > 0.0 ?
+         math.abs(expansionEndPrice - expansionStartPrice) /
+              expansionPath * 100.0 : 0.0
+    float expansionBullVolumeRatio =
+         expansionBullAverageVolume > 0.0 ?
+         expansionBullVolume / expansionBullAverageVolume : 0.0
+    float expansionBullVolumeSharePct =
+         expansionTotalVolume > 0.0 ?
+         expansionBullVolume / expansionTotalVolume * 100.0 : 0.0
+    int expansionStrengthScore = 0
+    if not na(expansionGainPct) and
+         expansionGainPct >= minimumFullExpansionGainPct
+        expansionStrengthScore += 1
+    if expansionBullVolumeRatio >= minimumExpansionBullVolumeRatio
+        expansionStrengthScore += 1
+    if expansionBullVolumeSharePct >= minimumExpansionBullVolumeSharePct
+        expansionStrengthScore += 1
+    if expansionEfficiencyPct >= minimumExpansionEfficiencyPct
+        expansionStrengthScore += 1
+    if maximumExpansionDrawdown <= maximumExpansionDrawdownPct
+        expansionStrengthScore += 1
+
+    float entryVolumeVsPrevious =
+         nz(volume[1], 0.0) > 0.0 ? volume / volume[1] : na
+    float entryRangeVsPriorThree =
+         not na(priorThreeRangeAverage) and
+              priorThreeRangeAverage > 0.0 ?
+         currentCandleRange / priorThreeRangeAverage : na
+    int entryConfirmationScore = 0
+    if not na(entryVolumeVsPrevious) and
+         entryVolumeVsPrevious >= minimumEntryVolumeVsPrevious
+        entryConfirmationScore += 1
+    if not na(entryVolumeVsPriorThree) and
+         entryVolumeVsPriorThree >= minimumEntryVolumeVsPriorThree
+        entryConfirmationScore += 1
+    if not na(resistanceVolumeExpansion) and
+         resistanceVolumeExpansion >= minimumEntryVolumeVsResistance
+        entryConfirmationScore += 1
+    if not na(entryRangeVsPriorThree) and
+         entryRangeVsPriorThree >= minimumEntryRangeVsPriorThree
+        entryConfirmationScore += 1
+    if entryBodyRangePct >= strongEntryMinimumBodyPct and
+         entryCloseLocationPct >= strongEntryMinimumCloseLocationPct
+        entryConfirmationScore += 1
+
+    int supportToEntryBars = math.max(0, bar_index - supportEndBar)
+    bool closeToExpansion =
+         supportToEntryBars <= maximumStrongSetupDistanceBars
+    int combinedConfidenceScore =
+         expansionStrengthScore + entryConfirmationScore +
+         (closeToExpansion ? 1 : 0)
+    [bar_index - expansionStartOffset, expansionBars,
+     expansionGainPct, expansionEfficiencyPct,
+     maximumExpansionDrawdown, expansionBullVolumeRatio,
+     expansionBullVolumeSharePct, expansionStrengthScore,
+     supportToEntryBars, closeToExpansion,
+     entryVolumeVsPrevious, entryRangeVsPriorThree,
+     entryConfirmationScore, combinedConfidenceScore]
+
+f_refinedSupportStartBar(
+     int supportStartBar, int supportEndBar, float supportLow) =>
+    int refinedStartBar = supportStartBar
+    int supportStartOffset = bar_index - supportStartBar
+    int supportEndOffset = bar_index - supportEndBar
+    bool validSupportWindow =
+         supportStartBar < supportEndBar and
+         supportEndOffset >= 0 and
+         supportStartOffset <= bar_index
+    if validSupportWindow
+        float firstSupportRange = math.max(
+             high[supportStartOffset] - low[supportStartOffset],
+             syminfo.mintick)
+        float firstSupportBullishShare = math.max(
+             close[supportStartOffset] - open[supportStartOffset], 0.0) /
+             firstSupportRange
+        // Refine only when the broad candidate began with a bullish expansion
+        // pass-through. Ordinary multi-bar shelves keep their full span.
+        if firstSupportBullishShare >= 0.60
+            int defendedOffset = na
+            for supportOffset = supportEndOffset to supportStartOffset
+                float supportRange = math.max(
+                     high[supportOffset] - low[supportOffset],
+                     syminfo.mintick)
+                float supportBodyFloor = math.min(
+                     open[supportOffset], close[supportOffset])
+                float supportLowerWick = math.max(
+                     supportBodyFloor - low[supportOffset], 0.0)
+                float supportBullishShare = math.max(
+                     close[supportOffset] - open[supportOffset], 0.0) /
+                     supportRange
+                bool defendedShelfBar =
+                     supportLowerWick / supportRange * 100.0 >=
+                          MINIMUM_DECISIVE_BUYER_DEFENSE_WICK_PCT and
+                     supportBullishShare < 0.60
+                if na(defendedOffset) and defendedShelfBar
+                    defendedOffset := supportOffset
+            if not na(defendedOffset)
+                refinedStartBar := bar_index - defendedOffset
+                int priorBarsAvailable =
+                     supportStartOffset - defendedOffset
+                if priorBarsAvailable > 0
+                    for priorStep = 1 to priorBarsAvailable
+                        int priorOffset = defendedOffset + priorStep
+                        float priorRange = math.max(
+                             high[priorOffset] - low[priorOffset],
+                             syminfo.mintick)
+                        float priorBullishShare = math.max(
+                             close[priorOffset] - open[priorOffset], 0.0) /
+                             priorRange
+                        float priorShelfDistancePct =
+                             supportLow > 0.0 ?
+                             math.abs(
+                                  low[priorOffset] / supportLow - 1.0) *
+                                  100.0 : na
+                        bool belongsToDefendedShelf =
+                             priorBullishShare < 0.60 and
+                             not na(priorShelfDistancePct) and
+                             priorShelfDistancePct <= 1.0
+                        if belongsToDefendedShelf
+                            refinedStartBar := bar_index - priorOffset
+                        else
+                            break
+    refinedStartBar
+
+f_refinedPivotShelf(int pivotSupportBar) =>
+    int refinedStartBar = na
+    int refinedEndBar = na
+    int refinedBreakBar = na
+    int refinedResistanceBar = na
+    float refinedSupportLow = na
+    int pivotOffset = bar_index - pivotSupportBar
+    if pivotOffset >= 1 and pivotOffset <= bar_index
+        for shelfStep = 1 to 4
+            int newerSupportOffset = pivotOffset + shelfStep
+            int olderSupportOffset = newerSupportOffset + 1
+            bool validSupportPair =
+                 olderSupportOffset <= bar_index and
+                 dateKey[newerSupportOffset] == dateKey and
+                 dateKey[olderSupportOffset] == dateKey
+            if validSupportPair
+                float newerSupportRange = math.max(
+                     high[newerSupportOffset] - low[newerSupportOffset],
+                     syminfo.mintick)
+                float olderSupportRange = math.max(
+                     high[olderSupportOffset] - low[olderSupportOffset],
+                     syminfo.mintick)
+                float newerSupportLowerWick = math.max(
+                     math.min(
+                          open[newerSupportOffset],
+                          close[newerSupportOffset]) -
+                          low[newerSupportOffset], 0.0)
+                float olderSupportLowerWick = math.max(
+                     math.min(
+                          open[olderSupportOffset],
+                          close[olderSupportOffset]) -
+                          low[olderSupportOffset], 0.0)
+                float shelfLow = math.min(
+                     low[newerSupportOffset], low[olderSupportOffset])
+                float shelfHigh = math.max(
+                     low[newerSupportOffset], low[olderSupportOffset])
+                float shelfSpreadPct =
+                     shelfLow > 0.0 ?
+                     (shelfHigh / shelfLow - 1.0) * 100.0 : na
+                bool defendedSupportPair =
+                     newerSupportLowerWick / newerSupportRange * 100.0 >=
+                          MINIMUM_DECISIVE_BUYER_DEFENSE_WICK_PCT and
+                     olderSupportLowerWick / olderSupportRange * 100.0 >=
+                          MINIMUM_DECISIVE_BUYER_DEFENSE_WICK_PCT and
+                     not na(shelfSpreadPct) and shelfSpreadPct <= 1.0 and
+                     high[newerSupportOffset] >=
+                          trendEmaFast[newerSupportOffset] and
+                     high[newerSupportOffset] >=
+                          momentumEma[newerSupportOffset] and
+                     not na(sessionVwap[newerSupportOffset]) and
+                     high[newerSupportOffset] >=
+                          sessionVwap[newerSupportOffset]
+                if defendedSupportPair
+                    int shelfBreakOffset = na
+                    for shelfBreakStep = 1 to 4
+                        int possibleBreakOffset =
+                             newerSupportOffset - shelfBreakStep
+                        bool validShelfBreak =
+                             possibleBreakOffset >= 1 and
+                             possibleBreakOffset < newerSupportOffset and
+                             dateKey[possibleBreakOffset] == dateKey
+                        if na(shelfBreakOffset) and validShelfBreak and
+                             close[possibleBreakOffset] < shelfLow and
+                             close[possibleBreakOffset] <
+                                  open[possibleBreakOffset]
+                            shelfBreakOffset := possibleBreakOffset
+                    int strongestResistanceOffset = na
+                    float strongestResistanceWickPct = na
+                    if not na(shelfBreakOffset) and shelfBreakOffset > 1
+                        for shelfResistanceOffset = 1 to shelfBreakOffset - 1
+                            float shelfResistanceRange = math.max(
+                                 high[shelfResistanceOffset] -
+                                      low[shelfResistanceOffset],
+                                 syminfo.mintick)
+                            float shelfResistanceUpperWickPct =
+                                 (high[shelfResistanceOffset] -
+                                      math.max(
+                                           open[shelfResistanceOffset],
+                                           close[shelfResistanceOffset])) /
+                                      shelfResistanceRange * 100.0
+                            bool shelfResistanceContact =
+                                 high[shelfResistanceOffset] >=
+                                      shelfLow * 0.96 and
+                                 close[shelfResistanceOffset] <=
+                                      shelfLow * 1.005 and
+                                 close[shelfResistanceOffset] >=
+                                      shelfLow * 0.92 and
+                                 shelfResistanceUpperWickPct >=
+                                      minimumResistanceUpperWickPct
+                            if shelfResistanceContact and
+                                 (na(strongestResistanceWickPct) or
+                                      shelfResistanceUpperWickPct >
+                                           strongestResistanceWickPct)
+                                strongestResistanceWickPct :=
+                                     shelfResistanceUpperWickPct
+                                strongestResistanceOffset :=
+                                     shelfResistanceOffset
+                    bool validRefinedShelf =
+                         not na(strongestResistanceOffset) and
+                         close > high[strongestResistanceOffset]
+                    if validRefinedShelf and
+                         (na(refinedSupportLow) or
+                              shelfLow > refinedSupportLow)
+                        refinedStartBar :=
+                             bar_index - olderSupportOffset
+                        refinedEndBar :=
+                             bar_index - newerSupportOffset
+                        refinedBreakBar :=
+                             bar_index - shelfBreakOffset
+                        refinedResistanceBar :=
+                             bar_index - strongestResistanceOffset
+                        refinedSupportLow := shelfLow
+    [refinedStartBar, refinedEndBar, refinedBreakBar,
+     refinedResistanceBar, refinedSupportLow]
 
 bool entrySignal = false
 bool nestedEvidenceSignal = false
@@ -428,6 +1073,20 @@ float signalParticipationVolumeExpansion = na
 float signalEntryDistanceFromSupportPct = na
 float signalResistanceBullishPct = na
 float signalMomentumEmaGapPct = na
+int signalExpansionStartBar = na
+int signalExpansionBars = na
+float signalExpansionGainPct = na
+float signalExpansionEfficiencyPct = na
+float signalExpansionDrawdownPct = na
+float signalExpansionBullVolumeRatio = na
+float signalExpansionBullVolumeSharePct = na
+int signalExpansionStrengthScore = na
+int signalSupportToEntryBars = na
+bool signalCloseToExpansion = false
+float signalEntryVolumeVsPrevious = na
+float signalEntryRangeVsPriorThree = na
+int signalEntryConfirmationScore = na
+int signalCombinedConfidenceScore = na
 float signalBreakdownVolumeExpansion = na
 float signalBreakdownBodyRangePct = na
 float signalBreakdownCloseFromLowPct = na
@@ -448,7 +1107,10 @@ int bestCandidateLastResistanceBar = na
 int bestCandidateSupportEndBar = na
 float bestCandidateLevel = na
 bool bestCandidateHasStrongVolume = false
+int bestCandidateExpansionStrengthScore = na
+float signalResistanceContactLevel = na
 
+// PARITY_RULE: candidate_evaluation
 // Update every independent support-break sequence. Resistance evidence is
 // direct contact with the frozen former-support zone. The full stage between
 // breakdown and entry is tracked separately, including quiet-volume bars.
@@ -465,13 +1127,16 @@ if inSession
                  bar_index - candidate.lastResistanceBar >
                       maximumResistanceGapBars
                 candidate.resistanceBars := 0
+                candidate.wickConfirmedResistanceBars := 0
                 candidate.resistanceAttempts := 0
                 candidate.bullishResistanceBars := 0
                 candidate.quietResistanceBars := 0
                 candidate.resistanceVolume := 0.0
                 candidate.resistanceBodyPct := 0.0
                 candidate.resistanceHigh := na
+                candidate.resistancePriceSum := 0.0
                 candidate.lastResistanceBar := na
+                candidate.acceptedClosesAboveResistanceContact := 0
 
             float supportLine = candidate.supportLow
             float contactFloor = supportLine *
@@ -483,11 +1148,47 @@ if inSession
                  close <= candidate.supportHigh and
                  close >= closeFloor
             float priorResistanceHigh = candidate.resistanceHigh
+            float priorResistanceContactLevel =
+                 candidate.resistanceBars > 0 ?
+                 candidate.resistancePriceSum /
+                      candidate.resistanceBars : na
+            bool closesAboveResistanceContact =
+                 candidate.resistanceBars >= minimumResistanceBars and
+                 candidate.resistanceBars >= 2 and
+                 not na(priorResistanceContactLevel) and
+                 close > priorResistanceContactLevel
+            candidate.acceptedClosesAboveResistanceContact :=
+                 closesAboveResistanceContact ?
+                 candidate.acceptedClosesAboveResistanceContact + 1 : 0
+            float nearEmaSupportHighGapPct =
+                 close > 0.0 ?
+                 (candidate.supportHigh / close - 1.0) * 100.0 : na
+            float nearEmaEntryDistancePct =
+                 candidate.supportLow > 0.0 ?
+                 (close / candidate.supportLow - 1.0) * 100.0 : na
+            bool nearEmaFreshBreakout =
+                 not candidate.reusedLevel and
+                 candidate.nearEmaSupport and
+                 candidate.resistanceBars >=
+                      NEAR_EMA_MINIMUM_RESISTANCE_BARS and
+                 candidate.resistanceBars <=
+                      NEAR_EMA_MAXIMUM_RESISTANCE_BARS and
+                 candidate.breakdownBodyRangePct >=
+                      NEAR_EMA_MINIMUM_BREAKDOWN_BODY_PCT and
+                 candidate.priorAdvancePct >=
+                      NEAR_EMA_MINIMUM_PRIOR_ADVANCE_PCT and
+                 not na(nearEmaSupportHighGapPct) and
+                 nearEmaSupportHighGapPct <=
+                      NEAR_EMA_MAXIMUM_SUPPORT_HIGH_GAP_PCT and
+                 not na(nearEmaEntryDistancePct) and
+                 nearEmaEntryDistancePct <=
+                      NEAR_EMA_MAXIMUM_ENTRY_DISTANCE_PCT
             bool strictFreshBreakout =
                  not candidate.reusedLevel and
                  close > priorResistanceHigh *
                       (1.0 + minimumBreakoutPct / 100.0) and
-                 close > candidate.supportHigh
+                 (close > candidate.supportHigh or
+                      nearEmaFreshBreakout)
             // A reused level cannot take a shortcut through a weaker, newer
             // sequence at the same price. It must also clear the highest
             // resistance already proven by every active sibling sequence in
@@ -525,10 +1226,19 @@ if inSession
                  clearsSameLevelResistance
             bool breakoutNow =
                  candidate.resistanceBars >= minimumResistanceBars and
+                 candidate.wickConfirmedResistanceBars >= 1 and
                  not na(priorResistanceHigh) and
                  (strictFreshBreakout or persistentLevelBreakout)
 
-            if breakoutNow
+            if breakoutNow and not candidate.supportBuyerDefense
+                // The compact pivot was provisional. Its reclaim may block
+                // same-bar shortcuts through the same price cluster, but it
+                // cannot produce an entry or survive as reusable resistance
+                // when the originating support lacked real lower-wick
+                // defense. `signaled` removes it on the next bar without
+                // plotting an entry on this one.
+                candidate.signaled := true
+            else if breakoutNow
                 float resistanceAverageVolume =
                      candidate.resistanceVolume /
                      candidate.resistanceBars
@@ -599,6 +1309,25 @@ if inSession
                      close >= trendEmaFast and
                      close >= momentumEma and
                      not na(sessionVwap) and close >= sessionVwap
+                bool nearEmaReclaimException =
+                     nearEmaFreshBreakout and
+                     entryBodyRangePct >=
+                          NEAR_EMA_MINIMUM_ENTRY_BODY_PCT and
+                     entryRangePct >=
+                          NEAR_EMA_MINIMUM_ENTRY_RANGE_PCT and
+                     not na(volumeExpansion) and
+                     volumeExpansion >=
+                          NEAR_EMA_MINIMUM_VOLUME_EXPANSION and
+                     not na(trendEmaFast) and
+                     not na(momentumEma) and
+                     trendEmaFast >= momentumEma *
+                          (1.0 -
+                               NEAR_EMA_ENTRY_TOLERANCE_PCT / 100.0) and
+                     close >= trendEmaFast and
+                     close >= momentumEma and
+                     not na(sessionVwap) and close >= sessionVwap
+                bool entryTrendAligned =
+                     trendAligned or nearEmaReclaimException
                 float vwapGapPct =
                      not na(sessionVwap) and sessionVwap > 0.0 ?
                      (close / sessionVwap - 1.0) * 100.0 : na
@@ -665,6 +1394,10 @@ if inSession
                                maximumLongStageSupportWidthPct and
                           candidate.priorAdvancePct >=
                                minimumLongStagePriorAdvancePct)
+                bool staleMatureReclaim =
+                     matureLowerHighCeiling and
+                     candidate.acceptedClosesAboveResistanceContact >=
+                          MINIMUM_ACCEPTED_CONTACT_CLOSES
                 bool candidateQualified =
                      barstate.isconfirmed and
                      candidate.supportBuyerDefense and
@@ -675,16 +1408,47 @@ if inSession
                      (normalPriceExpansion or compactQuietExpansion) and
                      not na(recentHighGapPct) and
                      (recentHighGapPct <= maximumRecentHighGapPct or
-                          trendAligned) and
+                          entryTrendAligned) and
                      candidate.breakdownBodyRangePct >=
                           minimumBreakdownBodyRangePct and
                      farReclaimQuality and
                      sustainedParticipation and
                      preciseLongResistance and
+                     not staleMatureReclaim and
                      (directVolumeConfirmation or quietResistanceExpansion) and
-                     trendAligned and controlledExtension
+                     entryTrendAligned and controlledExtension
 
                 if candidateQualified
+                    [candidateExpansionStartBar,
+                     candidateExpansionBars,
+                     candidateExpansionGainPct,
+                     candidateExpansionEfficiencyPct,
+                     candidateExpansionDrawdownPct,
+                     candidateExpansionBullVolumeRatio,
+                     candidateExpansionBullVolumeSharePct,
+                     candidateExpansionStrengthScore,
+                     candidateSupportToEntryBars,
+                     candidateCloseToExpansion,
+                     candidateEntryVolumeVsPrevious,
+                     candidateEntryRangeVsPriorThree,
+                     candidateEntryConfirmationScore,
+                     candidateCombinedConfidenceScore] =
+                         f_confidenceMetrics(
+                              candidate.supportStartBar,
+                              candidate.supportEndBar,
+                              volumeExpansion,
+                              entryVolumeVsPriorThree,
+                              entryBodyRangePct,
+                              closeLocationPct)
+                    bool matureWeakReset =
+                         confirmedTrendTiers >=
+                              MINIMUM_MATURE_TREND_TIERS and
+                         decliningTrendTiers >=
+                              MINIMUM_DECLINING_TREND_TIERS and
+                         candidateExpansionStrengthScore <=
+                              MAXIMUM_MATURE_RESET_EXPANSION_SCORE and
+                         candidateSupportToEntryBars >
+                              MINIMUM_MATURE_RESET_DISTANCE_BARS
                     int behaviorQualityScore = 0
                     if candidate.resistanceAttempts ==
                          preferredResistanceAttempts
@@ -712,23 +1476,45 @@ if inSession
                          not na(bestCandidateLastResistanceBar) and
                          candidate.lastResistanceBar ==
                               bestCandidateLastResistanceBar
+                    bool candidateHasStructuralExpansion =
+                         candidateExpansionStrengthScore >= 4
+                    bool bestHasWeakMicroExpansion =
+                         not na(bestCandidateExpansionStrengthScore) and
+                         bestCandidateExpansionStrengthScore <= 1
+                    bool bestHasStructuralExpansion =
+                         not na(bestCandidateExpansionStrengthScore) and
+                         bestCandidateExpansionStrengthScore >= 4
+                    bool candidateHasWeakMicroExpansion =
+                         candidateExpansionStrengthScore <= 1
+                    bool structuralExpansionOverride =
+                         sameResistanceRecency and
+                         bestHasWeakMicroExpansion and
+                         candidateHasStructuralExpansion
+                    bool protectStructuralExpansion =
+                         sameResistanceRecency and
+                         bestHasStructuralExpansion and
+                         candidateHasWeakMicroExpansion
                     bool higherEstablishedSupport =
                          sameResistanceRecency and
+                         not protectStructuralExpansion and
                          candidate.supportHigh > bestCandidateLevel
                     bool sameEstablishedSupport =
                          sameResistanceRecency and
                          candidate.supportHigh == bestCandidateLevel
                     bool betterCandidate =
-                         na(bestCandidateLevel) or moreRecentResistance or
-                         higherEstablishedSupport or
-                         (sameEstablishedSupport and
-                              candidateHasStrongVolume and
-                              not bestCandidateHasStrongVolume) or
-                         (sameEstablishedSupport and
-                              candidateHasStrongVolume ==
-                                   bestCandidateHasStrongVolume and
-                              candidate.supportEndBar >
-                                   bestCandidateSupportEndBar)
+                         not matureWeakReset and
+                         (na(bestCandidateLevel) or
+                          moreRecentResistance or
+                          structuralExpansionOverride or
+                          higherEstablishedSupport or
+                          (sameEstablishedSupport and
+                               candidateHasStrongVolume and
+                               not bestCandidateHasStrongVolume) or
+                          (sameEstablishedSupport and
+                               candidateHasStrongVolume ==
+                                    bestCandidateHasStrongVolume and
+                               candidate.supportEndBar >
+                                    bestCandidateSupportEndBar))
                     if betterCandidate
                         bestCandidateIndex := candidateIndex
                         bestCandidateBreakBar := candidate.breakBar
@@ -739,10 +1525,19 @@ if inSession
                         bestCandidateLevel := candidate.supportHigh
                         bestCandidateHasStrongVolume :=
                              candidateHasStrongVolume
+                        bestCandidateExpansionStrengthScore :=
+                             candidateExpansionStrengthScore
                         detectedSupportLow := candidate.supportLow
                         detectedSupportHigh := candidate.supportHigh
                         detectedResistanceHigh := priorResistanceHigh
-                        detectedFlipLevel := candidate.supportLow
+                        signalResistanceContactLevel :=
+                             candidate.resistanceBars > 0 ?
+                             math.round_to_mintick(
+                                  candidate.resistancePriceSum /
+                                       candidate.resistanceBars) :
+                             candidate.supportLow
+                        detectedFlipLevel :=
+                             signalResistanceContactLevel
                         signalPriorAdvancePct := candidate.priorAdvancePct
                         signalBodyExpansion := bodyExpansion
                         signalVolumeExpansion := volumeExpansion
@@ -757,6 +1552,33 @@ if inSession
                         signalResistanceBullishPct :=
                              resistanceBullishPct
                         signalMomentumEmaGapPct := momentumEmaGapPct
+                        signalExpansionStartBar :=
+                             candidateExpansionStartBar
+                        signalExpansionBars := candidateExpansionBars
+                        signalExpansionGainPct :=
+                             candidateExpansionGainPct
+                        signalExpansionEfficiencyPct :=
+                             candidateExpansionEfficiencyPct
+                        signalExpansionDrawdownPct :=
+                             candidateExpansionDrawdownPct
+                        signalExpansionBullVolumeRatio :=
+                             candidateExpansionBullVolumeRatio
+                        signalExpansionBullVolumeSharePct :=
+                             candidateExpansionBullVolumeSharePct
+                        signalExpansionStrengthScore :=
+                             candidateExpansionStrengthScore
+                        signalSupportToEntryBars :=
+                             candidateSupportToEntryBars
+                        signalCloseToExpansion :=
+                             candidateCloseToExpansion
+                        signalEntryVolumeVsPrevious :=
+                             candidateEntryVolumeVsPrevious
+                        signalEntryRangeVsPriorThree :=
+                             candidateEntryRangeVsPriorThree
+                        signalEntryConfirmationScore :=
+                             candidateEntryConfirmationScore
+                        signalCombinedConfidenceScore :=
+                             candidateCombinedConfidenceScore
                         signalBreakdownVolumeExpansion :=
                              candidate.breakdownVolumeExpansion
                         signalBreakdownBodyRangePct :=
@@ -774,26 +1596,50 @@ if inSession
                         signalRecentHighGapPct := recentHighGapPct
                         signalSupportStartBar := candidate.supportStartBar
                 else
-                    // A weak first cross is another unfinished attempt. A
-                    // later entry must clear this bar's high as well.
-                    bool weakBreakStartsNewAttempt =
-                         candidate.resistanceBars == 0 or
-                         na(candidate.lastResistanceBar) or
-                         bar_index - candidate.lastResistanceBar > 1
-                    if weakBreakStartsNewAttempt
-                        candidate.resistanceAttempts += 1
-                    candidate.resistanceBars += 1
-                    if close > open
-                        candidate.bullishResistanceBars += 1
-                    candidate.resistanceVolume += nz(volume, 0.0)
-                    candidate.resistanceBodyPct += nz(bodyPctSeries, 0.0)
-                    candidate.resistanceHigh := math.max(
-                         priorResistanceHigh, high)
-                    candidate.lastResistanceBar := bar_index
-                    if not na(volumeAverage) and volume < volumeAverage
-                        candidate.quietResistanceBars += 1
+                    // Once price closes cleanly above both the frozen support
+                    // zone and the resistance-contact price, that resistance
+                    // has already been crossed. If this first cross lacks the
+                    // required entry quality, consume the sequence instead of
+                    // relabeling the cross as another resistance bar and later
+                    // calling a continuation candle an ENTRY.
+                    bool unqualifiedResistanceCross =
+                         not na(priorResistanceHigh) and
+                         close > math.max(
+                              candidate.supportHigh,
+                              priorResistanceHigh) and
+                         candidate.acceptedClosesAboveSupport >= 1
+                    if unqualifiedResistanceCross
+                        candidate.signaled := true
+                    else
+                        candidate.acceptedClosesAboveSupport :=
+                             close > candidate.supportHigh and close > open ?
+                             candidate.acceptedClosesAboveSupport + 1 : 0
+                        bool weakBreakStartsNewAttempt =
+                             candidate.resistanceBars == 0 or
+                             na(candidate.lastResistanceBar) or
+                             bar_index - candidate.lastResistanceBar > 1
+                        if weakBreakStartsNewAttempt
+                            candidate.resistanceAttempts += 1
+                        candidate.resistanceBars += 1
+                        float weakBreakUpperWickPct =
+                             (high - math.max(open, close)) /
+                                  currentCandleRange * 100.0
+                        if weakBreakUpperWickPct >=
+                             minimumResistanceUpperWickPct
+                            candidate.wickConfirmedResistanceBars += 1
+                        if close > open
+                            candidate.bullishResistanceBars += 1
+                        candidate.resistanceVolume += nz(volume, 0.0)
+                        candidate.resistanceBodyPct += nz(bodyPctSeries, 0.0)
+                        candidate.resistancePriceSum += high
+                        candidate.resistanceHigh := math.max(
+                             priorResistanceHigh, high)
+                        candidate.lastResistanceBar := bar_index
+                        if not na(volumeAverage) and volume < volumeAverage
+                            candidate.quietResistanceBars += 1
             else
                 if resistanceNow
+                    candidate.acceptedClosesAboveSupport := 0
                     bool contactStartsNewAttempt =
                          candidate.resistanceBars == 0 or
                          na(candidate.lastResistanceBar) or
@@ -801,21 +1647,34 @@ if inSession
                     if contactStartsNewAttempt
                         candidate.resistanceAttempts += 1
                     candidate.resistanceBars += 1
+                    float resistanceUpperWickPct =
+                         (high - math.max(open, close)) /
+                              currentCandleRange * 100.0
+                    if resistanceUpperWickPct >=
+                         minimumResistanceUpperWickPct
+                        candidate.wickConfirmedResistanceBars += 1
                     if close > open
                         candidate.bullishResistanceBars += 1
                     candidate.resistanceVolume += nz(volume, 0.0)
                     candidate.resistanceBodyPct += nz(bodyPctSeries, 0.0)
+                    candidate.resistancePriceSum += high
                     candidate.resistanceHigh :=
                          na(candidate.resistanceHigh) ?
                          high : math.max(candidate.resistanceHigh, high)
                     candidate.lastResistanceBar := bar_index
                     if not na(volumeAverage) and volume < volumeAverage
                         candidate.quietResistanceBars += 1
-                else if candidate.resistanceBars == 0 and
-                     close > candidate.supportHigh
-                    // Breakdown failed before support proved itself as
-                    // resistance, so the required four-stage order is absent.
-                    removeCandidate := true
+                else if close > candidate.supportHigh
+                    if candidate.resistanceBars == 0
+                        // Breakdown failed before support proved itself as
+                        // resistance, so the required four-stage order is absent.
+                        removeCandidate := true
+                    else
+                        candidate.acceptedClosesAboveSupport :=
+                             close > open ?
+                             candidate.acceptedClosesAboveSupport + 1 : 0
+                else
+                    candidate.acceptedClosesAboveSupport := 0
 
             if not removeCandidate
                 candidate.stageBars += 1
@@ -840,6 +1699,7 @@ if inSession
             array.set(candidates, candidateIndex, candidate)
         candidateIndex -= 1
 
+// PARITY_RULE: nested_reclaim
 // A nested reclaim is a complete lower support-flip sequence that resolves
 // before a separate, higher active resistance. It is evidence that buyers
 // removed one supply layer, but it is not an entry until the higher layer is
@@ -877,8 +1737,10 @@ if nestedReclaimBarQuality
     float bestNestedLowerResistance = na
     float bestNestedHigherResistance = na
     int bestNestedSupportStartBar = na
+    int bestNestedBreakOffset = na
     int bestNestedResistanceTouches = 0
     int bestNestedSupportTouches = 0
+    int bestNestedSupportSpan = na
 
     for nestedBreakOffset = 2 to 6
         float nestedBreakRange = math.max(
@@ -905,7 +1767,7 @@ if nestedReclaimBarQuality
              close[nestedBreakOffset] < open[nestedBreakOffset] and
              nestedControlledExtension
         if validNestedBreak
-            float lowerResistance = na
+            float resistanceStageHigh = na
             bool validResistanceStage = true
             for nestedResistanceOffset = 1 to nestedBreakOffset - 1
                 bool validResistanceBar =
@@ -913,23 +1775,101 @@ if nestedReclaimBarQuality
                      inSession[nestedResistanceOffset] and
                      dateKey[nestedResistanceOffset] == dateKey
                 if validResistanceBar
-                    lowerResistance :=
-                         na(lowerResistance) ?
+                    resistanceStageHigh :=
+                         na(resistanceStageHigh) ?
                          high[nestedResistanceOffset] :
-                         math.max(lowerResistance,
+                         math.max(resistanceStageHigh,
                               high[nestedResistanceOffset])
                 else
                     validResistanceStage := false
 
+            // Freeze the level from the newest genuinely defended support
+            // bar before the bearish cross. Never derive it from the later
+            // resistance highs: doing so retrofits a pattern that the market
+            // had not established when the breakdown occurred.
+            float lowerResistance = na
+            if validResistanceStage
+                for nestedAnchorStep = 1 to 10
+                    int nestedAnchorOffset =
+                         nestedBreakOffset + nestedAnchorStep
+                    bool validNestedAnchor =
+                         nestedAnchorOffset <= bar_index and
+                         inSession[nestedAnchorOffset] and
+                         dateKey[nestedAnchorOffset] == dateKey
+                    if validNestedAnchor
+                        float frozenSupport = low[nestedAnchorOffset]
+                        bool breaksFrozenSupport =
+                             frozenSupport > 0.0 and
+                             close[nestedBreakOffset + 1] >=
+                                  frozenSupport and
+                             close[nestedBreakOffset] < frozenSupport
+                        if breaksFrozenSupport
+                            float anchorRange = math.max(
+                                 high[nestedAnchorOffset] -
+                                      low[nestedAnchorOffset],
+                                 syminfo.mintick)
+                            float anchorBody = math.max(
+                                 math.abs(
+                                      close[nestedAnchorOffset] -
+                                           open[nestedAnchorOffset]),
+                                 syminfo.mintick)
+                            float anchorBodyFloor = math.min(
+                                 open[nestedAnchorOffset],
+                                 close[nestedAnchorOffset])
+                            float anchorLowerWick = math.max(
+                                 anchorBodyFloor -
+                                      low[nestedAnchorOffset], 0.0)
+                            float anchorLowerWickPct =
+                                 anchorLowerWick / anchorRange * 100.0
+                            float anchorWickToBodyPct =
+                                 anchorLowerWick / anchorBody * 100.0
+                            float anchorCloseLocationPct =
+                                 (close[nestedAnchorOffset] -
+                                      low[nestedAnchorOffset]) /
+                                      anchorRange * 100.0
+                            float anchorRangeRatio =
+                                 not na(
+                                      priorThreeRangeAverage[
+                                           nestedAnchorOffset]) and
+                                      priorThreeRangeAverage[
+                                           nestedAnchorOffset] > 0.0 ?
+                                 anchorRange /
+                                      priorThreeRangeAverage[
+                                           nestedAnchorOffset] : na
+                            bool defendedFrozenSupport =
+                                 anchorLowerWickPct >=
+                                      minimumBuyerDefenseLowerWickPct and
+                                 (anchorWickToBodyPct >=
+                                      minimumSupportWickToBodyPct or
+                                      anchorCloseLocationPct >= 75.0) and
+                                 not na(anchorRangeRatio) and
+                                 anchorRangeRatio <= 1.25
+                            bool anchorReachesTrend =
+                                 high[nestedAnchorOffset] >=
+                                      trendEmaFast[nestedAnchorOffset] and
+                                 high[nestedAnchorOffset] >=
+                                      momentumEma[nestedAnchorOffset] and
+                                 not na(
+                                      sessionVwap[nestedAnchorOffset]) and
+                                 high[nestedAnchorOffset] >=
+                                      sessionVwap[nestedAnchorOffset]
+                            if defendedFrozenSupport and
+                                 anchorReachesTrend
+                                lowerResistance := frozenSupport
+                                break
+
             bool crossedLowerResistance =
                  validResistanceStage and
                  not na(lowerResistance) and
-                 close > lowerResistance and
+                 not na(resistanceStageHigh) and
+                 close > math.max(
+                      lowerResistance, resistanceStageHigh) and
                  close[nestedBreakOffset] < lowerResistance and
                  close[nestedBreakOffset + 1] >= lowerResistance
 
             if crossedLowerResistance
                 int nestedResistanceTouches = 0
+                bool nestedResistanceHasSellerRejection = false
                 for nestedTouchOffset = 1 to nestedBreakOffset - 1
                     bool resistanceTouch =
                          high[nestedTouchOffset] >=
@@ -941,15 +1881,46 @@ if nestedReclaimBarQuality
                               lowerResistance * 1.005
                     if resistanceTouch
                         nestedResistanceTouches += 1
+                        float nestedTouchRange = math.max(
+                             high[nestedTouchOffset] -
+                                  low[nestedTouchOffset],
+                             syminfo.mintick)
+                        float nestedTouchUpperWickPct =
+                             (high[nestedTouchOffset] -
+                                  math.max(
+                                       open[nestedTouchOffset],
+                                       close[nestedTouchOffset])) /
+                                  nestedTouchRange * 100.0
+                        if nestedTouchUpperWickPct >=
+                             minimumResistanceUpperWickPct
+                            nestedResistanceHasSellerRejection := true
 
                 int nestedSupportTouches = 0
                 int oldestNestedSupportOffset = na
                 int oldestNestedBullishSupportOffset = na
                 int newestNestedSupportOffset = na
+                int strongestNestedDefenseOffset = na
+                float strongestNestedDefensePct = na
+                int nestedSupportMaximumOffset =
+                     nestedBreakOffset + 10
+                for nestedBoundaryStep = 1 to 10
+                    int nestedBoundaryOffset =
+                         nestedBreakOffset + nestedBoundaryStep
+                    bool validNestedBoundaryBar =
+                         nestedBoundaryOffset <= bar_index and
+                         inSession[nestedBoundaryOffset] and
+                         dateKey[nestedBoundaryOffset] == dateKey
+                    if not validNestedBoundaryBar or
+                         close[nestedBoundaryOffset] < lowerResistance
+                        nestedSupportMaximumOffset :=
+                             nestedBoundaryOffset - 1
+                        break
                 for nestedSupportStep = 1 to 10
                     int nestedSupportOffset =
                          nestedBreakOffset + nestedSupportStep
                     bool validNestedSupportBar =
+                         nestedSupportOffset <=
+                              nestedSupportMaximumOffset and
                          nestedSupportOffset <= bar_index and
                          inSession[nestedSupportOffset] and
                          dateKey[nestedSupportOffset] == dateKey
@@ -964,6 +1935,24 @@ if nestedReclaimBarQuality
                                   lowerResistance * 0.97
                         if nestedSupportTouch
                             nestedSupportTouches += 1
+                            float nestedSupportRange = math.max(
+                                 high[nestedSupportOffset] -
+                                      low[nestedSupportOffset],
+                                 syminfo.mintick)
+                            float nestedSupportBodyFloor = math.min(
+                                 open[nestedSupportOffset],
+                                 close[nestedSupportOffset])
+                            float nestedSupportDefensePct = math.max(
+                                 nestedSupportBodyFloor -
+                                      low[nestedSupportOffset], 0.0) /
+                                      nestedSupportRange * 100.0
+                            if na(strongestNestedDefensePct) or
+                                 nestedSupportDefensePct >
+                                      strongestNestedDefensePct
+                                strongestNestedDefensePct :=
+                                     nestedSupportDefensePct
+                                strongestNestedDefenseOffset :=
+                                     nestedSupportOffset
                             newestNestedSupportOffset :=
                                  na(newestNestedSupportOffset) ?
                                  nestedSupportOffset :
@@ -992,6 +1981,44 @@ if nestedReclaimBarQuality
                      high[newestNestedSupportOffset] >=
                           sessionVwap[newestNestedSupportOffset]
 
+                bool nestedHasNearbyExpansionAnchor = false
+                if not na(oldestNestedSupportOffset)
+                    for nestedAnchorStep = 1 to NESTED_EXPANSION_ANCHOR_BARS
+                        int nestedAnchorOffset =
+                             oldestNestedSupportOffset + nestedAnchorStep
+                        bool validNestedAnchorBar =
+                             nestedAnchorOffset <= bar_index and
+                             inSession[nestedAnchorOffset] and
+                             dateKey[nestedAnchorOffset] == dateKey
+                        if validNestedAnchorBar
+                            float nestedAnchorRange = math.max(
+                                 high[nestedAnchorOffset] -
+                                      low[nestedAnchorOffset],
+                                 syminfo.mintick)
+                            float nestedAnchorBodyPct = math.max(
+                                 close[nestedAnchorOffset] -
+                                      open[nestedAnchorOffset],
+                                 0.0) / nestedAnchorRange * 100.0
+                            float nestedAnchorCloseLocationPct =
+                                 (close[nestedAnchorOffset] -
+                                      low[nestedAnchorOffset]) /
+                                      nestedAnchorRange * 100.0
+                            float nestedAnchorVolumeRatio =
+                                 not na(volumeAverage[nestedAnchorOffset]) and
+                                      volumeAverage[nestedAnchorOffset] > 0.0 ?
+                                 volume[nestedAnchorOffset] /
+                                      volumeAverage[nestedAnchorOffset] : na
+                            bool validNestedExpansionAnchor =
+                                 nestedAnchorBodyPct >=
+                                      MINIMUM_NESTED_ANCHOR_BODY_PCT and
+                                 nestedAnchorCloseLocationPct >=
+                                      MINIMUM_NESTED_ANCHOR_CLOSE_LOCATION_PCT and
+                                 not na(nestedAnchorVolumeRatio) and
+                                 nestedAnchorVolumeRatio >=
+                                      MINIMUM_NESTED_ANCHOR_VOLUME_RATIO
+                            if validNestedExpansionAnchor
+                                nestedHasNearbyExpansionAnchor := true
+
                 float nearestHigherResistance = na
                 int nestedOverheadIndex = array.size(candidates) - 1
                 while nestedOverheadIndex >= 0
@@ -999,21 +2026,31 @@ if nestedReclaimBarQuality
                          array.get(candidates, nestedOverheadIndex)
                     float nestedOverheadResistance =
                          nestedOverhead.resistanceHigh
+                    float nestedOverheadSupport =
+                         nestedOverhead.supportHigh
                     float nestedLayerDistancePct =
                          not na(nestedOverheadResistance) and
                               lowerResistance > 0.0 ?
                          (nestedOverheadResistance /
                               lowerResistance - 1.0) * 100.0 : na
+                    float nestedBlockerGapPct =
+                         not na(nestedOverheadResistance) and close > 0.0 ?
+                         (nestedOverheadResistance / close - 1.0) *
+                              100.0 : na
                     bool separateHigherResistance =
                          not nestedOverhead.signaled and
                          nestedOverhead.resistanceBars >=
                               minimumResistanceBars and
                          not na(nestedOverheadResistance) and
+                         nestedOverheadSupport > lowerResistance and
                          nestedOverheadResistance > close and
                          not na(nestedLayerDistancePct) and
                          nestedLayerDistancePct >= 1.0 and
                          nestedLayerDistancePct <=
-                              maximumOverheadResistanceDistancePct
+                              maximumOverheadResistanceDistancePct and
+                         not na(nestedBlockerGapPct) and
+                         nestedBlockerGapPct <=
+                              MAXIMUM_NESTED_BLOCKER_GAP_PCT
                     if separateHigherResistance and
                          (na(nearestHigherResistance) or
                               nestedOverheadResistance <
@@ -1024,9 +2061,11 @@ if nestedReclaimBarQuality
 
                 bool nestedPatternConfirmed =
                      nestedResistanceTouches >= 1 and
+                     nestedResistanceHasSellerRejection and
                      nestedSupportTouches >= 2 and
                      nestedSupportBarReachesTrend and
-                     not na(nearestHigherResistance)
+                     (na(nearestHigherResistance) or
+                          nestedHasNearbyExpansionAnchor)
                 bool betterNestedPattern =
                      nestedPatternConfirmed and
                      (na(bestNestedLowerResistance) or
@@ -1038,6 +2077,8 @@ if nestedReclaimBarQuality
                                 bestNestedSupportTouches))
                 if betterNestedPattern
                     int nestedLineStartOffset =
+                         not na(strongestNestedDefenseOffset) ?
+                         strongestNestedDefenseOffset :
                          not na(oldestNestedBullishSupportOffset) ?
                          oldestNestedBullishSupportOffset :
                          oldestNestedSupportOffset
@@ -1046,39 +2087,153 @@ if nestedReclaimBarQuality
                          nearestHigherResistance
                     bestNestedSupportStartBar :=
                          bar_index - nestedLineStartOffset
+                    bestNestedBreakOffset := nestedBreakOffset
                     bestNestedResistanceTouches :=
                          nestedResistanceTouches
                     bestNestedSupportTouches := nestedSupportTouches
+                    bestNestedSupportSpan :=
+                         not na(oldestNestedSupportOffset) and
+                              not na(newestNestedSupportOffset) ?
+                         oldestNestedSupportOffset -
+                              newestNestedSupportOffset + 1 : na
 
-    if not na(bestNestedLowerResistance) and
-         not na(bestNestedHigherResistance)
+    if not na(bestNestedLowerResistance)
         float nestedEvidenceScore =
              currentNestedVolumeRatio * currentNestedRangeRatio
-        bool previousEvidenceExpired =
-             na(lastNestedEvidenceBar) or
-             bar_index - lastNestedEvidenceBar >
-                  maximumContextEvidenceBars
-        bool sameBlockingLevel =
-             not na(lastNestedBlockingResistance) and
-             math.abs(
-                  bestNestedHigherResistance /
-                       lastNestedBlockingResistance - 1.0) * 100.0 <=
-                  supportClusterTolerancePct
-        bool strongerEvidence =
-             na(lastNestedEvidenceScore) or
-             nestedEvidenceScore > lastNestedEvidenceScore
-        if previousEvidenceExpired or not sameBlockingLevel or
-             strongerEvidence
-            nestedEvidenceSignal := true
-            detectedNestedSupportStartBar :=
-                 bestNestedSupportStartBar
-            detectedNestedFlipLevel := bestNestedLowerResistance
-            lastNestedEvidenceBar := bar_index
-            lastNestedClearedResistance :=
-                 bestNestedLowerResistance
-            lastNestedBlockingResistance :=
-                 bestNestedHigherResistance
-            lastNestedEvidenceScore := nestedEvidenceScore
+        int priorValidatedSetupAge =
+             not na(lastValidatedSetupBar) ?
+             bar_index - lastValidatedSetupBar : na
+        bool priorSetupCanMature =
+             not na(priorValidatedSetupAge) and
+             priorValidatedSetupAge >= MINIMUM_SETUP_TO_ENTRY_BARS and
+             priorValidatedSetupAge <= MAXIMUM_SETUP_TO_ENTRY_BARS
+        bool strongAdjacentBlockerBreak =
+             not na(bestNestedHigherResistance) and
+             high >= bestNestedHigherResistance and
+             close >= bestNestedHigherResistance * 0.995 and
+             currentNestedVolumeRatio >= 2.0 and
+             currentBullishBodyRangePct >= 75.0 and
+             currentCloseLocationPct >= 85.0
+        bool nestedDirectEntryCondition =
+             (na(bestNestedHigherResistance) and priorSetupCanMature) or
+             strongAdjacentBlockerBreak
+        float resolvedNestedCeiling =
+             not na(bestNestedHigherResistance) ?
+             bestNestedHigherResistance : bestNestedLowerResistance
+        bool repeatsResolvedNestedLayer =
+             nestedDirectEntryCondition and
+             not na(lastNestedDirectEntryBar) and
+             bar_index - lastNestedDirectEntryBar <= 1 and
+             not na(lastNestedDirectEntryLower) and
+             not na(lastNestedDirectEntryCeiling) and
+             bestNestedLowerResistance >=
+                  lastNestedDirectEntryLower *
+                       (1.0 - supportClusterTolerancePct / 100.0) and
+             bestNestedLowerResistance <=
+                  lastNestedDirectEntryCeiling *
+                       (1.0 + supportClusterTolerancePct / 100.0)
+        if nestedDirectEntryCondition
+            if not repeatsResolvedNestedLayer
+                // The earlier setup removed its first supply layer. A new
+                // complete support-break-resistance-reclaim sequence with no
+                // adjacent blocker is now the actionable entry.
+                entrySignal := true
+                detectedSupportLow := bestNestedLowerResistance
+                detectedSupportHigh := bestNestedLowerResistance
+                detectedResistanceHigh := bestNestedLowerResistance
+                detectedFlipLevel := bestNestedLowerResistance
+                signalSupportStartBar := bestNestedSupportStartBar
+                signalResistanceStageBars :=
+                     not na(bestNestedBreakOffset) ?
+                     bestNestedBreakOffset - 1 : 1
+                signalResistanceAttempts := 1
+                signalBehaviorQualityScore := 0
+                signalPriorAdvancePct := na
+                signalBodyExpansion := currentNestedRangeRatio
+                signalVolumeExpansion := currentNestedVolumeRatio
+                signalEntryVolumeVsPriorThree := currentNestedVolumeRatio
+                signalEntryBodyRangePct := currentBullishBodyRangePct
+                signalEntryRangePct := currentNestedEntryRangePct
+                signalHasNestedReclaimEvidence := true
+                signalHasContextEvidence := true
+                signalNestedEvidenceAgeBars := priorValidatedSetupAge
+                signalNestedClearedResistance :=
+                     bestNestedLowerResistance
+                signalNestedBlockingResistance := na
+                lastSignalIndex := bar_index
+                lastSignalResistance := bestNestedLowerResistance
+                lastSignalSupportLow := bestNestedLowerResistance
+                lastSignalSupportHigh := bestNestedLowerResistance
+                lastSignalResistanceStageBars :=
+                     signalResistanceStageBars
+                lastAcceptedSignalTime := time
+                lastAcceptedSignalSupportHigh :=
+                     bestNestedLowerResistance
+                lastAcceptedSignalResistanceStageBars :=
+                     signalResistanceStageBars
+                lastAcceptedEntryTrendTiers := confirmedTrendTiers
+                array.push(
+                     acceptedSignalSupportLows,
+                     bestNestedLowerResistance)
+                lowestSinceLastSignal := na
+                lastNestedEvidenceBar := na
+                lastNestedClearedResistance := na
+                lastNestedBlockingResistance := na
+                lastNestedEvidenceScore := na
+                lastValidatedSetupBar := na
+                lastNestedDirectEntryBar := bar_index
+                lastNestedDirectEntryLower :=
+                     bestNestedLowerResistance
+                lastNestedDirectEntryCeiling := resolvedNestedCeiling
+
+                // Consume every candidate in the compact layer that this
+                // candle has just cleared. Without this, the ordinary
+                // candidate path can emit the same entry again one bar later.
+                int resolvedNestedIndex = array.size(candidates) - 1
+                while resolvedNestedIndex >= 0
+                    FlipCandidate resolvedNestedCandidate =
+                         array.get(candidates, resolvedNestedIndex)
+                    bool candidateInsideResolvedLayer =
+                         resolvedNestedCandidate.supportHigh >=
+                              bestNestedLowerResistance *
+                                   (1.0 -
+                                        supportClusterTolerancePct / 100.0) and
+                         resolvedNestedCandidate.supportLow <=
+                              resolvedNestedCeiling *
+                                   (1.0 +
+                                        supportClusterTolerancePct / 100.0)
+                    if candidateInsideResolvedLayer
+                        array.remove(candidates, resolvedNestedIndex)
+                    resolvedNestedIndex -= 1
+        else if not na(bestNestedHigherResistance) and
+             not na(bestNestedSupportSpan) and
+             bestNestedSupportSpan <= 6
+            bool previousEvidenceExpired =
+                 na(lastNestedEvidenceBar) or
+                 bar_index - lastNestedEvidenceBar >
+                      maximumContextEvidenceBars
+            bool sameBlockingLevel =
+                 not na(lastNestedBlockingResistance) and
+                 math.abs(
+                      bestNestedHigherResistance /
+                           lastNestedBlockingResistance - 1.0) *
+                           100.0 <= supportClusterTolerancePct
+            bool strongerEvidence =
+                 na(lastNestedEvidenceScore) or
+                 nestedEvidenceScore > lastNestedEvidenceScore
+            if previousEvidenceExpired or not sameBlockingLevel or
+                 strongerEvidence
+                nestedEvidenceSignal := true
+                detectedNestedSupportStartBar :=
+                     bestNestedSupportStartBar
+                detectedNestedFlipLevel := bestNestedLowerResistance
+                lastNestedEvidenceBar := bar_index
+                lastNestedClearedResistance :=
+                     bestNestedLowerResistance
+                lastNestedBlockingResistance :=
+                     bestNestedHigherResistance
+                lastNestedEvidenceScore := nestedEvidenceScore
+                lastValidatedSetupBar := bar_index
 
 // Candidate removals can shift array indexes while the update loop runs.
 // Resolve the selected setup again by its immutable breakdown bar.
@@ -1094,9 +2249,10 @@ if not na(bestCandidateBreakBar)
             break
         selectedLookupIndex -= 1
 
+// PARITY_RULE: qualified_entry_acceptance
 // A lower reclaim cannot trigger while a higher proven former-support level
 // remains unresolved overhead.
-if not na(bestCandidateIndex)
+if not entrySignal and not na(bestCandidateIndex)
     bool blockedByHigherFormerSupport = false
     int overheadIndex = array.size(candidates) - 1
     while overheadIndex >= 0
@@ -1141,6 +2297,57 @@ if not na(bestCandidateIndex)
     if blockedByStackedKnownOverhead
         blockedByHigherFormerSupport := true
 
+    FlipCandidate chosenCandidate =
+         array.get(candidates, bestCandidateIndex)
+    bool previouslyAcceptedSameSupport = false
+    bool acceptedHigherSupportTier = false
+    int acceptedSupportIndex = array.size(acceptedSignalSupportLows) - 1
+    while acceptedSupportIndex >= 0
+        float acceptedSupportLow =
+             array.get(acceptedSignalSupportLows, acceptedSupportIndex)
+        float acceptedSupportDistancePct = math.abs(
+             chosenCandidate.supportLow / acceptedSupportLow - 1.0) * 100.0
+        if acceptedSupportDistancePct <= 0.20
+            previouslyAcceptedSameSupport := true
+        if acceptedSupportLow > chosenCandidate.supportLow *
+             (1.0 + supportClusterTolerancePct / 100.0)
+            acceptedHigherSupportTier := true
+        acceptedSupportIndex -= 1
+    bool staleReactivatedLowerSupport =
+         previouslyAcceptedSameSupport and acceptedHigherSupportTier
+    float chosenSupportHighGapPct =
+         close > 0.0 ?
+         (chosenCandidate.supportHigh / close - 1.0) * 100.0 : na
+    bool nearEmaHighConviction =
+         chosenCandidate.nearEmaSupport and
+         chosenCandidate.resistanceBars >=
+              NEAR_EMA_MINIMUM_RESISTANCE_BARS and
+         chosenCandidate.resistanceBars <=
+              NEAR_EMA_MAXIMUM_RESISTANCE_BARS and
+         chosenCandidate.breakdownBodyRangePct >=
+              NEAR_EMA_MINIMUM_BREAKDOWN_BODY_PCT and
+         chosenCandidate.priorAdvancePct >=
+              NEAR_EMA_MINIMUM_PRIOR_ADVANCE_PCT and
+         not na(chosenSupportHighGapPct) and
+         chosenSupportHighGapPct <=
+              NEAR_EMA_MAXIMUM_SUPPORT_HIGH_GAP_PCT and
+         not na(signalEntryDistanceFromSupportPct) and
+         signalEntryDistanceFromSupportPct <=
+              NEAR_EMA_MAXIMUM_ENTRY_DISTANCE_PCT and
+         not na(signalEntryBodyRangePct) and
+         signalEntryBodyRangePct >=
+              NEAR_EMA_MINIMUM_ENTRY_BODY_PCT and
+         not na(signalEntryRangePct) and
+         signalEntryRangePct >=
+              NEAR_EMA_MINIMUM_ENTRY_RANGE_PCT and
+         not na(signalVolumeExpansion) and
+         signalVolumeExpansion >=
+              NEAR_EMA_MINIMUM_VOLUME_EXPANSION and
+         not na(trendEmaFast) and not na(momentumEma) and
+         trendEmaFast >= momentumEma *
+              (1.0 - NEAR_EMA_ENTRY_TOLERANCE_PCT / 100.0) and
+         close >= trendEmaFast and close >= momentumEma and
+         not na(sessionVwap) and close >= sessionVwap
     bool highConvictionReclaim =
          (not na(signalVolumeExpansion) and
               signalVolumeExpansion >= strongCandidateVolumeExpansion and
@@ -1150,7 +2357,36 @@ if not na(bestCandidateIndex)
          (not na(trendEmaFast) and not na(momentumEma) and
               trendEmaFast > momentumEma and close >= trendEmaFast and
               close >= momentumEma and not na(sessionVwap) and
-              close >= sessionVwap)
+              close >= sessionVwap) or
+         nearEmaHighConviction
+    bool hardBlockedByImmediateOverhead = false
+    if signalExpansionStrengthScore < 4 and
+         chosenCandidate.priorAdvancePct < 15.0
+        int immediateOverheadIndex = array.size(candidates) - 1
+        while immediateOverheadIndex >= 0
+            FlipCandidate immediateOverhead =
+                 array.get(candidates, immediateOverheadIndex)
+            float immediateLayerDistancePct =
+                 detectedSupportHigh > 0.0 ?
+                 (immediateOverhead.supportHigh /
+                      detectedSupportHigh - 1.0) * 100.0 : na
+            bool immediateProvenOverhead =
+                 immediateOverheadIndex != bestCandidateIndex and
+                 not immediateOverhead.signaled and
+                 immediateOverhead.resistanceBars >=
+                      minimumResistanceBars and
+                 not na(immediateOverhead.resistanceHigh) and
+                 immediateOverhead.resistanceHigh > close and
+                 not na(immediateOverhead.lastResistanceBar) and
+                 bar_index - immediateOverhead.lastResistanceBar <= 3 and
+                 not na(immediateLayerDistancePct) and
+                 immediateLayerDistancePct >
+                      supportClusterTolerancePct and
+                 immediateLayerDistancePct <=
+                      maximumOverheadResistanceDistancePct
+            if immediateProvenOverhead
+                hardBlockedByImmediateOverhead := true
+            immediateOverheadIndex -= 1
 
     bool duplicateSignal =
          not na(lastSignalIndex) and
@@ -1160,8 +2396,6 @@ if not na(bestCandidateIndex)
               detectedResistanceHigh / lastSignalResistance - 1.0) *
               100.0 <= duplicateLevelTolerancePct
 
-    FlipCandidate chosenCandidate =
-         array.get(candidates, bestCandidateIndex)
     bool recentExpansionEvidence = false
     for contextOffset = 1 to maximumContextEvidenceBars
         bool validContextBar = contextOffset <= bar_index
@@ -1193,26 +2427,284 @@ if not na(bestCandidateIndex)
          not na(sameRegimeSupportRisePct) and
          sameRegimeSupportRisePct <= maximumSameRegimeSupportRisePct and
          lowestSinceLastSignal > lastSignalSupportHigh
-    if (not blockedByHigherFormerSupport or highConvictionReclaim) and
+    bool distinctHigherSupportTier =
+         not na(sameRegimeSupportRisePct) and
+         sameRegimeSupportRisePct >= 10.0 and
+         not na(signalEntryConfirmationScore) and
+         signalEntryConfirmationScore >= 4
+    blockedByUnresetPriceRegime :=
+         blockedByUnresetPriceRegime and
+         not distinctHigherSupportTier
+    bool freshMultiBarStructure =
+         not chosenCandidate.reusedLevel and
+         not chosenCandidate.nearEmaSupport and
+         chosenCandidate.supportStartBar <
+              chosenCandidate.supportEndBar
+    bool weakFreshBodyExpansion =
+         freshMultiBarStructure and
+         not na(signalBodyExpansion) and
+         signalBodyExpansion <
+              MINIMUM_FRESH_BREAKOUT_BODY_EXPANSION
+    bool immatureLongFreshStructure =
+         freshMultiBarStructure and
+         signalResistanceStageBars >
+              MAXIMUM_FRESH_RESISTANCE_STAGE_BARS and
+         signalResistanceAttempts <
+              MINIMUM_MATURE_FRESH_RESISTANCE_ATTEMPTS
+    bool excessivelyRetestedResistance =
+         signalResistanceAttempts > MAXIMUM_VALID_RESISTANCE_ATTEMPTS
+    bool previousBarAlreadyClearedResistance =
+         not na(detectedResistanceHigh) and
+         close[1] >= detectedResistanceHigh and
+         close[1] > chosenCandidate.supportHigh and
+         not na(volumeAverage[1]) and volume[1] >= volumeAverage[1]
+    int currentSetupAge =
+         not na(lastValidatedSetupBar) ?
+         bar_index - lastValidatedSetupBar : na
+    bool prematureAfterSetup =
+         not na(currentSetupAge) and
+         currentSetupAge < MINIMUM_SETUP_TO_ENTRY_BARS
+    bool weakMarginalBreakout =
+         signalResistanceStageBars > 10 and
+         currentCloseLocationPct <= 55.0 and
+         not na(signalEntryBodyRangePct) and
+         signalEntryBodyRangePct < 45.0
+    bool failedImpulseOverhead = false
+    int chosenSupportStartOffset =
+         bar_index - chosenCandidate.supportStartBar
+    int chosenSupportEndOffset =
+         bar_index - chosenCandidate.supportEndBar
+    int chosenBreakOffset = bar_index - chosenCandidate.breakBar
+    int maximumImpulseOffset = math.min(
+         bar_index, chosenSupportStartOffset + 4)
+    if chosenSupportEndOffset >= 0 and
+         maximumImpulseOffset >= chosenSupportEndOffset
+        for impulseOffset = chosenSupportEndOffset to maximumImpulseOffset
+            float impulseRange = math.max(
+                 high[impulseOffset] - low[impulseOffset],
+                 syminfo.mintick)
+            float impulseBodyPct = math.max(
+                 close[impulseOffset] - open[impulseOffset], 0.0) /
+                 impulseRange * 100.0
+            float impulseCloseLocationPct =
+                 (close[impulseOffset] - low[impulseOffset]) /
+                 impulseRange * 100.0
+            float impulseVolumeRatio =
+                 not na(volumeAverage[impulseOffset]) and
+                      volumeAverage[impulseOffset] > 0.0 ?
+                 volume[impulseOffset] /
+                      volumeAverage[impulseOffset] : na
+            bool strongImpulse =
+                 impulseBodyPct >= 60.0 and
+                 impulseCloseLocationPct >= 75.0 and
+                 not na(impulseVolumeRatio) and
+                 impulseVolumeRatio >= 1.50
+            if strongImpulse
+                int impulseEndOffset = impulseOffset
+                int continuationOffset = impulseOffset - 1
+                bool validContinuationOffset =
+                     continuationOffset > chosenBreakOffset and
+                     continuationOffset >= 0
+                if validContinuationOffset
+                    float continuationRange = math.max(
+                         high[continuationOffset] -
+                              low[continuationOffset],
+                         syminfo.mintick)
+                    float continuationBodyPct = math.max(
+                         close[continuationOffset] -
+                              open[continuationOffset], 0.0) /
+                         continuationRange * 100.0
+                    float continuationCloseLocationPct =
+                         (close[continuationOffset] -
+                              low[continuationOffset]) /
+                         continuationRange * 100.0
+                    float continuationVolumeRatio =
+                         not na(volumeAverage[continuationOffset]) and
+                              volumeAverage[continuationOffset] > 0.0 ?
+                         volume[continuationOffset] /
+                              volumeAverage[continuationOffset] : na
+                    bool extendsImpulse =
+                         continuationBodyPct >= 40.0 and
+                         continuationCloseLocationPct >= 65.0 and
+                         not na(continuationVolumeRatio) and
+                         continuationVolumeRatio >= 1.0
+                    if extendsImpulse
+                        impulseEndOffset := continuationOffset
+                int impulseRejectionOffset = impulseEndOffset - 1
+                bool validImpulseRejection =
+                     impulseRejectionOffset > chosenBreakOffset and
+                     impulseRejectionOffset >= 0
+                if validImpulseRejection
+                    float impulseRejectionRange = math.max(
+                         high[impulseRejectionOffset] -
+                              low[impulseRejectionOffset],
+                         syminfo.mintick)
+                    float impulseRejectionBodyPct = math.max(
+                         open[impulseRejectionOffset] -
+                              close[impulseRejectionOffset], 0.0) /
+                         impulseRejectionRange * 100.0
+                    float impulseRejectionCloseLocationPct =
+                         (close[impulseRejectionOffset] -
+                              low[impulseRejectionOffset]) /
+                         impulseRejectionRange * 100.0
+                    float impulseRejectionVolumeRatio =
+                         not na(volumeAverage[impulseRejectionOffset]) and
+                              volumeAverage[impulseRejectionOffset] > 0.0 ?
+                         volume[impulseRejectionOffset] /
+                              volumeAverage[impulseRejectionOffset] : na
+                    float failedImpulseHigh =
+                         impulseEndOffset != impulseOffset ?
+                         math.max(
+                              high[impulseOffset],
+                              high[impulseEndOffset]) :
+                         high[impulseOffset]
+                    bool immediateStrongRejection =
+                         impulseRejectionBodyPct >= 60.0 and
+                         impulseRejectionCloseLocationPct <= 25.0 and
+                         not na(impulseRejectionVolumeRatio) and
+                         impulseRejectionVolumeRatio >= 1.0 and
+                         close <= failedImpulseHigh
+                    if immediateStrongRejection
+                        failedImpulseOverhead := true
+    failedImpulseOverhead :=
+         failedImpulseOverhead and
+         signalExpansionStrengthScore < 5
+    bool blockedByFailedExpansion =
+         chosenCandidate.failedExpansionOrigin and
+         not na(chosenCandidate.failedExpansionHigh) and
+         close <= chosenCandidate.failedExpansionHigh
+    bool freshStructureVeto =
+         weakFreshBodyExpansion or immatureLongFreshStructure or
+         excessivelyRetestedResistance or
+         previousBarAlreadyClearedResistance or
+         blockedByFailedExpansion or prematureAfterSetup or
+         weakMarginalBreakout or failedImpulseOverhead
+    bool continuationInsteadOfFreshReclaim =
+         signalResistanceStageBars > normalResistanceStageBars and
+         ((chosenCandidate.resistanceAttempts == 1 and
+               chosenCandidate.acceptedClosesAboveSupport >= 2) or
+              (chosenCandidate.acceptedClosesAboveResistanceContact >=
+                    MINIMUM_ACCEPTED_CONTACT_CLOSES + 1 and
+               (signalEntryConfirmationScore < 5 or
+                    (signalResistanceStageBars > 30 and
+                         chosenCandidate.resistanceAttempts >= 3))))
+    bool rapidHigherContinuation =
+         not na(lastAcceptedSignalTime) and
+         time > lastAcceptedSignalTime and
+         time - lastAcceptedSignalTime <=
+              RAPID_HIGHER_CONTINUATION_MINUTES * 60 * 1000 and
+         not na(lastAcceptedSignalResistanceStageBars) and
+         lastAcceptedSignalResistanceStageBars >=
+              RAPID_HIGHER_PRIOR_STAGE_BARS and
+         not chosenCandidate.nearEmaSupport and
+         chosenCandidate.supportStartBar <
+              chosenCandidate.supportEndBar and
+         not na(signalVolumeExpansion) and
+         signalVolumeExpansion <
+              RAPID_HIGHER_MINIMUM_VOLUME_EXPANSION and
+         not na(lastAcceptedSignalSupportHigh) and
+         chosenCandidate.supportLow > lastAcceptedSignalSupportHigh
+    int trendTiersSinceAcceptedEntry =
+         not na(lastAcceptedEntryTrendTiers) ?
+         math.max(
+              confirmedTrendTiers - lastAcceptedEntryTrendTiers, 0) : 0
+    bool maturePostEntryContinuation =
+         not na(lastAcceptedEntryTrendTiers) and
+         trendTiersSinceAcceptedEntry >=
+              POST_ENTRY_MATURE_TREND_TIERS and
+         (na(signalEntryConfirmationScore) or
+              signalEntryConfirmationScore <
+                   POST_ENTRY_REQUIRED_CONFIRMATION_SCORE)
+    freshStructureVeto :=
+         freshStructureVeto or continuationInsteadOfFreshReclaim or
+         maturePostEntryContinuation or rapidHigherContinuation
+    if freshStructureVeto
+        // Consume the rejected pattern and remember its price regime. This
+        // prevents a later candle from replacing the failed breakout without
+        // first building a genuinely new support/resistance sequence.
+        if not rapidHigherContinuation
+            lastSignalIndex := bar_index
+            lastSignalResistance := detectedResistanceHigh
+            lastSignalSupportLow := chosenCandidate.supportLow
+            lastSignalSupportHigh := chosenCandidate.supportHigh
+            lastSignalResistanceStageBars := signalResistanceStageBars
+            lowestSinceLastSignal := na
+        float vetoedSupportLow = chosenCandidate.supportLow
+        int vetoClearIndex = array.size(candidates) - 1
+        while vetoClearIndex >= 0
+            FlipCandidate vetoCandidate =
+                 array.get(candidates, vetoClearIndex)
+            float vetoLevelDistancePct = math.abs(
+                 vetoCandidate.supportLow / vetoedSupportLow - 1.0) *
+                 100.0
+            if vetoLevelDistancePct <=
+                 SIGNAL_CLUSTER_CLEAR_TOLERANCE_PCT
+                array.remove(candidates, vetoClearIndex)
+            vetoClearIndex -= 1
+    else if not hardBlockedByImmediateOverhead and
+         not blockedByStackedKnownOverhead and
+         not staleReactivatedLowerSupport and
+         (not blockedByHigherFormerSupport or highConvictionReclaim) and
          not duplicateSignal and not blockedByUnresetPriceRegime
         entrySignal := true
-        // Use the exact lowest low of the selected support formation as the
-        // line price, but begin the line at the first bar of that formation.
-        // This keeps the complete support stage visible and prevents the
-        // later breakdown candle from appearing to be the original support.
-        int newestSupportScanOffset = math.max(
-             0, bar_index - chosenCandidate.supportEndBar)
-        int oldestSupportScanOffset = math.max(
-             newestSupportScanOffset,
-             bar_index - chosenCandidate.supportStartBar)
-        float actualSupportLowestLow = na
-        for supportScanOffset = newestSupportScanOffset to oldestSupportScanOffset
-            bool lowerSupportLow = not na(low[supportScanOffset]) and (na(actualSupportLowestLow) or low[supportScanOffset] < actualSupportLowestLow)
-            if lowerSupportLow
-                actualSupportLowestLow := low[supportScanOffset]
-        if not na(actualSupportLowestLow)
-            detectedFlipLevel := actualSupportLowestLow
-            signalSupportStartBar := chosenCandidate.supportStartBar
+        // Prefer the frozen upper support price when the final resistance bar
+        // actually tests that level from below. Otherwise retain the repeated
+        // contact price; this preserves legitimate lower resistance shelves.
+        int refinedSupportStartBar = f_refinedSupportStartBar(
+             chosenCandidate.supportStartBar,
+             chosenCandidate.supportEndBar,
+             chosenCandidate.supportLow)
+        [pivotShelfStartBar, pivotShelfEndBar,
+         pivotShelfBreakBar, pivotShelfResistanceBar,
+         pivotShelfLow] = f_refinedPivotShelf(
+              chosenCandidate.supportStartBar)
+        bool useRefinedPivotShelf =
+             chosenCandidate.supportStartBar ==
+                  chosenCandidate.supportEndBar and
+             not na(pivotShelfStartBar) and
+             not na(pivotShelfEndBar) and
+             not na(pivotShelfBreakBar) and
+             not na(pivotShelfResistanceBar) and
+             not na(pivotShelfLow)
+        int lastResistanceOffset =
+             not na(chosenCandidate.lastResistanceBar) ?
+             bar_index - chosenCandidate.lastResistanceBar : na
+        bool finalResistanceTestsFrozenSupport =
+             not na(lastResistanceOffset) and
+             lastResistanceOffset >= 1 and
+             lastResistanceOffset <= bar_index and
+             high[lastResistanceOffset] >= chosenCandidate.supportLow and
+             close[lastResistanceOffset] <= chosenCandidate.supportLow
+        if useRefinedPivotShelf
+            int pivotShelfStartOffset =
+                 bar_index - pivotShelfStartBar
+            int pivotShelfEndOffset =
+                 bar_index - pivotShelfEndBar
+            int pivotShelfResistanceOffset =
+                 bar_index - pivotShelfResistanceBar
+            refinedSupportStartBar := pivotShelfStartBar
+            detectedSupportLow := pivotShelfLow
+            detectedSupportHigh := math.max(
+                 pivotShelfLow,
+                 (math.min(
+                      open[pivotShelfStartOffset],
+                      close[pivotShelfStartOffset]) +
+                  math.min(
+                      open[pivotShelfEndOffset],
+                      close[pivotShelfEndOffset])) / 2.0)
+            detectedResistanceHigh :=
+                 high[pivotShelfResistanceOffset]
+            detectedFlipLevel := pivotShelfLow
+        else
+            detectedFlipLevel :=
+                 finalResistanceTestsFrozenSupport ?
+                 chosenCandidate.supportLow :
+                 refinedSupportStartBar != chosenCandidate.supportStartBar ?
+                 chosenCandidate.supportLow :
+                 (not na(signalResistanceContactLevel) ?
+                      signalResistanceContactLevel :
+                      chosenCandidate.supportLow)
+        signalSupportStartBar := refinedSupportStartBar
         signalHasRecentExpansionEvidence := recentExpansionEvidence
         signalHasNestedReclaimEvidence := recentNestedReclaimEvidence
         signalHasContextEvidence :=
@@ -1230,11 +2722,21 @@ if not na(bestCandidateIndex)
         lastSignalResistance := detectedResistanceHigh
         lastSignalSupportLow := chosenCandidate.supportLow
         lastSignalSupportHigh := chosenCandidate.supportHigh
+        lastSignalResistanceStageBars := signalResistanceStageBars
+        lastAcceptedSignalTime := time
+        lastAcceptedSignalSupportHigh := chosenCandidate.supportHigh
+        lastAcceptedSignalResistanceStageBars :=
+             signalResistanceStageBars
+        lastAcceptedEntryTrendTiers := confirmedTrendTiers
+        array.push(
+             acceptedSignalSupportLows,
+             chosenCandidate.supportLow)
         lowestSinceLastSignal := na
         lastNestedEvidenceBar := na
         lastNestedClearedResistance := na
         lastNestedBlockingResistance := na
         lastNestedEvidenceScore := na
+        lastValidatedSetupBar := na
         float chosenSupportLow = chosenCandidate.supportLow
         int clearIndex = array.size(candidates) - 1
         while clearIndex >= 0
@@ -1244,13 +2746,14 @@ if not na(bestCandidateIndex)
                  math.abs(
                       candidateToClear.supportLow /
                            chosenSupportLow - 1.0) * 100.0
-            if levelDistancePct <= supportClusterTolerancePct
+            if levelDistancePct <= SIGNAL_CLUSTER_CLEAR_TOLERANCE_PCT
                 array.remove(candidates, clearIndex)
             clearIndex -= 1
     else if duplicateSignal
         chosenCandidate.signaled := true
         array.set(candidates, bestCandidateIndex, chosenCandidate)
 
+// PARITY_RULE: candidate_creation
 // Create a candidate only on a bearish close below the accepted lower edge of
 // a recent support shelf formed during a prior advance. Rejected lower wicks
 // may probe below that edge without moving the accepted support line.
@@ -1262,6 +2765,7 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
     int bestSupportStartBar = na
     int bestSupportEndBar = na
     bool bestSupportBuyerDefense = false
+    bool bestNearEmaSupport = false
     bool bestReusedLevel = false
 
     for anchorOffset = 1 to supportAnchorLookbackBars
@@ -1300,6 +2804,18 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
                 float supportBodySum = 0.0
                 int strongLowerWickDefenses = 0
                 int buyerDefenseLowerWicks = 0
+                int decisiveBuyerDefenseLowerWicks = 0
+                int nearEmaSupportTouches = 0
+                int nearEmaNewestSupportOffset = na
+                int nearEmaOldestSupportOffset = na
+                float nearEmaWidestSupportDistancePct = 0.0
+                float nearEmaRawSupportLow = na
+                float nearEmaMinimumSupportBodyFloor = na
+                float nearEmaMaximumSupportBodyFloor = na
+                float nearEmaSupportBodySum = 0.0
+                int nearEmaStrongLowerWickDefenses = 0
+                int nearEmaBuyerDefenseLowerWicks = 0
+                int nearEmaDecisiveBuyerDefenseLowerWicks = 0
 
                 for testOffset = 1 to supportEvidenceLookbackBars
                     bool validTestBar =
@@ -1343,6 +2859,25 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
                                       open[testOffset]), syminfo.mintick)
                             float supportLowerWick = math.max(
                                  supportBodyFloor - low[testOffset], 0.0)
+                            float supportCloseLocationPct =
+                                 (close[testOffset] - low[testOffset]) /
+                                      testRange * 100.0
+                            float supportRangeRatio =
+                                 not na(
+                                      priorThreeRangeAverage[testOffset]) and
+                                      priorThreeRangeAverage[testOffset] >
+                                           0.0 ?
+                                 testRange /
+                                      priorThreeRangeAverage[testOffset] : na
+                            bool qualifiedBuyerDefense =
+                                 supportLowerWick / testRange * 100.0 >=
+                                      minimumBuyerDefenseLowerWickPct and
+                                 (supportLowerWick / supportBodySize *
+                                           100.0 >=
+                                      minimumSupportWickToBodyPct or
+                                      supportCloseLocationPct >= 75.0) and
+                                 not na(supportRangeRatio) and
+                                 supportRangeRatio <= 1.25
                             rawSupportLow :=
                                  na(rawSupportLow) ? low[testOffset] :
                                  math.min(rawSupportLow, low[testOffset])
@@ -1360,9 +2895,76 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
                             if supportLowerWick / supportBodySize * 100.0 >=
                                  minimumSupportWickToBodyPct
                                 strongLowerWickDefenses += 1
-                            if supportLowerWick / testRange * 100.0 >=
-                                 minimumBuyerDefenseLowerWickPct
+                            if qualifiedBuyerDefense
                                 buyerDefenseLowerWicks += 1
+                                if supportLowerWick / testRange * 100.0 >=
+                                     MINIMUM_DECISIVE_BUYER_DEFENSE_WICK_PCT or
+                                     supportCloseLocationPct >= 75.0
+                                    decisiveBuyerDefenseLowerWicks += 1
+                            bool nearEmaTrendTouch =
+                                 not na(trendEmaFast[testOffset]) and
+                                 not na(momentumEma[testOffset]) and
+                                 not na(sessionVwap[testOffset]) and
+                                 high[testOffset] >=
+                                      trendEmaFast[testOffset] *
+                                           (1.0 -
+                                                NEAR_EMA_SUPPORT_TOLERANCE_PCT /
+                                                100.0) and
+                                 high[testOffset] >=
+                                      momentumEma[testOffset] *
+                                           (1.0 -
+                                                NEAR_EMA_SUPPORT_TOLERANCE_PCT /
+                                                100.0) and
+                                 high[testOffset] >=
+                                      sessionVwap[testOffset] *
+                                           (1.0 -
+                                                NEAR_EMA_SUPPORT_TOLERANCE_PCT /
+                                                100.0)
+                            if nearEmaTrendTouch
+                                nearEmaSupportTouches += 1
+                                nearEmaNewestSupportOffset :=
+                                     na(nearEmaNewestSupportOffset) ?
+                                     testOffset :
+                                     math.min(
+                                          nearEmaNewestSupportOffset,
+                                          testOffset)
+                                nearEmaOldestSupportOffset :=
+                                     na(nearEmaOldestSupportOffset) ?
+                                     testOffset :
+                                     math.max(
+                                          nearEmaOldestSupportOffset,
+                                          testOffset)
+                                nearEmaWidestSupportDistancePct := math.max(
+                                     nearEmaWidestSupportDistancePct,
+                                     lowDistancePct)
+                                nearEmaRawSupportLow :=
+                                     na(nearEmaRawSupportLow) ?
+                                     low[testOffset] :
+                                     math.min(
+                                          nearEmaRawSupportLow,
+                                          low[testOffset])
+                                nearEmaMinimumSupportBodyFloor :=
+                                     na(nearEmaMinimumSupportBodyFloor) ?
+                                     supportBodyFloor :
+                                     math.min(
+                                          nearEmaMinimumSupportBodyFloor,
+                                          supportBodyFloor)
+                                nearEmaMaximumSupportBodyFloor :=
+                                     na(nearEmaMaximumSupportBodyFloor) ?
+                                     supportBodyFloor :
+                                     math.max(
+                                          nearEmaMaximumSupportBodyFloor,
+                                          supportBodyFloor)
+                                nearEmaSupportBodySum += supportBodyFloor
+                                if supportLowerWick / supportBodySize *
+                                     100.0 >= minimumSupportWickToBodyPct
+                                    nearEmaStrongLowerWickDefenses += 1
+                                if qualifiedBuyerDefense
+                                    nearEmaBuyerDefenseLowerWicks += 1
+                                    if supportLowerWick / testRange * 100.0 >=
+                                         MINIMUM_DECISIVE_BUYER_DEFENSE_WICK_PCT or
+                                         supportCloseLocationPct >= 75.0
+                                        nearEmaDecisiveBuyerDefenseLowerWicks += 1
 
                 bool supportEvidenceConfirmed =
                      supportTouches >= minimumSupportTouches and
@@ -1421,7 +3023,8 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
                          priorBars >= 5 and not na(priorAdvancePct) and
                          priorAdvancePct >= minimumPriorAdvancePct
 
-                    if lowerEdgeBroken and priorAdvanceConfirmed
+                    if lowerEdgeBroken and priorAdvanceConfirmed and
+                         buyerDefenseLowerWicks > 0
                         int supportSpan =
                              oldestSupportOffset - newestSupportOffset + 1
                         float supportScore =
@@ -1440,16 +3043,144 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
                             bestSupportEndBar :=
                                  bar_index - newestSupportOffset
                             bestSupportBuyerDefense :=
-                                 buyerDefenseLowerWicks > 0
+                                 decisiveBuyerDefenseLowerWicks > 0
+                            bestNearEmaSupport := false
 
-    // A single bullish higher-low pivot is the compact support form.
-    if na(bestSupportLow)
+                // Fallback for a compact shelf whose support highs miss a
+                // falling fast EMA by only a fraction. It is accepted only
+                // after repeated lower-wick defense and an immediate,
+                // decisive breakdown; the later reclaim has its own strict
+                // quality checks before it may signal.
+                bool nearEmaEvidenceConfirmed =
+                     not supportBarReachesTrend and
+                     nearEmaSupportTouches >= minimumSupportTouches and
+                     nearEmaSupportTouches <=
+                          NEAR_EMA_MAXIMUM_SUPPORT_TOUCHES and
+                     not na(nearEmaNewestSupportOffset) and
+                     not na(nearEmaOldestSupportOffset) and
+                     nearEmaNewestSupportOffset <=
+                          NEAR_EMA_MAXIMUM_SUPPORT_TO_BREAK_BARS and
+                     nearEmaOldestSupportOffset -
+                          nearEmaNewestSupportOffset + 1 <=
+                          NEAR_EMA_MAXIMUM_SUPPORT_SPAN_BARS and
+                     nearEmaBuyerDefenseLowerWicks >=
+                          NEAR_EMA_MINIMUM_WICK_DEFENSES and
+                     not na(nearEmaRawSupportLow) and
+                     not na(nearEmaMinimumSupportBodyFloor) and
+                     not na(nearEmaMaximumSupportBodyFloor)
+                if nearEmaEvidenceConfirmed
+                    float nearEmaAcceptedSupportSpreadPct =
+                         nearEmaMinimumSupportBodyFloor > 0.0 ?
+                         (nearEmaMaximumSupportBodyFloor /
+                              nearEmaMinimumSupportBodyFloor - 1.0) *
+                              100.0 : na
+                    bool nearEmaDefendedAcceptedSupport =
+                         nearEmaSupportTouches >= 3 and
+                         nearEmaStrongLowerWickDefenses >= 2 and
+                         not na(nearEmaAcceptedSupportSpreadPct) and
+                         nearEmaAcceptedSupportSpreadPct <=
+                              maximumAcceptedSupportSpreadPct
+                    float nearEmaSupportLow =
+                         nearEmaDefendedAcceptedSupport ?
+                         nearEmaMinimumSupportBodyFloor :
+                         nearEmaRawSupportLow
+                    float nearEmaSupportHigh = math.max(
+                         nearEmaSupportLow,
+                         nearEmaSupportBodySum /
+                              nearEmaSupportTouches)
+                    bool nearEmaLowerEdgeBroken =
+                         close < nearEmaSupportLow *
+                              (1.0 -
+                                   minimumBreakBelowSupportPct / 100.0)
+                    float nearEmaPriorLow = na
+                    int nearEmaPriorBars = 0
+                    for nearEmaAdvanceStep = 1 to priorAdvanceLookbackBars
+                        int nearEmaHistoricalOffset =
+                             nearEmaOldestSupportOffset +
+                                  nearEmaAdvanceStep
+                        bool validNearEmaPriorBar =
+                             nearEmaHistoricalOffset <= bar_index and
+                             inSession[nearEmaHistoricalOffset] and
+                             dateKey[nearEmaHistoricalOffset] == dateKey
+                        if validNearEmaPriorBar
+                            nearEmaPriorLow :=
+                                 na(nearEmaPriorLow) ?
+                                 low[nearEmaHistoricalOffset] :
+                                 math.min(
+                                      nearEmaPriorLow,
+                                      low[nearEmaHistoricalOffset])
+                            nearEmaPriorBars += 1
+                    float nearEmaPriorAdvancePct =
+                         not na(nearEmaPriorLow) and
+                              nearEmaPriorLow > 0.0 ?
+                         (anchorLevel / nearEmaPriorLow - 1.0) *
+                              100.0 : na
+                    float currentBreakdownRange = math.max(
+                         high - low, syminfo.mintick)
+                    float currentBreakdownBodyPct =
+                         math.max(open - close, 0.0) /
+                              currentBreakdownRange * 100.0
+                    bool nearEmaBreakConfirmed =
+                         nearEmaLowerEdgeBroken and
+                         nearEmaPriorBars >= 5 and
+                         not na(nearEmaPriorAdvancePct) and
+                         nearEmaPriorAdvancePct >=
+                              NEAR_EMA_MINIMUM_PRIOR_ADVANCE_PCT and
+                         currentBreakdownBodyPct >=
+                              NEAR_EMA_MINIMUM_BREAKDOWN_BODY_PCT
+                    if nearEmaBreakConfirmed
+                        int nearEmaSupportSpan =
+                             nearEmaOldestSupportOffset -
+                                  nearEmaNewestSupportOffset + 1
+                        float nearEmaSupportScore =
+                             nearEmaSupportTouches * 1000000.0 -
+                             nearEmaSupportSpan * 10000.0 -
+                             nearEmaWidestSupportDistancePct *
+                                  100000.0 +
+                             nearEmaSupportHigh
+                        if na(bestSupportScore) or
+                             nearEmaSupportScore > bestSupportScore
+                            bestSupportScore := nearEmaSupportScore
+                            bestSupportLow := nearEmaSupportLow
+                            bestSupportHigh := nearEmaSupportHigh
+                            bestPriorAdvancePct :=
+                                 nearEmaPriorAdvancePct
+                            bestSupportStartBar :=
+                                 bar_index - nearEmaOldestSupportOffset
+                            bestSupportEndBar :=
+                                 bar_index - nearEmaNewestSupportOffset
+                            bestSupportBuyerDefense :=
+                                 nearEmaDecisiveBuyerDefenseLowerWicks > 0
+                            bestNearEmaSupport := true
+
+    // A compact higher-low pivot is the upper support form. Evaluate it even
+    // when a broader lower shelf exists: a genuinely defended upper pivot is
+    // the first level buyers must lose and therefore takes precedence.
+    if bar_index >= 2
         float pivotLow = low[1]
         float pivotRange = math.max(high[1] - low[1], syminfo.mintick)
         float pivotBodyFloor = math.min(open[1], close[1])
-        float pivotLowerWickPct =
-             math.max(pivotBodyFloor - low[1], 0.0) /
-                  pivotRange * 100.0
+        float pivotBodySize = math.max(
+             math.abs(close[1] - open[1]), syminfo.mintick)
+        float pivotLowerWick = math.max(pivotBodyFloor - low[1], 0.0)
+        float pivotLowerWickPct = pivotLowerWick / pivotRange * 100.0
+        float pivotLowerWickToBodyPct =
+             pivotLowerWick / pivotBodySize * 100.0
+        float pivotCloseLocationPct =
+             (close[1] - low[1]) / pivotRange * 100.0
+        bool pivotHasOwnBuyerDefense =
+             pivotLowerWickPct >= minimumBuyerDefenseLowerWickPct and
+             pivotLowerWickToBodyPct >= minimumSupportWickToBodyPct
+        float pivotBodyRangePct = pivotBodySize / pivotRange * 100.0
+        bool compactBearishBuyerDefense =
+             close[1] <= open[1] and
+             pivotCloseLocationPct <
+                  MINIMUM_PIVOT_SUPPORT_CLOSE_LOCATION_PCT and
+             pivotBodyRangePct <= 25.0 and
+             pivotHasOwnBuyerDefense
+        bool pivotIsExpansionPassThrough =
+             pivotBodySize / pivotRange * 100.0 >=
+                  PIVOT_EXPANSION_PASS_THROUGH_BODY_PCT
         bool nearbyPivotBuyerDefense = false
         for pivotDefenseOffset = 2 to 3
             bool validPivotDefenseBar =
@@ -1462,23 +3193,41 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
                      syminfo.mintick)
                 float pivotDefenseBodyFloor = math.min(
                      open[pivotDefenseOffset], close[pivotDefenseOffset])
+                float pivotDefenseBodySize = math.max(
+                     math.abs(
+                          close[pivotDefenseOffset] -
+                               open[pivotDefenseOffset]),
+                     syminfo.mintick)
+                float pivotDefenseLowerWick = math.max(
+                     pivotDefenseBodyFloor - low[pivotDefenseOffset], 0.0)
                 float pivotDefenseLowerWickPct =
-                     math.max(
-                          pivotDefenseBodyFloor -
-                               low[pivotDefenseOffset], 0.0) /
-                          pivotDefenseRange * 100.0
+                     pivotDefenseLowerWick / pivotDefenseRange * 100.0
+                float pivotDefenseLowerWickToBodyPct =
+                     pivotDefenseLowerWick / pivotDefenseBodySize * 100.0
                 float pivotDefenseDistancePct =
                      pivotLow > 0.0 ?
                      math.abs(
                           low[pivotDefenseOffset] / pivotLow - 1.0) *
                           100.0 : na
+                float pivotDefenseAcceptanceDistancePct =
+                     pivotBodyFloor > 0.0 ?
+                     math.abs(
+                          pivotDefenseBodyFloor / pivotBodyFloor - 1.0) *
+                          100.0 : na
                 bool sameSupportDefense =
                      not na(pivotDefenseDistancePct) and
                      pivotDefenseDistancePct <=
                           supportClusterTolerancePct and
+                     not na(pivotDefenseAcceptanceDistancePct) and
+                     pivotDefenseAcceptanceDistancePct <=
+                          maximumAcceptedSupportSpreadPct and
                      close[pivotDefenseOffset] >= pivotLow and
                      pivotDefenseLowerWickPct >=
-                          minimumBuyerDefenseLowerWickPct
+                          minimumBuyerDefenseLowerWickPct and
+                     pivotDefenseLowerWickToBodyPct >=
+                          minimumSupportWickToBodyPct and
+                     nz(volume[1], 0.0) >=
+                          nz(volume[pivotDefenseOffset], 0.0)
                 if sameSupportDefense
                     nearbyPivotBuyerDefense := true
                     break
@@ -1506,7 +3255,8 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
              // halt or trading interruption cannot turn the pre-halt candle
              // into support for the post-halt repricing.
              time - time[1] <= timeframe.in_seconds() * 2000 and
-             close[1] > open[1] and high[1] > high[2] and
+             (close[1] > open[1] or compactBearishBuyerDefense) and
+             high[1] > high[2] and
              low[1] > low[2] and
              high[1] >= trendEmaFast[1] and
              high[1] >= momentumEma[1] and
@@ -1515,17 +3265,26 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
                   (1.0 - minimumBreakBelowSupportPct / 100.0) and
              priorBars >= 5 and not na(pivotAdvancePct) and
              pivotAdvancePct >= minimumPriorAdvancePct
-        if pivotSupportCandidate
+        bool pivotBuyerDefenseAccepted =
+             (pivotCloseLocationPct >=
+                  MINIMUM_PIVOT_SUPPORT_CLOSE_LOCATION_PCT and
+                  (pivotHasOwnBuyerDefense or
+                       (nearbyPivotBuyerDefense and
+                            not pivotIsExpansionPassThrough))) or
+             compactBearishBuyerDefense
+        bool preferUpperDefendedPivot =
+             pivotSupportCandidate and compactBearishBuyerDefense and
+             not na(bestSupportHigh) and pivotLow > bestSupportHigh
+        if pivotSupportCandidate and
+             (na(bestSupportLow) or preferUpperDefendedPivot)
             bestSupportLow := pivotLow
             bestSupportHigh := math.max(
                  pivotLow, math.min(open[1], close[1]))
             bestPriorAdvancePct := pivotAdvancePct
             bestSupportStartBar := bar_index - 1
             bestSupportEndBar := bar_index - 1
-            bestSupportBuyerDefense :=
-                 pivotLowerWickPct >=
-                      minimumBuyerDefenseLowerWickPct or
-                 nearbyPivotBuyerDefense
+            bestSupportBuyerDefense := pivotBuyerDefenseAccepted
+            bestNearEmaSupport := false
 
     // A proven support remains relevant after an earlier reclaim. A later
     // bearish cross starts a fresh sequence from the original level.
@@ -1535,15 +3294,20 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
         bool crossedKnownLevel =
              close[1] >= knownLevel.supportLow and
              close < knownLevel.supportLow
+        bool recentKnownLevel =
+             bar_index - knownLevel.supportEndBar <=
+                  supportAnchorLookbackBars
         if crossedKnownLevel and
              (na(bestSupportLow) or
-                  knownLevel.supportLow > bestSupportLow)
+                  (recentKnownLevel and
+                       knownLevel.supportLow > bestSupportLow))
             bestSupportLow := knownLevel.supportLow
             bestSupportHigh := knownLevel.supportHigh
             bestPriorAdvancePct := knownLevel.priorAdvancePct
             bestSupportStartBar := knownLevel.supportStartBar
             bestSupportEndBar := knownLevel.supportEndBar
             bestSupportBuyerDefense := knownLevel.supportBuyerDefense
+            bestNearEmaSupport := false
             bestReusedLevel := true
         knownLevelIndex -= 1
 
@@ -1578,6 +3342,14 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
              math.max(open - close, 0.0) / breakdownRange * 100.0
         float breakdownCloseFromLowPct =
              (close - low) / breakdownRange * 100.0
+        bool candidateFailedExpansionOrigin =
+             failedExpansionDetectedNow and
+             not na(failedExpansionBreakoutBarNow) and
+             bestSupportStartBar >= failedExpansionBreakoutBarNow and
+             bestSupportStartBar <= bar_index
+        float candidateFailedExpansionHigh =
+             candidateFailedExpansionOrigin ?
+             failedExpansionHighNow : na
 
         // Every breakdown owns an independent sequence. A later micro-break
         // cannot erase an older unresolved support-to-resistance transition.
@@ -1586,14 +3358,20 @@ if inSession and barstate.isconfirmed and close < open and bar_index >= 2
         FlipCandidate newCandidate = FlipCandidate.new(
              bar_index, bestSupportStartBar, bestSupportEndBar,
              bestSupportLow, bestSupportHigh, bestPriorAdvancePct,
-             bestSupportBuyerDefense, bestReusedLevel,
-             0, 0, 0, 0, 0, 0,
-             0.0, 0.0, na, na, 0.0, 0, 0.0, 0,
+             bestSupportBuyerDefense, bestNearEmaSupport,
+             bestReusedLevel,
+             0, 0, 0, 0, 0, 0, 0,
+             0.0, 0.0, na, 0.0, na, 0.0, 0, 0.0, 0,
              breakdownVolumeExpansion, breakdownBodyRangePct,
-             breakdownCloseFromLowPct, false)
+             breakdownCloseFromLowPct, 0, 0,
+             candidateFailedExpansionOrigin,
+             candidateFailedExpansionHigh, false)
         array.push(candidates, newCandidate)
 
-if nestedEvidenceSignal and showNestedEvidenceLines and
+// PARITY_DETECTION_END
+
+if nestedEvidenceSignal and not entrySignal and
+     showNestedEvidenceLines and
      not na(detectedNestedSupportStartBar) and
      not na(detectedNestedFlipLevel)
     line nestedSupportFlipLine = line.new(
@@ -1616,25 +3394,25 @@ if entrySignal and showResistanceLines
     if array.size(savedResistanceLines) > maximumSavedSignals
         line.delete(array.shift(savedResistanceLines))
 
-bool normalEntrySignal =
+bool highQualityEntrySignal =
      entrySignal and
-     signalBehaviorQualityScore < highQualityScoreThreshold and
+     signalBehaviorQualityScore >= highQualityScoreThreshold and
+     not na(signalCombinedConfidenceScore) and
+     signalCombinedConfidenceScore >= highConfidenceCombinedScore
+bool normalEntrySignal =
+     entrySignal and not highQualityEntrySignal and
      signalResistanceStageBars <= normalResistanceStageBars
 bool extendedEntrySignal =
-     entrySignal and
-     signalBehaviorQualityScore < highQualityScoreThreshold and
+     entrySignal and not highQualityEntrySignal and
      signalResistanceStageBars > normalResistanceStageBars and
      signalResistanceStageBars <= longResistanceStageBars
 bool longEntrySignal =
-     entrySignal and
-     signalBehaviorQualityScore < highQualityScoreThreshold and
+     entrySignal and not highQualityEntrySignal and
      signalResistanceStageBars > longResistanceStageBars
-bool highQualityEntrySignal =
-     entrySignal and
-     signalBehaviorQualityScore >= highQualityScoreThreshold
 
 plotshape(
-     nestedEvidenceSignal and showNestedEvidenceMarkers,
+     nestedEvidenceSignal and not entrySignal and
+          showNestedEvidenceMarkers,
      title = "Nested Reclaim Evidence Marker",
      style = shape.labelup, location = location.belowbar,
      color = nestedEvidenceColor, text = "SETUP",
@@ -1659,6 +3437,9 @@ plotshape(
      style = shape.labelup, location = location.belowbar,
      color = entryColor, text = "ENTRY\nQUALITY", textcolor = color.white,
      size = size.small)
+plot(
+     VALIDATION_BUILD_ID, title = "Validation Build ID",
+     display = display.data_window)
 plot(
      entrySignal ? 1.0 : 0.0, title = "Strong Reclaim Entry",
      display = display.data_window)
@@ -1741,6 +3522,57 @@ plot(
      title = "Entry Gap Above EMA20 (%)",
      display = display.data_window)
 plot(
+     entrySignal ? signalExpansionStartBar : na,
+     title = "Expansion Start Bar Index", display = display.data_window)
+plot(
+     entrySignal ? signalExpansionBars : na,
+     title = "Full Expansion Bars", display = display.data_window)
+plot(
+     entrySignal ? signalExpansionGainPct : na,
+     title = "Full Expansion Gain (%)", display = display.data_window)
+plot(
+     entrySignal ? signalExpansionEfficiencyPct : na,
+     title = "Expansion Directional Efficiency (%)",
+     display = display.data_window)
+plot(
+     entrySignal ? signalExpansionDrawdownPct : na,
+     title = "Expansion Maximum Drawdown (%)",
+     display = display.data_window)
+plot(
+     entrySignal ? signalExpansionBullVolumeRatio : na,
+     title = "Expansion Bull Volume / Average",
+     display = display.data_window)
+plot(
+     entrySignal ? signalExpansionBullVolumeSharePct : na,
+     title = "Expansion Bull Volume Share (%)",
+     display = display.data_window)
+plot(
+     entrySignal ? signalExpansionStrengthScore : na,
+     title = "Expansion Strength Score (0-5)",
+     display = display.data_window)
+plot(
+     entrySignal ? signalSupportToEntryBars : na,
+     title = "Support To Entry Bars", display = display.data_window)
+plot(
+     entrySignal ? (signalCloseToExpansion ? 1.0 : 0.0) : na,
+     title = "Entry Is Close To Expansion", display = display.data_window)
+plot(
+     entrySignal ? signalEntryVolumeVsPrevious : na,
+     title = "Entry Volume vs Previous Bar",
+     display = display.data_window)
+plot(
+     entrySignal ? signalEntryRangeVsPriorThree : na,
+     title = "Entry Range vs Prior 3 Bars",
+     display = display.data_window)
+plot(
+     entrySignal ? signalEntryConfirmationScore : na,
+     title = "Entry Confirmation Score (0-5)",
+     display = display.data_window)
+plot(
+     entrySignal ? signalCombinedConfidenceScore : na,
+     title = "Combined Confidence Score (0-11)",
+     display = display.data_window)
+plot(
      entrySignal ? (signalHasRecentExpansionEvidence ? 1.0 : 0.0) : na,
      title = "Entry Has Recent Expansion Evidence",
      display = display.data_window)
@@ -1767,10 +3599,11 @@ plot(
 
 alertcondition(
      highQualityEntrySignal, title = "High Quality Reclaim Entry",
-     message = "High-quality support-break-resistance-reclaim entry on {{ticker}} at {{close}}.")
+     message = "High-confidence expansion and support-break-resistance-reclaim entry on {{ticker}} at {{close}}.")
 alertcondition(
      entrySignal, title = "Strong Reclaim Entry",
      message = "Confirmed support-break-resistance-reclaim entry on {{ticker}} at {{close}}.")
 alertcondition(
-     nestedEvidenceSignal, title = "Nested Reclaim Evidence",
+     nestedEvidenceSignal and not entrySignal,
+     title = "Nested Reclaim Evidence",
      message = "Lower resistance reclaimed on {{ticker}} at {{close}}, but a higher active resistance remains. This is setup evidence, not an entry.")

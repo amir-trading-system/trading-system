@@ -660,7 +660,7 @@ class GraphCreator:
 
 
 if __name__ == '__main__':
-    FILE_PATH = "model/training/data/PMAX-2026-05-06 10:18:00.json"
+    FILE_PATH = "model/training/data/next_training/WETO-2026-08-17 08:20:00.json"
     with open(FILE_PATH, "rb") as f:
         obj = pickle.load(f)
         stock: common.objects.Stock = obj["day_timeframe_stock"]
